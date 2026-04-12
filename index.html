@@ -2935,14 +2935,22 @@ function buildReviewPrompt(w){
     var sum=0;historyData.forEach(function(h){if(h.wk!==w.wk)sum+=h.cf;});
     histAvg=Math.round(sum/(historyData.length-1));
   }
-  return 'You are a sharp, no-nonsense manager reviewing weekly performance. Speak in about 100 words. Be authoritative, direct, controlled, slightly intense. No filler. Sound like someone responsible for results. Cover what was done well and what wasnt.\n\n'
+  return 'You are a sharp, no-nonsense manager reviewing weekly performance.\n\n'
+    +'OUTPUT RULES — THIS IS FOR TEXT-TO-SPEECH. Your output will be read aloud by a voice engine.\n'
+    +'- Write EXACTLY 100 words of clean flowing prose. No more, no less.\n'
+    +'- NO timestamps, NO speaker labels, NO markdown, NO bullet points, NO asterisks, NO special characters.\n'
+    +'- NO URLs, NO code, NO brackets, NO parentheses with annotations.\n'
+    +'- Convert all numbers for speech: $1,200 becomes "twelve hundred dollars". 50% becomes "fifty percent". 6hr becomes "six hours".\n'
+    +'- NO filler words (uh, um, you know). NO stutters. NO repeated words.\n'
+    +'- Write in complete, clean sentences. Flowing prose only. No lists.\n'
+    +'- Be authoritative, direct, controlled, slightly intense. Sound like someone responsible for results.\n\n'
     +'WEEK '+w.wk+' ('+w.range+'):\n'
     +'Total Earnings: $'+w.earn+' | Total Spending: $'+w.spend+' | Cashflow: $'+w.cf+' | Running Balance: $'+w.run+'\n'
     +'Strong days (cf>$100): '+strongDays+' | Weak days: '+weakDays+' | Negative days: '+negDays+'\n'
     +'Ability hours: '+Math.round(abilityH)+' | Prestige hours: '+Math.round(prestigeH)+' | OT hours used: '+Math.round(totalOT)+'\n'
     +'Historical avg weekly cf: $'+histAvg+'\n'
     +'Day breakdown:\n'+dayBreakdown.join('\n')+'\n\n'
-    +'Give the review. Start with a one-sentence snapshot. Then performance. Then identify the driver (Ability or Prestige). Call out the worst day or pattern. Explain how many 6-hour OT shifts would improve things. Give direction on what to increase/decrease. End with a forward-looking statement about next week. Be specific with numbers.';
+    +'Give the review. Start with a one-sentence snapshot of how the week went. Then cover performance — what was done well and what was not. Identify whether Ability or Prestige carried the week. Call out the worst day or spending pattern specifically. State how many six-hour overtime shifts would fix or improve things. Give direction on what to increase and decrease. End with one forward-looking sentence about next week if they execute. Be specific with the actual numbers from the data above.';
 }
 
 function generateVoiceReview(histIdx){
@@ -2960,15 +2968,17 @@ function generateVoiceReview(histIdx){
   .then(function(data){
     var txt=(data.content&&data.content[0]&&data.content[0].text)||'';
     if(!txt){showToast('Review generation failed');return;}
+    // Clean text for TTS — strip any artifacts
+    txt=txt.replace(/\*+/g,'').replace(/#+/g,'').replace(/\[.*?\]/g,'').replace(/\(.*?\)/g,'').replace(/https?:\/\/\S+/g,'').replace(/\n+/g,' ').replace(/\s{2,}/g,' ').trim();
     w.reviewText=txt;
     // Step 2: Convert to speech via ElevenLabs
     return fetch('https://api.elevenlabs.io/v1/text-to-speech/'+ELEVEN_VOICE,{
       method:'POST',
-      headers:{'xi-api-key':ELEVEN_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({text:txt,model_id:'eleven_monolingual_v1',voice_settings:{stability:0.6,similarity_boost:0.8}})
+      headers:{'xi-api-key':ELEVEN_KEY,'Content-Type':'application/json','Accept':'audio/mpeg'},
+      body:JSON.stringify({text:txt,model_id:'eleven_multilingual_v2',voice_settings:{stability:0.6,similarity_boost:0.8}})
     });
   })
-  .then(function(r){if(!r||!r.ok)throw new Error('TTS failed');return r.blob();})
+  .then(function(r){if(!r||!r.ok){return r.text().then(function(t){throw new Error('TTS '+r.status+': '+t);});}return r.blob();})
   .then(function(blob){
     var reader=new FileReader();
     reader.onloadend=function(){
