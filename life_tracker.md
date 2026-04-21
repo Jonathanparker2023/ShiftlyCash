@@ -15,6 +15,10 @@
   - One task at a time, not dumps
   - Nudge only when deadlines actually slip (no daily check-ins)
   - Personal projects + workouts land on days off between shifts
+- **Response format (standing order, 2026-04-21):**
+  - Every response is also written to a PDF in `responses/`
+  - Include any links/resources inside the PDF
+  - Tool: `python3 scripts/make_response_pdf.py "<slug>" < response.txt`
 
 ---
 
