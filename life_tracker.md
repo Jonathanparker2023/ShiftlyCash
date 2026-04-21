@@ -45,6 +45,14 @@ Shift status: TBD (may or may not pick up). If no shift → free day for persona
    - Mode: info-gathering only, not booking an appointment.
    - **Status:** open-ended research.
 
+4. **Locs — find a loctician (new project, 2026-04-21)**
+   - Locs are **instant locs** (crocheted), not naturally developed.
+   - Problem: bulges / inconsistent shape at odd places; they're "coming out of form."
+   - **Goal:** find an expert who can assess whether they can be fixed, and fix them if possible.
+   - **Fallback:** if they can't be fixed — [pending: user was cut off mid-thought, need to capture backup plan].
+   - Related to: Scalp health project (same domain — treat as linked).
+   - **Status:** open — need to source locticians, ideally Danbury / Fairfield County area.
+
 ---
 
 ## Side Projects (self-managed — track progress, don't over-coach)
@@ -77,3 +85,5 @@ Shift status: TBD (may or may not pick up). If no shift → free day for persona
 ## Log
 
 - **2026-04-21** — Tracker created. Logged today's active items, side projects, operator profile.
+- **2026-04-21** — Added PDF response workflow (responses/ + scripts/make_response_pdf.py).
+- **2026-04-21** — New project: find a loctician to fix instant-loc bulges. Fallback plan TBC (user cut off).
