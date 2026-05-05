@@ -1434,7 +1434,7 @@ function shiftDotClass(jobType: JobType): string {
 
 function payTypeBadgeClass(payType: PayType | null | undefined): string {
   if (payType === "overtime") {
-    return "rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#15803d]";
+    return "rounded-full bg-[#22c55e] px-2 py-0.5 text-[10px] font-bold uppercase text-white";
   }
 
   return "rounded-full bg-[#dbeafe] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#1d4ed8]";
