@@ -877,7 +877,7 @@ function FocusedDayEditor({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_1fr_1fr]">
+      <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
         <ShiftList
           day={day}
           expandedSlotIndex={expandedSlotIndex}
@@ -958,7 +958,7 @@ function TransactionDrawer({
         </div>
       ) : null}
 
-      <div className="grid max-h-72 gap-3 overflow-y-auto pr-1">
+      <div className="grid gap-3 lg:grid-cols-2">
         <TransactionColumn
           emptyText="No applied spending for this day."
           heading="SPENDING"
@@ -1052,7 +1052,7 @@ function TransactionColumn({
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
   return (
-    <div className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3">
+    <div className="min-h-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155]">
           {heading}
@@ -1062,7 +1062,7 @@ function TransactionColumn({
         </span>
       </div>
 
-      <div className="space-y-2">
+      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
         {transactions.length > 0 ? (
           transactions.map((transaction) => (
             <TransactionRowButton
@@ -1327,9 +1327,13 @@ function TotalsPanel({
       <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155]">
         Totals
       </h3>
-      <div className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3 text-sm">
+      <div className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-2.5 text-sm">
         <TotalLine label="Earnings" value={formatMoney(earningsCents)} />
-        <TotalLine label="- Spend" value={formatMoney(spendCents)} />
+        <TotalLine
+          label="- Spend"
+          tone="negative"
+          value={formatMoney(spendCents)}
+        />
         <TotalLine label="- Base" value={formatMoney(baseCents)} />
         <div className="my-2 border-t border-[#cbd5e1]" />
         <TotalLine
