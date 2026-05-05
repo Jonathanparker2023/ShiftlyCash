@@ -104,7 +104,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     (async () => {
       try {
         const result = await syncTransactionsAction();
-        if (!cancelled && (result.added > 0 || result.modified > 0)) {
+        if (
+          !cancelled &&
+          (result.added > 0 || result.modified > 0 || result.normalized > 0)
+        ) {
           router.refresh();
         }
       } catch {
