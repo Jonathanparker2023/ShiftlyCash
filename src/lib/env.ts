@@ -17,6 +17,20 @@ export function getSupabasePublicEnv(): SupabasePublicEnv {
   return { supabaseUrl, supabasePublishableKey };
 }
 
+export function getSupabaseServiceRoleKey(): string {
+  const key = getOptionalSupabaseServiceRoleKey();
+
+  if (!key) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  return key;
+}
+
+export function getOptionalSupabaseServiceRoleKey(): string | null {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? null;
+}
+
 export function getSiteUrl(): string {
   const rawUrl =
     process.env.NEXT_PUBLIC_SITE_URL ??

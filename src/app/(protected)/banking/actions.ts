@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import type { Transaction } from "plaid";
 
 import { requireUser } from "@/lib/auth";
-import { getPlaidServerEnv } from "@/lib/env";
+import { getOptionalSupabaseServiceRoleKey, getPlaidServerEnv } from "@/lib/env";
 import { getPlaidClient, toPlaidCountryCodes, toPlaidProducts } from "@/lib/plaid/client";
 import { decryptAccessToken, encryptAccessToken } from "@/lib/plaid/crypto";
 import { isPlaidLoginRequiredError } from "@/lib/plaid/errors";
-import { isLegacyExempt, normalizeTxName } from "@/lib/domain/legacyRules";
+import { resolveMerchantName } from "@/lib/domain/merchant-ai";
+import { isLegacyExempt } from "@/lib/domain/legacyRules";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type CreateLinkTokenResult = {
   ok: true;
@@ -127,6 +129,9 @@ export async function exchangePublicTokenAction(
 
 export async function syncTransactionsAction(): Promise<SyncTransactionsResult> {
   const { supabase, user } = await requireUser();
+  const merchantCacheClient = getOptionalSupabaseServiceRoleKey()
+    ? createAdminClient()
+    : supabase;
   const config = getPlaidServerEnv();
   const [
     { data, error },
@@ -244,8 +249,17 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
     const isBeforeActiveWeek =
       Boolean(activeWeekStartDate) && transaction.date < activeWeekStartDate!;
     const rawName = transaction.original_description ?? transaction.name;
-    const merchantName = normalizeTxName(
+    const existingTransaction = await findExistingPlaidTransaction(
+      transaction.transaction_id,
+    );
+
+    if (existingTransaction?.status === "excluded") {
+      return;
+    }
+
+    const merchantName = await resolveMerchantName(
       transaction.merchant_name ?? transaction.name,
+      merchantCacheClient,
     );
     const category = formatCategory(transaction);
     const isIncome = transaction.amount <= 0;
@@ -273,14 +287,6 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
       : matchesLegacyRule
         ? "Auto-excluded by legacy rule (subscription/recurring/insurance/etc.)."
         : null;
-    const existingTransaction = await findExistingPlaidTransaction(
-      transaction.transaction_id,
-    );
-
-    if (existingTransaction?.status === "excluded") {
-      return;
-    }
-
     const row = {
       plaid_item_id: plaidItemId,
       source: "plaid",
