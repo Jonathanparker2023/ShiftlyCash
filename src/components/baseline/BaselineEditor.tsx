@@ -304,14 +304,18 @@ function ExpenseRow({
   onUpdate: (id: string, patch: Partial<BaselineExpense>) => void;
   onDelete: (id: string) => void;
 }) {
+  const hasDatedExpiration = Boolean(expense.expirationDate);
+  const isDatedActive = hasDatedExpiration && !expired;
+  const rowClassName = [
+    "grid gap-3 px-4 py-4 transition md:grid-cols-[minmax(180px,1fr)_150px_160px_90px_88px] md:items-center",
+    expired ? "opacity-50" : "",
+    isDatedActive ? "bg-amber-50/80 ring-1 ring-inset ring-amber-300" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      className={
-        expired
-          ? "grid gap-3 px-4 py-4 opacity-50 md:grid-cols-[minmax(180px,1fr)_150px_160px_90px_88px] md:items-center"
-          : "grid gap-3 px-4 py-4 md:grid-cols-[minmax(180px,1fr)_150px_160px_90px_88px] md:items-center"
-      }
-    >
+    <div className={rowClassName}>
       <label className="block">
         <MobileLabel>Name</MobileLabel>
         <div className="flex items-center gap-2">
@@ -325,6 +329,7 @@ function ExpenseRow({
             value={expense.name}
           />
           {expired ? <ExpiredBadge /> : null}
+          {isDatedActive ? <ExpiresBadge /> : null}
         </div>
       </label>
 
@@ -349,7 +354,11 @@ function ExpenseRow({
       <label className="block">
         <MobileLabel>Expiration</MobileLabel>
         <input
-          className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm"
+          className={
+            isDatedActive
+              ? "h-10 w-full rounded-md border border-amber-400 bg-amber-50 px-3 text-sm text-amber-950"
+              : "h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm"
+          }
           onChange={(event) =>
             onUpdate(expense.id, {
               expirationDate: event.target.value || null,
@@ -396,6 +405,14 @@ function ExpiredBadge() {
   return (
     <span className="rounded-full border border-zinc-300 bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600">
       Expired
+    </span>
+  );
+}
+
+function ExpiresBadge() {
+  return (
+    <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+      Expires
     </span>
   );
 }
