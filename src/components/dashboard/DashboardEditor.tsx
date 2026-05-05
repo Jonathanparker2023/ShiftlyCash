@@ -784,14 +784,6 @@ function WeekStripCell({
   totals: ReturnType<typeof calculateDayTotals> | undefined;
   onFocus: (dayIndex: number) => void;
 }) {
-  const shiftCount = day.slots.filter((slot) => slot.jobType !== "none").length;
-  const totalHours = day.slots.reduce((total, slot) => {
-    if (slot.jobType === "none") {
-      return total;
-    }
-
-    return total + slot.hoursOrUnits;
-  }, 0);
   const cashflowCents = totals?.cashflowCents ?? 0;
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
 
@@ -827,10 +819,7 @@ function WeekStripCell({
           </span>
         ) : null}
       </div>
-      <p className="mt-2 text-xs font-medium text-[#475569]">
-        {formatShiftCount(shiftCount)} - {formatPlainHours(totalHours)}h
-      </p>
-      <p className={`mt-2 text-sm font-semibold ${cashflowDailyColor(displayCashflowCents)}`}>
+      <p className={`mt-6 text-sm font-semibold ${cashflowDailyColor(displayCashflowCents)}`}>
         {formatMoney(displayCashflowCents)}
       </p>
     </button>
@@ -887,12 +876,6 @@ function FocusedDayEditor({
   onPrevious: () => void;
   onNext: () => void;
 }) {
-  const activeSlots = day.slots.filter((slot) => slot.jobType !== "none");
-  const totalHours = activeSlots.reduce(
-    (total, slot) => total + slot.hoursOrUnits,
-    0,
-  );
-
   return (
     <section className="mt-4 rounded-lg border border-[#d7dee8] bg-white p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -903,9 +886,6 @@ function FocusedDayEditor({
           <h2 className="min-w-0 text-lg font-semibold sm:text-xl">
             {formatLongDate(day.date)}
           </h2>
-          <span className="rounded-full border border-[#d7dee8] bg-[#e8eef6] px-3 py-1 text-xs font-medium text-[#334155]">
-            {formatShiftCount(activeSlots.length)} - {formatPlainHours(totalHours)}h
-          </span>
           {day.spendLocked ? (
             <span className="rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-semibold text-[#c2410c]">
               Locked
@@ -1206,10 +1186,6 @@ function ShiftList({
 }) {
   const [draggedSlotIndex, setDraggedSlotIndex] = useState<number | null>(null);
   const activeSlots = day.slots.filter((slot) => slot.jobType !== "none");
-  const totalHours = activeSlots.reduce(
-    (total, slot) => total + slot.hoursOrUnits,
-    0,
-  );
 
   function handleDrop(targetSlotIndex: number) {
     if (draggedSlotIndex === null || draggedSlotIndex === targetSlotIndex) {
@@ -1227,9 +1203,6 @@ function ShiftList({
         <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155]">
           Shifts
         </h3>
-        <span className="text-xs font-medium text-[#64748b]">
-          {formatPlainHours(totalHours)}h total
-        </span>
       </div>
       <div className="space-y-2">
         {activeSlots.length > 0 ? (
@@ -1760,10 +1733,6 @@ function formatHoursFromSlots(days: DashboardDay[], jobType: JobType): string {
 
 function formatPlainHours(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
-
-function formatShiftCount(value: number): string {
-  return `${value} ${value === 1 ? "shift" : "shifts"}`;
 }
 
 function capitalize(value: string): string {
