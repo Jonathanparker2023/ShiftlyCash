@@ -1,26 +1,190 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #101827;
+  --foreground: #f8fafc;
+  --shift-bg: #101827;
+  --shift-bg-deep: #0b1220;
+  --shift-panel: #f8fafc;
+  --shift-panel-soft: #e8eef6;
+  --shift-border: #d7dee8;
+  --shift-border-strong: #cbd5e1;
+  --shift-ink: #0f172a;
+  --shift-ink-soft: #334155;
+  --shift-muted: #64748b;
+  --shift-teal: #0e7490;
+  --shift-teal-soft: #e0f2fe;
+  --shift-orange: #c2410c;
+  --shift-orange-soft: #fff7ed;
+  --shift-purple: #7e22ce;
+  --shift-purple-soft: #f3e8ff;
+  --shift-danger: #b91c1c;
+  --shift-danger-soft: #fff1f2;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(14, 116, 144, 0.32);
+}
+
+/*
+  App-wide palette bridge.
+  Most early screens were built with Tailwind neutrals. These overrides pull
+  them into the ShiftlyCash navy/off-white/teal/orange system without forcing
+  every feature file to carry a wall of arbitrary color classes.
+*/
+.bg-zinc-50 {
+  background-color: var(--shift-bg) !important;
+}
+
+.min-h-screen.bg-zinc-50.text-zinc-950,
+.min-h-screen.bg-background {
+  color: var(--foreground) !important;
+}
+
+.bg-white {
+  background-color: var(--shift-panel) !important;
+  color: var(--shift-ink);
+}
+
+.bg-zinc-100 {
+  background-color: var(--shift-panel-soft) !important;
+}
+
+.bg-zinc-200 {
+  background-color: var(--shift-border) !important;
+}
+
+.bg-zinc-950 {
+  background-color: var(--shift-ink) !important;
+}
+
+.hover\:bg-zinc-800:hover {
+  background-color: #1e293b !important;
+}
+
+.border-zinc-100 {
+  border-color: #e2e8f0 !important;
+}
+
+.border-zinc-200 {
+  border-color: var(--shift-border) !important;
+}
+
+.border-zinc-300 {
+  border-color: var(--shift-border-strong) !important;
+}
+
+.hover\:border-zinc-950:hover,
+.focus\:border-zinc-950:focus {
+  border-color: var(--shift-ink) !important;
+}
+
+.text-zinc-950 {
+  color: var(--shift-ink) !important;
+}
+
+.text-zinc-700 {
+  color: var(--shift-ink-soft) !important;
+}
+
+.text-zinc-600 {
+  color: #475569 !important;
+}
+
+.text-zinc-500,
+.text-zinc-400 {
+  color: var(--shift-muted) !important;
+}
+
+.hover\:text-zinc-950:hover {
+  color: var(--shift-ink) !important;
+}
+
+.hover\:text-zinc-600:hover {
+  color: #475569 !important;
+}
+
+.bg-emerald-50,
+.bg-emerald-100 {
+  background-color: var(--shift-teal-soft) !important;
+}
+
+.border-emerald-200 {
+  border-color: #bae6fd !important;
+}
+
+.text-emerald-600,
+.text-emerald-700,
+.text-emerald-800 {
+  color: var(--shift-teal) !important;
+}
+
+.bg-amber-50,
+.bg-amber-100 {
+  background-color: var(--shift-orange-soft) !important;
+}
+
+.border-amber-200,
+.border-amber-300 {
+  border-color: #fed7aa !important;
+}
+
+.text-amber-600,
+.text-amber-700,
+.text-amber-950 {
+  color: var(--shift-orange) !important;
+}
+
+.bg-red-50,
+.bg-red-100 {
+  background-color: var(--shift-danger-soft) !important;
+}
+
+.border-red-200 {
+  border-color: #fecaca !important;
+}
+
+.text-red-600,
+.text-red-700,
+.text-red-800 {
+  color: var(--shift-danger) !important;
+}
+
+.hover\:border-red-700:hover {
+  border-color: var(--shift-danger) !important;
+}
+
+.hover\:text-red-700:hover {
+  color: var(--shift-danger) !important;
+}
+
+.bg-violet-50,
+.bg-purple-50 {
+  background-color: var(--shift-purple-soft) !important;
+}
+
+.text-violet-700,
+.text-purple-700 {
+  color: var(--shift-purple) !important;
+}
+
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
