@@ -94,21 +94,38 @@ describe("merchant AI normalization", () => {
     expect(supabase.upsert).not.toHaveBeenCalled();
   });
 
-  it("refreshes ugly cached names when explicitly requested", async () => {
-    createMock.mockResolvedValueOnce({
-      content: [{ type: "text", text: "Perplexity" }],
-    });
-    const supabase = createSupabaseStub({ cachedName: "Www Perplexity Ai" });
+  it("keeps Perplexity deterministic without calling Anthropic", async () => {
+    const supabase = createSupabaseStub({});
 
     await expect(
       resolveMerchantName("www.perplexity.ai", supabase.client as never, {
         refreshUglyCache: true,
       }),
     ).resolves.toBe("Perplexity");
-    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(createMock).not.toHaveBeenCalled();
     expect(supabase.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         display_name: "Perplexity",
+        source: "rule",
+      }),
+    );
+  });
+
+  it("refreshes ugly cached names when explicitly requested", async () => {
+    createMock.mockResolvedValueOnce({
+      content: [{ type: "text", text: "Clean Merchant" }],
+    });
+    const supabase = createSupabaseStub({ cachedName: "Www Strange Domain Ai" });
+
+    await expect(
+      resolveMerchantName("www.strangedomain.ai", supabase.client as never, {
+        refreshUglyCache: true,
+      }),
+    ).resolves.toBe("Clean Merchant");
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(supabase.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        display_name: "Clean Merchant",
         source: "ai",
       }),
     );
@@ -116,18 +133,18 @@ describe("merchant AI normalization", () => {
 
   it("uses Haiku for ugly uncached names and writes the cache", async () => {
     createMock.mockResolvedValueOnce({
-      content: [{ type: "text", text: "Perplexity" }],
+      content: [{ type: "text", text: "Clean Merchant" }],
     });
     const supabase = createSupabaseStub({});
 
     await expect(
-      resolveMerchantName("www.perplexity.ai", supabase.client as never),
-    ).resolves.toBe("Perplexity");
+      resolveMerchantName("www.strangedomain.ai", supabase.client as never),
+    ).resolves.toBe("Clean Merchant");
     expect(createMock).toHaveBeenCalledTimes(1);
     expect(supabase.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        raw_key: "wwwperplexityai",
-        display_name: "Perplexity",
+        raw_key: "wwwstrangedomainai",
+        display_name: "Clean Merchant",
         source: "ai",
         ai_model: "claude-haiku-4-5",
       }),
@@ -162,6 +179,6 @@ describe("merchant AI normalization", () => {
   it("returns null on Anthropic errors", async () => {
     createMock.mockRejectedValueOnce(new Error("rate limited"));
 
-    await expect(aiCleanupName("www.perplexity.ai")).resolves.toBeNull();
+    await expect(aiCleanupName("www.strangedomain.ai")).resolves.toBeNull();
   });
 });

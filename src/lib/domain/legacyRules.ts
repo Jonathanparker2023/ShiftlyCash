@@ -152,6 +152,7 @@ export const MERCHANT_MAP: ReadonlyArray<readonly [string, string]> = [
   ["nintendo", "Nintendo"],
   ["dropbox", "Dropbox"],
   ["adobe", "Adobe"],
+  ["perplexity", "Perplexity"],
   ["openai", "OpenAI"],
   ["chatgpt", "ChatGPT"],
   ["anthropic", "Anthropic"],

@@ -6,6 +6,7 @@ import {
   cashflowDailyTone,
   cashflowWeeklyColor,
   cashflowWeeklyTone,
+  normalizeTxName,
 } from "./legacyRules";
 
 describe("legacy cashflow color tiers", () => {
@@ -77,5 +78,12 @@ describe("legacy cashflow color tiers", () => {
       expect(cashflowColorFromTone("amber")).toBe("text-amber-500");
       expect(cashflowColorFromTone("negative")).toBe("text-red-600");
     });
+  });
+});
+
+describe("legacy merchant normalization", () => {
+  it("normalizes Perplexity domain charges deterministically", () => {
+    expect(normalizeTxName("www.perplexity.ai")).toBe("Perplexity");
+    expect(normalizeTxName("Www.perplexity.ai")).toBe("Perplexity");
   });
 });
