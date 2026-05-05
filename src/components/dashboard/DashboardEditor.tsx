@@ -1249,8 +1249,15 @@ function ShiftRow({
             {slot.payType === "overtime" ? "OT" : "Reg"}
           </span>
         </span>
-        <span className="flex items-center gap-2 text-sm text-[#475569]">
-          {formatPlainHours(slot.hoursOrUnits)}h {expanded ? "^" : ">"}
+        <span className="flex min-w-0 items-center gap-2 text-sm text-[#475569]">
+          {slot.label ? (
+            <span className="max-w-[180px] truncate text-xs font-semibold text-[#64748b]">
+              {slot.label}
+            </span>
+          ) : null}
+          <span className="shrink-0">
+            {formatPlainHours(slot.hoursOrUnits)}h {expanded ? "^" : ">"}
+          </span>
         </span>
       </button>
 

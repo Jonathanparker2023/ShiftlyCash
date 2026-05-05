@@ -45,9 +45,9 @@ export default async function ProtectedLayout({
               <div className="flex w-max min-w-full items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] p-1">
                 <NavLink href="/">Dashboard</NavLink>
                 <NavLink href="/baseline">Baseline</NavLink>
+                <NavLink href="/history">History</NavLink>
                 <NavLink href="/debt">Debt</NavLink>
                 <NavLink href="/net-worth">Net Worth</NavLink>
-                <NavLink href="/history">History</NavLink>
                 <NavLink href="/banking">Banking</NavLink>
                 <NavLink href="/settings/account">Account</NavLink>
                 <NavLink href="/settings/template">Settings</NavLink>
