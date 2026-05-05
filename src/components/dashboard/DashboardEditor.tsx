@@ -23,11 +23,13 @@ import type {
 } from "@/lib/dashboard/types";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
 import {
+  calculateEarnSlot,
   calculateDayTotals,
   calculateWeekTotals,
   getPayPeriodInfo,
   type JobType,
   type PayType,
+  type PaySettings,
 } from "@/lib/domain/pay";
 import {
   cashflowColorFromTone,
@@ -627,6 +629,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               expandedSlotIndex={expandedSlotIndex}
               isManualTransactionPending={pendingManualDayIds.has(focusedDay.id)}
               pendingTransactionIds={pendingTransactionIds}
+              settings={initialData.settings}
               transactionError={transactionError}
               totals={focusedDayTotals}
               onAddShift={addShift}
@@ -836,6 +839,7 @@ function FocusedDayEditor({
   expandedSlotIndex,
   isManualTransactionPending,
   pendingTransactionIds,
+  settings,
   transactionError,
   onSlotChange,
   onToggleSlot,
@@ -853,6 +857,7 @@ function FocusedDayEditor({
   expandedSlotIndex: number | null;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
+  settings: PaySettings;
   transactionError: string | null;
   onSlotChange: (
     dayId: string,
@@ -917,6 +922,7 @@ function FocusedDayEditor({
         <ShiftList
           day={day}
           expandedSlotIndex={expandedSlotIndex}
+          settings={settings}
           onAddShift={onAddShift}
           onRemoveSlot={onRemoveSlot}
           onReorderSlots={onReorderSlots}
@@ -1165,6 +1171,7 @@ function TransactionRowButton({
 function ShiftList({
   day,
   expandedSlotIndex,
+  settings,
   onSlotChange,
   onToggleSlot,
   onAddShift,
@@ -1173,6 +1180,7 @@ function ShiftList({
 }: {
   day: DashboardDay;
   expandedSlotIndex: number | null;
+  settings: PaySettings;
   onSlotChange: (
     dayId: string,
     slotIndex: number,
@@ -1215,6 +1223,7 @@ function ShiftList({
               isDragging={draggedSlotIndex === slot.slotIndex}
               key={`${slot.dayId}-${slot.slotIndex}`}
               locked={day.spendLocked}
+              settings={settings}
               slot={slot}
               onDragEnd={() => setDraggedSlotIndex(null)}
               onDragOver={(event) => event.preventDefault()}
@@ -1248,6 +1257,7 @@ function ShiftRow({
   expanded,
   locked,
   isDragging,
+  settings,
   onToggle,
   onSlotChange,
   onRemove,
@@ -1260,6 +1270,7 @@ function ShiftRow({
   expanded: boolean;
   locked: boolean;
   isDragging: boolean;
+  settings: PaySettings;
   onToggle: () => void;
   onSlotChange: (
     dayId: string,
@@ -1313,11 +1324,7 @@ function ShiftRow({
           </span>
         ) : null}
         <span className="shrink-0 text-sm font-medium">
-          {slot.payType === "unit"
-            ? formatMoney(dollarsToCents(slot.hoursOrUnits))
-            : `${formatPlainHours(slot.hoursOrUnits)}h`}
-          {" "}
-          {expanded ? "^" : ">"}
+          {formatShiftBarValue(slot, settings)}
         </span>
       </button>
 
@@ -1746,6 +1753,21 @@ function formatHoursFromSlots(days: DashboardDay[], jobType: JobType): string {
 
 function formatPlainHours(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatShiftBarValue(
+  slot: DashboardSlot,
+  settings: PaySettings,
+): string {
+  if (slot.jobType === "incentive") {
+    return formatMoney(calculateEarnSlot(slot, settings).earningsCents);
+  }
+
+  if (slot.payType === "unit") {
+    return formatMoney(dollarsToCents(slot.hoursOrUnits));
+  }
+
+  return `${formatPlainHours(slot.hoursOrUnits)}h`;
 }
 
 function capitalize(value: string): string {
