@@ -1212,38 +1212,38 @@ function ShiftRow({
   ) => void;
   onRemove: (slot: DashboardSlot) => void;
 }) {
+  const rowClassName = [
+    "rounded-md border shadow-sm transition",
+    shiftBarClass(slot.jobType),
+    locked ? "opacity-60" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      className={
-        locked
-          ? "rounded-md border border-[#d7dee8] bg-[#e8eef6] opacity-60"
-          : "rounded-md border border-[#d7dee8] bg-white shadow-sm"
-      }
-    >
+    <div className={rowClassName}>
       <button
-        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+        className="relative flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left"
         disabled={locked}
         onClick={onToggle}
         type="button"
       >
         <span className="flex min-w-0 items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#0e7490] shadow-[0_0_0_3px_rgba(14,116,144,0.16)]" />
+          <span className={shiftDotClass(slot.jobType)} />
           <span className="truncate text-sm font-semibold">
             {capitalize(slot.jobType)}
           </span>
-          <span className="rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#0e7490]">
+          <span className={payTypeBadgeClass(slot.payType)}>
             {slot.payType === "overtime" ? "OT" : "Reg"}
           </span>
         </span>
-        <span className="flex min-w-0 items-center gap-2 text-sm text-[#475569]">
-          {slot.label ? (
-            <span className="max-w-[180px] truncate text-xs font-semibold text-[#64748b]">
-              {slot.label}
-            </span>
-          ) : null}
-          <span className="shrink-0">
-            {formatPlainHours(slot.hoursOrUnits)}h {expanded ? "^" : ">"}
+        {slot.label ? (
+          <span className="pointer-events-none absolute left-1/2 max-w-[38%] -translate-x-1/2 truncate px-2 text-center text-xs font-semibold">
+            {slot.label}
           </span>
+        ) : null}
+        <span className="shrink-0 text-sm font-medium">
+          {formatPlainHours(slot.hoursOrUnits)}h {expanded ? "^" : ">"}
         </span>
       </button>
 
@@ -1301,6 +1301,38 @@ function ShiftRow({
       ) : null}
     </div>
   );
+}
+
+function shiftBarClass(jobType: JobType): string {
+  if (jobType === "ability") {
+    return "border-[#172554] bg-[#0b1220] text-white";
+  }
+
+  if (jobType === "prestige") {
+    return "border-[#d97706] bg-[#facc15] text-[#1f2937]";
+  }
+
+  return "border-[#d7dee8] bg-white text-[#0f172a]";
+}
+
+function shiftDotClass(jobType: JobType): string {
+  if (jobType === "ability") {
+    return "h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]";
+  }
+
+  if (jobType === "prestige") {
+    return "h-2.5 w-2.5 rounded-full bg-[#92400e] shadow-[0_0_0_3px_rgba(146,64,14,0.16)]";
+  }
+
+  return "h-2.5 w-2.5 rounded-full bg-[#0e7490] shadow-[0_0_0_3px_rgba(14,116,144,0.16)]";
+}
+
+function payTypeBadgeClass(payType: PayType | null | undefined): string {
+  if (payType === "overtime") {
+    return "rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#15803d]";
+  }
+
+  return "rounded-full bg-[#dbeafe] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#1d4ed8]";
 }
 
 function TotalsPanel({
