@@ -1319,20 +1319,20 @@ function ShiftRow({
               {slot.payType === "overtime" ? "OT" : "Reg"}
             </span>
           ) : null}
+          {shiftQuantityLabel ? (
+            <span className="shrink-0 text-xs font-semibold opacity-90">
+              {shiftQuantityLabel}
+            </span>
+          ) : null}
         </span>
-        {slot.label || shiftAmountLabel ? (
-          <span className="pointer-events-none absolute left-1/2 flex max-w-[48%] -translate-x-1/2 items-center justify-center gap-1 truncate px-2 text-center text-xs font-semibold">
-            {slot.label ? (
-              <span className="truncate">{slot.label}</span>
-            ) : null}
-            {shiftAmountLabel ? (
-              <span className="shrink-0 opacity-90">{shiftAmountLabel}</span>
-            ) : null}
+        {slot.label ? (
+          <span className="pointer-events-none absolute left-1/2 max-w-[42%] -translate-x-1/2 truncate px-2 text-center text-xs font-semibold">
+            {slot.label}
           </span>
         ) : null}
-        {shiftQuantityLabel ? (
+        {shiftAmountLabel ? (
           <span className="shrink-0 text-sm font-medium">
-            {shiftQuantityLabel}
+            {shiftAmountLabel}
           </span>
         ) : null}
       </button>
