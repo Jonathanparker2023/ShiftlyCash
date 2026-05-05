@@ -1148,8 +1148,6 @@ function TransactionRowButton({
   variant: "spending" | "exempt";
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
-  const timeLabel = formatTransactionTime(transaction.time);
-
   return (
     <button
       className="grid w-full grid-cols-[1fr_auto] gap-3 rounded-md border border-transparent bg-white px-3 py-2 text-left text-sm shadow-sm transition hover:border-[#0e7490] hover:bg-[#eef4fb]"
@@ -1167,10 +1165,6 @@ function TransactionRowButton({
         >
           {transaction.merchantName}
         </span>
-        <span className="mt-1 flex items-center gap-1.5 text-xs text-[#64748b]">
-          {timeLabel ? <span>{timeLabel}</span> : null}
-          <SourceBadge source={transaction.source} />
-        </span>
       </span>
       <span
         className={
@@ -1182,16 +1176,6 @@ function TransactionRowButton({
         {formatMoney(transaction.amountCents)}
       </span>
     </button>
-  );
-}
-
-function SourceBadge({ source }: { source: DashboardTransaction["source"] }) {
-  const label = source === "plaid" ? "P" : source === "manual" ? "M" : "I";
-
-  return (
-    <span className="rounded-full border border-[#d7dee8] bg-[#f8fafc] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[#334155]">
-      {label}
-    </span>
   );
 }
 
@@ -1805,44 +1789,6 @@ function roundCashflowToNearestFiveDollars(value: number): number {
   const sign = value < 0 ? -1 : 1;
 
   return sign * Math.round(Math.abs(value) / incrementCents) * incrementCents;
-}
-
-function formatTransactionTime(value: string | null): string | null {
-  const rawTime = value?.trim();
-
-  if (!rawTime) {
-    return null;
-  }
-
-  const timestamp = Date.parse(rawTime);
-
-  if (Number.isFinite(timestamp)) {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date(timestamp));
-  }
-
-  const twelveHourMatch = rawTime.match(
-    /^(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])\.?m\.?$/i,
-  );
-
-  if (twelveHourMatch) {
-    return `${Number(twelveHourMatch[1])}:${twelveHourMatch[2]} ${twelveHourMatch[3].toUpperCase()}M`;
-  }
-
-  const twentyFourHourMatch = rawTime.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-
-  if (!twentyFourHourMatch) {
-    return rawTime;
-  }
-
-  const hours = Number(twentyFourHourMatch[1]);
-  const minutes = Number(twentyFourHourMatch[2]);
-  const period = hours >= 12 ? "PM" : "AM";
-  const displayHour = hours % 12 || 12;
-
-  return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
 function formatLongDate(value: string): string {
