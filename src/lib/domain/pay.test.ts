@@ -150,7 +150,7 @@ describe("pay calculations", () => {
       abilityOvertimeNetRateCents: 3_000,
       prestigeRegularNetRateCents: 1_000,
       prestigeOvertimeNetRateCents: 1_500,
-      incentiveNetMultiplier: 0.5,
+      abilityNetMultiplier: 0.5,
     };
 
     const totals = calculateDayTotals(

@@ -33,7 +33,7 @@ describe("projection math", () => {
         abilityOvertimeNetRateCents: 2173,
         prestigeRegularNetRateCents: 1428,
         prestigeOvertimeNetRateCents: 2142,
-        incentiveNetMultiplier: 0.7348,
+        abilityNetMultiplier: 0.7348,
       },
       withholding: {
         ability: 0.2652,

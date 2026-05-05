@@ -61,7 +61,7 @@ export async function getNetWorthData(): Promise<NetWorthPageData> {
     supabase
       .from("settings")
       .select(
-        "ability_withholding_rate, prestige_withholding_rate, incentive_withholding_rate, filing_fee, standard_deduction",
+        "ability_withholding_rate, prestige_withholding_rate, filing_fee, standard_deduction",
       )
       .eq("user_id", user.id)
       .maybeSingle(),
@@ -111,12 +111,13 @@ export async function getNetWorthData(): Promise<NetWorthPageData> {
       abilityOvertimeNetRateCents: 2173,
       prestigeRegularNetRateCents: 1428,
       prestigeOvertimeNetRateCents: 2142,
-      incentiveNetMultiplier: 0.7348,
+      abilityNetMultiplier:
+        1 - Number(settings?.ability_withholding_rate ?? 0.2652),
     },
     withholding: {
       ability: Number(settings?.ability_withholding_rate ?? 0.2652),
       prestige: Number(settings?.prestige_withholding_rate ?? 0.18),
-      incentive: Number(settings?.incentive_withholding_rate ?? 0.2652),
+      incentive: Number(settings?.ability_withholding_rate ?? 0.2652),
       filingFeeCents: dollarsToCents(Number(settings?.filing_fee ?? 160)),
       standardDeductionCents: dollarsToCents(
         Number(settings?.standard_deduction ?? 15000),

@@ -1298,9 +1298,11 @@ function ShiftRow({
           <span className="truncate text-sm font-semibold">
             {capitalize(slot.jobType)}
           </span>
-          <span className={payTypeBadgeClass(slot.payType)}>
-            {slot.payType === "overtime" ? "OT" : "Reg"}
-          </span>
+          {slot.payType === "regular" || slot.payType === "overtime" ? (
+            <span className={payTypeBadgeClass(slot.payType)}>
+              {slot.payType === "overtime" ? "OT" : "Reg"}
+            </span>
+          ) : null}
         </span>
         {slot.label ? (
           <span className="pointer-events-none absolute left-1/2 max-w-[38%] -translate-x-1/2 truncate px-2 text-center text-xs font-semibold">
@@ -1308,7 +1310,11 @@ function ShiftRow({
           </span>
         ) : null}
         <span className="shrink-0 text-sm font-medium">
-          {formatPlainHours(slot.hoursOrUnits)}h {expanded ? "^" : ">"}
+          {slot.payType === "unit"
+            ? formatMoney(dollarsToCents(slot.hoursOrUnits))
+            : `${formatPlainHours(slot.hoursOrUnits)}h`}
+          {" "}
+          {expanded ? "^" : ">"}
         </span>
       </button>
 
@@ -1324,18 +1330,22 @@ function ShiftRow({
               })
             }
           />
-          <SelectField
-            label="Type"
-            value={slot.payType ?? "none"}
-            values={PAY_OPTIONS}
-            onChange={(value) =>
-              onSlotChange(slot.dayId, slot.slotIndex, {
-                payType: value as PayType,
-              })
-            }
-          />
+          {slot.payType === "unit" ? (
+            <span aria-hidden className="hidden sm:block" />
+          ) : (
+            <SelectField
+              label="Type"
+              value={slot.payType ?? "none"}
+              values={PAY_OPTIONS}
+              onChange={(value) =>
+                onSlotChange(slot.dayId, slot.slotIndex, {
+                  payType: value as PayType,
+                })
+              }
+            />
+          )}
           <NumberField
-            label="Hours / units"
+            label={slot.payType === "unit" ? "Amount ($)" : "Hours / units"}
             value={slot.hoursOrUnits}
             onChange={(value) =>
               onSlotChange(slot.dayId, slot.slotIndex, {
@@ -1369,7 +1379,7 @@ function ShiftRow({
 }
 
 function shiftBarClass(jobType: JobType): string {
-  if (jobType === "ability") {
+  if (jobType === "ability" || jobType === "incentive") {
     return "border-[#1e3a8a] bg-[#1d4ed8] text-white";
   }
 
@@ -1381,7 +1391,7 @@ function shiftBarClass(jobType: JobType): string {
 }
 
 function shiftDotClass(jobType: JobType): string {
-  if (jobType === "ability") {
+  if (jobType === "ability" || jobType === "incentive") {
     return "h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]";
   }
 

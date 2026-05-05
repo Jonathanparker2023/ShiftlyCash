@@ -28,7 +28,7 @@ type SettingsRow = {
   ability_ot_net_rate: NumericValue;
   prestige_regular_net_rate: NumericValue;
   prestige_ot_net_rate: NumericValue;
-  incentive_net_multiplier: NumericValue;
+  ability_withholding_rate: NumericValue;
 };
 
 type WeekRow = {
@@ -143,7 +143,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabase
       .from("settings")
       .select(
-        "ability_regular_net_rate, ability_ot_net_rate, prestige_regular_net_rate, prestige_ot_net_rate, incentive_net_multiplier",
+        "ability_regular_net_rate, ability_ot_net_rate, prestige_regular_net_rate, prestige_ot_net_rate, ability_withholding_rate",
       )
       .single(),
     supabase
@@ -397,7 +397,7 @@ function mapPaySettings(row: SettingsRow): PaySettings {
     prestigeOvertimeNetRateCents: dollarsToCents(
       toNumber(row.prestige_ot_net_rate),
     ),
-    incentiveNetMultiplier: toNumber(row.incentive_net_multiplier),
+    abilityNetMultiplier: 1 - toNumber(row.ability_withholding_rate),
   };
 }
 

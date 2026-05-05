@@ -14,7 +14,9 @@ export type PaySettings = {
   abilityOvertimeNetRateCents: MoneyCents;
   prestigeRegularNetRateCents: MoneyCents;
   prestigeOvertimeNetRateCents: MoneyCents;
-  incentiveNetMultiplier: number;
+  // Net-of-tax multiplier for the Ability paycheck. Incentive pay is treated
+  // as Ability income for tax purposes, so it uses this same multiplier.
+  abilityNetMultiplier: number;
 };
 
 export type EarnSlotInput = {
@@ -67,7 +69,7 @@ export const DEFAULT_PAY_SETTINGS: PaySettings = {
   abilityOvertimeNetRateCents: 2173,
   prestigeRegularNetRateCents: 1428,
   prestigeOvertimeNetRateCents: 2142,
-  incentiveNetMultiplier: 0.7348,
+  abilityNetMultiplier: 0.7348,
 };
 
 // Live weeks compute Ability/Prestige splits here. Summary-only legacy imports
@@ -115,7 +117,7 @@ export function calculateEarnSlot(
   if (slot.jobType === "incentive") {
     const earningsCents = multiplyCents(
       dollarsToCents(amount),
-      settings.incentiveNetMultiplier,
+      settings.abilityNetMultiplier,
     );
 
     return {
