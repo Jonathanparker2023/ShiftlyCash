@@ -46,7 +46,6 @@ export default async function ProtectedLayout({
                 <NavLink href="/">Dashboard</NavLink>
                 <NavLink href="/baseline">Baseline</NavLink>
                 <NavLink href="/debt">Debt</NavLink>
-                <NavLink href="/net-worth">Net Worth</NavLink>
                 <NavLink href="/history">History</NavLink>
                 <NavLink href="/banking">Banking</NavLink>
                 <NavLink href="/settings/account">Account</NavLink>
