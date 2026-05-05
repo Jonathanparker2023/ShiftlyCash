@@ -673,7 +673,8 @@ function MetricStrip({
   earningsCents: number;
   cashflowCents: number;
 }) {
-  const cashflowTone = cashflowDailyTone(cashflowCents);
+  const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
+  const cashflowTone = cashflowDailyTone(displayCashflowCents);
 
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -682,7 +683,7 @@ function MetricStrip({
         accent={cashflowTone}
         label="Cashflow"
         tone={cashflowTone}
-        value={formatMoney(cashflowCents)}
+        value={formatMoney(displayCashflowCents)}
       />
     </div>
   );
@@ -791,6 +792,8 @@ function WeekStripCell({
 
     return total + slot.hoursOrUnits;
   }, 0);
+  const cashflowCents = totals?.cashflowCents ?? 0;
+  const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
 
   return (
     <button
@@ -827,8 +830,8 @@ function WeekStripCell({
       <p className="mt-2 text-xs font-medium text-[#475569]">
         {formatShiftCount(shiftCount)} - {formatPlainHours(totalHours)}h
       </p>
-      <p className={`mt-2 text-sm font-semibold ${cashflowDailyColor(totals?.cashflowCents ?? 0)}`}>
-        {formatMoney(totals?.cashflowCents ?? 0)}
+      <p className={`mt-2 text-sm font-semibold ${cashflowDailyColor(displayCashflowCents)}`}>
+        {formatMoney(displayCashflowCents)}
       </p>
     </button>
   );
@@ -1451,6 +1454,7 @@ function TotalsPanel({
   const spendCents = totals?.spendCents ?? 0;
   const baseCents = totals?.baseCents ?? day.baseCents;
   const cashflowCents = totals?.cashflowCents ?? 0;
+  const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
 
   return (
     <div className="space-y-3">
@@ -1469,8 +1473,8 @@ function TotalsPanel({
         <TotalLine
           strong
           label="= Cashflow"
-          tone={cashflowDailyTone(cashflowCents)}
-          value={formatMoney(cashflowCents)}
+          tone={cashflowDailyTone(displayCashflowCents)}
+          value={formatMoney(displayCashflowCents)}
         />
       </div>
     </div>
@@ -1794,6 +1798,13 @@ function formatMoney(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(centsToDollars(value)));
+}
+
+function roundCashflowToNearestFiveDollars(value: number): number {
+  const incrementCents = 500;
+  const sign = value < 0 ? -1 : 1;
+
+  return sign * Math.round(Math.abs(value) / incrementCents) * incrementCents;
 }
 
 function formatTransactionTime(value: string | null): string | null {
