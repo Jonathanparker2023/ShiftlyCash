@@ -241,16 +241,16 @@ export type CashflowTone = "positive" | "amber" | "negative";
 
 /**
  * Dashboard daily cashflow color tier:
- *   >  $200      -> green   (strict — $200 itself is amber)
- *   $75 .. $200  -> amber   (inclusive on both bounds)
- *   <  $75       -> red     (strict — $75 itself is amber)
+ *   >= $200     -> green
+ *   $75 .. $195 -> amber
+ *   <  $75      -> red
  */
 export function cashflowDailyColor(cents: number): string {
   return cashflowColorFromTone(cashflowDailyTone(cents));
 }
 
 export function cashflowDailyTone(cents: number): CashflowTone {
-  if (cents > 20000) return "positive";
+  if (cents >= 20000) return "positive";
   if (cents >= 7500) return "amber";
   return "negative";
 }

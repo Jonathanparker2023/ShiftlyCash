@@ -9,19 +9,19 @@ import {
 } from "./legacyRules";
 
 describe("legacy cashflow color tiers", () => {
-  describe("daily tier — > $200 green, $75–$200 amber, < $75 red", () => {
-    it("classifies green strictly above $200", () => {
-      expect(cashflowDailyTone(20_001)).toBe("positive");
-      expect(cashflowDailyColor(20_001)).toBe("text-green-600");
-      // Spec boundary: $201 must be green.
+  describe("daily tier - >= $200 green, $75-$195 amber, < $75 red", () => {
+    it("classifies $200 and above as green", () => {
+      expect(cashflowDailyTone(20_000)).toBe("positive");
+      expect(cashflowDailyColor(20_000)).toBe("text-green-600");
+      // Spec boundary: displayed $200 must be green after nearest-$5 rounding.
       expect(cashflowDailyTone(20_100)).toBe("positive");
       expect(cashflowDailyColor(20_100)).toBe("text-green-600");
       expect(cashflowDailyColor(50_000)).toBe("text-green-600");
     });
 
-    it("treats exactly $200 as the top of the amber band, not green", () => {
-      expect(cashflowDailyTone(20_000)).toBe("amber");
-      expect(cashflowDailyColor(20_000)).toBe("text-amber-500");
+    it("treats $195 as the top of the amber band", () => {
+      expect(cashflowDailyTone(19_500)).toBe("amber");
+      expect(cashflowDailyColor(19_500)).toBe("text-amber-500");
     });
 
     it("classifies the middle of the amber band as amber", () => {
