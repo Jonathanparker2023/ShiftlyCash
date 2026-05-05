@@ -80,7 +80,7 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
       const result = await syncTransactionsAction();
       setStatus("success");
       setMessage(
-        `Synced ${result.added} added, ${result.modified} modified, ${result.removed} removed transactions.`,
+        `Synced ${result.added} added, ${result.modified} modified, ${result.removed} removed, ${result.normalized} cleaned transactions.`,
       );
       window.location.reload();
     } catch (error) {

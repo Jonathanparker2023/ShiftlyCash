@@ -41,6 +41,7 @@ export function isLikelyUglyMerchantName(cleanedName: string): boolean {
 export async function resolveMerchantName(
   rawName: string | null | undefined,
   supabaseAdmin: SupabaseClient,
+  options: { refreshUglyCache?: boolean } = {},
 ): Promise<string> {
   if (!rawName) return "";
 
@@ -61,7 +62,14 @@ export async function resolveMerchantName(
   }
 
   if (cached) {
-    return (cached as MerchantCacheRow).display_name;
+    const cachedName = (cached as MerchantCacheRow).display_name;
+
+    if (
+      !options.refreshUglyCache ||
+      !isLikelyUglyMerchantName(cachedName)
+    ) {
+      return cachedName;
+    }
   }
 
   const cleaned = normalizeTxName(rawName);

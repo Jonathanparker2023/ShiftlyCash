@@ -94,6 +94,26 @@ describe("merchant AI normalization", () => {
     expect(supabase.upsert).not.toHaveBeenCalled();
   });
 
+  it("refreshes ugly cached names when explicitly requested", async () => {
+    createMock.mockResolvedValueOnce({
+      content: [{ type: "text", text: "Perplexity" }],
+    });
+    const supabase = createSupabaseStub({ cachedName: "Www Perplexity Ai" });
+
+    await expect(
+      resolveMerchantName("www.perplexity.ai", supabase.client as never, {
+        refreshUglyCache: true,
+      }),
+    ).resolves.toBe("Perplexity");
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(supabase.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        display_name: "Perplexity",
+        source: "ai",
+      }),
+    );
+  });
+
   it("uses Haiku for ugly uncached names and writes the cache", async () => {
     createMock.mockResolvedValueOnce({
       content: [{ type: "text", text: "Perplexity" }],

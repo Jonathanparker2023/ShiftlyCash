@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { Transaction } from "plaid";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireUser } from "@/lib/auth";
 import { getOptionalSupabaseServiceRoleKey, getPlaidServerEnv } from "@/lib/env";
@@ -32,6 +33,7 @@ export type SyncTransactionsResult = {
   added: number;
   modified: number;
   removed: number;
+  normalized: number;
 };
 
 export type ApplyPendingTransactionInput = {
@@ -60,6 +62,17 @@ type ServerPlaidItem = {
 type DayMatch = {
   id: string;
   spend_locked: boolean;
+};
+
+type ActiveWeekRange = {
+  start_date: string;
+  end_date: string;
+};
+
+type CurrentWeekTransaction = {
+  id: string;
+  merchant_name: string | null;
+  raw_name: string | null;
 };
 
 export async function createLinkTokenAction(): Promise<CreateLinkTokenResult> {
@@ -140,7 +153,7 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
     supabase.rpc("plaid_items_for_server_sync"),
     supabase
       .from("weeks")
-      .select("start_date")
+      .select("start_date,end_date")
       .eq("status", "active")
       .maybeSingle(),
   ]);
@@ -153,7 +166,7 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
   }
 
   const items = (data ?? []) as ServerPlaidItem[];
-  const activeWeek = activeWeekData as { start_date: string } | null;
+  const activeWeek = activeWeekData as ActiveWeekRange | null;
   const activeWeekStartDate = activeWeek?.start_date ?? null;
   let added = 0;
   let modified = 0;
@@ -184,11 +197,15 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
   }
 
   await excludeOldNoMatchingTransactions(activeWeekStartDate);
+  const normalized = await normalizeCurrentWeekMerchantNames(
+    activeWeek,
+    merchantCacheClient,
+  );
 
   revalidatePath("/");
   revalidatePath("/banking");
 
-  return { ok: true, added, modified, removed };
+  return { ok: true, added, modified, removed, normalized };
 
   async function syncPlaidItem(item: ServerPlaidItem, encryptionKey: string) {
     const client = getPlaidClient();
@@ -413,6 +430,55 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
         `Unable to auto-exclude old transactions: ${updateError.message}`,
       );
     }
+  }
+
+  async function normalizeCurrentWeekMerchantNames(
+    week: ActiveWeekRange | null,
+    cacheClient: SupabaseClient,
+  ): Promise<number> {
+    if (!week) {
+      return 0;
+    }
+
+    const { data: transactions, error: transactionsError } = await supabase
+      .from("transactions")
+      .select("id,merchant_name,raw_name")
+      .gte("date", week.start_date)
+      .lte("date", week.end_date);
+
+    if (transactionsError) {
+      throw new Error(
+        `Unable to load current-week transactions for normalization: ${transactionsError.message}`,
+      );
+    }
+
+    let normalizedCount = 0;
+
+    for (const transaction of (transactions ?? []) as CurrentWeekTransaction[]) {
+      const rawName = transaction.raw_name ?? transaction.merchant_name;
+      const merchantName = await resolveMerchantName(rawName, cacheClient, {
+        refreshUglyCache: true,
+      });
+
+      if (!merchantName || merchantName === transaction.merchant_name) {
+        continue;
+      }
+
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({ merchant_name: merchantName })
+        .eq("id", transaction.id);
+
+      if (updateError) {
+        throw new Error(
+          `Unable to update normalized merchant name: ${updateError.message}`,
+        );
+      }
+
+      normalizedCount++;
+    }
+
+    return normalizedCount;
   }
 }
 
