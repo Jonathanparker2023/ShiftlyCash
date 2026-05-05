@@ -1291,6 +1291,8 @@ function ShiftRow({
   ]
     .filter(Boolean)
     .join(" ");
+  const shiftAmountLabel = formatShiftAmountValue(slot, settings);
+  const shiftQuantityLabel = formatShiftQuantityValue(slot);
 
   return (
     <div
@@ -1318,14 +1320,21 @@ function ShiftRow({
             </span>
           ) : null}
         </span>
-        {slot.label ? (
-          <span className="pointer-events-none absolute left-1/2 max-w-[38%] -translate-x-1/2 truncate px-2 text-center text-xs font-semibold">
-            {slot.label}
+        {slot.label || shiftAmountLabel ? (
+          <span className="pointer-events-none absolute left-1/2 flex max-w-[48%] -translate-x-1/2 items-center justify-center gap-1 truncate px-2 text-center text-xs font-semibold">
+            {slot.label ? (
+              <span className="truncate">{slot.label}</span>
+            ) : null}
+            {shiftAmountLabel ? (
+              <span className="shrink-0 opacity-90">{shiftAmountLabel}</span>
+            ) : null}
           </span>
         ) : null}
-        <span className="shrink-0 text-sm font-medium">
-          {formatShiftBarValue(slot, settings)}
-        </span>
+        {shiftQuantityLabel ? (
+          <span className="shrink-0 text-sm font-medium">
+            {shiftQuantityLabel}
+          </span>
+        ) : null}
       </button>
 
       {expanded && !locked ? (
@@ -1755,16 +1764,22 @@ function formatPlainHours(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatShiftBarValue(
+function formatShiftAmountValue(
   slot: DashboardSlot,
   settings: PaySettings,
 ): string {
-  if (slot.jobType === "incentive") {
-    return formatMoney(calculateEarnSlot(slot, settings).earningsCents);
+  const earningsCents = calculateEarnSlot(slot, settings).earningsCents;
+
+  if (earningsCents <= 0) {
+    return "";
   }
 
+  return formatMoney(earningsCents);
+}
+
+function formatShiftQuantityValue(slot: DashboardSlot): string {
   if (slot.payType === "unit") {
-    return formatMoney(dollarsToCents(slot.hoursOrUnits));
+    return "";
   }
 
   return `${formatPlainHours(slot.hoursOrUnits)}h`;
