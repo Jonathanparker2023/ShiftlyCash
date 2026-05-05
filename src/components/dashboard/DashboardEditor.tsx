@@ -1305,7 +1305,7 @@ function ShiftRow({
 
 function shiftBarClass(jobType: JobType): string {
   if (jobType === "ability") {
-    return "border-[#172554] bg-[#0b1220] text-white";
+    return "border-[#1e3a8a] bg-[#1d4ed8] text-white";
   }
 
   if (jobType === "prestige") {
