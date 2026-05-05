@@ -825,7 +825,7 @@ function WeekStripCell({
         ) : null}
       </div>
       <p className="mt-2 text-xs font-medium text-[#475569]">
-        {shiftCount} shifts - {formatPlainHours(totalHours)}h
+        {formatShiftCount(shiftCount)} - {formatPlainHours(totalHours)}h
       </p>
       <p className={`mt-2 text-sm font-semibold ${cashflowDailyColor(totals?.cashflowCents ?? 0)}`}>
         {formatMoney(totals?.cashflowCents ?? 0)}
@@ -901,7 +901,7 @@ function FocusedDayEditor({
             {formatLongDate(day.date)}
           </h2>
           <span className="rounded-full border border-[#d7dee8] bg-[#e8eef6] px-3 py-1 text-xs font-medium text-[#334155]">
-            {activeSlots.length} shifts - {formatPlainHours(totalHours)}h
+            {formatShiftCount(activeSlots.length)} - {formatPlainHours(totalHours)}h
           </span>
           {day.spendLocked ? (
             <span className="rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-semibold text-[#c2410c]">
@@ -1772,6 +1772,10 @@ function formatHoursFromSlots(days: DashboardDay[], jobType: JobType): string {
 
 function formatPlainHours(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatShiftCount(value: number): string {
+  return `${value} ${value === 1 ? "shift" : "shifts"}`;
 }
 
 function capitalize(value: string): string {
