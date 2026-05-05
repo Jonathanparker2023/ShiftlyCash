@@ -131,14 +131,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     () => calculateWeekTotals({ days: days.map(toDayInput) }, initialData.settings),
     [days, initialData.settings],
   );
-  const initialWeekTotals = useMemo(
-    () => initialData.week.totals,
-    [initialData.week.totals],
-  );
-  const optimisticRunningBalance =
-    initialData.week.runningBalanceCents -
-    initialWeekTotals.cashflowCents +
-    weekTotals.cashflowCents;
   const focusedDay = days[focusedDayIndex] ?? days[0];
   const focusedDayTotals = focusedDay ? dayTotals.get(focusedDay.id) : undefined;
 
@@ -533,7 +525,9 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                   {" - "}
                   Paycheck {initialData.week.paycheckDueDate ?? "after week 2"}
                 </p>
-                <SaveIndicator state={saveState} error={saveError} />
+                {saveState === "error" ? (
+                  <SaveIndicator state={saveState} error={saveError} />
+                ) : null}
               </div>
             </div>
 
@@ -546,7 +540,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               <MetricStrip
                 cashflowCents={weekTotals.cashflowCents}
                 earningsCents={weekTotals.earningsCents}
-                runningBalanceCents={optimisticRunningBalance}
               />
             </div>
           </div>
@@ -618,27 +611,20 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 function MetricStrip({
   earningsCents,
   cashflowCents,
-  runningBalanceCents,
 }: {
   earningsCents: number;
   cashflowCents: number;
-  runningBalanceCents: number;
 }) {
   const cashflowTone = cashflowDailyTone(cashflowCents);
 
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <TopMetric accent="green" label="Earnings" value={formatMoney(earningsCents)} />
+    <div className="grid grid-cols-2 gap-2">
+      <TopMetric accent="green" label="Earn" value={formatMoney(earningsCents)} />
       <TopMetric
         accent={cashflowTone}
         label="Cashflow"
         tone={cashflowTone}
         value={formatMoney(cashflowCents)}
-      />
-      <TopMetric
-        dark
-        label="Running balance"
-        value={formatMoney(runningBalanceCents)}
       />
     </div>
   );
@@ -1335,7 +1321,7 @@ function TotalsPanel({
         Totals
       </h3>
       <div className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-2.5 text-sm">
-        <TotalLine label="Earnings" value={formatMoney(earningsCents)} />
+        <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
           label="- Spend"
           tone="negative"
