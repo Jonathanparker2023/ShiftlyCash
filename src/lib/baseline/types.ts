@@ -2,6 +2,7 @@ export type BaselineExpense = {
   id: string;
   name: string;
   amountCents: number;
+  withdrawalDay: number | null;
   expirationDate: string | null;
   isActive: boolean;
   sortOrder: number;

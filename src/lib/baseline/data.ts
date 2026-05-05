@@ -13,6 +13,7 @@ type ExpenseRow = {
   id: string;
   name: string;
   amount: NumericValue;
+  withdrawal_day: number | null;
   expiration_date: string | null;
   is_active: boolean;
   sort_order: number;
@@ -32,7 +33,7 @@ export async function getBaselineData(): Promise<BaselineData> {
   ] = await Promise.all([
     supabase
       .from("expenses")
-      .select("id,name,amount,expiration_date,is_active,sort_order")
+      .select("id,name,amount,withdrawal_day,expiration_date,is_active,sort_order")
       .eq("user_id", user.id)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
@@ -63,6 +64,7 @@ function mapExpenseRow(row: ExpenseRow): BaselineExpense {
     id: row.id,
     name: row.name,
     amountCents: dollarsToCents(toNumber(row.amount)),
+    withdrawalDay: row.withdrawal_day,
     expirationDate: row.expiration_date,
     isActive: row.is_active,
     sortOrder: row.sort_order,

@@ -118,6 +118,7 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
       id: expense.id,
       name: expense.name,
       amountCents: expense.amountCents,
+      withdrawalDay: expense.withdrawalDay,
       expirationDate: expense.expirationDate,
       isActive: expense.isActive,
       sortOrder: expense.sortOrder,
@@ -212,9 +213,10 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
         />
 
         <section className="mt-5 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm">
-          <div className="hidden grid-cols-[minmax(180px,1fr)_150px_160px_90px_88px] gap-3 border-b border-zinc-200 bg-zinc-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.12em] text-zinc-500 md:grid">
+          <div className="hidden grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] gap-3 border-b border-zinc-200 bg-zinc-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.12em] text-zinc-500 md:grid">
             <div>Name</div>
             <div>Monthly</div>
+            <div>Withdraws</div>
             <div>Expiration</div>
             <div>Active</div>
             <div className="text-right">Delete</div>
@@ -307,7 +309,7 @@ function ExpenseRow({
   const hasDatedExpiration = Boolean(expense.expirationDate);
   const isDatedActive = hasDatedExpiration && !expired;
   const rowClassName = [
-    "grid gap-3 px-4 py-4 transition md:grid-cols-[minmax(180px,1fr)_150px_160px_90px_88px] md:items-center",
+    "grid gap-3 px-4 py-4 transition md:grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] md:items-center",
     expired ? "opacity-50" : "",
     isDatedActive ? "bg-amber-50/80 ring-1 ring-inset ring-amber-300" : "",
   ]
@@ -348,6 +350,24 @@ function ExpenseRow({
           step="0.01"
           type="number"
           value={formatNumberInput(centsToDollars(expense.amountCents))}
+        />
+      </label>
+
+      <label className="block">
+        <MobileLabel>Withdraws</MobileLabel>
+        <input
+          className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm"
+          max="31"
+          min="1"
+          onChange={(event) =>
+            onUpdate(expense.id, {
+              withdrawalDay: parseWithdrawalDay(event.target.value),
+            })
+          }
+          placeholder="Day"
+          step="1"
+          type="number"
+          value={expense.withdrawalDay ?? ""}
         />
       </label>
 
@@ -452,6 +472,20 @@ function SaveIndicator({
 function parsePositiveNumber(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+function parseWithdrawalDay(value: string): number | null {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed)) {
+    return null;
+  }
+
+  return Math.min(31, Math.max(1, parsed));
 }
 
 function formatNumberInput(value: number): string {

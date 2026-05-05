@@ -9,6 +9,7 @@ export type SaveExpenseInput = {
   id: string;
   name: string;
   amountCents: number;
+  withdrawalDay: number | null;
   expirationDate: string | null;
   isActive: boolean;
   sortOrder: number;
@@ -55,11 +56,12 @@ export async function createExpenseAction(): Promise<CreateExpenseResult> {
       user_id: user.id,
       name: "",
       amount: 0,
+      withdrawal_day: null,
       expiration_date: null,
       is_active: true,
       sort_order: sortOrder,
     })
-    .select("id,name,amount,expiration_date,is_active,sort_order")
+    .select("id,name,amount,withdrawal_day,expiration_date,is_active,sort_order")
     .single();
 
   if (error) {
@@ -85,12 +87,13 @@ export async function saveExpenseAction(
     .update({
       name: normalized.name,
       amount: centsToDollars(normalized.amountCents),
+      withdrawal_day: normalized.withdrawalDay,
       expiration_date: normalized.expirationDate,
       is_active: normalized.isActive,
       sort_order: normalized.sortOrder,
     })
     .eq("id", normalized.id)
-    .select("id,name,amount,expiration_date,is_active,sort_order")
+    .select("id,name,amount,withdrawal_day,expiration_date,is_active,sort_order")
     .single();
 
   if (error) {
@@ -144,6 +147,7 @@ type ExpenseRow = {
   id: string;
   name: string;
   amount: number | string | null;
+  withdrawal_day: number | null;
   expiration_date: string | null;
   is_active: boolean;
   sort_order: number;
@@ -154,6 +158,7 @@ function normalizeExpenseInput(input: SaveExpenseInput): SaveExpenseInput {
     id: requireUuid(input.id, "id"),
     name: input.name.trim(),
     amountCents: requireNonNegativeInteger(input.amountCents, "amountCents"),
+    withdrawalDay: normalizeWithdrawalDay(input.withdrawalDay),
     expirationDate: normalizeDate(input.expirationDate),
     isActive: Boolean(input.isActive),
     sortOrder: requireInteger(input.sortOrder, "sortOrder"),
@@ -165,10 +170,23 @@ function mapExpenseRow(row: ExpenseRow): BaselineExpense {
     id: row.id,
     name: row.name,
     amountCents: dollarsToCents(toNumber(row.amount)),
+    withdrawalDay: row.withdrawal_day,
     expirationDate: row.expiration_date,
     isActive: row.is_active,
     sortOrder: row.sort_order,
   };
+}
+
+function normalizeWithdrawalDay(value: number | null): number | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (!Number.isInteger(value) || value < 1 || value > 31) {
+    throw new Error("Invalid withdrawalDay.");
+  }
+
+  return value;
 }
 
 function normalizeDate(value: string | null): string | null {
