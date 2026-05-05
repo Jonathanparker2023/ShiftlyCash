@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
+import type { DragEvent, FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -195,6 +195,63 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     );
 
     scheduleSlotSave(nextSlot);
+  }
+
+  function reorderSlots(
+    dayId: string,
+    fromSlotIndex: number,
+    toSlotIndex: number,
+  ) {
+    const day = days.find((currentDay) => currentDay.id === dayId);
+
+    if (!day || day.spendLocked || fromSlotIndex === toSlotIndex) {
+      return;
+    }
+
+    const activeSlots = day.slots
+      .filter((slot) => slot.jobType !== "none")
+      .sort((a, b) => a.slotIndex - b.slotIndex);
+    const fromPosition = activeSlots.findIndex(
+      (slot) => slot.slotIndex === fromSlotIndex,
+    );
+    const toPosition = activeSlots.findIndex(
+      (slot) => slot.slotIndex === toSlotIndex,
+    );
+
+    if (fromPosition < 0 || toPosition < 0 || fromPosition === toPosition) {
+      return;
+    }
+
+    const reorderedActiveSlots = [...activeSlots];
+    const [movedSlot] = reorderedActiveSlots.splice(fromPosition, 1);
+    reorderedActiveSlots.splice(toPosition, 0, movedSlot);
+
+    const nextSlots = Array.from({ length: 4 }, (_, slotIndex) => {
+      const activeSlot = reorderedActiveSlots[slotIndex];
+
+      if (activeSlot) {
+        return normalizeSlotForClient({
+          ...activeSlot,
+          slotIndex,
+          source: "user",
+        });
+      }
+
+      return makeEmptySlot(dayId, slotIndex);
+    });
+
+    setExpandedSlotIndex(null);
+    setDays((currentDays) =>
+      currentDays.map((currentDay) =>
+        currentDay.id === dayId
+          ? {
+              ...currentDay,
+              slots: nextSlots,
+            }
+          : currentDay,
+      ),
+    );
+    nextSlots.forEach(scheduleSlotSave);
   }
 
   async function toggleTransactionStatus(
@@ -574,6 +631,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               onNext={focusNextDay}
               onPrevious={focusPreviousDay}
               onRemoveSlot={removeSlot}
+              onReorderSlots={reorderSlots}
               onSlotChange={updateSlot}
               onToggleTransactionStatus={toggleTransactionStatus}
               onToggleSlot={(slotIndex) =>
@@ -790,6 +848,7 @@ function FocusedDayEditor({
   onAddManualTransaction,
   onAddShift,
   onRemoveSlot,
+  onReorderSlots,
   onPrevious,
   onNext,
 }: {
@@ -817,6 +876,11 @@ function FocusedDayEditor({
   ) => void;
   onAddShift: (day: DashboardDay) => void;
   onRemoveSlot: (slot: DashboardSlot) => void;
+  onReorderSlots: (
+    dayId: string,
+    fromSlotIndex: number,
+    toSlotIndex: number,
+  ) => void;
   onPrevious: () => void;
   onNext: () => void;
 }) {
@@ -869,6 +933,7 @@ function FocusedDayEditor({
           expandedSlotIndex={expandedSlotIndex}
           onAddShift={onAddShift}
           onRemoveSlot={onRemoveSlot}
+          onReorderSlots={onReorderSlots}
           onSlotChange={onSlotChange}
           onToggleSlot={onToggleSlot}
         />
@@ -1134,6 +1199,7 @@ function ShiftList({
   onToggleSlot,
   onAddShift,
   onRemoveSlot,
+  onReorderSlots,
 }: {
   day: DashboardDay;
   expandedSlotIndex: number | null;
@@ -1145,12 +1211,28 @@ function ShiftList({
   onToggleSlot: (slotIndex: number) => void;
   onAddShift: (day: DashboardDay) => void;
   onRemoveSlot: (slot: DashboardSlot) => void;
+  onReorderSlots: (
+    dayId: string,
+    fromSlotIndex: number,
+    toSlotIndex: number,
+  ) => void;
 }) {
+  const [draggedSlotIndex, setDraggedSlotIndex] = useState<number | null>(null);
   const activeSlots = day.slots.filter((slot) => slot.jobType !== "none");
   const totalHours = activeSlots.reduce(
     (total, slot) => total + slot.hoursOrUnits,
     0,
   );
+
+  function handleDrop(targetSlotIndex: number) {
+    if (draggedSlotIndex === null || draggedSlotIndex === targetSlotIndex) {
+      setDraggedSlotIndex(null);
+      return;
+    }
+
+    onReorderSlots(day.id, draggedSlotIndex, targetSlotIndex);
+    setDraggedSlotIndex(null);
+  }
 
   return (
     <div className="space-y-2">
@@ -1167,9 +1249,14 @@ function ShiftList({
           activeSlots.map((slot) => (
             <ShiftRow
               expanded={expandedSlotIndex === slot.slotIndex}
+              isDragging={draggedSlotIndex === slot.slotIndex}
               key={`${slot.dayId}-${slot.slotIndex}`}
               locked={day.spendLocked}
               slot={slot}
+              onDragEnd={() => setDraggedSlotIndex(null)}
+              onDragOver={(event) => event.preventDefault()}
+              onDragStart={() => setDraggedSlotIndex(slot.slotIndex)}
+              onDrop={() => handleDrop(slot.slotIndex)}
               onRemove={onRemoveSlot}
               onSlotChange={onSlotChange}
               onToggle={() => onToggleSlot(slot.slotIndex)}
@@ -1197,13 +1284,19 @@ function ShiftRow({
   slot,
   expanded,
   locked,
+  isDragging,
   onToggle,
   onSlotChange,
   onRemove,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   slot: DashboardSlot;
   expanded: boolean;
   locked: boolean;
+  isDragging: boolean;
   onToggle: () => void;
   onSlotChange: (
     dayId: string,
@@ -1211,19 +1304,31 @@ function ShiftRow({
     patch: Partial<DashboardSlot>,
   ) => void;
   onRemove: (slot: DashboardSlot) => void;
+  onDragStart: () => void;
+  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
 }) {
   const rowClassName = [
     "rounded-md border shadow-sm transition",
     shiftBarClass(slot.jobType),
     locked ? "opacity-60" : "",
+    isDragging ? "scale-[0.99] opacity-70 ring-2 ring-[#0e7490]" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <div className={rowClassName}>
+    <div
+      className={rowClassName}
+      draggable={!locked}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragStart={onDragStart}
+      onDrop={onDrop}
+    >
       <button
-        className="relative flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left"
+        className="relative flex min-h-11 w-full cursor-grab items-center justify-between gap-3 px-3 py-2 text-left active:cursor-grabbing disabled:cursor-not-allowed"
         disabled={locked}
         onClick={onToggle}
         type="button"
@@ -1623,6 +1728,19 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
         ? slot.payType
         : "regular",
     hoursOrUnits: Math.max(0, slot.hoursOrUnits),
+    source: "user",
+  };
+}
+
+function makeEmptySlot(dayId: string, slotIndex: number): DashboardSlot {
+  return {
+    id: null,
+    dayId,
+    slotIndex,
+    jobType: "none",
+    payType: "none",
+    hoursOrUnits: 0,
+    label: "",
     source: "user",
   };
 }
