@@ -27,6 +27,29 @@ const RANGE_WEEKS: Record<ChartRange, number> = {
   full: Number.POSITIVE_INFINITY,
 };
 
+function buildChartTicks(yMin: number, yMax: number): number[] {
+  const span = Math.max(1, yMax - yMin);
+  const roughStep = span / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const normalized = roughStep / magnitude;
+  const niceMultiplier = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const step = niceMultiplier * magnitude;
+  const first = Math.ceil(yMin / step) * step;
+  const ticks: number[] = [];
+
+  for (let value = first; value <= yMax; value += step) {
+    ticks.push(Math.round(value));
+  }
+
+  if (!ticks.some((value) => Math.abs(value) < step / 2)) {
+    ticks.push(0);
+  }
+
+  return Array.from(new Set(ticks))
+    .filter((value) => value >= yMin && value <= yMax)
+    .sort((a, b) => a - b);
+}
+
 export function DebtPage({ initialData }: { initialData: DebtPageData }) {
   const router = useRouter();
   const [debts, setDebts] = useState<DebtRow[]>(initialData.debts);
@@ -481,13 +504,14 @@ function Chart({
   const principalSeries = principalValues.slice(0, series.length);
   const targetCents = 100_000_000;
 
-  const allSeries = [...series, ...principalSeries, targetCents];
+  const allSeries = [...series, ...principalSeries];
   const min = Math.min(...allSeries);
   const max = Math.max(...allSeries);
-  const negativeFloor =
-    min < 0 ? min - Math.max(Math.abs(min) * 0.15, targetCents * 0.02) : 0;
+  const negativeFloor = min < 0 ? min - Math.max(Math.abs(min) * 0.15, 500_000) : 0;
   const yMin = Math.min(0, negativeFloor);
-  const yMax = Math.max(targetCents, max, 1) * 1.06;
+  const positiveCeiling = Math.max(0, max);
+  const yMax =
+    Math.max(positiveCeiling + Math.max(positiveCeiling * 0.12, 500_000), 1);
 
   const W = 800;
   const H = compact ? 220 : 260;
@@ -550,19 +574,10 @@ function Chart({
   const principalTargetIndex = principalSeries.findIndex(
     (value) => value >= targetCents,
   );
+  const shouldShowTargetLine = targetCents >= yMin && targetCents <= yMax;
 
   // Y-axis labels
-  const rawYTicks = [
-    yMin,
-    0,
-    targetCents * 0.25,
-    targetCents * 0.5,
-    targetCents * 0.75,
-    targetCents,
-  ];
-  const yTicks = Array.from(
-    new Set(rawYTicks.map((value) => Math.round(value))),
-  ).filter((value) => value >= yMin && value <= yMax);
+  const yTicks = buildChartTicks(yMin, yMax);
   const yLabels: React.ReactElement[] = [];
   for (const v of yTicks) {
     const yy = py(v);
@@ -660,25 +675,29 @@ function Chart({
           strokeWidth="1"
           strokeDasharray="4 4"
         />
-        <line
-          x1={PAD.l}
-          y1={py(targetCents)}
-          x2={W - PAD.r}
-          y2={py(targetCents)}
-          stroke="#7e22ce"
-          strokeDasharray="6 4"
-          strokeWidth="1"
-        />
-        <text
-          x={W - PAD.r - 8}
-          y={py(targetCents) - 8}
-          fill="#7e22ce"
-          fontSize="10"
-          fontWeight="700"
-          textAnchor="end"
-        >
-          $1M target
-        </text>
+        {shouldShowTargetLine ? (
+          <>
+            <line
+              x1={PAD.l}
+              y1={py(targetCents)}
+              x2={W - PAD.r}
+              y2={py(targetCents)}
+              stroke="#7e22ce"
+              strokeDasharray="6 4"
+              strokeWidth="1"
+            />
+            <text
+              x={W - PAD.r - 8}
+              y={py(targetCents) - 8}
+              fill="#7e22ce"
+              fontSize="10"
+              fontWeight="700"
+              textAnchor="end"
+            >
+              $1M target
+            </text>
+          </>
+        ) : null}
         {debtFillPath ? <path d={debtFillPath} fill="rgba(194,65,12,0.22)" /> : null}
         {principalFillPath ? (
           <path d={principalFillPath} fill="rgba(15,23,42,0.12)" />
