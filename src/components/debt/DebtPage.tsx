@@ -825,6 +825,7 @@ function Chart({
         {(() => {
           const xEnd = px(series.length - 1);
           const principalXText = xEnd - 40;
+          const principalLabelOffset = series.length - 1 <= 260 ? 40 : 24;
           const interestXText = xEnd - 92;
           return (
             <>
@@ -839,7 +840,7 @@ function Chart({
               />
               <text
                 x={principalXText}
-                y={py(principalEnd) + 24}
+                y={py(principalEnd) + principalLabelOffset}
                 fill="#18181b"
                 fontSize="10"
                 fontWeight="700"
