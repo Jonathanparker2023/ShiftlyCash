@@ -631,12 +631,19 @@ function Chart({
 
   const endVal = series[series.length - 1];
   const endColor = endVal >= 0 ? "#0e7490" : "#c2410c";
+  const principalEnd = principalSeries[principalSeries.length - 1] ?? 0;
+  const interestEarned = endVal - principalEnd;
   const visibleEvents = events.filter(
     (event) => event.week > 0 && event.week < series.length,
   );
 
   return (
     <div className="relative">
+      {/* Total above the chart — sits in HTML so it scales independently of
+          the SVG and can never collide with the interest endpoint label. */}
+      <div className="mb-1 text-center text-sm font-extrabold tracking-tight text-[#0f172a]">
+        Total {formatMoney(endVal)}
+      </div>
       <svg
         className="h-64 w-full"
         preserveAspectRatio="xMidYMid meet"
@@ -792,18 +799,16 @@ function Chart({
             </text>
           </g>
         ) : null}
-        {/* End markers — three labels:
-            • principal endpoint (slate, matches bottom line color)
-            • invested endpoint (teal, matches top line color, shows interest earned)
-            • centered top total (= principal + interest = invested end value) */}
+        {/* End markers — two endpoint labels matching their line colors:
+            • bottom line (slate) → principal end value
+            • top line (teal) → interest earned (invested − principal)
+            Total label lives in the HTML above the SVG. */}
         {(() => {
-          const principalEnd = principalSeries[principalSeries.length - 1] ?? 0;
-          const interestEarned = endVal - principalEnd;
           const xEnd = px(series.length - 1);
-          const xLabel = Math.max(PAD.l + 80, xEnd - 96);
+          const xText = xEnd - 40;
           return (
             <>
-              {/* Principal endpoint dot + label (slate) */}
+              {/* Principal endpoint dot + label below the dot (slate) */}
               <circle
                 cx={xEnd}
                 cy={py(principalEnd)}
@@ -813,18 +818,18 @@ function Chart({
                 strokeWidth="2"
               />
               <text
-                x={xLabel}
-                y={py(principalEnd) + 16}
+                x={xText}
+                y={py(principalEnd) + 24}
                 fill="#18181b"
                 fontSize="10"
                 fontWeight="700"
-                textAnchor="start"
+                textAnchor="end"
                 fontFamily="ui-monospace, monospace"
               >
                 {formatMoney(principalEnd)}
               </text>
 
-              {/* Invested endpoint dot + interest-earned label (teal) */}
+              {/* Invested endpoint dot + interest-earned label above the dot (teal) */}
               <circle
                 cx={xEnd}
                 cy={py(endVal)}
@@ -834,28 +839,15 @@ function Chart({
                 strokeWidth="2"
               />
               <text
-                x={xLabel}
-                y={py(endVal) - 8}
+                x={xText}
+                y={py(endVal) + 26}
                 fill={endColor}
                 fontSize="10"
                 fontWeight="700"
-                textAnchor="start"
+                textAnchor="end"
                 fontFamily="ui-monospace, monospace"
               >
                 +{formatMoney(interestEarned)} interest
-              </text>
-
-              {/* Centered top: total = principal + interest */}
-              <text
-                x={(PAD.l + W - PAD.r) / 2}
-                y={PAD.t - 6}
-                fill="#0f172a"
-                fontSize="12"
-                fontWeight="800"
-                textAnchor="middle"
-                fontFamily="ui-monospace, monospace"
-              >
-                Total {formatMoney(endVal)}
               </text>
             </>
           );
