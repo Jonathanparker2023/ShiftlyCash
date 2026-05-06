@@ -136,8 +136,9 @@ async function aiCleanupName(rawName) {
     const response = await client.messages.create({
       model: anthropicModel,
       max_tokens: 100,
+      temperature: 0,
       system:
-        "Normalize messy bank transaction descriptions into one clean merchant display name. Output ONLY title-case merchant name, or UNKNOWN if ambiguous. Strip URLs, suffixes, dates, store numbers, location codes, and payment processor prefixes.",
+        'Normalize messy bank transaction descriptions into one clean merchant display name. Output ONLY title-case merchant name, or UNKNOWN if ambiguous. Strip URLs, suffixes, dates, store numbers, location codes, country/region suffixes like US/USA, and payment processor/storefront prefixes including SPO*, TST*, SQ*, PYP*, PAYPAL*, BLIZZARD*. Examples: "SPO*PRIMEBURGER" -> Primeburger; "BLIZZARD*US" -> Blizzard; "BLIZZARD*CALL OF DUTY" -> Call of Duty.',
       messages: [{ role: "user", content: rawName }],
     });
     const textBlock = response.content.find((block) => block.type === "text");
@@ -160,6 +161,12 @@ async function aiCleanupName(rawName) {
 
 function isLikelyUgly(cleanedName) {
   if (!cleanedName) return true;
+  if (/^(spo|tst|sq|pyp|paypal|pypl)\b/i.test(cleanedName)) return true;
+  if (
+    /\b(us|usa)\b$/i.test(cleanedName) &&
+    cleanedName.split(/\s+/).length > 1
+  )
+    return true;
   if (/\d/.test(cleanedName)) return true;
   if (/^www\b/i.test(cleanedName)) return true;
   if (/www\.|https?:\/\//i.test(cleanedName)) return true;
@@ -177,6 +184,7 @@ function compactKey(value) {
 function titleCaseFallback(value) {
   const cleaned = String(value)
     .replace(/^(tst\s*\*|sq\s*\*|py\s*\*|pyp\s*\*|pos\s+(debit\s+)?)/i, "")
+    .replace(/^(spo\s*\*)/i, "")
     .replace(/\b\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/g, " ")
     .replace(/[\s\-_#*]+\d{2,}[a-z0-9]{0,10}\s*$/i, "")
     .replace(/\s+/g, " ")

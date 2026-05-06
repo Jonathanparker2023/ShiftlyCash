@@ -77,6 +77,8 @@ describe("merchant AI normalization", () => {
 
   it("flags URL-shaped and long names as ugly", () => {
     expect(isLikelyUglyMerchantName("Www Perplexity Ai")).toBe(true);
+    expect(isLikelyUglyMerchantName("Spo Primeburger")).toBe(true);
+    expect(isLikelyUglyMerchantName("Blizzard Us")).toBe(true);
     expect(isLikelyUglyMerchantName("Store 12345")).toBe(true);
     expect(isLikelyUglyMerchantName("Long Merchant Name With Many Words")).toBe(
       true,
@@ -127,6 +129,27 @@ describe("merchant AI normalization", () => {
       expect.objectContaining({
         display_name: "Clean Merchant",
         source: "ai",
+      }),
+    );
+  });
+
+  it("prompts Haiku with storefront and game cleanup examples", async () => {
+    createMock.mockResolvedValueOnce({
+      content: [{ type: "text", text: "Primeburger" }],
+    });
+
+    await expect(aiCleanupName("SPO*PRIMEBURGER")).resolves.toBe(
+      "Primeburger",
+    );
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        temperature: 0,
+        system: expect.stringContaining('Input: "SPO*PRIMEBURGER"'),
+      }),
+    );
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining('Input: "BLIZZARD*CALL OF DUTY"'),
       }),
     );
   });

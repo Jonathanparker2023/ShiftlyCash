@@ -83,6 +83,10 @@ export const MERCHANT_MAP: ReadonlyArray<readonly [string, string]> = [
   ["disney", "Disney+"],
   ["youtube", "YouTube"],
   ["hbomax", "HBO Max"],
+  ["callofduty", "Call of Duty"],
+  ["primeburger", "Primeburger"],
+  ["blizzard", "Blizzard"],
+  ["activision", "Activision"],
   ["itunes", "Apple"],
   ["applecom", "Apple"],
   ["appleitunes", "Apple"],
@@ -194,7 +198,7 @@ export function normalizeTxName(name: string | null | undefined): string {
 
   let clean = s;
   clean = clean.replace(
-    /^(tst\s*\*|sq\s*\*|py\s*\*|pyp\s*\*|sp\s+|pos\s+(debit\s+)?|debit\s+card\s+|debit\s+|purchase\s+(authorized\s+(on\s+\S+\s+)?)?|visa\s+(checkcard\s+)?|mc\s+|chk\s+|ach\s+(debit|credit|hold)?\s*|external\s+|bill\s+pay\s+|recurring\s+|web\s+id:?\s*\S*\s*)/i,
+    /^(spo\s*\*|tst\s*\*|sq\s*\*|py\s*\*|pyp\s*\*|sp\s+|pos\s+(debit\s+)?|debit\s+card\s+|debit\s+|purchase\s+(authorized\s+(on\s+\S+\s+)?)?|visa\s+(checkcard\s+)?|mc\s+|chk\s+|ach\s+(debit|credit|hold)?\s*|external\s+|bill\s+pay\s+|recurring\s+|web\s+id:?\s*\S*\s*)/i,
     "",
   );
   clean = clean.replace(/\b\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/g, " ");

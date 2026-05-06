@@ -28,6 +28,12 @@ export function merchantRawKey(rawName: string): string {
 
 export function isLikelyUglyMerchantName(cleanedName: string): boolean {
   if (!cleanedName) return true;
+  if (/^(spo|tst|sq|pyp|paypal|pypl)\b/i.test(cleanedName)) return true;
+  if (
+    /\b(us|usa)\b$/i.test(cleanedName) &&
+    cleanedName.split(/\s+/).length > 1
+  )
+    return true;
   if (/\d/.test(cleanedName)) return true;
   if (/^www\b/i.test(cleanedName)) return true;
   if (/www\.|https?:\/\//i.test(cleanedName)) return true;
@@ -111,20 +117,25 @@ export async function aiCleanupName(rawName: string): Promise<string | null> {
     const response = await client.messages.create({
       model: getAnthropicModel(),
       max_tokens: 100,
+      temperature: 0,
       system: `You normalize messy bank transaction descriptions into clean merchant display names.
 
 Rules:
 - Output ONLY the clean merchant name in title case (e.g., "Perplexity", "Chick-fil-A").
 - If you cannot identify a real merchant with high confidence, output exactly "UNKNOWN".
 - Never invent merchants. If the input is ambiguous (e.g., "TST* CORE"), output "UNKNOWN".
-- Strip URLs, domain suffixes, store numbers, dates, location codes, payment processor prefixes (TST*, SQ*, PYP*).
+- Strip URLs, domain suffixes, store numbers, dates, location codes, country/region suffixes (US, USA), and payment processor/storefront prefixes (SPO*, TST*, SQ*, PYP*, PAYPAL*, BLIZZARD*).
+- For game-platform charges, keep the recognizable game or publisher brand when present. If the input only says BLIZZARD*US, output Blizzard. If it says BLIZZARD*CALL OF DUTY, output Call of Duty.
 - Do NOT include explanations, quotes, punctuation around the answer, or any extra text.
 
 Examples:
 Input: "www.perplexity.ai"          -> Perplexity
 Input: "AMZN MKTP US*1A2B3"         -> Amazon
 Input: "TST* CORE BURGER NY"        -> UNKNOWN
-Input: "STARBUCKS #12345 CHICAGO"   -> Starbucks`,
+Input: "STARBUCKS #12345 CHICAGO"   -> Starbucks
+Input: "SPO*PRIMEBURGER"            -> Primeburger
+Input: "BLIZZARD*US"                -> Blizzard
+Input: "BLIZZARD*CALL OF DUTY"      -> Call of Duty`,
       messages: [{ role: "user", content: rawName }],
     });
     const text = extractAnthropicText(response.content).trim();

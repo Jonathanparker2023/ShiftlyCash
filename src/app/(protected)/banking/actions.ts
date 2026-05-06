@@ -275,7 +275,7 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
     }
 
     const merchantName = await resolveMerchantName(
-      transaction.merchant_name ?? transaction.name,
+      rawName ?? transaction.merchant_name ?? transaction.name,
       merchantCacheClient,
     );
     const category = formatCategory(transaction);

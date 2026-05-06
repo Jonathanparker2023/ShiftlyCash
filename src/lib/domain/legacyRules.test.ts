@@ -86,4 +86,11 @@ describe("legacy merchant normalization", () => {
     expect(normalizeTxName("www.perplexity.ai")).toBe("Perplexity");
     expect(normalizeTxName("Www.perplexity.ai")).toBe("Perplexity");
   });
+
+  it("normalizes known storefront and game charges deterministically", () => {
+    expect(normalizeTxName("SPO*PRIMEBURGER")).toBe("Primeburger");
+    expect(normalizeTxName("spo*primeburger")).toBe("Primeburger");
+    expect(normalizeTxName("BLIZZARD*US")).toBe("Blizzard");
+    expect(normalizeTxName("BLIZZARD*CALL OF DUTY")).toBe("Call of Duty");
+  });
 });
