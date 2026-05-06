@@ -1304,14 +1304,14 @@ function ShiftRow({
       onDrop={onDrop}
     >
       <button
-        className="relative flex min-h-11 w-full cursor-grab items-center justify-between gap-3 px-3 py-2 text-left active:cursor-grabbing disabled:cursor-not-allowed"
+        className="flex min-h-11 w-full cursor-grab items-center gap-3 px-3 py-2 text-left active:cursor-grabbing disabled:cursor-not-allowed"
         disabled={locked}
         onClick={onToggle}
         type="button"
       >
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex shrink-0 items-center gap-2">
           <span className={shiftDotClass(slot.jobType)} />
-          <span className="truncate text-sm font-semibold">
+          <span className="text-sm font-semibold">
             {capitalize(slot.jobType)}
           </span>
           {slot.payType === "regular" || slot.payType === "overtime" ? (
@@ -1320,16 +1320,14 @@ function ShiftRow({
             </span>
           ) : null}
           {shiftQuantityLabel ? (
-            <span className="shrink-0 text-xs font-semibold opacity-90">
+            <span className="text-xs font-semibold opacity-90">
               {shiftQuantityLabel}
             </span>
           ) : null}
         </span>
-        {slot.label ? (
-          <span className="pointer-events-none absolute left-1/2 max-w-[42%] -translate-x-1/2 truncate px-2 text-center text-xs font-semibold">
-            {slot.label}
-          </span>
-        ) : null}
+        <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
+          {slot.label ?? ""}
+        </span>
         {shiftAmountLabel ? (
           <span className="shrink-0 text-sm font-medium">
             {shiftAmountLabel}
