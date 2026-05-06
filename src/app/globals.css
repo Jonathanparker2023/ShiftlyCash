@@ -33,6 +33,17 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+html {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 ::selection {

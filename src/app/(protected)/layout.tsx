@@ -70,7 +70,7 @@ export default async function ProtectedLayout({
           </div>
         </div>
       </nav>
-      {children}
+      <div className="w-full max-w-[100vw] overflow-x-hidden">{children}</div>
     </>
   );
 }

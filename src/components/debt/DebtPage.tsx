@@ -149,10 +149,10 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
     [chartWeekLimit, initialData.principalMillionaireBalances],
   );
   return (
-    <div className="min-h-screen bg-[#101827] px-4 py-5 text-[#f8fafc] sm:px-6 lg:px-8">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#101827] px-3 py-5 text-[#f8fafc] sm:px-6 lg:px-8">
       <header className="mx-auto mb-5 max-w-7xl border-b border-[#2f3d52] pb-4">
-        <div className="grid gap-4 lg:grid-cols-[1fr_296px] lg:items-start">
-          <div>
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_296px] lg:items-start">
+          <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8ea0b8]">
               ShiftlyCash
             </p>
@@ -183,8 +183,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
         </div>
       ) : null}
 
-      <main className="mx-auto grid max-w-7xl gap-5">
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <main className="mx-auto grid w-full max-w-7xl min-w-0 gap-5">
+        <section className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Metric
             label="Earnings avg"
             sub={`${formatMoneyList(initialData.projection.recentEarningsCents)} - ${initialData.projection.recentEarningsCents.length} wks`}
@@ -248,9 +248,9 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
         </section>
 
-        <section className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-4 shadow-lg shadow-black/20">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
+        <section className="min-w-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3 shadow-lg shadow-black/20 sm:p-4">
+          <div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-[#334155]">
                 Path to $1M
               </h2>
@@ -259,18 +259,18 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                 compounds at 10%.
               </p>
             </div>
-            <div className="flex gap-1">
+            <div className="flex w-full flex-nowrap gap-1 sm:w-auto">
               {(["1y", "3y", "5y", "10y", "full"] as ChartRange[]).map((r) => (
                 <button
                   key={r}
                   onClick={() => setChartRange(r)}
                   className={
                     chartRange === r
-                      ? "rounded bg-[#0f172a] px-3 py-1 text-xs font-semibold text-white"
-                      : "rounded border border-[#cbd5e1] px-3 py-1 text-xs font-medium text-[#475569] hover:bg-[#eef4fb]"
+                      ? "min-w-0 flex-1 rounded bg-[#0f172a] px-2 py-1 text-xs font-semibold text-white sm:flex-none sm:px-3"
+                      : "min-w-0 flex-1 rounded border border-[#cbd5e1] px-2 py-1 text-xs font-medium text-[#475569] hover:bg-[#eef4fb] sm:flex-none sm:px-3"
                   }
                 >
-                  {r === "full" ? "TO $1M" : r.toUpperCase()}
+                  {r === "full" ? "$1M" : r.toUpperCase()}
                 </button>
               ))}
             </div>
@@ -282,7 +282,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
         </section>
 
-        <section className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-4 shadow-lg shadow-black/20">
+        <section className="min-w-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-4 shadow-lg shadow-black/20">
           <div className="mb-4">
             <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-[#334155]">
               Debt breakdown
@@ -295,7 +295,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
         </section>
 
         {/* Debts list */}
-        <section className="rounded-md border border-[#d7dee8] bg-[#f8fafc] shadow-lg shadow-black/20">
+        <section className="min-w-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] shadow-lg shadow-black/20">
           <div className="flex items-center justify-between border-b border-[#d7dee8] p-3">
             <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-[#334155]">
               Debts ({debts.length})
@@ -307,7 +307,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
               + Add debt
             </button>
           </div>
-          <div className="overflow-x-auto">
+          <div className="w-full max-w-full overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-[#d7dee8] bg-[#e8eef6] text-xs uppercase tracking-[0.12em] text-[#334155]">
               <tr>
@@ -465,7 +465,7 @@ function Metric({
             ? "text-[#7e22ce]"
             : "text-[#0f172a]";
   return (
-    <div className="min-h-[132px] rounded-md border border-[#d7dee8] bg-[#f8fafc] p-4 shadow-lg shadow-black/20">
+    <div className="min-h-[132px] min-w-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-4 shadow-lg shadow-black/20">
       <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#334155]">
         {label}
       </div>
@@ -473,7 +473,7 @@ function Metric({
         {value}
       </div>
       {sub ? (
-        <div className="mt-2 text-sm leading-snug text-[#64748b]">
+        <div className="mt-2 min-w-0 break-words text-sm leading-snug text-[#64748b]">
           {sub}
         </div>
       ) : null}
@@ -515,7 +515,7 @@ function Chart({
 
   const W = 800;
   const H = compact ? 220 : 260;
-  const PAD = { t: 22, r: 60, b: 28, l: 60 };
+  const PAD = { t: 22, r: 124, b: 28, l: 60 };
   const cw = W - PAD.l - PAD.r;
   const ch = H - PAD.t - PAD.b;
   const px = (i: number) =>
@@ -660,7 +660,7 @@ function Chart({
         Total {formatMoney(endVal)}
       </div>
       <svg
-        className="h-64 w-full"
+        className="h-64 w-full max-w-full"
         preserveAspectRatio="xMidYMid meet"
         viewBox={`0 0 ${W} ${H}`}
       >
@@ -687,7 +687,7 @@ function Chart({
               strokeWidth="1"
             />
             <text
-              x={W - PAD.r - 8}
+              x={W - 10}
               y={py(targetCents) - 8}
               fill="#7e22ce"
               fontSize="10"
@@ -824,9 +824,8 @@ function Chart({
             Total label lives in the HTML above the SVG. */}
         {(() => {
           const xEnd = px(series.length - 1);
-          const principalXText = xEnd - 40;
+          const labelX = W - 10;
           const principalLabelOffset = series.length - 1 <= 260 ? 40 : 24;
-          const interestXText = xEnd - 92;
           return (
             <>
               {/* Principal endpoint dot + label below the dot (slate) */}
@@ -839,7 +838,7 @@ function Chart({
                 strokeWidth="2"
               />
               <text
-                x={principalXText}
+                x={labelX}
                 y={py(principalEnd) + principalLabelOffset}
                 fill="#18181b"
                 fontSize="10"
@@ -860,8 +859,8 @@ function Chart({
                 strokeWidth="2"
               />
               <text
-                x={interestXText}
-                y={py(endVal) + 26}
+                x={labelX}
+                y={py(endVal) + 18}
                 fill={endColor}
                 fontSize="10"
                 fontWeight="700"
