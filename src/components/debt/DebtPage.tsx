@@ -846,7 +846,7 @@ function Chart({
                 textAnchor="end"
                 fontFamily="ui-monospace, monospace"
               >
-                {formatMoney(principalEnd)}
+                {formatMoney(principalEnd)} principal
               </text>
 
               {/* Invested endpoint dot + interest-earned label above the dot (teal) */}
