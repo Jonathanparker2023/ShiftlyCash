@@ -805,7 +805,8 @@ function Chart({
             Total label lives in the HTML above the SVG. */}
         {(() => {
           const xEnd = px(series.length - 1);
-          const xText = xEnd - 40;
+          const principalXText = xEnd - 40;
+          const interestXText = xEnd - 92;
           return (
             <>
               {/* Principal endpoint dot + label below the dot (slate) */}
@@ -818,7 +819,7 @@ function Chart({
                 strokeWidth="2"
               />
               <text
-                x={xText}
+                x={principalXText}
                 y={py(principalEnd) + 24}
                 fill="#18181b"
                 fontSize="10"
@@ -839,7 +840,7 @@ function Chart({
                 strokeWidth="2"
               />
               <text
-                x={xText}
+                x={interestXText}
                 y={py(endVal) + 26}
                 fill={endColor}
                 fontSize="10"
