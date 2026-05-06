@@ -284,7 +284,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
               + Add debt
             </button>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-[#d7dee8] bg-[#e8eef6] text-xs uppercase tracking-[0.12em] text-[#334155]">
               <tr>
                 <th className="p-3 text-left font-semibold">Order</th>
@@ -412,6 +413,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
               ) : null}
             </tbody>
           </table>
+          </div>
         </section>
       </main>
     </div>
@@ -790,19 +792,74 @@ function Chart({
             </text>
           </g>
         ) : null}
-        {/* End markers */}
-        <circle cx={px(series.length - 1)} cy={py(endVal)} r="4" fill={endColor} stroke="#fff" strokeWidth="2" />
-        <text
-          x={Math.max(PAD.l + 120, px(series.length - 1) - 135)}
-          y={py(endVal) + 34}
-          fill={endColor}
-          fontSize="10"
-          fontWeight="700"
-          textAnchor="start"
-          fontFamily="ui-monospace, monospace"
-        >
-          {formatMoney(endVal)}
-        </text>
+        {/* End markers — three labels:
+            • principal endpoint (slate, matches bottom line color)
+            • invested endpoint (teal, matches top line color, shows interest earned)
+            • centered top total (= principal + interest = invested end value) */}
+        {(() => {
+          const principalEnd = principalSeries[principalSeries.length - 1] ?? 0;
+          const interestEarned = endVal - principalEnd;
+          const xEnd = px(series.length - 1);
+          const xLabel = Math.max(PAD.l + 80, xEnd - 96);
+          return (
+            <>
+              {/* Principal endpoint dot + label (slate) */}
+              <circle
+                cx={xEnd}
+                cy={py(principalEnd)}
+                r="4"
+                fill="#18181b"
+                stroke="#fff"
+                strokeWidth="2"
+              />
+              <text
+                x={xLabel}
+                y={py(principalEnd) + 16}
+                fill="#18181b"
+                fontSize="10"
+                fontWeight="700"
+                textAnchor="start"
+                fontFamily="ui-monospace, monospace"
+              >
+                {formatMoney(principalEnd)}
+              </text>
+
+              {/* Invested endpoint dot + interest-earned label (teal) */}
+              <circle
+                cx={xEnd}
+                cy={py(endVal)}
+                r="4"
+                fill={endColor}
+                stroke="#fff"
+                strokeWidth="2"
+              />
+              <text
+                x={xLabel}
+                y={py(endVal) - 8}
+                fill={endColor}
+                fontSize="10"
+                fontWeight="700"
+                textAnchor="start"
+                fontFamily="ui-monospace, monospace"
+              >
+                +{formatMoney(interestEarned)} interest
+              </text>
+
+              {/* Centered top: total = principal + interest */}
+              <text
+                x={(PAD.l + W - PAD.r) / 2}
+                y={PAD.t - 6}
+                fill="#0f172a"
+                fontSize="12"
+                fontWeight="800"
+                textAnchor="middle"
+                fontFamily="ui-monospace, monospace"
+              >
+                Total {formatMoney(endVal)}
+              </text>
+            </>
+          );
+        })()}
       </svg>
       <div className="mt-2 flex items-center justify-between text-xs font-medium text-[#64748b]">
         <span className="flex flex-wrap items-center gap-3">
