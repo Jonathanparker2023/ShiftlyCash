@@ -1,23 +1,32 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { TaskList } from "@/components/projects/TaskList";
 import type { ProjectItem } from "@/lib/projects/types";
 
-export function ProjectBar({ project }: { project: ProjectItem }) {
+const PROJECT_ACCENT = "#1d4ed8";
+
+export function ProjectBar({
+  dragHandle,
+  project,
+}: {
+  dragHandle?: ReactNode;
+  project: ProjectItem;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const progressLabel = `${project.progress.done} / ${project.progress.total}`;
 
   return (
     <article className="overflow-hidden rounded-md border border-[#d7dee8] bg-[#f8fafc] shadow-[0_16px_38px_rgba(0,0,0,0.16)]">
-      <button
-        className="block w-full text-left"
-        onClick={() => setIsExpanded((current) => !current)}
-        type="button"
-      >
-        <div className="h-1.5" style={{ backgroundColor: project.color }} />
-        <div className="p-3 sm:p-4">
+      <div className="h-1.5 bg-[#1d4ed8]" />
+      <div className="flex items-start gap-2 p-3 sm:p-4">
+        <button
+          className="block min-w-0 flex-1 text-left"
+          onClick={() => setIsExpanded((current) => !current)}
+          type="button"
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -50,13 +59,14 @@ export function ProjectBar({ project }: { project: ProjectItem }) {
             <div
               className="h-full rounded-full transition-all"
               style={{
-                backgroundColor: project.color,
+                backgroundColor: PROJECT_ACCENT,
                 width: `${project.progress.percent}%`,
               }}
             />
           </div>
-        </div>
-      </button>
+        </button>
+        {dragHandle ? <div className="shrink-0">{dragHandle}</div> : null}
+      </div>
 
       {isExpanded ? <TaskList project={project} /> : null}
     </article>

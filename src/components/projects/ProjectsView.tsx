@@ -1,26 +1,50 @@
 "use client";
 
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
-import { createProjectAction } from "@/app/(protected)/projects/actions";
+import {
+  createProjectAction,
+  reorderProjectsAction,
+} from "@/app/(protected)/projects/actions";
 import { ClaudeChat } from "@/components/projects/ClaudeChat";
 import { ProjectBar } from "@/components/projects/ProjectBar";
-import type { ProjectsData } from "@/lib/projects/types";
+import type { ProjectItem, ProjectsData } from "@/lib/projects/types";
 
-const PROJECT_COLORS = ["#1d4ed8", "#0e7490", "#16a34a", "#d97706"] as const;
+const PROJECT_ACCENT = "#1d4ed8";
 
 export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [color, setColor] = useState<(typeof PROJECT_COLORS)[number]>("#1d4ed8");
   const [isAdding, setIsAdding] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const activeCount = initialData.projects.filter(
+  const projects = initialData.projects;
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+  );
+  const activeCount = projects.filter(
     (project) => project.status === "active",
   ).length;
-  const taskCount = initialData.projects.reduce(
+  const taskCount = projects.reduce(
     (total, project) => total + project.progress.total,
     0,
   );
@@ -37,13 +61,38 @@ export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
     setError(null);
 
     try {
-      await createProjectAction({ name: nextName, color });
+      await createProjectAction({ name: nextName, color: PROJECT_ACCENT });
       setName("");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create project.");
     } finally {
       setIsAdding(false);
+    }
+  }
+
+  async function reorderProjectBars(event: DragEndEvent) {
+    if (!event.over || event.active.id === event.over.id || isReordering) {
+      return;
+    }
+
+    const oldIndex = projects.findIndex((project) => project.id === event.active.id);
+    const newIndex = projects.findIndex((project) => project.id === event.over?.id);
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
+
+    const nextProjects = arrayMove(projects, oldIndex, newIndex);
+    setIsReordering(true);
+    setError(null);
+
+    try {
+      await reorderProjectsAction({ orderedIds: nextProjects.map((project) => project.id) });
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to reorder projects.");
+    } finally {
+      setIsReordering(false);
     }
   }
 
@@ -92,22 +141,6 @@ export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
                     Add
                   </button>
                 </div>
-                <div className="flex gap-1">
-                  {PROJECT_COLORS.map((projectColor) => (
-                    <button
-                      aria-label={`Use color ${projectColor}`}
-                      className={
-                        projectColor === color
-                          ? "h-7 w-7 rounded-full ring-2 ring-[#0f172a] ring-offset-2"
-                          : "h-7 w-7 rounded-full ring-1 ring-black/10"
-                      }
-                      key={projectColor}
-                      onClick={() => setColor(projectColor)}
-                      style={{ backgroundColor: projectColor }}
-                      type="button"
-                    />
-                  ))}
-                </div>
               </form>
             </div>
 
@@ -117,12 +150,27 @@ export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
               </p>
             ) : null}
 
-            {initialData.projects.length > 0 ? (
-              <div className="grid gap-3 xl:grid-cols-2">
-                {initialData.projects.map((project) => (
-                  <ProjectBar key={project.id} project={project} />
-                ))}
-              </div>
+            {projects.length > 0 ? (
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={reorderProjectBars}
+                sensors={sensors}
+              >
+                <SortableContext
+                  items={projects.map((project) => project.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  <div className="-mx-3 flex flex-col gap-3 px-3 md:flex-row md:overflow-x-auto md:pb-2">
+                    {projects.map((project) => (
+                      <SortableProjectBar
+                        isReordering={isReordering}
+                        key={project.id}
+                        project={project}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             ) : (
               <div className="rounded-md border border-dashed border-[#cbd5e1] bg-white p-8 text-center text-sm text-[#64748b]">
                 No projects yet.
@@ -134,5 +182,55 @@ export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
         <ClaudeChat />
       </div>
     </main>
+  );
+}
+
+function SortableProjectBar({
+  isReordering,
+  project,
+}: {
+  isReordering: boolean;
+  project: ProjectItem;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: project.id, disabled: isReordering });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      className={
+        isDragging
+          ? "opacity-70 md:w-[360px] md:min-w-[360px]"
+          : "md:w-[360px] md:min-w-[360px]"
+      }
+      ref={setNodeRef}
+      style={style}
+    >
+      <ProjectBar
+        dragHandle={
+          <button
+            aria-label={`Drag ${project.name}`}
+            className="h-8 w-8 touch-none rounded-md border border-[#cbd5e1] bg-white text-sm font-bold text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+            disabled={isReordering}
+            title="Drag to reorder"
+            type="button"
+            {...attributes}
+            {...listeners}
+          >
+            ::
+          </button>
+        }
+        project={project}
+      />
+    </div>
   );
 }
