@@ -639,8 +639,8 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             </div>
           </div>
 
-          <div className="-mx-3 overflow-x-auto px-3 pb-2 sm:mx-0 sm:px-0">
-            <div className="flex w-max min-w-full snap-x gap-2 sm:grid sm:w-auto sm:min-w-0 sm:grid-cols-7 sm:snap-none">
+          <div className="pb-2">
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
               {days.map((day, dayIndex) => (
                 <WeekStripCell
                   day={day}
@@ -875,35 +875,35 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? "min-w-[118px] snap-start rounded-md border-2 border-[#0e7490] bg-white p-3 text-left shadow-[0_10px_24px_rgba(16,16,15,0.12)] sm:min-w-0"
+          ? "min-w-0 rounded-md border-2 border-[#0e7490] bg-white px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(16,16,15,0.12)] sm:p-3"
           : day.spendLocked
-            ? "min-w-[118px] snap-start rounded-md border border-[#d7dee8] bg-[#e8eef6] p-3 text-left opacity-70 transition hover:border-[#0e7490] sm:min-w-0"
-            : "min-w-[118px] snap-start rounded-md border border-[#d7dee8] bg-white p-3 text-left shadow-sm transition hover:border-[#0e7490] hover:bg-[#eef4fb] sm:min-w-0"
+            ? "min-w-0 rounded-md border border-[#d7dee8] bg-[#e8eef6] px-1.5 py-2 text-left opacity-70 transition hover:border-[#0e7490] sm:p-3"
+            : "min-w-0 rounded-md border border-[#d7dee8] bg-white px-1.5 py-2 text-left shadow-sm transition hover:border-[#0e7490] hover:bg-[#eef4fb] sm:p-3"
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#334155]">
+      <div className="flex min-w-0 items-center justify-between gap-1 sm:gap-2">
+        <span className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-[#334155] sm:text-[10px] sm:tracking-[0.14em]">
           {shortDayName(day.date)}
         </span>
         {day.spendLocked ? (
-          <span className="rounded-full bg-[#fff7ed] px-1.5 py-0.5 text-[10px] font-semibold text-[#c2410c]">
+          <span className="hidden rounded-full bg-[#fff7ed] px-1.5 py-0.5 text-[10px] font-semibold text-[#c2410c] sm:inline-flex">
             Locked
           </span>
         ) : null}
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="text-lg font-semibold text-[#0f172a]">
+      <div className="mt-1 flex min-w-0 items-center justify-between gap-1 sm:gap-2">
+        <span className="text-base font-semibold text-[#0f172a] sm:text-lg">
           {formatDayOnly(day.date)}
         </span>
         {isToday ? (
-          <span className="rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[10px] font-semibold text-[#0e7490]">
+          <span className="hidden rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[10px] font-semibold text-[#0e7490] sm:inline-flex">
             Today
           </span>
         ) : null}
       </div>
-      <p className={`mt-6 text-sm font-semibold ${cashflowDailyColor(displayCashflowCents)}`}>
+      <p className={`mt-3 truncate text-xs font-semibold sm:mt-6 sm:text-sm ${cashflowDailyColor(displayCashflowCents)}`}>
         {formatMoney(displayCashflowCents)}
       </p>
     </button>
