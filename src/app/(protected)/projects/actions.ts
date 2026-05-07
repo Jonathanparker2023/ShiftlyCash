@@ -10,6 +10,7 @@ import {
   createTask,
   deleteProject,
   deleteTask,
+  getProjectForUser,
   reorderProjects,
   reorderTasks,
   updateProject,
@@ -56,8 +57,15 @@ export async function archiveProjectAction(input: {
 
 export async function deleteProjectAction(input: {
   id: string;
+  confirmationText: string;
 }): Promise<{ ok: true }> {
   const { supabase } = await requireUser();
+  const project = await getProjectForUser(supabase, input.id);
+  if (!project.ok) throw new Error(project.error);
+  if (input.confirmationText !== project.data.name) {
+    throw new Error("Confirmation must match the current project name exactly.");
+  }
+
   const result = await deleteProject(supabase, input);
   if (!result.ok) throw new Error(result.error);
 

@@ -1,8 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { deleteProjectAction } from "@/app/(protected)/projects/actions";
 import { TaskList } from "@/components/projects/TaskList";
 import type { ProjectItem } from "@/lib/projects/types";
 
@@ -15,8 +17,36 @@ export function ProjectBar({
   dragHandle?: ReactNode;
   project: ProjectItem;
 }) {
+  const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const progressLabel = `${project.progress.done} / ${project.progress.total}`;
+
+  async function deleteProject() {
+    if (isDeleting) {
+      return;
+    }
+
+    const confirmationText = window.prompt(
+      `Delete "${project.name}" and all of its tasks?\n\nType the exact project name to confirm.`,
+    );
+    if (confirmationText === null) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setError(null);
+
+    try {
+      await deleteProjectAction({ id: project.id, confirmationText });
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete project.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   return (
     <article className="overflow-hidden rounded-md border border-[#d7dee8] bg-[#f8fafc] shadow-[0_16px_38px_rgba(0,0,0,0.16)]">
@@ -65,8 +95,26 @@ export function ProjectBar({
             />
           </div>
         </button>
-        {dragHandle ? <div className="shrink-0">{dragHandle}</div> : null}
+        <div className="flex shrink-0 flex-col gap-2">
+          {dragHandle}
+          <button
+            aria-label={`Delete ${project.name}`}
+            className="h-8 rounded-md border border-[#fecaca] bg-white px-2 text-xs font-semibold text-[#b91c1c] transition hover:border-[#ef4444] hover:bg-[#fff1f2] focus:outline-none focus:ring-2 focus:ring-[#fecaca] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isDeleting}
+            onClick={deleteProject}
+            title="Delete project"
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
       </div>
+
+      {error ? (
+        <p className="mx-3 mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-sm font-medium text-[#b91c1c] sm:mx-4">
+          {error}
+        </p>
+      ) : null}
 
       {isExpanded ? <TaskList project={project} /> : null}
     </article>
