@@ -1,4 +1,5 @@
 import { requireUserWithBootstrapStatus } from "@/lib/auth";
+import { mark, since, timed } from "@/lib/perf";
 import {
   addDaysIso,
   formatDayLabel,
@@ -126,12 +127,16 @@ type AdjacentAbilityPayPeriod = {
 };
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const { supabase } = await requireUserWithBootstrapStatus();
+  const tTotal = mark();
+  const { supabase } = await timed("dashboard:auth", () =>
+    requireUserWithBootstrapStatus(),
+  );
   const startDate = getSundayOnOrBeforeTodayIso();
 
-  const { data: weekId, error: ensureError } = await supabase.rpc(
-    "ensure_current_active_week",
-    { p_start_date: startDate },
+  const { data: weekId, error: ensureError } = await timed(
+    "dashboard:ensureWeek",
+    () =>
+      supabase.rpc("ensure_current_active_week", { p_start_date: startDate }),
   );
 
   if (ensureError) {
@@ -142,6 +147,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     throw new Error("Active week RPC did not return a week id.");
   }
 
+  const tBatchA = mark();
   const [
     { data: settingsData, error: settingsError },
     { data: weekData, error: weekError },
@@ -192,6 +198,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       .eq("status", "closed")
       .order("start_date", { ascending: true }),
   ]);
+  since("dashboard:batchA(settings+week+days+totals+baseline+closed)", tBatchA);
 
   if (settingsError) {
     throw new Error(`Unable to load settings: ${settingsError.message}`);
@@ -221,6 +228,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const days = (dayData ?? []) as DayRow[];
   const dayIds = days.map((day) => day.id);
+  const tBatchB = mark();
   const [
     { data: slotData, error: slotError },
     { data: transactionData, error: transactionError },
@@ -250,6 +258,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           { data: [], error: null },
           { data: [], error: null },
         ];
+  since("dashboard:batchB(slots+transactions)", tBatchB);
 
   if (slotError) {
     throw new Error(`Unable to load earn slots: ${slotError.message}`);
@@ -264,7 +273,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     weekTotal: weekTotalData as WeekTotalRow,
   });
 
-  return mapDashboardData({
+  const result = mapDashboardData({
     settings: settingsData as SettingsRow,
     week: weekData as WeekRow,
     days,
@@ -277,6 +286,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
     todayIso: getTodayIso(),
   });
+  since("dashboard:total", tTotal);
+  return result;
 }
 
 function mapDashboardData(input: {
@@ -469,9 +480,9 @@ function sumAbilityHours(slots: AdjacentEarnSlotRow[]): {
 } {
   return slots.reduce(
     (total, slot) => {
-      if (slot.job_type !== "ability") {
-        return total;
-      }
+    if (slot.job_type !== "ability") {
+      return total;
+    }
 
       if (slot.pay_type === "regular") {
         return {

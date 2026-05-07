@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/domain/money";
+import { mark, since, timed } from "@/lib/perf";
 import { formatWeekDuration } from "@/lib/domain/projection-format";
 import {
   calcWeeklyProjection,
@@ -46,9 +47,11 @@ const MILLIONAIRE_ANNUAL_RETURN = 0.1;
 const ROLLING_WINDOW_WEEKS = 2;
 
 export async function getDebtData(): Promise<DebtPageData> {
-  const { supabase, user } = await requireUser();
+  const tTotal = mark();
+  const { supabase, user } = await timed("debt:auth", () => requireUser());
   if (!user) redirect("/login");
 
+  const tBatch = mark();
   const [debtsRes, weeksRes, settingsRes, assetsRes] = await Promise.all([
     supabase
       .from("debts")
@@ -75,6 +78,7 @@ export async function getDebtData(): Promise<DebtPageData> {
       .eq("user_id", user.id)
       .not("linked_debt_id", "is", null),
   ]);
+  since("debt:reads(debts+weeks+settings+assets)", tBatch);
 
   if (debtsRes.error) throw new Error(`Debts: ${debtsRes.error.message}`);
   if (weeksRes.error) throw new Error(`Weeks: ${weeksRes.error.message}`);
@@ -214,7 +218,7 @@ export async function getDebtData(): Promise<DebtPageData> {
       ? null
       : calculateAgeOnDate(millionaireDateIso);
 
-  return {
+  const result = {
     debts,
     totalActiveDebtCents,
     activeDebtCount,
@@ -241,6 +245,8 @@ export async function getDebtData(): Promise<DebtPageData> {
         .map((week) => Number(week.display_week_number)),
     },
   };
+  since("debt:total", tTotal);
+  return result;
 }
 
 function calculateAgeOnDate(iso: string): number {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { requireUser } from "@/lib/auth";
+import { NavLink } from "./NavLink";
 
 export const dynamic = "force-dynamic";
 
@@ -73,16 +74,5 @@ export default async function ProtectedLayout({
       </nav>
       <div className="w-full max-w-[100vw] overflow-x-hidden">{children}</div>
     </>
-  );
-}
-
-function NavLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      className="shrink-0 rounded-full px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-white/[0.1] hover:text-white"
-      href={href}
-    >
-      {children}
-    </Link>
   );
 }

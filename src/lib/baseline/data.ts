@@ -1,4 +1,5 @@
 import { requireUserWithBootstrapStatus } from "@/lib/auth";
+import { mark, since, timed } from "@/lib/perf";
 import { getTodayIso } from "@/lib/dashboard/dates";
 import type {
   BaselineData,
@@ -26,7 +27,11 @@ type ExpenseTotalRow = {
 };
 
 export async function getBaselineData(): Promise<BaselineData> {
-  const { supabase, user } = await requireUserWithBootstrapStatus();
+  const tTotal = mark();
+  const { supabase, user } = await timed("baseline:auth", () =>
+    requireUserWithBootstrapStatus(),
+  );
+  const tBatch = mark();
   const [
     { data: expenseData, error: expenseError },
     { data: totalData, error: totalError },
@@ -43,6 +48,7 @@ export async function getBaselineData(): Promise<BaselineData> {
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
+  since("baseline:reads", tBatch);
 
   if (expenseError) {
     throw new Error(`Unable to load expenses: ${expenseError.message}`);
@@ -52,11 +58,13 @@ export async function getBaselineData(): Promise<BaselineData> {
     throw new Error(`Unable to load baseline totals: ${totalError.message}`);
   }
 
-  return {
+  const result = {
     todayIso: getTodayIso(),
     expenses: ((expenseData ?? []) as ExpenseRow[]).map(mapExpenseRow),
     totals: mapExpenseTotals(totalData as ExpenseTotalRow | null),
   };
+  since("baseline:total", tTotal);
+  return result;
 }
 
 function mapExpenseRow(row: ExpenseRow): BaselineExpense {

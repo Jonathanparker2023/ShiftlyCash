@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { HistoryDayStrip } from "@/components/history/HistoryDayStrip";
 import { ReopenWeekButton } from "@/components/history/ReopenWeekButton";
+import { getTodayIso } from "@/lib/dashboard/dates";
 import {
   cashflowDailyTone,
   cashflowWeeklyTone,
@@ -25,6 +27,7 @@ export default async function HistoryDetailPage({
 
   const dateRange = formatDateRange(data.week.startDate, data.week.endDate);
   const statusLabel = data.week.archivedAt ? "archived" : data.week.status;
+  const todayIso = getTodayIso();
 
   return (
     <div className="min-h-screen bg-zinc-50 px-4 py-5 text-zinc-950 sm:px-6 lg:px-8">
@@ -77,11 +80,13 @@ export default async function HistoryDetailPage({
           />
         </section>
 
-        <section className="flex flex-col gap-4 lg:flex-row lg:overflow-x-auto lg:pb-2">
+        <HistoryDayStrip todayIso={todayIso}>
           {data.days.map((day) => (
-            <ReadOnlyDayCard day={day} key={day.id} />
+            <div data-day-date={day.date} key={day.id}>
+              <ReadOnlyDayCard day={day} />
+            </div>
           ))}
-        </section>
+        </HistoryDayStrip>
 
         <SnapshotSection snapshots={data.snapshots} />
       </main>
@@ -118,16 +123,16 @@ function ReadOnlyDayCard({ day }: { day: HistoryDetailDay }) {
         ) : (
           day.slots.map((slot) => (
             <div
-              className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm"
+              className={historyShiftBarClass(slot.jobType, day.spendLocked)}
               key={slot.id}
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="font-medium text-zinc-950">
+                <span className="font-medium">
                   {slot.jobType} / {slot.payType}
                 </span>
-                <span className="text-zinc-600">{formatQuantity(slot.hoursOrUnits)}</span>
+                <span className="opacity-80">{formatQuantity(slot.hoursOrUnits)}</span>
               </div>
-              <div className="mt-1 flex items-center justify-between gap-3 text-xs text-zinc-500">
+              <div className="mt-1 flex items-center justify-between gap-3 text-xs opacity-70">
                 <span>{slot.label || "No label"}</span>
                 <span>slot {slot.slotIndex + 1}</span>
               </div>
@@ -137,8 +142,16 @@ function ReadOnlyDayCard({ day }: { day: HistoryDetailDay }) {
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2 border-t border-zinc-200 pt-3 text-sm">
-        <Metric label="Earn" value={formatMoney(day.earningsCents)} />
-        <Metric label="Spend" value={formatMoney(day.spendCents)} />
+        <Metric
+          label="Earn"
+          tone="positive"
+          value={formatMoney(day.earningsCents)}
+        />
+        <Metric
+          label="Spend"
+          tone="negative"
+          value={formatMoney(day.spendCents)}
+        />
         <Metric
           label="Cashflow"
           tone={cashflowDailyTone(day.cashflowCents)}
@@ -146,9 +159,8 @@ function ReadOnlyDayCard({ day }: { day: HistoryDetailDay }) {
         />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+      <div className="mt-3 text-sm">
         <Metric label="Base" value={formatMoney(day.baseCents)} />
-        <Metric label="Manual spend" value={formatMoney(day.manualSpendCents)} />
       </div>
 
       {day.transactions.length > 0 ? (
@@ -284,6 +296,32 @@ function Metric({
       </div>
     </div>
   );
+}
+
+// Mirrors DashboardEditor's shiftBarClass colors so History detail shift bars
+// match the dashboard's job-type color coding. The `locked` variant lightens
+// the bar (subtle white tint) to signal that the day is finalized — needed
+// because globals.css rewrites bg-zinc-50/text-zinc-* to navy-on-navy and
+// erases the previous neutral styling.
+function historyShiftBarClass(jobType: string, locked: boolean): string {
+  const base = "rounded-md border p-3 text-sm";
+
+  if (jobType === "ability" || jobType === "incentive") {
+    return locked
+      ? `${base} border-[#3b82f6] bg-[#60a5fa] text-white`
+      : `${base} border-[#1e3a8a] bg-[#1d4ed8] text-white`;
+  }
+
+  if (jobType === "prestige") {
+    return locked
+      ? `${base} border-[#fbbf24] bg-[#fde68a] text-[#1f2937]`
+      : `${base} border-[#d97706] bg-[#facc15] text-[#1f2937]`;
+  }
+
+  // other / none
+  return locked
+    ? `${base} border-[#cbd5e1] bg-[#e8eef6] text-[#0f172a]`
+    : `${base} border-[#d7dee8] bg-white text-[#0f172a]`;
 }
 
 function formatMoney(value: number): string {

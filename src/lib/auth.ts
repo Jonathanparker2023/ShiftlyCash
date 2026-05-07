@@ -26,6 +26,36 @@ export async function requireUser() {
 
 export async function requireUserWithBootstrapStatus() {
   const { supabase, user } = await requireUser();
+
+  // Fast path: bootstrap_user_defaults RPC creates profile + settings + default
+  // template in a single transaction (see 202605040007_bootstrap_defaults.sql),
+  // and a signup trigger fires it on every new auth.users row. So if settings
+  // exists, the other two are guaranteed to exist. Single round-trip check on
+  // every authenticated nav, vs. 3 parallel reads + bootstrap RPC in the slow
+  // path. Saves DB load on the hot path (every protected page render).
+  const { data: existingSettings } = await supabase
+    .from("settings")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingSettings) {
+    return {
+      supabase,
+      user,
+      status: {
+        profileReady: true,
+        settingsReady: true,
+        defaultTemplateReady: true,
+        bootstrapAttempted: false,
+        bootstrapError: null,
+      } satisfies BootstrapStatus,
+    };
+  }
+
+  // Slow path: settings missing → run the original probe + bootstrap RPC.
+  // Reached only by users predating the signup trigger or after a partial
+  // failure. Keeps full belt-and-suspenders behavior for those cases.
   let bootstrapAttempted = false;
   let bootstrapError: string | null = null;
 
