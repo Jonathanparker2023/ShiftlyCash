@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
+import { getTodayIso } from "@/lib/dashboard/dates";
 import type { JobType, PayType } from "@/lib/domain/pay";
 
 const JOB_TYPES = ["ability", "prestige", "incentive", "other", "none"] as const;
@@ -70,6 +71,12 @@ export type ManualTransactionResult = {
     time: string | null;
     createdAt: string;
   };
+};
+
+export type RefreshDashboardProjectionMaintenanceResult = {
+  ok: true;
+  cleaned: number;
+  projected: number;
 };
 
 export async function saveDayAction(input: SaveDayInput): Promise<SaveDayResult> {
@@ -201,6 +208,59 @@ export async function closeWeekAndRedirectAction(
 ): Promise<never> {
   await closeWeekAction(input);
   redirect("/");
+}
+
+export async function refreshDashboardProjectionMaintenanceAction(): Promise<RefreshDashboardProjectionMaintenanceResult> {
+  const { supabase } = await requireUser();
+  const todayIso = getTodayIso();
+  const { data: activeWeek, error: activeWeekError } = await supabase
+    .from("weeks")
+    .select("id")
+    .eq("status", "active")
+    .order("start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeWeekError) {
+    throw new Error(`Unable to load active week: ${activeWeekError.message}`);
+  }
+
+  const { data: cleaned, error: cleanupError } = await supabase.rpc(
+    "cleanup_expired_projections",
+    { p_today: todayIso },
+  );
+
+  if (cleanupError) {
+    throw new Error(`Unable to clean projections: ${cleanupError.message}`);
+  }
+
+  let projected = 0;
+
+  if (activeWeek?.id) {
+    const { data: projectedData, error: projectionError } = await supabase.rpc(
+      "apply_future_day_projection",
+      {
+        p_week_id: activeWeek.id,
+        p_today: todayIso,
+      },
+    );
+
+    if (projectionError) {
+      throw new Error(`Unable to apply projections: ${projectionError.message}`);
+    }
+
+    projected = Number(projectedData ?? 0);
+  }
+
+  if (Number(cleaned ?? 0) > 0 || projected > 0) {
+    revalidatePath("/");
+  }
+
+  return {
+    ok: true,
+    cleaned: Number(cleaned ?? 0),
+    projected,
+  };
 }
 
 export async function toggleTransactionStatusAction(

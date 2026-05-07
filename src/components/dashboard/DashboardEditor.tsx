@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addManualTransactionAction,
   closeWeekAction,
+  refreshDashboardProjectionMaintenanceAction,
   saveEarnSlotAction,
   toggleTransactionStatusAction,
   type SaveEarnSlotInput,
@@ -91,6 +92,36 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       Object.values(scheduledTimers).forEach(clearTimeout);
     };
   }, []);
+
+  // Projection maintenance is intentionally post-render. It clears projected
+  // spend that has reached today and fills future-day projections without
+  // blocking dashboard navigation.
+  useEffect(() => {
+    const storageKey = `shiftly:projectionMaintenance:${initialData.todayIso}`;
+
+    if (sessionStorage.getItem(storageKey)) {
+      return;
+    }
+
+    sessionStorage.setItem(storageKey, String(Date.now()));
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await refreshDashboardProjectionMaintenanceAction();
+
+        if (!cancelled && (result.cleaned > 0 || result.projected > 0)) {
+          router.refresh();
+        }
+      } catch {
+        // Projection maintenance is best-effort; dashboard reads stay usable.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialData.todayIso, router]);
 
   // Auto-sync Plaid transactions on first dashboard load (fire-and-forget).
   // Throttled by sessionStorage so it only runs once per browser session per

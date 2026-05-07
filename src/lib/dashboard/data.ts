@@ -114,7 +114,6 @@ type DayTotalRow = {
 export async function getDashboardData(): Promise<DashboardData> {
   const { supabase } = await requireUserWithBootstrapStatus();
   const startDate = getSundayOnOrBeforeTodayIso();
-  const todayIso = getTodayIso();
 
   const { data: weekId, error: ensureError } = await supabase.rpc(
     "ensure_current_active_week",
@@ -128,15 +127,6 @@ export async function getDashboardData(): Promise<DashboardData> {
   if (typeof weekId !== "string") {
     throw new Error("Active week RPC did not return a week id.");
   }
-
-  // Clear any future-day projections that have rolled into today (or past),
-  // and apply projections to remaining future days. Both use the user's local
-  // date so timezone drift doesn't cause off-by-one errors.
-  await supabase.rpc("cleanup_expired_projections", { p_today: todayIso });
-  await supabase.rpc("apply_future_day_projection", {
-    p_week_id: weekId,
-    p_today: todayIso,
-  });
 
   const [
     { data: settingsData, error: settingsError },
