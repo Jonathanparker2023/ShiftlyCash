@@ -793,14 +793,30 @@ function TopMetric({
           : `relative overflow-hidden rounded-md border border-[#d7dee8] bg-white px-2.5 py-3 shadow-sm before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
-      <div
-        className={
-          dark
-            ? "text-[9px] font-semibold uppercase tracking-[0.12em] text-[#cbd5e1] sm:text-[10px] sm:tracking-[0.14em]"
-            : "text-[9px] font-semibold uppercase tracking-[0.12em] text-[#334155] sm:text-[10px] sm:tracking-[0.14em]"
-        }
-      >
-        {label}
+      <div className="flex items-start justify-between gap-2">
+        <div
+          className={
+            dark
+              ? "text-[9px] font-semibold uppercase tracking-[0.12em] text-[#cbd5e1] sm:text-[10px] sm:tracking-[0.14em]"
+              : "text-[9px] font-semibold uppercase tracking-[0.12em] text-[#334155] sm:text-[10px] sm:tracking-[0.14em]"
+          }
+        >
+          {label}
+        </div>
+        {trend ? (
+          <div
+            className={`shrink-0 text-right text-[10px] font-bold uppercase tracking-[0.08em] ${cashflowColorFromTone(
+              trend.tone,
+            )}`}
+          >
+            {trend.direction === "up"
+              ? "↑"
+              : trend.direction === "down"
+                ? "↓"
+                : "→"}{" "}
+            {trend.percent}%
+          </div>
+        ) : null}
       </div>
       <div
         className={
@@ -813,16 +829,6 @@ function TopMetric({
       >
         {value}
       </div>
-      {trend ? (
-        <div
-          className={`mt-1 text-[10px] font-bold uppercase tracking-[0.08em] ${cashflowColorFromTone(
-            trend.tone,
-          )}`}
-        >
-          {trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→"}{" "}
-          {trend.percent}% vs median
-        </div>
-      ) : null}
     </div>
   );
 }
