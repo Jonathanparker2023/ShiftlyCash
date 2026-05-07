@@ -8,7 +8,20 @@ import { deleteProjectAction } from "@/app/(protected)/projects/actions";
 import { TaskList } from "@/components/projects/TaskList";
 import type { ProjectItem } from "@/lib/projects/types";
 
-const PROJECT_ACCENT = "#1d4ed8";
+const PROJECT_EMOJIS = [
+  "🚀",
+  "💎",
+  "⚡",
+  "🎯",
+  "🔥",
+  "🌟",
+  "🧠",
+  "🛠️",
+  "📈",
+  "🏆",
+  "💡",
+  "🧭",
+] as const;
 
 export function ProjectBar({
   dragHandle,
@@ -22,6 +35,7 @@ export function ProjectBar({
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const progressLabel = `${project.progress.done} / ${project.progress.total}`;
+  const identity = getProjectIdentity(project);
 
   async function deleteProject() {
     if (isDeleting) {
@@ -49,76 +63,108 @@ export function ProjectBar({
   }
 
   return (
-    <article className="overflow-hidden rounded-md border border-[#d7dee8] bg-[#f8fafc] shadow-[0_16px_38px_rgba(0,0,0,0.16)]">
-      <div className="h-1.5 bg-[#1d4ed8]" />
-      <div className="flex items-start gap-2 p-3 sm:p-4">
-        <button
-          className="block min-w-0 flex-1 text-left"
-          onClick={() => setIsExpanded((current) => !current)}
-          type="button"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-base font-semibold text-[#0f172a]">
-                  {project.name}
-                </h2>
-                {project.status === "archived" ? (
-                  <span className="rounded-full border border-[#cbd5e1] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
-                    Archived
-                  </span>
-                ) : null}
-              </div>
-              {project.description ? (
-                <p className="mt-1 line-clamp-2 text-sm text-[#64748b]">
-                  {project.description}
-                </p>
-              ) : null}
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-sm font-semibold text-[#0f172a]">{progressLabel}</p>
-              {project.deadline ? (
-                <p className="mt-1 text-xs text-[#64748b]">
-                  {formatDeadline(project.deadline)}
-                </p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                backgroundColor: PROJECT_ACCENT,
-                width: `${project.progress.percent}%`,
-              }}
-            />
-          </div>
-        </button>
-        <div className="flex shrink-0 flex-col gap-2">
-          {dragHandle}
+    <article className="flex overflow-hidden rounded-md border border-[#d7dee8] bg-[#f8fafc] shadow-[0_16px_38px_rgba(0,0,0,0.16)]">
+      <div
+        aria-hidden="true"
+        className="w-1.5 shrink-0"
+        style={{ backgroundColor: identity.accent }}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2 p-3 sm:p-4">
           <button
-            aria-label={`Delete ${project.name}`}
-            className="h-8 rounded-md border border-[#fecaca] bg-white px-2 text-xs font-semibold text-[#b91c1c] transition hover:border-[#ef4444] hover:bg-[#fff1f2] focus:outline-none focus:ring-2 focus:ring-[#fecaca] disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={isDeleting}
-            onClick={deleteProject}
-            title="Delete project"
+            className="block min-w-0 flex-1 text-left"
+            onClick={() => setIsExpanded((current) => !current)}
             type="button"
           >
-            Delete
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span aria-hidden="true" className="text-lg leading-none">
+                    {identity.emoji}
+                  </span>
+                  <h2 className="truncate text-base font-semibold text-[#0f172a]">
+                    {project.name}
+                  </h2>
+                  {project.status === "archived" ? (
+                    <span className="rounded-full border border-[#cbd5e1] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                      Archived
+                    </span>
+                  ) : null}
+                </div>
+                {project.description ? (
+                  <p className="mt-1 line-clamp-2 text-sm text-[#64748b]">
+                    {project.description}
+                  </p>
+                ) : null}
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-semibold text-[#0f172a]">{progressLabel}</p>
+                {project.deadline ? (
+                  <p className="mt-1 text-xs text-[#64748b]">
+                    {formatDeadline(project.deadline)}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  backgroundColor: identity.accent,
+                  width: `${project.progress.percent}%`,
+                }}
+              />
+            </div>
           </button>
+          <div className="flex shrink-0 flex-col gap-2">
+            {dragHandle}
+            <button
+              aria-label={`Delete ${project.name}`}
+              className="h-8 rounded-md border border-[#fecaca] bg-white px-2 text-xs font-semibold text-[#b91c1c] transition hover:border-[#ef4444] hover:bg-[#fff1f2] focus:outline-none focus:ring-2 focus:ring-[#fecaca] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isDeleting}
+              onClick={deleteProject}
+              title="Delete project"
+              type="button"
+            >
+              Delete
+            </button>
+          </div>
         </div>
+
+        {error ? (
+          <p className="mx-3 mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-sm font-medium text-[#b91c1c] sm:mx-4">
+            {error}
+          </p>
+        ) : null}
+
+        {isExpanded ? <TaskList project={project} /> : null}
       </div>
-
-      {error ? (
-        <p className="mx-3 mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-sm font-medium text-[#b91c1c] sm:mx-4">
-          {error}
-        </p>
-      ) : null}
-
-      {isExpanded ? <TaskList project={project} /> : null}
     </article>
   );
+}
+
+function getProjectIdentity(project: ProjectItem): {
+  accent: string;
+  emoji: (typeof PROJECT_EMOJIS)[number];
+} {
+  const hash = hashText(`${project.id}:${project.name}`);
+  const hue = hash % 360;
+  const emoji = PROJECT_EMOJIS[hash % PROJECT_EMOJIS.length];
+
+  return {
+    accent: `hsl(${hue} 88% 48%)`,
+    emoji,
+  };
+}
+
+function hashText(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return hash;
 }
 
 function formatDeadline(value: string): string {
