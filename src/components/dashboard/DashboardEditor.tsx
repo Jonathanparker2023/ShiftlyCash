@@ -602,6 +602,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               <MetricStrip
                 cashflowCents={weekTotals.cashflowCents}
                 earningsCents={weekTotals.earningsCents}
+                medians={initialData.metricMedians}
                 spendCents={weekTotals.spendCents}
               />
             </div>
@@ -677,38 +678,58 @@ function MetricStrip({
   earningsCents,
   spendCents,
   cashflowCents,
+  medians,
 }: {
   earningsCents: number;
   spendCents: number;
   cashflowCents: number;
+  medians: DashboardData["metricMedians"];
 }) {
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
   const cashflowTone = cashflowDailyTone(displayCashflowCents);
 
   return (
     <div className="grid grid-cols-3 gap-2">
-      <TopMetric accent="green" label="Earn" value={formatMoney(earningsCents)} />
+      <TopMetric
+        accent="green"
+        label="Earn"
+        trend={buildMedianTrend(earningsCents, medians.earningsCents, "higher")}
+        value={formatMoney(earningsCents)}
+      />
       <TopMetric
         accent="negative"
         label="Spend"
         tone="negative"
+        trend={buildMedianTrend(spendCents, medians.spendCents, "lower")}
         value={formatMoney(spendCents)}
       />
       <TopMetric
         accent={cashflowTone}
         label="Cashflow"
         tone={cashflowTone}
+        trend={buildMedianTrend(
+          displayCashflowCents,
+          medians.cashflowCents,
+          "higher",
+        )}
         value={formatMoney(displayCashflowCents)}
       />
     </div>
   );
 }
 
+type MedianTrend = {
+  direction: "up" | "down" | "flat";
+  percent: number;
+  tone: "positive" | "amber" | "negative";
+};
+
 function TopMetric({
   label,
   value,
   tone,
   accent,
+  trend,
   className = "",
   dark = false,
 }: {
@@ -716,6 +737,7 @@ function TopMetric({
   value: string;
   tone?: "positive" | "amber" | "negative";
   accent?: "green" | "blue" | "positive" | "amber" | "negative";
+  trend?: MedianTrend | null;
   className?: string;
   dark?: boolean;
 }) {
@@ -760,6 +782,16 @@ function TopMetric({
       >
         {value}
       </div>
+      {trend ? (
+        <div
+          className={`mt-1 text-[10px] font-bold uppercase tracking-[0.08em] ${cashflowColorFromTone(
+            trend.tone,
+          )}`}
+        >
+          {trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→"}{" "}
+          {trend.percent}% vs median
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1815,6 +1847,41 @@ function roundCashflowToNearestFiveDollars(value: number): number {
   const sign = value < 0 ? -1 : 1;
 
   return sign * Math.round(Math.abs(value) / incrementCents) * incrementCents;
+}
+
+function buildMedianTrend(
+  currentCents: number,
+  medianCents: number,
+  favorableDirection: "higher" | "lower",
+): MedianTrend | null {
+  if (!Number.isFinite(currentCents) || !Number.isFinite(medianCents)) {
+    return null;
+  }
+
+  if (Math.abs(medianCents) < 1) {
+    return null;
+  }
+
+  const delta = currentCents - medianCents;
+  const percent = Math.round((Math.abs(delta) / Math.abs(medianCents)) * 100);
+
+  if (percent === 0) {
+    return {
+      direction: "flat",
+      percent,
+      tone: "amber",
+    };
+  }
+
+  const direction = delta > 0 ? "up" : "down";
+  const isFavorable =
+    favorableDirection === "higher" ? delta > 0 : delta < 0;
+
+  return {
+    direction,
+    percent,
+    tone: isFavorable ? "positive" : "negative",
+  };
 }
 
 function formatLongDate(value: string): string {

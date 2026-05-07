@@ -87,6 +87,12 @@ type WeekTotalRow = {
   running_balance: NumericValue;
 };
 
+type ClosedWeekMetricRow = {
+  earnings_total: NumericValue;
+  spend_total: NumericValue;
+  cashflow_total: NumericValue;
+};
+
 type BaselineTotalRow = {
   monthly_total: NumericValue;
   weekly_average: NumericValue;
@@ -139,6 +145,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     { data: dayTotalData, error: dayTotalError },
     { data: weekTotalData, error: weekTotalError },
     { data: baselineTotalData, error: baselineTotalError },
+    { data: closedWeekMetricData, error: closedWeekMetricError },
   ] = await Promise.all([
     supabase
       .from("settings")
@@ -175,6 +182,11 @@ export async function getDashboardData(): Promise<DashboardData> {
       .from("v_active_expense_totals")
       .select("monthly_total,weekly_average,projected_daily_base")
       .maybeSingle(),
+    supabase
+      .from("v_week_totals")
+      .select("earnings_total,spend_total,cashflow_total")
+      .eq("status", "closed")
+      .order("start_date", { ascending: true }),
   ]);
 
   if (settingsError) {
@@ -195,6 +207,11 @@ export async function getDashboardData(): Promise<DashboardData> {
   if (baselineTotalError) {
     throw new Error(
       `Unable to load baseline totals: ${baselineTotalError.message}`,
+    );
+  }
+  if (closedWeekMetricError) {
+    throw new Error(
+      `Unable to load metric medians: ${closedWeekMetricError.message}`,
     );
   }
 
@@ -246,6 +263,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     transactions: (transactionData ?? []) as TransactionRow[],
     weekTotal: weekTotalData as WeekTotalRow,
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
+    closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
     todayIso: getTodayIso(),
   });
 }
@@ -259,6 +277,7 @@ function mapDashboardData(input: {
   transactions: TransactionRow[];
   weekTotal: WeekTotalRow;
   baselineTotal: BaselineTotalRow | null;
+  closedWeekMetrics: ClosedWeekMetricRow[];
   todayIso: string;
 }): DashboardData {
   const settings = mapPaySettings(input.settings);
@@ -318,7 +337,36 @@ function mapDashboardData(input: {
         toNumber(input.baselineTotal?.projected_daily_base ?? 0),
       ),
     },
+    metricMedians: {
+      earningsCents: medianCents(
+        input.closedWeekMetrics.map((row) => row.earnings_total),
+      ),
+      spendCents: medianCents(
+        input.closedWeekMetrics.map((row) => row.spend_total),
+      ),
+      cashflowCents: medianCents(
+        input.closedWeekMetrics.map((row) => row.cashflow_total),
+      ),
+    },
   };
+}
+
+function medianCents(values: NumericValue[]): number {
+  const cents = values
+    .map((value) => dollarsToCents(toNumber(value)))
+    .sort((left, right) => left - right);
+
+  if (cents.length === 0) {
+    return 0;
+  }
+
+  const middle = Math.floor(cents.length / 2);
+
+  if (cents.length % 2 === 1) {
+    return cents[middle];
+  }
+
+  return Math.round((cents[middle - 1] + cents[middle]) / 2);
 }
 
 function mapDashboardDay(

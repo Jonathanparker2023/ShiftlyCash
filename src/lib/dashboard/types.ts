@@ -64,12 +64,19 @@ export type DashboardBaselineTotals = {
   projectedDailyBaseCents: number;
 };
 
+export type DashboardMetricMedians = {
+  earningsCents: number;
+  spendCents: number;
+  cashflowCents: number;
+};
+
 export type DashboardData = {
   todayIso: string;
   settings: PaySettings;
   week: DashboardWeek;
   days: DashboardDay[];
   baselineTotals: DashboardBaselineTotals;
+  metricMedians: DashboardMetricMedians;
 };
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
