@@ -70,6 +70,12 @@ export type DashboardMetricMedians = {
   cashflowCents: number;
 };
 
+export type DashboardAbilityPayPeriod = {
+  adjacentWeekAbilityHours: number;
+  adjacentWeekAbilityPaycheckCents: number;
+  hasAdjacentWeek: boolean;
+};
+
 export type DashboardData = {
   todayIso: string;
   settings: PaySettings;
@@ -77,6 +83,7 @@ export type DashboardData = {
   days: DashboardDay[];
   baselineTotals: DashboardBaselineTotals;
   metricMedians: DashboardMetricMedians;
+  abilityPayPeriod: DashboardAbilityPayPeriod;
 };
 
 export type SaveState = "idle" | "saving" | "saved" | "error";

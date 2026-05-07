@@ -58,6 +58,12 @@ type EarnSlotRow = {
   source: EarnSlotSource;
 };
 
+type AdjacentEarnSlotRow = {
+  job_type: JobType;
+  pay_type: PayType;
+  hours_or_units: NumericValue;
+};
+
 type TransactionRow = {
   id: string;
   day_id: string | null;
@@ -109,6 +115,12 @@ type DayTotalRow = {
   spend_total: NumericValue;
   base_amount: NumericValue;
   cashflow_total: NumericValue;
+};
+
+type AdjacentAbilityPayPeriod = {
+  adjacentWeekAbilityHours: number;
+  adjacentWeekAbilityPaycheckCents: number;
+  hasAdjacentWeek: boolean;
 };
 
 export async function getDashboardData(): Promise<DashboardData> {
@@ -244,6 +256,12 @@ export async function getDashboardData(): Promise<DashboardData> {
     throw new Error(`Unable to load transactions: ${transactionError.message}`);
   }
 
+  const adjacentAbilityPayPeriod = await loadAdjacentAbilityPayPeriod({
+    supabase,
+    week: weekData as WeekRow,
+    weekTotal: weekTotalData as WeekTotalRow,
+  });
+
   return mapDashboardData({
     settings: settingsData as SettingsRow,
     week: weekData as WeekRow,
@@ -252,6 +270,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     slots: (slotData ?? []) as EarnSlotRow[],
     transactions: (transactionData ?? []) as TransactionRow[],
     weekTotal: weekTotalData as WeekTotalRow,
+    adjacentAbilityPayPeriod,
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
     closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
     todayIso: getTodayIso(),
@@ -266,6 +285,7 @@ function mapDashboardData(input: {
   slots: EarnSlotRow[];
   transactions: TransactionRow[];
   weekTotal: WeekTotalRow;
+  adjacentAbilityPayPeriod: AdjacentAbilityPayPeriod;
   baselineTotal: BaselineTotalRow | null;
   closedWeekMetrics: ClosedWeekMetricRow[];
   todayIso: string;
@@ -338,6 +358,81 @@ function mapDashboardData(input: {
         input.closedWeekMetrics.map((row) => row.cashflow_total),
       ),
     },
+    abilityPayPeriod: input.adjacentAbilityPayPeriod,
+  };
+}
+
+async function loadAdjacentAbilityPayPeriod({
+  supabase,
+  week,
+  weekTotal,
+}: {
+  supabase: Awaited<ReturnType<typeof requireUserWithBootstrapStatus>>["supabase"];
+  week: WeekRow;
+  weekTotal: WeekTotalRow;
+}): Promise<AdjacentAbilityPayPeriod> {
+  const adjacentStartDate = addDaysIso(
+    week.start_date,
+    weekTotal.pay_period_role === "week_1" ? 7 : -7,
+  );
+  const { data: adjacentWeekTotal, error: adjacentWeekError } = await supabase
+    .from("v_week_totals")
+    .select("week_id,ability_paycheck_earnings")
+    .eq("start_date", adjacentStartDate)
+    .maybeSingle();
+
+  if (adjacentWeekError) {
+    throw new Error(
+      `Unable to load adjacent pay-period week: ${adjacentWeekError.message}`,
+    );
+  }
+
+  const adjacentWeek = adjacentWeekTotal as
+    | Pick<WeekTotalRow, "week_id" | "ability_paycheck_earnings">
+    | null;
+
+  if (!adjacentWeek) {
+    return {
+      adjacentWeekAbilityHours: 0,
+      adjacentWeekAbilityPaycheckCents: 0,
+      hasAdjacentWeek: false,
+    };
+  }
+
+  const { data: adjacentDays, error: adjacentDaysError } = await supabase
+    .from("days")
+    .select("id")
+    .eq("week_id", adjacentWeek.week_id);
+
+  if (adjacentDaysError) {
+    throw new Error(`Unable to load adjacent week days: ${adjacentDaysError.message}`);
+  }
+
+  const adjacentDayIds = ((adjacentDays ?? []) as Array<{ id: string }>).map(
+    (day) => day.id,
+  );
+  const { data: adjacentSlots, error: adjacentSlotsError } =
+    adjacentDayIds.length > 0
+      ? await supabase
+          .from("earn_slots")
+          .select("job_type,pay_type,hours_or_units")
+          .in("day_id", adjacentDayIds)
+      : { data: [], error: null };
+
+  if (adjacentSlotsError) {
+    throw new Error(
+      `Unable to load adjacent week earn slots: ${adjacentSlotsError.message}`,
+    );
+  }
+
+  return {
+    adjacentWeekAbilityHours: sumAbilityHours(
+      (adjacentSlots ?? []) as AdjacentEarnSlotRow[],
+    ),
+    adjacentWeekAbilityPaycheckCents: dollarsToCents(
+      toNumber(adjacentWeek.ability_paycheck_earnings),
+    ),
+    hasAdjacentWeek: true,
   };
 }
 
@@ -357,6 +452,20 @@ function medianCents(values: NumericValue[]): number {
   }
 
   return Math.round((cents[middle - 1] + cents[middle]) / 2);
+}
+
+function sumAbilityHours(slots: AdjacentEarnSlotRow[]): number {
+  return slots.reduce((total, slot) => {
+    if (slot.job_type !== "ability") {
+      return total;
+    }
+
+    if (slot.pay_type !== "regular" && slot.pay_type !== "overtime") {
+      return total;
+    }
+
+    return total + toNumber(slot.hours_or_units);
+  }, 0);
 }
 
 function mapDashboardDay(

@@ -37,7 +37,10 @@ import {
   cashflowDailyColor,
   cashflowDailyTone,
 } from "@/lib/domain/legacyRules";
-import { marginalTaxForExtraHours } from "@/lib/domain/withholding";
+import {
+  estimateBiweeklyWithholding,
+  marginalTaxForExtraHours,
+} from "@/lib/domain/withholding";
 
 const JOB_OPTIONS: JobType[] = [
   "none",
@@ -637,7 +640,12 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                 medians={initialData.metricMedians}
                 spendCents={weekTotals.spendCents}
               />
-              <AbilityMarginalTaxPreview settings={initialData.settings} />
+              <AbilityMarginalTaxPreview
+                adjacentPayPeriod={initialData.abilityPayPeriod}
+                days={days}
+                settings={initialData.settings}
+                weekTotals={weekTotals}
+              />
             </div>
           </div>
 
@@ -1756,27 +1764,65 @@ function replaceTransaction(
   };
 }
 
-function AbilityMarginalTaxPreview({ settings }: { settings: PaySettings }) {
-  const sampleCurrentBiweeklyGross = 2504.78;
+function AbilityMarginalTaxPreview({
+  adjacentPayPeriod,
+  days,
+  settings,
+  weekTotals,
+}: {
+  adjacentPayPeriod: DashboardData["abilityPayPeriod"];
+  days: DashboardDay[];
+  settings: PaySettings;
+  weekTotals: ReturnType<typeof calculateWeekTotals>;
+}) {
+  const extraOtHours = 1;
   // Phase-2 input cleanup needed: settings currently stores Ability OT as a
   // net rate, so this grosses it up through the legacy Ability multiplier.
   const abilityNetMultiplier = Math.max(settings.abilityNetMultiplier, 0.01);
   const abilityOtGrossHourlyRate = centsToDollars(
     settings.abilityOvertimeNetRateCents,
   ) / abilityNetMultiplier;
-  const result = marginalTaxForExtraHours({
+  const currentWeekAbilityHours = sumAbilityHoursFromDays(days);
+  const biweeklyAbilityHours =
+    currentWeekAbilityHours + adjacentPayPeriod.adjacentWeekAbilityHours;
+  const biweeklyAbilityNetCents =
+    weekTotals.abilityPaycheckCents +
+    adjacentPayPeriod.adjacentWeekAbilityPaycheckCents;
+  const biweeklyAbilityGross = centsToDollars(
+    Math.round(biweeklyAbilityNetCents / abilityNetMultiplier),
+  );
+  const withholding = estimateBiweeklyWithholding({
     jobType: "ability",
-    currentBiweeklyGross: sampleCurrentBiweeklyGross,
-    extraHours: 8,
+    biweeklyGross: biweeklyAbilityGross,
+  });
+  const marginal = marginalTaxForExtraHours({
+    jobType: "ability",
+    currentBiweeklyGross: biweeklyAbilityGross,
+    extraHours: extraOtHours,
     hourlyRate: abilityOtGrossHourlyRate,
   });
+  const estimatedTakeHome = biweeklyAbilityGross - withholding.tax;
+  const marginalTakeHome = marginal.extraGross - marginal.extraTax;
+  const biweekLabel = adjacentPayPeriod.hasAdjacentWeek ? "biweek" : "biweek so far";
 
   return (
-    <p className="mt-3 rounded-md border border-[#d7dee8] bg-white px-3 py-2 text-sm font-semibold text-[#334155] shadow-sm">
-      Marginal Ability tax on +1 OT shift (8 hours):{" "}
-      <span className="text-[#0f172a]">{formatMoneyExact(result.extraTax)}</span>{" "}
-      (~{formatPercent(result.effectiveMarginalRate)})
-    </p>
+    <div className="mt-3 rounded-md border border-[#d7dee8] bg-white px-3 py-2 text-sm font-semibold text-[#334155] shadow-sm">
+      <p>
+        Ability: {formatHours(currentWeekAbilityHours)}h this week /{" "}
+        {formatHours(biweeklyAbilityHours)}h {biweekLabel} ={" "}
+        <span className="text-[#0f172a]">{formatMoney(biweeklyAbilityGross * 100)}</span>{" "}
+        gross,{" "}
+        <span className="text-[#0f172a]">{formatMoneyExact(withholding.tax)}</span>{" "}
+        tax,{" "}
+        <span className="text-[#0f172a]">{formatMoneyExact(estimatedTakeHome)}</span>{" "}
+        take-home.
+      </p>
+      <p className="mt-1 text-xs text-[#64748b]">
+        +1 OT hour: {formatMoneyExact(marginal.extraGross)} gross -{" "}
+        {formatMoneyExact(marginal.extraTax)} tax ={" "}
+        {formatMoneyExact(marginalTakeHome)} take-home.
+      </p>
+    </div>
   );
 }
 
@@ -1862,8 +1908,30 @@ function formatHoursFromSlots(days: DashboardDay[], jobType: JobType): string {
   return hours.toFixed(2);
 }
 
+function sumAbilityHoursFromDays(days: DashboardDay[]): number {
+  return days.reduce((total, day) => {
+    const dayHours = day.slots.reduce((slotTotal, slot) => {
+      if (slot.jobType !== "ability") {
+        return slotTotal;
+      }
+
+      if (slot.payType !== "regular" && slot.payType !== "overtime") {
+        return slotTotal;
+      }
+
+      return slotTotal + slot.hoursOrUnits;
+    }, 0);
+
+    return total + dayHours;
+  }, 0);
+}
+
 function formatPlainHours(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatHours(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function formatShiftAmountValue(
@@ -1912,10 +1980,6 @@ function formatMoneyExact(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
-}
-
-function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
 }
 
 function roundCashflowToNearestFiveDollars(value: number): number {
