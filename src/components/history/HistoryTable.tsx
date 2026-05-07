@@ -4,10 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import {
-  reopenWeekAction,
-  toggleProjectionExclusionAction,
-} from "@/app/(protected)/history/actions";
+import { toggleProjectionExclusionAction } from "@/app/(protected)/history/actions";
 import { cashflowWeeklyColor } from "@/lib/domain/legacyRules";
 import { centsToDollars } from "@/lib/domain/money";
 import type {
@@ -18,7 +15,6 @@ import type {
 
 type PendingAction =
   | { kind: "exclude"; weekId: string; field: ProjectionExclusionField }
-  | { kind: "reopen"; weekId: string }
   | null;
 
 export function HistoryTable({ initialData }: { initialData: HistoryData }) {
@@ -59,33 +55,6 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
           : "Unable to update projection flag.",
       );
     } finally {
-      setPendingAction(null);
-    }
-  }
-
-  async function reopenWeek(week: HistoryWeek) {
-    const confirmed = window.confirm(
-      `Reopen week ${week.displayWeekNumber} (${formatDateRange(
-        week.startDate,
-        week.endDate,
-      )})? This will discard your current active week and any unsaved data on it. Continue?`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setPendingAction({ kind: "reopen", weekId: week.id });
-    setError(null);
-
-    try {
-      await reopenWeekAction({ weekId: week.id });
-      router.push("/");
-      router.refresh();
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : "Unable to reopen week.",
-      );
       setPendingAction(null);
     }
   }
@@ -187,17 +156,6 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          className="h-8 rounded-md border border-zinc-300 bg-white px-2.5 text-xs font-medium transition hover:border-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={pendingAction?.kind === "reopen"}
-                          onClick={() => reopenWeek(week)}
-                          type="button"
-                        >
-                          {pendingAction?.kind === "reopen" &&
-                          pendingAction.weekId === week.id
-                            ? "Reopening..."
-                            : "Reopen"}
-                        </button>
                         <Link
                           className="h-8 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition hover:border-zinc-950 hover:text-zinc-950"
                           href={`/history/${week.id}`}
