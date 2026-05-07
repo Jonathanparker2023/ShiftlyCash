@@ -12,6 +12,11 @@ import type {
 } from "@anthropic-ai/sdk/resources/messages/messages";
 
 import {
+  checkDailyCap,
+  DailyCapExceededError,
+  logUsage,
+} from "@/lib/claude/usage";
+import {
   archiveProject,
   completeTask,
   createProject,
@@ -32,6 +37,7 @@ const MAX_TOKENS = 900;
 type ProjectsAgentInput = {
   messages: MessageParam[];
   supabase: SupabaseClient;
+  userId: string;
 };
 
 export type ProjectsAgentUsage = {
@@ -58,6 +64,7 @@ let anthropicClient: Anthropic | null = null;
 export async function runProjectsAgent({
   messages,
   supabase,
+  userId,
 }: ProjectsAgentInput): Promise<ProjectsAgentResult> {
   const client = getAnthropicClient();
   const conversation: MessageParam[] = [...messages];
@@ -66,6 +73,11 @@ export async function runProjectsAgent({
   let toolRounds = 0;
 
   while (true) {
+    const cap = await checkDailyCap(supabase, userId);
+    if (!cap.allowed) {
+      throw new DailyCapExceededError(cap);
+    }
+
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
@@ -75,6 +87,7 @@ export async function runProjectsAgent({
       tools: PROJECT_TOOLS,
       tool_choice: { type: "auto", disable_parallel_tool_use: true },
     });
+    await logUsage(supabase, userId, response.id, MODEL, response.usage);
     addUsage(usage, response.usage);
 
     const toolUses = response.content.filter(isToolUseBlock);

@@ -2,6 +2,7 @@ import type { MessageParam } from "@anthropic-ai/sdk/resources/messages/messages
 import { NextResponse } from "next/server";
 
 import { runProjectsAgent } from "@/lib/claude/projectsAgent";
+import { DailyCapExceededError } from "@/lib/claude/usage";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -28,9 +29,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await runProjectsAgent({ messages, supabase });
+    const result = await runProjectsAgent({ messages, supabase, userId: user.id });
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof DailyCapExceededError) {
+      return NextResponse.json(
+        {
+          error: "daily_cap_exceeded",
+          usedCents: error.usedCents,
+          capCents: error.capCents,
+          resetsAtIso: error.resetsAtIso,
+        },
+        { status: 429 },
+      );
+    }
+
     return NextResponse.json(
       {
         error:

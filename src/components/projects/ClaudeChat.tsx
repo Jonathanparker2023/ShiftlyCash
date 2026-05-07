@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { VoiceInput } from "@/components/projects/VoiceInput";
 
@@ -24,11 +24,23 @@ type ProjectsChatResponse = {
   usage: TokenUsage;
 };
 
+type DailyUsage = {
+  usedCents: number;
+  capCents: number;
+  resetsAtIso: string;
+};
+
+type DailyCapExceededResponse = DailyUsage & {
+  error: "daily_cap_exceeded";
+};
+
 export function ClaudeChat() {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [usage, setUsage] = useState<TokenUsage | null>(null);
+  const [dailyUsage, setDailyUsage] = useState<DailyUsage | null>(null);
+  const [capExceededUntil, setCapExceededUntil] = useState<string | null>(null);
   const [toolCount, setToolCount] = useState(0);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,11 +60,38 @@ export function ClaudeChat() {
     return Math.round((cacheRead / total) * 100);
   }, [usage]);
 
+  const isCapLocked =
+    capExceededUntil !== null && Date.now() < new Date(capExceededUntil).getTime();
+
+  useEffect(() => {
+    void refreshDailyUsage();
+  }, []);
+
+  async function refreshDailyUsage() {
+    try {
+      const response = await fetch("/api/projects-chat/usage", {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as DailyUsage;
+      setDailyUsage(payload);
+      if (payload.usedCents < payload.capCents) {
+        setCapExceededUntil(null);
+      }
+    } catch {
+      // Usage display is advisory; chat errors still surface through submit().
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const text = input.trim();
-    if (!text || isPending) {
+    if (!text || isPending || isCapLocked) {
       return;
     }
 
@@ -75,9 +114,26 @@ export function ClaudeChat() {
       });
       const payload = (await response.json()) as
         | ProjectsChatResponse
+        | DailyCapExceededResponse
         | { error?: string };
 
       if (!response.ok) {
+        if (response.status === 429 && isDailyCapExceeded(payload)) {
+          setDailyUsage({
+            usedCents: payload.usedCents,
+            capCents: payload.capCents,
+            resetsAtIso: payload.resetsAtIso,
+          });
+          setCapExceededUntil(payload.resetsAtIso);
+          throw new Error(
+            `Daily Opus budget reached (${formatMoneyFromCents(
+              payload.usedCents,
+            )} / ${formatMoneyFromCents(payload.capCents)}). Resets at ${formatResetTime(
+              payload.resetsAtIso,
+            )}.`,
+          );
+        }
+
         const errorPayload = payload as { error?: string };
         throw new Error(errorPayload.error ?? "Project chat failed.");
       }
@@ -89,6 +145,7 @@ export function ClaudeChat() {
       ]);
       setUsage(chatPayload.usage);
       setToolCount(chatPayload.toolCalls.length);
+      await refreshDailyUsage();
       router.refresh();
     } catch (err) {
       setMessages(messages);
@@ -119,6 +176,8 @@ export function ClaudeChat() {
         </span>
       </div>
 
+      <UsageBudget usage={dailyUsage} />
+
       <div className="mb-3 flex h-[320px] flex-col gap-2 overflow-y-auto rounded-md border border-[#d7dee8] bg-white p-3">
         {messages.length === 0 ? (
           <div className="flex min-h-full items-center justify-center text-center text-sm text-[#64748b]">
@@ -143,17 +202,17 @@ export function ClaudeChat() {
       <form className="flex gap-2" onSubmit={submit}>
         <input
           className="h-10 min-w-0 flex-1 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm outline-none transition placeholder:text-[#94a3b8] focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#bfdbfe]"
-          disabled={isPending}
+          disabled={isPending || isCapLocked}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Ask for a project or task change"
           ref={inputRef}
           type="text"
           value={input}
         />
-        <VoiceInput disabled={isPending} onTranscript={appendTranscript} />
+        <VoiceInput disabled={isPending || isCapLocked} onTranscript={appendTranscript} />
         <button
           className="h-10 rounded-md bg-[#0b1220] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
-          disabled={isPending || !input.trim()}
+          disabled={isPending || isCapLocked || !input.trim()}
           type="submit"
         >
           {isPending ? "Sending" : "Send"}
@@ -198,4 +257,58 @@ function TokenPill({
       </span>
     </div>
   );
+}
+
+function UsageBudget({ usage }: { usage: DailyUsage | null }) {
+  const usedCents = usage?.usedCents ?? 0;
+  const capCents = usage?.capCents ?? 500;
+  const progress = capCents > 0 ? Math.min(100, (usedCents / capCents) * 100) : 0;
+
+  return (
+    <div className="mb-3 rounded-md border border-[#d7dee8] bg-white px-3 py-2">
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs font-semibold text-[#334155]">
+        <span>
+          Today: {formatMoneyFromCents(usedCents)} of{" "}
+          {formatMoneyFromCents(capCents)}
+        </span>
+        <span className="text-[#64748b]">
+          Resets {usage ? formatResetTime(usage.resetsAtIso) : "at midnight UTC"}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-[#e2e8f0]">
+        <div
+          className="h-full rounded-full bg-[#1d4ed8] transition-[width]"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function isDailyCapExceeded(
+  payload: ProjectsChatResponse | DailyCapExceededResponse | { error?: string },
+): payload is DailyCapExceededResponse {
+  return (
+    "error" in payload &&
+    payload.error === "daily_cap_exceeded" &&
+    "usedCents" in payload &&
+    "capCents" in payload &&
+    "resetsAtIso" in payload
+  );
+}
+
+function formatMoneyFromCents(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}
+
+function formatResetTime(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
