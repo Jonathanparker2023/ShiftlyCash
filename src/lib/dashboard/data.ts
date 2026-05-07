@@ -119,6 +119,8 @@ type DayTotalRow = {
 
 type AdjacentAbilityPayPeriod = {
   adjacentWeekAbilityHours: number;
+  adjacentWeekAbilityRegularHours: number;
+  adjacentWeekAbilityOvertimeHours: number;
   adjacentWeekAbilityPaycheckCents: number;
   hasAdjacentWeek: boolean;
 };
@@ -394,6 +396,8 @@ async function loadAdjacentAbilityPayPeriod({
   if (!adjacentWeek) {
     return {
       adjacentWeekAbilityHours: 0,
+      adjacentWeekAbilityRegularHours: 0,
+      adjacentWeekAbilityOvertimeHours: 0,
       adjacentWeekAbilityPaycheckCents: 0,
       hasAdjacentWeek: false,
     };
@@ -425,10 +429,15 @@ async function loadAdjacentAbilityPayPeriod({
     );
   }
 
+  const adjacentAbilityHours = sumAbilityHours(
+    (adjacentSlots ?? []) as AdjacentEarnSlotRow[],
+  );
+
   return {
-    adjacentWeekAbilityHours: sumAbilityHours(
-      (adjacentSlots ?? []) as AdjacentEarnSlotRow[],
-    ),
+    adjacentWeekAbilityHours:
+      adjacentAbilityHours.regularHours + adjacentAbilityHours.overtimeHours,
+    adjacentWeekAbilityRegularHours: adjacentAbilityHours.regularHours,
+    adjacentWeekAbilityOvertimeHours: adjacentAbilityHours.overtimeHours,
     adjacentWeekAbilityPaycheckCents: dollarsToCents(
       toNumber(adjacentWeek.ability_paycheck_earnings),
     ),
@@ -454,18 +463,34 @@ function medianCents(values: NumericValue[]): number {
   return Math.round((cents[middle - 1] + cents[middle]) / 2);
 }
 
-function sumAbilityHours(slots: AdjacentEarnSlotRow[]): number {
-  return slots.reduce((total, slot) => {
-    if (slot.job_type !== "ability") {
-      return total;
-    }
+function sumAbilityHours(slots: AdjacentEarnSlotRow[]): {
+  regularHours: number;
+  overtimeHours: number;
+} {
+  return slots.reduce(
+    (total, slot) => {
+      if (slot.job_type !== "ability") {
+        return total;
+      }
 
-    if (slot.pay_type !== "regular" && slot.pay_type !== "overtime") {
-      return total;
-    }
+      if (slot.pay_type === "regular") {
+        return {
+          ...total,
+          regularHours: total.regularHours + toNumber(slot.hours_or_units),
+        };
+      }
 
-    return total + toNumber(slot.hours_or_units);
-  }, 0);
+      if (slot.pay_type === "overtime") {
+        return {
+          ...total,
+          overtimeHours: total.overtimeHours + toNumber(slot.hours_or_units),
+        };
+      }
+
+      return total;
+    },
+    { regularHours: 0, overtimeHours: 0 },
+  );
 }
 
 function mapDashboardDay(

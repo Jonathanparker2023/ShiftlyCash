@@ -72,6 +72,8 @@ export type DashboardMetricMedians = {
 
 export type DashboardAbilityPayPeriod = {
   adjacentWeekAbilityHours: number;
+  adjacentWeekAbilityRegularHours: number;
+  adjacentWeekAbilityOvertimeHours: number;
   adjacentWeekAbilityPaycheckCents: number;
   hasAdjacentWeek: boolean;
 };

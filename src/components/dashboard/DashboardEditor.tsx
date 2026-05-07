@@ -50,6 +50,8 @@ const JOB_OPTIONS: JobType[] = [
   "other",
 ];
 const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "unit"];
+const ABILITY_REGULAR_GROSS_RATE = 19.055;
+const ABILITY_OVERTIME_GROSS_RATE = 28.5825;
 
 type DashboardEditorProps = {
   initialData: DashboardData;
@@ -643,8 +645,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               <AbilityMarginalTaxPreview
                 adjacentPayPeriod={initialData.abilityPayPeriod}
                 days={days}
-                settings={initialData.settings}
-                weekTotals={weekTotals}
               />
             </div>
           </div>
@@ -1767,30 +1767,23 @@ function replaceTransaction(
 function AbilityMarginalTaxPreview({
   adjacentPayPeriod,
   days,
-  settings,
-  weekTotals,
 }: {
   adjacentPayPeriod: DashboardData["abilityPayPeriod"];
   days: DashboardDay[];
-  settings: PaySettings;
-  weekTotals: ReturnType<typeof calculateWeekTotals>;
 }) {
   const extraOtHours = 1;
-  // Phase-2 input cleanup needed: settings currently stores Ability OT as a
-  // net rate, so this grosses it up through the legacy Ability multiplier.
-  const abilityNetMultiplier = Math.max(settings.abilityNetMultiplier, 0.01);
-  const abilityOtGrossHourlyRate = centsToDollars(
-    settings.abilityOvertimeNetRateCents,
-  ) / abilityNetMultiplier;
   const currentWeekAbilityHours = sumAbilityHoursFromDays(days);
+  const regularHours =
+    currentWeekAbilityHours.regularHours +
+    adjacentPayPeriod.adjacentWeekAbilityRegularHours;
+  const overtimeHours =
+    currentWeekAbilityHours.overtimeHours +
+    adjacentPayPeriod.adjacentWeekAbilityOvertimeHours;
   const biweeklyAbilityHours =
-    currentWeekAbilityHours + adjacentPayPeriod.adjacentWeekAbilityHours;
-  const biweeklyAbilityNetCents =
-    weekTotals.abilityPaycheckCents +
-    adjacentPayPeriod.adjacentWeekAbilityPaycheckCents;
-  const biweeklyAbilityGross = centsToDollars(
-    Math.round(biweeklyAbilityNetCents / abilityNetMultiplier),
-  );
+    currentWeekAbilityHours.totalHours + adjacentPayPeriod.adjacentWeekAbilityHours;
+  const biweeklyAbilityGross =
+    regularHours * ABILITY_REGULAR_GROSS_RATE +
+    overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
   const withholding = estimateBiweeklyWithholding({
     jobType: "ability",
     biweeklyGross: biweeklyAbilityGross,
@@ -1799,7 +1792,7 @@ function AbilityMarginalTaxPreview({
     jobType: "ability",
     currentBiweeklyGross: biweeklyAbilityGross,
     extraHours: extraOtHours,
-    hourlyRate: abilityOtGrossHourlyRate,
+    hourlyRate: ABILITY_OVERTIME_GROSS_RATE,
   });
   const estimatedTakeHome = biweeklyAbilityGross - withholding.tax;
   const marginalTakeHome = marginal.extraGross - marginal.extraTax;
@@ -1808,7 +1801,7 @@ function AbilityMarginalTaxPreview({
   return (
     <div className="mt-3 rounded-md border border-[#d7dee8] bg-white px-3 py-2 text-sm font-semibold text-[#334155] shadow-sm">
       <p>
-        Ability: {formatHours(currentWeekAbilityHours)}h this week /{" "}
+        Ability: {formatHours(currentWeekAbilityHours.totalHours)}h this week /{" "}
         {formatHours(biweeklyAbilityHours)}h {biweekLabel} ={" "}
         <span className="text-[#0f172a]">{formatMoney(biweeklyAbilityGross * 100)}</span>{" "}
         gross,{" "}
@@ -1908,22 +1901,42 @@ function formatHoursFromSlots(days: DashboardDay[], jobType: JobType): string {
   return hours.toFixed(2);
 }
 
-function sumAbilityHoursFromDays(days: DashboardDay[]): number {
-  return days.reduce((total, day) => {
-    const dayHours = day.slots.reduce((slotTotal, slot) => {
-      if (slot.jobType !== "ability") {
+function sumAbilityHoursFromDays(days: DashboardDay[]): {
+  regularHours: number;
+  overtimeHours: number;
+  totalHours: number;
+} {
+  const totals = days.reduce(
+    (total, day) => {
+      return day.slots.reduce((slotTotal, slot) => {
+        if (slot.jobType !== "ability") {
+          return slotTotal;
+        }
+
+        if (slot.payType === "regular") {
+          return {
+            ...slotTotal,
+            regularHours: slotTotal.regularHours + slot.hoursOrUnits,
+          };
+        }
+
+        if (slot.payType === "overtime") {
+          return {
+            ...slotTotal,
+            overtimeHours: slotTotal.overtimeHours + slot.hoursOrUnits,
+          };
+        }
+
         return slotTotal;
-      }
+      }, total);
+    },
+    { regularHours: 0, overtimeHours: 0 },
+  );
 
-      if (slot.payType !== "regular" && slot.payType !== "overtime") {
-        return slotTotal;
-      }
-
-      return slotTotal + slot.hoursOrUnits;
-    }, 0);
-
-    return total + dayHours;
-  }, 0);
+  return {
+    ...totals,
+    totalHours: totals.regularHours + totals.overtimeHours,
+  };
 }
 
 function formatPlainHours(value: number): string {
