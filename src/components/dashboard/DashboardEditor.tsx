@@ -602,6 +602,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               <MetricStrip
                 cashflowCents={weekTotals.cashflowCents}
                 earningsCents={weekTotals.earningsCents}
+                spendCents={weekTotals.spendCents}
               />
             </div>
           </div>
@@ -674,17 +675,25 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
 function MetricStrip({
   earningsCents,
+  spendCents,
   cashflowCents,
 }: {
   earningsCents: number;
+  spendCents: number;
   cashflowCents: number;
 }) {
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
   const cashflowTone = cashflowDailyTone(displayCashflowCents);
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-3 gap-2">
       <TopMetric accent="green" label="Earn" value={formatMoney(earningsCents)} />
+      <TopMetric
+        accent="negative"
+        label="Spend"
+        tone="negative"
+        value={formatMoney(spendCents)}
+      />
       <TopMetric
         accent={cashflowTone}
         label="Cashflow"
