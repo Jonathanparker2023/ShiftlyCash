@@ -217,3 +217,125 @@ Bottom line: Jon's believed-lost weeks 15 and 16 are recoverable from `week_reop
 4. The current `reopen_week` RPC remains destructive. Do not click Reopen again until it is patched or guarded.
 5. `state_snapshots` is the only source of truth for cascaded child rows for the missing weeks. Protect this table before attempting UI recovery work.
 6. Snapshot write happened before delete, which saved the data. The dangerous part is the hard delete of the active week; the snapshot system itself worked.
+
+## 12. Claude Review Notes
+
+Second-pass forensic review of Codex's diagnostic. No DB writes, no migrations, no recovery code — code reading and verification only.
+
+### 12.1 Agreement With Recoverability Verdict
+
+I agree with §10. Weeks 15 and 16 are recoverable from `week_reopen` snapshots. The core chain holds:
+
+- Snapshot write precedes the destructive delete inside the same transaction (`reopen_week` body, `202605040014_week_close_history.sql:208-227`).
+- `week_snapshot_json` captures week + days + earn slots + day-attached transactions + unassigned transactions in the date range + projection exclusion row.
+- Both target snapshots (`da7d3899-...` for week 15, `39971813-...` for week 16) pass structural checks and have no surviving FK descendants.
+
+### 12.2 Things Codex Did Not Surface
+
+**A. Snapshot payload is two-rooted, not one.**
+
+Each `week_reopen` payload is `jsonb_build_object('discarded_active_week', ..., 'reopened_week', ...)`. Recovery must read `payload->'discarded_active_week'`, not the payload root. `reopened_week` is the previously-closed week being promoted at the time — restoring from that key would restore the wrong week. The report's day/slot/transaction counts in §6 are clearly sourced from the right key, but the recovery script needs this called out explicitly.
+
+**B. `state_snapshots.week_id` column for these rows is currently NULL.**
+
+`state_snapshots.week_id` is `references public.weeks(id) on delete set null` (`202605040002_tables.sql:412`). The RPC inserts the snapshot with `week_id = v_active_week.id`, then deletes that same week in the same transaction. The cascade fires `set null` on the row just inserted. Net effect at commit: snapshot exists, but its `week_id` column is NULL.
+
+Recovery queries cannot use `where week_id = X`. The deleted week ID must come from `payload->'discarded_active_week'->'week'->>'id'`. The "Deleted Week ID" column in §6 is parsed from JSON, not from the table column — that distinction matters for the recovery query.
+
+**C. The 37/38 unassigned transactions are almost certainly still in `public.transactions`.**
+
+The cascade is `weeks → days → transactions(day_id)`. Transactions with `day_id IS NULL` do not cascade. Snapshot's `unassigned_transactions` captured rows with `day_id IS NULL` whose `date` fell inside the deleted week's range. They were never subject to the cascade. They almost certainly still exist live with the same IDs.
+
+This isn't theoretical — the `transactions_applied_requires_day` check (`202605040002_tables.sql:249-251`) means only `applied` transactions ever had a `day_id`. Pending/excluded ones with `day_id IS NULL` are exactly the population captured in `unassigned_transactions`. They're still there.
+
+A naive `INSERT` of those rows from the snapshot would either create PK conflicts or duplicate semantically-identical rows depending on conflict handling.
+
+**D. RPC is `security invoker`; underlying grants still allow `delete on public.weeks`.**
+
+`reopen_week` runs as the calling user. The reason it can issue `delete from public.weeks` is the explicit `grant ... delete on public.weeks to authenticated` (`202605040006_rls_policies.sql:29`) plus the permissive `weeks_own` policy. Even after we patch the RPC, raw client SQL with the user's session token can still issue `DELETE` against `weeks`. Defense-in-depth: route all `weeks` deletes through `SECURITY DEFINER` functions and revoke the direct grant. Wider scope than this incident — flagging.
+
+**E. UI confirm copy understates the action.**
+
+`HistoryTable.tsx:67-72` and `ReopenWeekButton.tsx:22-24` use `window.confirm` with text saying "discard your current active week and any unsaved data." The "unsaved" framing reads as draft-state semantics. Reality is hard delete with cascade. Until the RPC is patched, this button should be disabled or the copy should explicitly say "permanently delete" with a typed confirmation.
+
+### 12.3 Top 3 Risks Before Recovery
+
+1. **Duplicate-row risk for unassigned transactions** (per §12.2.C). The snapshot's `unassigned_transactions` likely correspond to rows still living in `public.transactions`. Recovery must skip them (or `ON CONFLICT (id) DO NOTHING`) and not blindly insert.
+
+2. **`weeks_one_active_per_user` violation.** Both snapshots captured `status = 'active'` — the destroyed weeks were the active week at deletion. Restoring with the snapshot's status as-is conflicts with the currently-active week 18 (`b207659a-...`). Recovery must override status to `'closed'` and set `closed_at` to a sensible non-null value (e.g. snapshot `created_at`) for ordering parity with sibling closed weeks.
+
+3. **`reopen_week` is still loaded.** Until it is patched or the UI is gated, one more click extends the destruction by another week. The recovery work itself should not be done while the destructive path remains live, because partial recovery state is exactly the kind of state someone might "fix" with another Reopen.
+
+### 12.4 Unassigned Transactions: Restore As-Is, Don't Re-Insert
+
+Recommended posture: **do not re-insert** the snapshot's `unassigned_transactions`. Treat the surviving live rows as authoritative. Their `day_id` is already NULL, which is the correct state for "landed in the date range but never attached to a day." After weeks/days are recovered, those transactions will appear in the recovered detail view as the same orphans they have been, available for normal review/apply workflows.
+
+If a side-by-side comparison turns up snapshot-only IDs (rows the snapshot has but live does not), those are the only candidates for restore — and even then, restore them with `day_id = NULL` and the original `status` from the snapshot. Do not synthesize a `day_id` mapping from date alone — that crosses the line from recovery into reconciliation, and date-based remap is not what the user did originally (the original `applied` transactions had explicit `day_id` set by user action; the unassigned ones did not).
+
+Day-attached transactions in the target snapshots are zero for both weeks, so this branch is not hot for the immediate recovery. It would matter for the week-18 alternate (`855aa948-...`, 30 day-attached transactions), but that recovery is contraindicated for other reasons (replacement week exists).
+
+### 12.5 Patch `reopen_week` Before Recovery, Not After
+
+Order:
+
+1. Patch the RPC and ship the migration.
+2. Patch or hide the Reopen UI.
+3. Tighten `state_snapshots` grants (§12.6).
+4. Run the recovery.
+
+Patch shape (sketch — do not implement yet):
+
+- Replace `delete from public.weeks where id = v_active_week.id` with `update public.weeks set status = 'discarded', archived_at = now() where id = v_active_week.id`.
+- Add `'discarded'` to the `week_status` enum.
+- `weeks_one_active_per_user` already filters `where status = 'active'`, so `discarded` rows do not collide with it.
+- Adjust `weeks_archived_must_be_closed` to allow `archived_at` for both `closed` and `discarded`.
+- Update read paths that filter `status in ('closed','archived')` to optionally include `'discarded'` based on UI need (likely: hide from `History` by default, expose in a "Recoverable" admin view).
+
+Rationale: keep the snapshot for redundancy, but make the primary record non-destructive. Recovery becomes "flip status back from `discarded`" — no JSON marshalling needed for future incidents.
+
+### 12.6 `state_snapshots` Grants Are Too Permissive
+
+`202605040006_rls_policies.sql:44` grants `select, insert, update, delete on public.state_snapshots to authenticated`. Combined with `state_snapshots_own ... for all` (lines 152-155), this means:
+
+- The user's auth-token session can `DELETE FROM state_snapshots WHERE id = ...` and erase the recovery payload.
+- The user's session can also `UPDATE` the payload, corrupting JSON in place.
+
+No application code currently does either, but the recovery payload is exposed to anything wielding the user's anon-key plus session token.
+
+Recommended hardening (do not implement now):
+
+- `revoke update, delete on public.state_snapshots from authenticated;`
+- Keep `select` (the History detail page reads snapshots).
+- Keep `insert` (the close/reopen RPCs run `security invoker` and need it). Or flip those RPCs to `security definer` and revoke `insert` too. Either is fine; the second is cleaner.
+- Pruning, if ever introduced, runs through a `security definer` RPC enforcing retention.
+
+For the immediate term (before recovery), at minimum revoke `update` and `delete` on this table.
+
+### 12.7 Recommended Next Step
+
+Single one-shot SQL recovery transaction, authored on a fresh branch, reviewed before execution, run inside a transaction with row-count verification before commit. Sketch only:
+
+1. For snapshot `da7d3899-3d59-4fb0-aed5-a2594cbb6882`:
+   - Read `payload->'discarded_active_week'`.
+   - `INSERT INTO public.weeks` with the original `id`, `user_id`, `start_date`, `end_date`; override `status = 'closed'`; set `closed_at` to the snapshot's `created_at`; `archived_at = NULL`.
+   - `INSERT INTO public.days` for each day in the payload, preserving original IDs.
+   - `INSERT INTO public.earn_slots` for each slot per day, preserving IDs.
+   - `INSERT INTO public.transactions` for any day-attached transactions (zero for this snapshot).
+   - `INSERT INTO public.week_projection_exclusions` if `payload->'discarded_active_week'->'projection_exclusions'` is non-null.
+   - **Skip** `unassigned_transactions` per §12.4.
+2. Repeat for snapshot `39971813-1daf-4672-96e0-ec6a3265c96a` (week 16).
+3. Verify row deltas before commit:
+   - `weeks` +2
+   - `days` +14
+   - `earn_slots` +35 (18 + 17)
+   - `transactions` +0
+   - `week_projection_exclusions` +0..+2 depending on snapshot content
+4. If counts match expectation, `COMMIT`. Else `ROLLBACK` and reinvestigate.
+
+Pre-flight:
+
+- Take an out-of-band backup of `state_snapshots` filtered to this user. The snapshots are the only copy of the destroyed data; do not begin recovery without a copy outside the database.
+- Confirm `reopen_week` patch is shipped, or the UI is gated, before running.
+- Rehearse with a dry-run inside a transaction that ends in `ROLLBACK`. Inspect the inserted row shapes before the real run.
+
+Explicitly out of scope for this incident's recovery: the week-18 alternate (`855aa948-...`) and the week-19 future/test (`b17a5f7e-...`). Both have complications (replacement week exists; future-dated). Neither was what the user reported losing. Leave both in `state_snapshots`; do not restore.
