@@ -37,6 +37,7 @@ import {
   cashflowDailyColor,
   cashflowDailyTone,
 } from "@/lib/domain/legacyRules";
+import { marginalTaxForExtraHours } from "@/lib/domain/withholding";
 
 const JOB_OPTIONS: JobType[] = [
   "none",
@@ -636,6 +637,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                 medians={initialData.metricMedians}
                 spendCents={weekTotals.spendCents}
               />
+              <AbilityMarginalTaxPreview settings={initialData.settings} />
             </div>
           </div>
 
@@ -1754,6 +1756,30 @@ function replaceTransaction(
   };
 }
 
+function AbilityMarginalTaxPreview({ settings }: { settings: PaySettings }) {
+  const sampleCurrentBiweeklyGross = 2504.78;
+  // Phase-2 input cleanup needed: settings currently stores Ability OT as a
+  // net rate, so this grosses it up through the legacy Ability multiplier.
+  const abilityNetMultiplier = Math.max(settings.abilityNetMultiplier, 0.01);
+  const abilityOtGrossHourlyRate = centsToDollars(
+    settings.abilityOvertimeNetRateCents,
+  ) / abilityNetMultiplier;
+  const result = marginalTaxForExtraHours({
+    jobType: "ability",
+    currentBiweeklyGross: sampleCurrentBiweeklyGross,
+    extraHours: 8,
+    hourlyRate: abilityOtGrossHourlyRate,
+  });
+
+  return (
+    <p className="mt-3 rounded-md border border-[#d7dee8] bg-white px-3 py-2 text-sm font-semibold text-[#334155] shadow-sm">
+      Marginal Ability tax on +1 OT shift (8 hours):{" "}
+      <span className="text-[#0f172a]">{formatMoneyExact(result.extraTax)}</span>{" "}
+      (~{formatPercent(result.effectiveMarginalRate)})
+    </p>
+  );
+}
+
 function toDayInput(day: DashboardDay) {
   return {
     earnSlots: day.slots.map((slot) => ({
@@ -1877,6 +1903,19 @@ function formatMoney(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(centsToDollars(value)));
+}
+
+function formatMoneyExact(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function roundCashflowToNearestFiveDollars(value: number): number {
