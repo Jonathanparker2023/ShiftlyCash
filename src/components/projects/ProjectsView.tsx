@@ -10,9 +10,9 @@ import {
 } from "@dnd-kit/core";
 import {
   arrayMove,
-  horizontalListSortingStrategy,
   SortableContext,
   useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
@@ -158,9 +158,9 @@ export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
               >
                 <SortableContext
                   items={projects.map((project) => project.id)}
-                  strategy={horizontalListSortingStrategy}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <div className="-mx-3 flex flex-col gap-3 px-3 md:flex-row md:overflow-x-auto md:pb-2">
+                  <div className="flex flex-col gap-3">
                     {projects.map((project) => (
                       <SortableProjectBar
                         isReordering={isReordering}
@@ -209,8 +209,8 @@ function SortableProjectBar({
     <div
       className={
         isDragging
-          ? "opacity-70 md:w-[360px] md:min-w-[360px]"
-          : "md:w-[360px] md:min-w-[360px]"
+          ? "w-full opacity-70"
+          : "w-full"
       }
       ref={setNodeRef}
       style={style}
