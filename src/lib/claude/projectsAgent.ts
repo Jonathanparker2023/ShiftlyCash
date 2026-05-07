@@ -138,7 +138,6 @@ const PROJECT_TOOLS: Tool[] = [
     name: "list_projects",
     description: "List the user's projects with status, deadline, and progress.",
     input_schema: objectSchema({}),
-    strict: true,
   },
   {
     name: "list_tasks",
@@ -152,7 +151,6 @@ const PROJECT_TOOLS: Tool[] = [
       },
       due_date_on_or_before: stringProperty("YYYY-MM-DD due date ceiling."),
     }),
-    strict: true,
   },
   {
     name: "create_project",
@@ -161,12 +159,10 @@ const PROJECT_TOOLS: Tool[] = [
       {
         name: stringProperty("Project name."),
         description: stringProperty("Optional project description."),
-        color: stringProperty("Optional hex color, for example #1d4ed8."),
         deadline: stringProperty("Optional YYYY-MM-DD project deadline."),
       },
       ["name"],
     ),
-    strict: true,
   },
   {
     name: "update_project",
@@ -176,13 +172,10 @@ const PROJECT_TOOLS: Tool[] = [
         id: stringProperty("Project id."),
         name: stringProperty("New project name."),
         description: stringProperty("New project description, or empty to clear."),
-        color: stringProperty("New hex color."),
         deadline: stringProperty("New YYYY-MM-DD deadline, or empty to clear."),
-        sort_order: numberProperty("New project sort order."),
       },
       ["id"],
     ),
-    strict: true,
   },
   {
     name: "archive_project",
@@ -194,7 +187,6 @@ const PROJECT_TOOLS: Tool[] = [
       },
       ["id", "confirmation_text"],
     ),
-    strict: true,
   },
   {
     name: "delete_project",
@@ -206,7 +198,6 @@ const PROJECT_TOOLS: Tool[] = [
       },
       ["id", "confirmation_text"],
     ),
-    strict: true,
   },
   {
     name: "create_task",
@@ -225,7 +216,6 @@ const PROJECT_TOOLS: Tool[] = [
       },
       ["project_id", "title"],
     ),
-    strict: true,
   },
   {
     name: "update_task",
@@ -241,17 +231,14 @@ const PROJECT_TOOLS: Tool[] = [
           enum: ["todo", "in_progress", "done"],
           description: "New task status.",
         },
-        sort_order: numberProperty("New task sort order."),
       },
       ["id"],
     ),
-    strict: true,
   },
   {
     name: "complete_task",
     description: "Mark a task done.",
     input_schema: objectSchema({ id: stringProperty("Task id.") }, ["id"]),
-    strict: true,
   },
   {
     name: "delete_task",
@@ -263,7 +250,6 @@ const PROJECT_TOOLS: Tool[] = [
       },
       ["id", "confirmation_text"],
     ),
-    strict: true,
   },
 ];
 
@@ -287,7 +273,6 @@ async function runTool(
       const result = await createProject(supabase, {
         name: requireString(toolInput.name, "name"),
         description: optionalString(toolInput.description),
-        color: optionalString(toolInput.color),
         deadline: optionalString(toolInput.deadline),
       });
       return mutationToolResult(result);
@@ -299,9 +284,7 @@ async function runTool(
         fields: {
           name: optionalString(toolInput.name) ?? undefined,
           description: optionalString(toolInput.description),
-          color: optionalString(toolInput.color) ?? undefined,
           deadline: optionalString(toolInput.deadline),
-          sortOrder: optionalNumber(toolInput.sort_order),
         },
       });
       return mutationToolResult(result);
@@ -350,7 +333,6 @@ async function runTool(
           description: optionalString(toolInput.description),
           dueDate: optionalString(toolInput.due_date),
           status: optionalTaskStatus(toolInput.status),
-          sortOrder: optionalNumber(toolInput.sort_order),
         },
       });
       return mutationToolResult(result);
@@ -511,10 +493,6 @@ function optionalString(value: unknown): string | null {
   return trimmed ? trimmed : null;
 }
 
-function optionalNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
 function optionalTaskStatus(value: unknown): TaskStatus | undefined {
   if (value === "todo" || value === "in_progress" || value === "done") {
     return value;
@@ -537,8 +515,4 @@ function objectSchema(
 
 function stringProperty(description: string) {
   return { type: "string", description };
-}
-
-function numberProperty(description: string) {
-  return { type: "number", description };
 }
