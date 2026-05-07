@@ -203,17 +203,6 @@ function SortableTaskRow({
       ref={setNodeRef}
       style={style}
     >
-      <button
-        aria-label={`Drag ${task.title}`}
-        className="h-8 w-8 shrink-0 touch-none rounded-md border border-[#cbd5e1] bg-[#f8fafc] text-sm font-bold text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={disabled}
-        title="Drag to reorder"
-        type="button"
-        {...attributes}
-        {...listeners}
-      >
-        ::
-      </button>
       <input
         checked={task.status === "done"}
         className="h-4 w-4 accent-[#1d4ed8]"
@@ -236,6 +225,17 @@ function SortableTaskRow({
           {task.dueDate ? <span>Due {formatDate(task.dueDate)}</span> : null}
         </div>
       </div>
+      <button
+        aria-label={`Drag ${task.title}`}
+        className="h-8 w-8 shrink-0 touch-none rounded-md border border-[#cbd5e1] bg-[#f8fafc] text-sm font-bold text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={disabled}
+        title="Drag to reorder"
+        type="button"
+        {...attributes}
+        {...listeners}
+      >
+        ::
+      </button>
     </div>
   );
 }
