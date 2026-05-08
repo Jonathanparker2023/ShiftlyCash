@@ -29,7 +29,7 @@ export type ProjectItem = {
 
 export type ProjectEventItem = {
   id: string;
-  projectId: string;
+  projectId: string | null;
   taskId: string | null;
   kind: string;
   payload: Record<string, unknown>;

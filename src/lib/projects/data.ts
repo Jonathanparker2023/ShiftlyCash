@@ -37,7 +37,7 @@ type TaskRow = {
 
 type ProjectEventRow = {
   id: string;
-  project_id: string;
+  project_id: string | null;
   task_id: string | null;
   kind: string;
   payload: Record<string, unknown> | null;
