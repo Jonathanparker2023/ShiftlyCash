@@ -6,7 +6,14 @@ import { requireUser } from "@/lib/auth";
 import type { PayType } from "@/lib/domain/pay";
 import type { TemplateSlotDraft } from "@/lib/template/types";
 
-const JOB_TYPES = ["ability", "prestige", "incentive", "other", "none"] as const;
+const JOB_TYPES = [
+  "ability",
+  "prestige",
+  "prestige_ilst",
+  "incentive",
+  "other",
+  "none",
+] as const;
 
 export type SaveTemplateInput = {
   slots: TemplateSlotDraft[];

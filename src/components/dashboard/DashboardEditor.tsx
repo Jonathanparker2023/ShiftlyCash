@@ -41,6 +41,7 @@ const JOB_OPTIONS: JobType[] = [
   "none",
   "ability",
   "prestige",
+  "prestige_ilst",
   "incentive",
   "other",
 ];
@@ -643,7 +644,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#475569]">
               <span>Total: {weekTotals.wageHours.toFixed(2)}h</span>
               <span>Ability: {formatHoursFromSlots(days, "ability")}h</span>
-              <span>Prestige: {formatHoursFromSlots(days, "prestige")}h</span>
+              <span>
+                Prestige:{" "}
+                {formatHoursFromSlots(days, ["prestige", "prestige_ilst"])}h
+              </span>
             </div>
             <button
               className="h-10 w-full rounded-md bg-[#0b1220] px-5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(16,16,15,0.18)] transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#d7dee8] disabled:text-[#64748b] disabled:shadow-none sm:w-auto"
@@ -1315,7 +1319,7 @@ function ShiftRow({
         <span className="flex shrink-0 items-center gap-2">
           <span className={shiftDotClass(slot.jobType)} />
           <span className="text-sm font-semibold">
-            {capitalize(slot.jobType)}
+            {formatJobLabel(slot.jobType)}
           </span>
           {slot.payType === "regular" || slot.payType === "overtime" ? (
             <span className={payTypeBadgeClass(slot.payType)}>
@@ -1344,6 +1348,7 @@ function ShiftRow({
             label="Job"
             value={slot.jobType}
             values={JOB_OPTIONS}
+            formatOption={formatJobLabel}
             onChange={(value) =>
               onSlotChange(slot.dayId, slot.slotIndex, {
                 jobType: value as JobType,
@@ -1403,7 +1408,7 @@ function shiftBarClass(jobType: JobType): string {
     return "border-[#1e3a8a] bg-[#1d4ed8] text-white";
   }
 
-  if (jobType === "prestige") {
+  if (jobType === "prestige" || jobType === "prestige_ilst") {
     return "border-[#d97706] bg-[#facc15] text-[#1f2937]";
   }
 
@@ -1415,7 +1420,7 @@ function shiftDotClass(jobType: JobType): string {
     return "h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]";
   }
 
-  if (jobType === "prestige") {
+  if (jobType === "prestige" || jobType === "prestige_ilst") {
     return "h-2.5 w-2.5 rounded-full bg-[#92400e] shadow-[0_0_0_3px_rgba(146,64,14,0.16)]";
   }
 
@@ -1501,11 +1506,13 @@ function SelectField({
   label,
   value,
   values,
+  formatOption,
   onChange,
 }: {
   label: string;
   value: string;
   values: string[];
+  formatOption?: (value: string) => string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -1520,7 +1527,7 @@ function SelectField({
       >
         {values.map((option) => (
           <option key={option} value={option}>
-            {capitalize(option)}
+            {formatOption ? formatOption(option) : capitalize(option)}
           </option>
         ))}
       </select>
@@ -1745,10 +1752,16 @@ function formatNumberInput(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatHoursFromSlots(days: DashboardDay[], jobType: JobType): string {
+function formatHoursFromSlots(
+  days: DashboardDay[],
+  jobTypes: JobType | JobType[],
+): string {
+  const selectedJobTypes = new Set(
+    Array.isArray(jobTypes) ? jobTypes : [jobTypes],
+  );
   const hours = days.reduce((total, day) => {
     const dayHours = day.slots.reduce((slotTotal, slot) => {
-      if (slot.jobType !== jobType) {
+      if (!selectedJobTypes.has(slot.jobType)) {
         return slotTotal;
       }
 
@@ -1759,6 +1772,18 @@ function formatHoursFromSlots(days: DashboardDay[], jobType: JobType): string {
   }, 0);
 
   return hours.toFixed(2);
+}
+
+function formatJobLabel(value: string): string {
+  if (value === "prestige") {
+    return "Prestige $17";
+  }
+
+  if (value === "prestige_ilst") {
+    return "Prestige ILST $18";
+  }
+
+  return capitalize(value);
 }
 
 function formatPlainHours(value: number): string {

@@ -119,14 +119,16 @@ export async function getDebtData(): Promise<DebtPageData> {
     settings: {
       abilityRegularNetRateCents: 1563,
       abilityOvertimeNetRateCents: 2173,
-      prestigeRegularNetRateCents: 1428,
-      prestigeOvertimeNetRateCents: 2142,
+      prestigeRegularNetRateCents: 1462,
+      prestigeOvertimeNetRateCents: 2193,
+      prestigeIlstRegularNetRateCents: 1548,
+      prestigeIlstOvertimeNetRateCents: 2322,
       abilityNetMultiplier:
         1 - Number(settings?.ability_withholding_rate ?? 0.2652),
     },
     withholding: {
       ability: Number(settings?.ability_withholding_rate ?? 0.2652),
-      prestige: Number(settings?.prestige_withholding_rate ?? 0.18),
+      prestige: Number(settings?.prestige_withholding_rate ?? 0.14),
       incentive: Number(settings?.ability_withholding_rate ?? 0.2652),
       filingFeeCents: dollarsToCents(Number(settings?.filing_fee ?? 160)),
       standardDeductionCents: dollarsToCents(

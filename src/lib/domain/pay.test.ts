@@ -47,9 +47,9 @@ describe("pay calculations", () => {
         hoursOrUnits: 13,
       }),
     ).toMatchObject({
-      earningsCents: 18_564,
+      earningsCents: 19_006,
       abilityPaycheckCents: 0,
-      prestigePaycheckCents: 18_564,
+      prestigePaycheckCents: 19_006,
       wageHours: 13,
     });
 
@@ -60,10 +60,38 @@ describe("pay calculations", () => {
         hoursOrUnits: 8,
       }),
     ).toMatchObject({
-      earningsCents: 17_136,
+      earningsCents: 17_544,
       abilityPaycheckCents: 0,
-      prestigePaycheckCents: 17_136,
+      prestigePaycheckCents: 17_544,
       wageHours: 8,
+    });
+  });
+
+  it("calculates Prestige ILST regular and overtime earnings from ILST rates", () => {
+    expect(
+      calculateEarnSlot({
+        jobType: "prestige_ilst",
+        payType: "regular",
+        hoursOrUnits: 2,
+      }),
+    ).toMatchObject({
+      earningsCents: 3_096,
+      abilityPaycheckCents: 0,
+      prestigePaycheckCents: 3_096,
+      wageHours: 2,
+    });
+
+    expect(
+      calculateEarnSlot({
+        jobType: "prestige_ilst",
+        payType: "overtime",
+        hoursOrUnits: 3,
+      }),
+    ).toMatchObject({
+      earningsCents: 6_966,
+      abilityPaycheckCents: 0,
+      prestigePaycheckCents: 6_966,
+      wageHours: 3,
     });
   });
 
@@ -106,12 +134,12 @@ describe("pay calculations", () => {
       baseCents: dollarsToCents(52),
     });
 
-    expect(totals.earningsCents).toBe(17_788);
+    expect(totals.earningsCents).toBe(17_890);
     expect(totals.abilityPaycheckCents).toBe(12_504);
-    expect(totals.prestigePaycheckCents).toBe(4_284);
+    expect(totals.prestigePaycheckCents).toBe(4_386);
     expect(totals.spendCents).toBe(6_000);
     expect(totals.baseCents).toBe(5_200);
-    expect(totals.cashflowCents).toBe(6_588);
+    expect(totals.cashflowCents).toBe(6_690);
     expect(totals.legacyRoundedCashflowCents).toBe(7_000);
   });
 
@@ -135,13 +163,13 @@ describe("pay calculations", () => {
     });
 
     expect(totals.dayCount).toBe(2);
-    expect(totals.earningsCents).toBe(30_375);
+    expect(totals.earningsCents).toBe(30_783);
     expect(totals.abilityPaycheckCents).toBe(13_239);
-    expect(totals.prestigePaycheckCents).toBe(17_136);
+    expect(totals.prestigePaycheckCents).toBe(17_544);
     expect(totals.spendCents).toBe(5_000);
     expect(totals.baseCents).toBe(10_900);
-    expect(totals.cashflowCents).toBe(14_475);
-    expect(totals.legacyRoundedCashflowCents).toBe(14_000);
+    expect(totals.cashflowCents).toBe(14_883);
+    expect(totals.legacyRoundedCashflowCents).toBe(15_000);
   });
 
   it("uses custom settings instead of defaults", () => {
@@ -150,6 +178,8 @@ describe("pay calculations", () => {
       abilityOvertimeNetRateCents: 3_000,
       prestigeRegularNetRateCents: 1_000,
       prestigeOvertimeNetRateCents: 1_500,
+      prestigeIlstRegularNetRateCents: 1_100,
+      prestigeIlstOvertimeNetRateCents: 1_650,
       abilityNetMultiplier: 0.5,
     };
 

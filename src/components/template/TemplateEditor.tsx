@@ -14,6 +14,7 @@ const JOB_OPTIONS: JobType[] = [
   "none",
   "ability",
   "prestige",
+  "prestige_ilst",
   "incentive",
   "other",
 ];
@@ -158,7 +159,7 @@ function TemplateSlotRow({
       >
         {JOB_OPTIONS.map((jobType) => (
           <option key={jobType} value={jobType}>
-            {jobType}
+            {formatJobLabel(jobType)}
           </option>
         ))}
       </select>
@@ -254,4 +255,16 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
 function parsePositiveNumber(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+function formatJobLabel(jobType: JobType): string {
+  if (jobType === "prestige") {
+    return "Prestige $17";
+  }
+
+  if (jobType === "prestige_ilst") {
+    return "Prestige ILST $18";
+  }
+
+  return jobType;
 }

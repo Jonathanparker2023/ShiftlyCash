@@ -7,7 +7,14 @@ import { requireUser } from "@/lib/auth";
 import { getTodayIso } from "@/lib/dashboard/dates";
 import type { JobType, PayType } from "@/lib/domain/pay";
 
-const JOB_TYPES = ["ability", "prestige", "incentive", "other", "none"] as const;
+const JOB_TYPES = [
+  "ability",
+  "prestige",
+  "prestige_ilst",
+  "incentive",
+  "other",
+  "none",
+] as const;
 
 export type SaveDayInput = {
   dayId: string;

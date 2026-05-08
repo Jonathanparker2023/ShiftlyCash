@@ -29,6 +29,8 @@ type SettingsRow = {
   ability_ot_net_rate: NumericValue;
   prestige_regular_net_rate: NumericValue;
   prestige_ot_net_rate: NumericValue;
+  prestige_ilst_net_rate: NumericValue;
+  prestige_ilst_ot_net_rate: NumericValue;
   ability_withholding_rate: NumericValue;
 };
 
@@ -160,7 +162,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabase
       .from("settings")
       .select(
-        "ability_regular_net_rate, ability_ot_net_rate, prestige_regular_net_rate, prestige_ot_net_rate, ability_withholding_rate",
+        "ability_regular_net_rate, ability_ot_net_rate, prestige_regular_net_rate, prestige_ot_net_rate, prestige_ilst_net_rate, prestige_ilst_ot_net_rate, ability_withholding_rate",
       )
       .single(),
     supabase
@@ -579,6 +581,12 @@ function mapPaySettings(row: SettingsRow): PaySettings {
     ),
     prestigeOvertimeNetRateCents: dollarsToCents(
       toNumber(row.prestige_ot_net_rate),
+    ),
+    prestigeIlstRegularNetRateCents: dollarsToCents(
+      toNumber(row.prestige_ilst_net_rate),
+    ),
+    prestigeIlstOvertimeNetRateCents: dollarsToCents(
+      toNumber(row.prestige_ilst_ot_net_rate),
     ),
     abilityNetMultiplier: 1 - toNumber(row.ability_withholding_rate),
   };

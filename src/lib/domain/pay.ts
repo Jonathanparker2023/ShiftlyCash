@@ -5,7 +5,13 @@ import {
   type MoneyCents,
 } from "@/lib/domain/money";
 
-export type JobType = "ability" | "prestige" | "incentive" | "other" | "none";
+export type JobType =
+  | "ability"
+  | "prestige"
+  | "prestige_ilst"
+  | "incentive"
+  | "other"
+  | "none";
 export type PayType = "regular" | "overtime" | "unit" | "none";
 export type PayPeriodRole = "week_1" | "week_2";
 
@@ -14,6 +20,8 @@ export type PaySettings = {
   abilityOvertimeNetRateCents: MoneyCents;
   prestigeRegularNetRateCents: MoneyCents;
   prestigeOvertimeNetRateCents: MoneyCents;
+  prestigeIlstRegularNetRateCents: MoneyCents;
+  prestigeIlstOvertimeNetRateCents: MoneyCents;
   // Net-of-tax multiplier for the Ability paycheck. Incentive pay is treated
   // as Ability income for tax purposes, so it uses this same multiplier.
   abilityNetMultiplier: number;
@@ -67,8 +75,10 @@ export type PayPeriodInfo = {
 export const DEFAULT_PAY_SETTINGS: PaySettings = {
   abilityRegularNetRateCents: 1563,
   abilityOvertimeNetRateCents: 2173,
-  prestigeRegularNetRateCents: 1428,
-  prestigeOvertimeNetRateCents: 2142,
+  prestigeRegularNetRateCents: 1462,
+  prestigeOvertimeNetRateCents: 2193,
+  prestigeIlstRegularNetRateCents: 1548,
+  prestigeIlstOvertimeNetRateCents: 2322,
   abilityNetMultiplier: 0.7348,
 };
 
@@ -99,11 +109,18 @@ export function calculateEarnSlot(
     };
   }
 
-  if (slot.jobType === "prestige") {
+  if (slot.jobType === "prestige" || slot.jobType === "prestige_ilst") {
+    // v0 stopgap: Prestige OT uses simple 1.5x net rates. Real Prestige OT is
+    // FLSA weighted-average per workweek and belongs in the next rebuild.
+    const isIlst = slot.jobType === "prestige_ilst";
     const rate =
       slot.payType === "overtime"
-        ? settings.prestigeOvertimeNetRateCents
-        : settings.prestigeRegularNetRateCents;
+        ? isIlst
+          ? settings.prestigeIlstOvertimeNetRateCents
+          : settings.prestigeOvertimeNetRateCents
+        : isIlst
+          ? settings.prestigeIlstRegularNetRateCents
+          : settings.prestigeRegularNetRateCents;
     const earningsCents = Math.round(amount * rate);
 
     return {

@@ -31,13 +31,15 @@ describe("projection math", () => {
       settings: {
         abilityRegularNetRateCents: 1563,
         abilityOvertimeNetRateCents: 2173,
-        prestigeRegularNetRateCents: 1428,
-        prestigeOvertimeNetRateCents: 2142,
+        prestigeRegularNetRateCents: 1462,
+        prestigeOvertimeNetRateCents: 2193,
+        prestigeIlstRegularNetRateCents: 1548,
+        prestigeIlstOvertimeNetRateCents: 2322,
         abilityNetMultiplier: 0.7348,
       },
       withholding: {
         ability: 0.2652,
-        prestige: 0.18,
+        prestige: 0.14,
         incentive: 0.2652,
         filingFeeCents: 16_000,
         standardDeductionCents: 1_500_000,
@@ -82,13 +84,15 @@ describe("projection math", () => {
       settings: {
         abilityRegularNetRateCents: 1563,
         abilityOvertimeNetRateCents: 2173,
-        prestigeRegularNetRateCents: 1428,
-        prestigeOvertimeNetRateCents: 2142,
+        prestigeRegularNetRateCents: 1462,
+        prestigeOvertimeNetRateCents: 2193,
+        prestigeIlstRegularNetRateCents: 1548,
+        prestigeIlstOvertimeNetRateCents: 2322,
         abilityNetMultiplier: 0.7348,
       },
       withholding: {
         ability: 0.2652,
-        prestige: 0.18,
+        prestige: 0.14,
         incentive: 0.2652,
         filingFeeCents: 16_000,
         standardDeductionCents: 1_500_000,
@@ -118,8 +122,8 @@ describe("projection math", () => {
     //
     // So smoothed gross is ~$3,697 less than realized. Lock the smoothed
     // value within rounding noise.
-    expect(projection.ypwiGrossCents).toBeGreaterThan(18_300_000);
-    expect(projection.ypwiGrossCents).toBeLessThan(18_310_000);
+    expect(projection.ypwiGrossCents).toBeGreaterThan(18_070_000);
+    expect(projection.ypwiGrossCents).toBeLessThan(18_090_000);
 
     // ypwiNet stays realized (sum-based) — that's still YPWI net's contract.
     //   ytdEarnings = (5 * 140_000) + (300_000 + 120_000 - 140_000) = 700_000 + 280_000 = 980_000
