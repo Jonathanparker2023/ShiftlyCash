@@ -1016,7 +1016,6 @@ function TransactionDrawer({
 
       <div className="grid gap-3 lg:grid-cols-2">
         <TransactionColumn
-          emptyText="No applied spending for this day."
           heading="SPENDING"
           pendingTransactionIds={pendingTransactionIds}
           transactions={appliedTransactions}
@@ -1026,7 +1025,6 @@ function TransactionDrawer({
           }
         />
         <TransactionColumn
-          emptyText="No exempt transactions for this day."
           heading="EXEMPT"
           pendingTransactionIds={pendingTransactionIds}
           transactions={excludedTransactions}
@@ -1097,14 +1095,12 @@ function TransactionColumn({
   pendingTransactionIds,
   transactions,
   variant,
-  emptyText,
   onToggle,
 }: {
   heading: string;
   pendingTransactionIds: Set<string>;
   transactions: DashboardTransaction[];
   variant: "spending" | "exempt";
-  emptyText: string;
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
   return (
@@ -1119,21 +1115,15 @@ function TransactionColumn({
       </div>
 
       <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-        {transactions.length > 0 ? (
-          transactions.map((transaction) => (
-            <TransactionRowButton
-              key={transaction.id}
-              transaction={transaction}
-              disabled={pendingTransactionIds.has(transaction.id)}
-              variant={variant}
-              onToggle={onToggle}
-            />
-          ))
-        ) : (
-          <div className="rounded-md border border-dashed border-[#cbd5e1] bg-white p-3 text-sm text-[#64748b]">
-            {emptyText}
-          </div>
-        )}
+        {transactions.map((transaction) => (
+          <TransactionRowButton
+            key={transaction.id}
+            transaction={transaction}
+            disabled={pendingTransactionIds.has(transaction.id)}
+            variant={variant}
+            onToggle={onToggle}
+          />
+        ))}
       </div>
     </div>
   );
