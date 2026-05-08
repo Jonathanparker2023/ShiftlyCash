@@ -169,32 +169,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   const focusedDay = days[focusedDayIndex] ?? days[0];
   const focusedDayTotals = focusedDay ? dayTotals.get(focusedDay.id) : undefined;
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-
-      if (
-        target &&
-        ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)
-      ) {
-        return;
-      }
-
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        focusPreviousDay();
-      }
-
-      if (event.key === "ArrowRight") {
-        event.preventDefault();
-        focusNextDay();
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
   function updateSlot(
     dayId: string,
     slotIndex: number,
@@ -451,18 +425,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     setTransactionError(null);
   }
 
-  function focusPreviousDay() {
-    setFocusedDayIndex((current) => (current + 6) % 7);
-    setExpandedSlotIndex(null);
-    setTransactionError(null);
-  }
-
-  function focusNextDay() {
-    setFocusedDayIndex((current) => (current + 1) % 7);
-    setExpandedSlotIndex(null);
-    setTransactionError(null);
-  }
-
   function scheduleSlotSave(slot: DashboardSlot) {
     const key = `slot:${slot.dayId}:${slot.slotIndex}`;
     const version = bumpVersion(key);
@@ -657,7 +619,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
           {focusedDay ? (
             <FocusedDayEditor
               day={focusedDay}
-              dayIndex={focusedDayIndex}
               expandedSlotIndex={expandedSlotIndex}
               isManualTransactionPending={pendingManualDayIds.has(focusedDay.id)}
               pendingTransactionIds={pendingTransactionIds}
@@ -666,8 +627,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               totals={focusedDayTotals}
               onAddShift={addShift}
               onAddManualTransaction={addManualTransaction}
-              onNext={focusNextDay}
-              onPrevious={focusPreviousDay}
               onRemoveSlot={removeSlot}
               onReorderSlots={reorderSlots}
               onSlotChange={updateSlot}
@@ -685,7 +644,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               <span>Total: {weekTotals.wageHours.toFixed(2)}h</span>
               <span>Ability: {formatHoursFromSlots(days, "ability")}h</span>
               <span>Prestige: {formatHoursFromSlots(days, "prestige")}h</span>
-              <span className="text-[#0e7490]">Use day strip or arrow keys</span>
             </div>
             <button
               className="h-10 w-full rounded-md bg-[#0b1220] px-5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(16,16,15,0.18)] transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#d7dee8] disabled:text-[#64748b] disabled:shadow-none sm:w-auto"
@@ -911,7 +869,6 @@ function WeekStripCell({
 
 function FocusedDayEditor({
   day,
-  dayIndex,
   totals,
   expandedSlotIndex,
   isManualTransactionPending,
@@ -925,11 +882,8 @@ function FocusedDayEditor({
   onAddShift,
   onRemoveSlot,
   onReorderSlots,
-  onPrevious,
-  onNext,
 }: {
   day: DashboardDay;
-  dayIndex: number;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
   expandedSlotIndex: number | null;
   isManualTransactionPending: boolean;
@@ -958,12 +912,10 @@ function FocusedDayEditor({
     fromSlotIndex: number,
     toSlotIndex: number,
   ) => void;
-  onPrevious: () => void;
-  onNext: () => void;
 }) {
   return (
     <section className="mt-4 rounded-lg border border-[#d7dee8] bg-white p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <span className="rounded-full bg-[#0b1220] px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">
             {shortDayName(day.date)}
@@ -976,22 +928,6 @@ function FocusedDayEditor({
               Locked
             </span>
           ) : null}
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
-          <button
-            className="h-9 rounded-md border border-[#d7dee8] bg-[#f8fafc] px-3 text-sm font-medium transition hover:border-[#0e7490]"
-            onClick={onPrevious}
-            type="button"
-          >
-            {"<"} {shortDayNameByIndex(dayIndex - 1)}
-          </button>
-          <button
-            className="h-9 rounded-md border border-[#d7dee8] bg-[#f8fafc] px-3 text-sm font-medium transition hover:border-[#0e7490]"
-            onClick={onNext}
-            type="button"
-          >
-            {shortDayNameByIndex(dayIndex + 1)} {">"}
-          </button>
         </div>
       </div>
 
@@ -1969,7 +1905,3 @@ function shortDayName(value: string): string {
   }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
-function shortDayNameByIndex(value: number): string {
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return dayNames[(value + 7) % 7];
-}
