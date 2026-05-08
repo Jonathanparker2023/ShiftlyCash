@@ -36,6 +36,21 @@ type PaycheckActualRow = {
   ability_actual_amount: NumericValue;
 };
 
+export type PaycheckWeekSummary = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  displayWeekNumber: number;
+  role: "week_1" | "week_2";
+  status: "active" | "closed";
+  ability: {
+    regularHours: number;
+    overtimeHours: number;
+    totalHours: number;
+    grossCents: number;
+  };
+};
+
 export type PaycheckPeriod = {
   id: "previous" | "current";
   label: string;
@@ -43,15 +58,10 @@ export type PaycheckPeriod = {
   endDate: string;
   paycheckDueDate: string | null;
   actualWeekId: string | null;
-  weeks: Array<{
-    id: string;
-    startDate: string;
-    endDate: string;
-    displayWeekNumber: number;
-    role: "week_1" | "week_2";
-    status: "active" | "closed";
-  }>;
+  weeks: PaycheckWeekSummary[];
   ability: {
+    regularRate: number;
+    overtimeRate: number;
     regularHours: number;
     overtimeHours: number;
     totalHours: number;
@@ -178,22 +188,31 @@ function buildPeriod({
     .filter((week) => week.start_date >= periodStart && week.start_date <= periodEnd)
     .sort((left, right) => left.start_date.localeCompare(right.start_date));
   const dayToWeekId = new Map(days.map((day) => [day.id, day.week_id]));
-  const periodWeekIds = new Set(periodWeeks.map((week) => week.week_id));
-  const abilityHours = slots.reduce(
+  const weekSummaries = periodWeeks.map((week) => {
+    const abilityHours = sumAbilityHoursForWeek(week.week_id, dayToWeekId, slots);
+    const gross =
+      abilityHours.regularHours * ABILITY_REGULAR_GROSS_RATE +
+      abilityHours.overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
+
+    return {
+      id: week.week_id,
+      startDate: week.start_date,
+      endDate: week.end_date,
+      displayWeekNumber: week.display_week_number,
+      role: week.pay_period_role,
+      status: week.status,
+      ability: {
+        regularHours: abilityHours.regularHours,
+        overtimeHours: abilityHours.overtimeHours,
+        totalHours: abilityHours.regularHours + abilityHours.overtimeHours,
+        grossCents: dollarsToCents(gross),
+      },
+    };
+  });
+  const abilityHours = weekSummaries.reduce(
     (total, slot) => {
-      const weekId = dayToWeekId.get(slot.day_id);
-      if (!weekId || !periodWeekIds.has(weekId) || slot.job_type !== "ability") {
-        return total;
-      }
-
-      if (slot.pay_type === "regular") {
-        total.regularHours += toNumber(slot.hours_or_units);
-      }
-
-      if (slot.pay_type === "overtime") {
-        total.overtimeHours += toNumber(slot.hours_or_units);
-      }
-
+      total.regularHours += slot.ability.regularHours;
+      total.overtimeHours += slot.ability.overtimeHours;
       return total;
     },
     { regularHours: 0, overtimeHours: 0 },
@@ -221,15 +240,10 @@ function buildPeriod({
     endDate: periodEnd,
     paycheckDueDate: actualWeek?.paycheck_due_date ?? null,
     actualWeekId: actualWeek?.week_id ?? null,
-    weeks: periodWeeks.map((week) => ({
-      id: week.week_id,
-      startDate: week.start_date,
-      endDate: week.end_date,
-      displayWeekNumber: week.display_week_number,
-      role: week.pay_period_role,
-      status: week.status,
-    })),
+    weeks: weekSummaries,
     ability: {
+      regularRate: ABILITY_REGULAR_GROSS_RATE,
+      overtimeRate: ABILITY_OVERTIME_GROSS_RATE,
       regularHours: abilityHours.regularHours,
       overtimeHours: abilityHours.overtimeHours,
       totalHours: abilityHours.regularHours + abilityHours.overtimeHours,
@@ -241,6 +255,31 @@ function buildPeriod({
         actualNetCents === null ? null : actualNetCents - estimatedNetCents,
     },
   };
+}
+
+function sumAbilityHoursForWeek(
+  weekId: string,
+  dayToWeekId: Map<string, string>,
+  slots: EarnSlotRow[],
+): { regularHours: number; overtimeHours: number } {
+  return slots.reduce(
+    (total, slot) => {
+      if (dayToWeekId.get(slot.day_id) !== weekId || slot.job_type !== "ability") {
+        return total;
+      }
+
+      if (slot.pay_type === "regular") {
+        total.regularHours += toNumber(slot.hours_or_units);
+      }
+
+      if (slot.pay_type === "overtime") {
+        total.overtimeHours += toNumber(slot.hours_or_units);
+      }
+
+      return total;
+    },
+    { regularHours: 0, overtimeHours: 0 },
+  );
 }
 
 function toNumber(value: NumericValue): number {

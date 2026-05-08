@@ -148,11 +148,39 @@ function PaycheckPeriodCard({
 
       <div className="my-4 border-t border-[#e2e8f0]" />
 
+      <div className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-sm font-semibold text-[#0f172a]">Ability hours by week</h3>
+          <span className="text-xs font-semibold text-[#475569]">
+            {formatRate(period.ability.regularRate)} base / {formatRate(period.ability.overtimeRate)} OT
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {period.weeks.map((week) => (
+            <WeekBreakdown key={week.id} week={week} />
+          ))}
+        </div>
+      </div>
+
+      <div className="my-4 border-t border-[#e2e8f0]" />
+
       <div className="grid gap-2 text-sm">
         <MoneyLine label="Expected gross" value={period.ability.grossCents} />
         <MoneyLine label="Est. withholding" tone="negative" value={period.ability.estimatedTaxCents} />
         <MoneyLine strong label="Expected take-home" value={period.ability.estimatedNetCents} />
+        {period.ability.actualNetCents !== null ? (
+          <>
+            <MoneyLine label="Actual take-home" value={period.ability.actualNetCents} />
+            <MoneyLine
+              label="Difference"
+              tone={period.ability.differenceCents !== null && period.ability.differenceCents < 0 ? "negative" : undefined}
+              value={Math.abs(period.ability.differenceCents ?? 0)}
+            />
+          </>
+        ) : null}
       </div>
+
+      <AuditRead period={period} />
 
       <form className="mt-4 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3" onSubmit={submit}>
         <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-[#334155]">
@@ -181,6 +209,70 @@ function PaycheckPeriodCard({
         </p>
       </form>
     </article>
+  );
+}
+
+function WeekBreakdown({
+  week,
+}: {
+  week: PaycheckPeriod["weeks"][number];
+}) {
+  return (
+    <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div>
+        <p className="font-semibold text-[#0f172a]">
+          Week {week.displayWeekNumber}{" "}
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-[#64748b]">
+            {week.role === "week_1" ? "first half" : "paycheck week"}
+          </span>
+        </p>
+        <p className="text-xs text-[#64748b]">
+          {formatDate(week.startDate)} - {formatDate(week.endDate)}
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-right">
+        <MiniStat label="Reg" value={`${formatHours(week.ability.regularHours)}h`} />
+        <MiniStat label="OT" value={`${formatHours(week.ability.overtimeHours)}h`} />
+        <MiniStat label="Gross" value={formatMoney(week.ability.grossCents)} />
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+        {label}
+      </span>
+      <span className="font-semibold text-[#0f172a]">{value}</span>
+    </div>
+  );
+}
+
+function AuditRead({ period }: { period: PaycheckPeriod }) {
+  const difference = period.ability.differenceCents;
+  const classes =
+    difference === null
+      ? "border-[#d7dee8] bg-[#f8fafc] text-[#475569]"
+      : difference < -100
+        ? "border-[#fecaca] bg-[#fff1f2] text-[#991b1b]"
+        : difference > 100
+          ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]"
+          : "border-[#bae6fd] bg-[#e0f2fe] text-[#075985]";
+  const message =
+    difference === null
+      ? `Expected Ability net is ${formatMoney(period.ability.estimatedNetCents)} from ${formatHours(period.ability.totalHours)} total hours. Add the UKG net check to see if the paycheck is short.`
+      : difference < -100
+        ? `Short by ${formatMoney(Math.abs(difference))}. First compare UKG gross to ${formatMoney(period.ability.grossCents)}; if gross matches, the gap is likely deductions or withholding.`
+        : difference > 100
+          ? `Over by ${formatMoney(difference)}. Check UKG for extra pay, bonus pay, or lower withholding than the model expected.`
+          : `Within ${formatMoney(Math.abs(difference))} of the estimate. This paycheck is close enough to call matched.`;
+
+  return (
+    <div className={`mt-4 rounded-md border px-3 py-2 text-sm font-medium ${classes}`}>
+      {message}
+    </div>
   );
 }
 
@@ -280,6 +372,15 @@ function formatMoney(value: number): string {
 
 function formatHours(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatRate(value: number): string {
+  return `${value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })}/hr`;
 }
 
 function formatDate(value: string): string {
