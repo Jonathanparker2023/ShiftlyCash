@@ -5,7 +5,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   ContentBlock,
   MessageParam,
-  Tool,
   ToolResultBlockParam,
   ToolUseBlock,
   Usage,
@@ -16,6 +15,10 @@ import {
   DailyCapExceededError,
   logUsage,
 } from "@/lib/claude/usage";
+import {
+  READ_ONLY_PROJECTS_TOOLS,
+  runReadOnlyProjectsTool,
+} from "@/lib/claude/readOnlyProjectsTools";
 import { getTodayIso } from "@/lib/dashboard/dates";
 
 const MODEL = "claude-opus-4-7";
@@ -65,7 +68,7 @@ export async function generateDailyBrief(
       thinking: { type: "disabled" },
       system: DAILY_BRIEF_SYSTEM_PROMPT,
       messages: conversation,
-      tools: DAILY_BRIEF_TOOLS,
+      tools: READ_ONLY_PROJECTS_TOOLS,
       tool_choice: { type: "auto", disable_parallel_tool_use: true },
     });
     await logUsage(supabase, resolvedUserId, response.id, MODEL, response.usage);
@@ -88,7 +91,7 @@ export async function generateDailyBrief(
 
     const toolResults: ToolResultBlockParam[] = [];
     for (const toolUse of toolUses) {
-      const result = await runBriefTool(supabase, toolUse.name, toolUse.input);
+      const result = await runReadOnlyProjectsTool(supabase, toolUse.name, toolUse.input);
       toolResults.push({
         type: "tool_result",
         tool_use_id: toolUse.id,
@@ -107,21 +110,6 @@ export async function generateDailyBrief(
   return { reply: "No project brief available yet.", usage };
 }
 
-const DAILY_BRIEF_TOOLS: Tool[] = [
-  {
-    name: "list_projects",
-    description: "List the user's projects with status, deadline, and progress.",
-    input_schema: objectSchema({}),
-  },
-  {
-    name: "list_tasks",
-    description: "List the user's tasks due on or before a date.",
-    input_schema: objectSchema({
-      due_date_on_or_before: stringProperty("YYYY-MM-DD due date ceiling."),
-    }),
-  },
-];
-
 function getAnthropicClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -130,63 +118,6 @@ function getAnthropicClient(): Anthropic {
 
   anthropicClient ??= new Anthropic({ apiKey });
   return anthropicClient;
-}
-
-async function runBriefTool(
-  supabase: SupabaseClient,
-  name: string,
-  input: unknown,
-): Promise<{ ok: boolean; data: unknown }> {
-  try {
-    if (name === "list_projects") {
-      return toolOk(await listProjects(supabase));
-    }
-
-    if (name === "list_tasks") {
-      return toolOk(await listTasks(supabase, asRecord(input)));
-    }
-
-    return toolError(`Unknown tool: ${name}`);
-  } catch (error) {
-    return toolError(error instanceof Error ? error.message : "Tool failed.");
-  }
-}
-
-async function listProjects(supabase: SupabaseClient) {
-  const userId = await getAuthedUserId(supabase);
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id,name,description,status,sort_order,deadline,is_inbox")
-    .eq("user_id", userId)
-    .eq("is_inbox", false)
-    .order("sort_order");
-
-  if (error) {
-    throw new Error(`Unable to list projects: ${error.message}`);
-  }
-
-  return data ?? [];
-}
-
-async function listTasks(supabase: SupabaseClient, input: Record<string, unknown>) {
-  const userId = await getAuthedUserId(supabase);
-  const dueDate = optionalString(input.due_date_on_or_before) ?? getTodayIso();
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("id,project_id,title,description,due_date,status,sort_order,projects!inner(name,is_inbox)")
-    .eq("user_id", userId)
-    .eq("projects.is_inbox", false)
-    .in("status", ["todo", "in_progress"])
-    .not("due_date", "is", null)
-    .lte("due_date", dueDate)
-    .order("due_date", { ascending: true })
-    .order("sort_order", { ascending: true });
-
-  if (error) {
-    throw new Error(`Unable to list tasks: ${error.message}`);
-  }
-
-  return data ?? [];
 }
 
 async function getAuthedUserId(supabase: SupabaseClient): Promise<string> {
@@ -228,45 +159,4 @@ function addUsage(total: DailyBriefUsage, usage: Usage) {
   total.output_tokens += usage.output_tokens;
   total.cache_creation_input_tokens += usage.cache_creation_input_tokens ?? 0;
   total.cache_read_input_tokens += usage.cache_read_input_tokens ?? 0;
-}
-
-function toolOk(data: unknown) {
-  return { ok: true, data: { ok: true, data } };
-}
-
-function toolError(error: string) {
-  return { ok: false, data: { ok: false, error } };
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function optionalString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function objectSchema(
-  properties: Record<string, unknown>,
-  required: string[] = [],
-): Tool.InputSchema {
-  return {
-    type: "object",
-    properties,
-    required,
-    additionalProperties: false,
-  };
-}
-
-function stringProperty(description: string) {
-  return { type: "string", description };
 }

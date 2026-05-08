@@ -17,6 +17,10 @@ import {
   logUsage,
 } from "@/lib/claude/usage";
 import {
+  READ_ONLY_PROJECTS_TOOLS,
+  runReadOnlyProjectsTool,
+} from "@/lib/claude/readOnlyProjectsTools";
+import {
   archiveProject,
   completeTask,
   createProject,
@@ -146,25 +150,7 @@ Before archive_project, delete_project, or delete_task, ask the user to confirm 
 
 Do not expose internal IDs unless they are needed to resolve ambiguity. If several records could match, ask one clarifying question.`;
 
-const PROJECT_TOOLS: Tool[] = [
-  {
-    name: "list_projects",
-    description: "List the user's projects with status, deadline, and progress.",
-    input_schema: objectSchema({}),
-  },
-  {
-    name: "list_tasks",
-    description: "List the user's tasks, optionally filtered by project, status, or due date.",
-    input_schema: objectSchema({
-      project_id: stringProperty("Project id to filter by."),
-      status: {
-        type: "string",
-        enum: ["todo", "in_progress", "done"],
-        description: "Task status to filter by.",
-      },
-      due_date_on_or_before: stringProperty("YYYY-MM-DD due date ceiling."),
-    }),
-  },
+const PROJECT_MUTATION_TOOLS: Tool[] = [
   {
     name: "create_project",
     description: "Create a project.",
@@ -266,6 +252,11 @@ const PROJECT_TOOLS: Tool[] = [
   },
 ];
 
+const PROJECT_TOOLS: Tool[] = [
+  ...READ_ONLY_PROJECTS_TOOLS,
+  ...PROJECT_MUTATION_TOOLS,
+];
+
 async function runTool(
   supabase: SupabaseClient,
   name: string,
@@ -274,12 +265,8 @@ async function runTool(
   try {
     const toolInput = asRecord(input);
 
-    if (name === "list_projects") {
-      return toolOk(await listProjects(supabase));
-    }
-
-    if (name === "list_tasks") {
-      return toolOk(await listTasks(supabase, toolInput));
+    if (name === "list_projects" || name === "list_tasks") {
+      return runReadOnlyProjectsTool(supabase, name, toolInput);
     }
 
     if (name === "create_project") {
@@ -373,68 +360,6 @@ async function runTool(
   } catch (error) {
     return toolError(error instanceof Error ? error.message : "Tool failed.");
   }
-}
-
-async function listProjects(supabase: SupabaseClient) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new Error(userError?.message ?? "User is not authenticated.");
-  }
-
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id,name,description,color,status,sort_order,deadline")
-    .eq("user_id", user.id)
-    .order("sort_order");
-
-  if (error) {
-    throw new Error(`Unable to list projects: ${error.message}`);
-  }
-
-  return data ?? [];
-}
-
-async function listTasks(supabase: SupabaseClient, input: Record<string, unknown>) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new Error(userError?.message ?? "User is not authenticated.");
-  }
-
-  let query = supabase
-    .from("tasks")
-    .select("id,project_id,title,description,due_date,status,sort_order,completed_at")
-    .eq("user_id", user.id)
-    .order("sort_order");
-
-  const projectId = optionalString(input.project_id);
-  if (projectId) {
-    query = query.eq("project_id", projectId);
-  }
-
-  const status = optionalTaskStatus(input.status);
-  if (status) {
-    query = query.eq("status", status);
-  }
-
-  const dueDate = optionalString(input.due_date_on_or_before);
-  if (dueDate) {
-    query = query.lte("due_date", dueDate);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    throw new Error(`Unable to list tasks: ${error.message}`);
-  }
-
-  return data ?? [];
 }
 
 function mutationToolResult<T>(
