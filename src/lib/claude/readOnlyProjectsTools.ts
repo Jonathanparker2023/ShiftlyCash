@@ -24,20 +24,25 @@ export const READ_ONLY_PROJECTS_TOOLS: Tool[] = [
   },
 ];
 
+type ReadOnlyProjectsToolOptions = {
+  includeInbox?: boolean;
+};
+
 export async function runReadOnlyProjectsTool(
   supabase: SupabaseClient,
   name: string,
   input: unknown,
+  options: ReadOnlyProjectsToolOptions = {},
 ): Promise<{ ok: boolean; data: unknown }> {
   try {
     const toolInput = asRecord(input);
 
     if (name === "list_projects") {
-      return toolOk(await listProjects(supabase));
+      return toolOk(await listProjects(supabase, options));
     }
 
     if (name === "list_tasks") {
-      return toolOk(await listTasks(supabase, toolInput));
+      return toolOk(await listTasks(supabase, toolInput, options));
     }
 
     return toolError(`Unknown tool: ${name}`);
@@ -46,14 +51,21 @@ export async function runReadOnlyProjectsTool(
   }
 }
 
-export async function listProjects(supabase: SupabaseClient) {
+export async function listProjects(
+  supabase: SupabaseClient,
+  options: ReadOnlyProjectsToolOptions = {},
+) {
   const userId = await getAuthedUserId(supabase);
-  const { data, error } = await supabase
+  let query = supabase
     .from("projects")
     .select("id,name,description,color,status,sort_order,deadline,is_inbox")
-    .eq("user_id", userId)
-    .eq("is_inbox", false)
-    .order("sort_order");
+    .eq("user_id", userId);
+
+  if (!options.includeInbox) {
+    query = query.eq("is_inbox", false);
+  }
+
+  const { data, error } = await query.order("sort_order");
 
   if (error) {
     throw new Error(`Unable to list projects: ${error.message}`);
@@ -65,6 +77,7 @@ export async function listProjects(supabase: SupabaseClient) {
 export async function listTasks(
   supabase: SupabaseClient,
   input: Record<string, unknown>,
+  options: ReadOnlyProjectsToolOptions = {},
 ) {
   const userId = await getAuthedUserId(supabase);
   let query = supabase
@@ -73,8 +86,11 @@ export async function listTasks(
       "id,project_id,title,description,due_date,status,sort_order,completed_at,projects!inner(name,is_inbox)",
     )
     .eq("user_id", userId)
-    .eq("projects.is_inbox", false)
     .order("sort_order");
+
+  if (!options.includeInbox) {
+    query = query.eq("projects.is_inbox", false);
+  }
 
   const projectId = optionalString(input.project_id);
   if (projectId) {

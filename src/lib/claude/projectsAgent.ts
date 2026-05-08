@@ -266,7 +266,7 @@ async function runTool(
     const toolInput = asRecord(input);
 
     if (name === "list_projects" || name === "list_tasks") {
-      return runReadOnlyProjectsTool(supabase, name, toolInput);
+      return runReadOnlyProjectsTool(supabase, name, toolInput, { includeInbox: true });
     }
 
     if (name === "create_project") {
