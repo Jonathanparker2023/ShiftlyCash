@@ -9,6 +9,7 @@ import {
   archiveTag,
   completeTask,
   createProject,
+  createInboxTask,
   createTag,
   createTask,
   deleteProject,
@@ -18,6 +19,8 @@ import {
   reorderTasks,
   reorderTags,
   removeTagFromTask,
+  moveTaskToProject,
+  saveWeeklyReflection,
   updateTag,
   updateProject,
   updateTask,
@@ -212,6 +215,44 @@ export async function reorderTagsAction(input: {
 }): Promise<{ ok: true }> {
   const { supabase } = await requireUser();
   const result = await reorderTags(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths();
+  return { ok: true };
+}
+
+export async function createInboxTaskAction(input: {
+  title: string;
+  description?: string | null;
+}): Promise<{ ok: true; id: string }> {
+  const { supabase } = await requireUser();
+  const result = await createInboxTask(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths();
+  return { ok: true, id: result.data.id };
+}
+
+export async function moveTaskToProjectAction(input: {
+  taskId: string;
+  projectId: string;
+}): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const result = await moveTaskToProject(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths(result.data.projectId);
+  return { ok: true };
+}
+
+export async function saveWeeklyReflectionAction(input: {
+  weekStart: string;
+  shipped?: string | null;
+  stuck?: string | null;
+  nextWeek?: string | null;
+}): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const result = await saveWeeklyReflection(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
   revalidateProjectPaths();

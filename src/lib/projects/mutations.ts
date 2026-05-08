@@ -60,6 +60,7 @@ type ProjectOwnershipRow = {
   id: string;
   user_id: string;
   name: string;
+  is_inbox?: boolean | null;
 };
 
 type TaskOwnershipRow = {
@@ -470,6 +471,127 @@ export async function deleteTask(
   return ok({ id: owner.data.id, projectId: owner.data.project_id });
 }
 
+export async function createInboxTask(
+  supabase: SupabaseClient,
+  input: { title: string; description?: string | null },
+): Promise<MutationResult<{ id: string; projectId: string }>> {
+  const userResult = await getAuthedUserId(supabase);
+  if (!userResult.ok) return userResult;
+
+  const title = requireName(input.title, "task title");
+  if (!title.ok) return title;
+
+  const inbox = await ensureInboxProject(supabase, userResult.data);
+  if (!inbox.ok) return inbox;
+
+  const orderResult = await nextTaskSortOrder(
+    supabase,
+    userResult.data,
+    inbox.data.id,
+  );
+  if (!orderResult.ok) return orderResult;
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      user_id: userResult.data,
+      project_id: inbox.data.id,
+      title: title.data,
+      description: normalizeOptionalText(input.description),
+      status: "todo" satisfies TaskStatus,
+      sort_order: orderResult.data,
+      completed_at: null,
+    })
+    .select("id")
+    .single();
+
+  if (error) return fail(`Unable to create inbox task: ${error.message}`);
+
+  const taskId = (data as { id: string }).id;
+  await logProjectEvent({
+    supabase,
+    projectId: inbox.data.id,
+    taskId,
+    kind: "task.created",
+    payload: { title: title.data, projectId: inbox.data.id, inbox: true },
+  });
+
+  return ok({ id: taskId, projectId: inbox.data.id });
+}
+
+export async function moveTaskToProject(
+  supabase: SupabaseClient,
+  input: { taskId: string; projectId: string },
+): Promise<MutationResult<{ id: string; projectId: string }>> {
+  const task = await getTaskForUser(supabase, input.taskId);
+  if (!task.ok) return task;
+
+  const projectId = requireUuid(input.projectId, "project id");
+  if (!projectId.ok) return projectId;
+
+  const target = await getProjectForUser(supabase, projectId.data);
+  if (!target.ok) return target;
+  if (target.data.is_inbox) {
+    return fail("Inbox tasks can only move to a regular project.");
+  }
+
+  const orderResult = await nextTaskSortOrder(
+    supabase,
+    task.data.user_id,
+    target.data.id,
+  );
+  if (!orderResult.ok) return orderResult;
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({ project_id: target.data.id, sort_order: orderResult.data })
+    .eq("id", task.data.id);
+
+  if (error) return fail(`Unable to move task: ${error.message}`);
+
+  await logProjectEvent({
+    supabase,
+    projectId: target.data.id,
+    taskId: task.data.id,
+    kind: "task.updated",
+    payload: { changedFields: ["projectId"], fromProjectId: task.data.project_id },
+  });
+
+  return ok({ id: task.data.id, projectId: target.data.id });
+}
+
+export async function saveWeeklyReflection(
+  supabase: SupabaseClient,
+  input: {
+    weekStart: string;
+    shipped?: string | null;
+    stuck?: string | null;
+    nextWeek?: string | null;
+  },
+): Promise<MutationResult<{ weekStart: string }>> {
+  const userResult = await getAuthedUserId(supabase);
+  if (!userResult.ok) return userResult;
+
+  const weekStart = normalizeDate(input.weekStart, "week start");
+  if (!weekStart.ok || !weekStart.data) return fail("Invalid week start.");
+
+  const { error } = await supabase.from("weekly_reflections").upsert(
+    {
+      user_id: userResult.data,
+      week_start: weekStart.data,
+      shipped: normalizeOptionalText(input.shipped),
+      stuck: normalizeOptionalText(input.stuck),
+      next_week: normalizeOptionalText(input.nextWeek),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,week_start" },
+  );
+
+  if (error) return fail(`Unable to save reflection: ${error.message}`);
+
+  return ok({ weekStart: weekStart.data });
+}
+
 export async function reorderProjects(
   supabase: SupabaseClient,
   input: { orderedIds: string[] },
@@ -761,7 +883,7 @@ export async function getProjectForUser(
 
   const { data, error } = await supabase
     .from("projects")
-    .select("id,user_id,name")
+    .select("id,user_id,name,is_inbox")
     .eq("id", projectId)
     .maybeSingle();
 
@@ -800,6 +922,64 @@ export async function getTaskForUser(
   }
 
   return ok(row);
+}
+
+async function ensureInboxProject(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<MutationResult<ProjectOwnershipRow>> {
+  const existing = await getInboxProject(supabase, userId);
+  if (!existing.ok) return existing;
+  if (existing.data) return ok(existing.data);
+
+  const orderResult = await nextProjectSortOrder(supabase, userId);
+  if (!orderResult.ok) return orderResult;
+
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      user_id: userId,
+      name: "Inbox",
+      description: "Quick-captured tasks waiting for triage.",
+      color: "#64748b",
+      status: "active" satisfies ProjectStatus,
+      sort_order: orderResult.data,
+      is_inbox: true,
+    })
+    .select("id,user_id,name,is_inbox")
+    .single();
+
+  if (error) {
+    const retried = await getInboxProject(supabase, userId);
+    if (retried.ok && retried.data) return ok(retried.data);
+    return fail(`Unable to prepare inbox: ${error.message}`);
+  }
+
+  const inbox = data as ProjectOwnershipRow;
+  await logProjectEvent({
+    supabase,
+    projectId: inbox.id,
+    kind: "project.created",
+    payload: { name: inbox.name, inbox: true },
+  });
+
+  return ok(inbox);
+}
+
+async function getInboxProject(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<MutationResult<ProjectOwnershipRow | null>> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id,user_id,name,is_inbox")
+    .eq("user_id", userId)
+    .eq("is_inbox", true)
+    .maybeSingle();
+
+  if (error) return fail(`Unable to read inbox project: ${error.message}`);
+
+  return ok((data as ProjectOwnershipRow | null) ?? null);
 }
 
 export async function getTagForUser(

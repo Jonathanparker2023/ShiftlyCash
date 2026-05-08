@@ -39,6 +39,7 @@ export type ProjectItem = {
   status: ProjectStatus;
   sortOrder: number;
   deadline: string | null;
+  isInbox: boolean;
   progress: {
     total: number;
     done: number;
@@ -71,4 +72,18 @@ export type TaskFilterInput = {
   tagIds?: string[];
   statuses?: TaskStatus[];
   dueBefore?: string | null;
+};
+
+export type TodayData = {
+  dueToday: ProjectTask[];
+  dueThisWeek: ProjectTask[];
+};
+
+export type WeeklyReflection = {
+  id: string;
+  weekStart: string;
+  shipped: string | null;
+  stuck: string | null;
+  nextWeek: string | null;
+  updatedAt: string;
 };

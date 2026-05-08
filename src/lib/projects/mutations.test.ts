@@ -4,8 +4,10 @@ import {
   addTagToTask,
   archiveTag,
   completeTask,
+  createInboxTask,
   createTag,
   removeTagFromTask,
+  saveWeeklyReflection,
   updateTag,
 } from "@/lib/projects/mutations";
 
@@ -183,6 +185,74 @@ describe("project mutations", () => {
       },
     ]);
   });
+
+  it("creates the inbox project once and reuses it for later captures", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    const inboxProjectId = "55555555-5555-4555-8555-555555555555";
+    const insertedProjects: Record<string, unknown>[] = [];
+    const insertedTasks: Record<string, unknown>[] = [];
+    const supabase = createInboxMutationSupabase({
+      inboxProjectId,
+      insertedProjects,
+      insertedTasks,
+      userId,
+    });
+
+    await expect(
+      createInboxTask(supabase as never, { title: "First loose task" }),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: { projectId: inboxProjectId },
+    });
+    await expect(
+      createInboxTask(supabase as never, { title: "Second loose task" }),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: { projectId: inboxProjectId },
+    });
+
+    expect(insertedProjects).toHaveLength(1);
+    expect(insertedProjects[0]).toMatchObject({ is_inbox: true, name: "Inbox" });
+    expect(insertedTasks).toHaveLength(2);
+  });
+
+  it("upserts weekly reflections by week start", async () => {
+    const upserts: Record<string, unknown>[] = [];
+    const supabase = {
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+          error: null,
+        }),
+      },
+      from(table: string) {
+        if (table !== "weekly_reflections") {
+          throw new Error(`Unexpected table: ${table}`);
+        }
+
+        return {
+          upsert(payload: Record<string, unknown>) {
+            upserts.push(payload);
+            return { error: null };
+          },
+        };
+      },
+    };
+
+    await saveWeeklyReflection(supabase as never, {
+      weekStart: "2026-05-03",
+      shipped: "Moved projects forward",
+      stuck: "Nothing major",
+      nextWeek: "Review inbox",
+    });
+    await saveWeeklyReflection(supabase as never, {
+      weekStart: "2026-05-03",
+      shipped: "Updated same week",
+    });
+
+    expect(upserts).toHaveLength(2);
+    expect(upserts.every((row) => row.week_start === "2026-05-03")).toBe(true);
+  });
 });
 
 function createProjectMutationSupabase(input: {
@@ -351,6 +421,127 @@ function createProjectMutationSupabase(input: {
           upsert(payload: Record<string, unknown>) {
             input.taskTags?.add(`${payload.task_id}:${payload.tag_id}`);
             return { error: null };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  };
+}
+
+function createInboxMutationSupabase(input: {
+  inboxProjectId: string;
+  insertedProjects: Record<string, unknown>[];
+  insertedTasks: Record<string, unknown>[];
+  userId: string;
+}) {
+  let inboxExists = false;
+  let taskCount = 0;
+
+  return {
+    auth: {
+      getUser: async () => ({
+        data: { user: { id: input.userId } },
+        error: null,
+      }),
+    },
+    from(table: string) {
+      if (table === "project_events") {
+        return { insert: async () => ({ error: null }) };
+      }
+
+      if (table === "projects") {
+        return {
+          insert(payload: Record<string, unknown>) {
+            inboxExists = true;
+            input.insertedProjects.push(payload);
+            return {
+              select() {
+                return {
+                  single: async () => ({
+                    data: {
+                      id: input.inboxProjectId,
+                      user_id: input.userId,
+                      name: "Inbox",
+                      is_inbox: true,
+                    },
+                    error: null,
+                  }),
+                };
+              },
+            };
+          },
+          select(columns?: string) {
+            const filters: Record<string, unknown> = {};
+            const chain = {
+              eq(field: string, value: unknown) {
+                filters[field] = value;
+                return chain;
+              },
+              limit() {
+                return chain;
+              },
+              maybeSingle: async () => {
+                if (columns?.includes("is_inbox")) {
+                  if (!inboxExists) {
+                    return { data: null, error: null };
+                  }
+
+                  return {
+                    data: {
+                      id: input.inboxProjectId,
+                      user_id: input.userId,
+                      name: "Inbox",
+                      is_inbox: true,
+                    },
+                    error: null,
+                  };
+                }
+
+                return { data: { sort_order: 0 }, error: null };
+              },
+              order() {
+                return chain;
+              },
+            };
+            return chain;
+          },
+        };
+      }
+
+      if (table === "tasks") {
+        return {
+          insert(payload: Record<string, unknown>) {
+            taskCount += 1;
+            input.insertedTasks.push(payload);
+            return {
+              select() {
+                return {
+                  single: async () => ({
+                    data: {
+                      id: `44444444-4444-4444-8444-44444444444${taskCount}`,
+                    },
+                    error: null,
+                  }),
+                };
+              },
+            };
+          },
+          select() {
+            const chain = {
+              eq() {
+                return chain;
+              },
+              limit() {
+                return chain;
+              },
+              maybeSingle: async () => ({ data: { sort_order: 0 }, error: null }),
+              order() {
+                return chain;
+              },
+            };
+            return chain;
           },
         };
       }

@@ -1,6 +1,10 @@
 import { CrossProjectFilter } from "@/components/projects/CrossProjectFilter";
 import { ProjectsView } from "@/components/projects/ProjectsView";
+import { QuickCaptureInbox } from "@/components/projects/QuickCaptureInbox";
+import { TodayView } from "@/components/projects/TodayView";
+import { WeeklyReflection } from "@/components/projects/WeeklyReflection";
 import { requireUser } from "@/lib/auth";
+import { getTodayIso } from "@/lib/dashboard/dates";
 import { getProjectsData, getTasksFiltered } from "@/lib/projects/data";
 import type { TaskStatus } from "@/lib/projects/types";
 
@@ -10,6 +14,8 @@ export default async function ProjectsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const data = await getProjectsData();
+  const todayIso = getTodayIso();
+  const weekStartIso = getSundayUtcStartIso(todayIso);
   const params = await searchParams;
   const selectedTagIds = parseSelectedTagIds(params.tags);
   const dueThisWeek = params.due === "week";
@@ -38,9 +44,12 @@ export default async function ProjectsPage({
             tags={data.tags}
           />
           {/* SLOT: today (Batch B) */}
+          <TodayView todayIso={todayIso} />
           {/* SLOT: inbox (Batch B) */}
+          <QuickCaptureInbox />
           {/* SLOT: project-list (existing) */}
           {/* SLOT: reflection (Batch B) */}
+          <WeeklyReflection todayIso={todayIso} weekStartIso={weekStartIso} />
         </>
       }
       initialData={data}
@@ -81,4 +90,10 @@ function endOfCurrentWeekIso(): string {
   );
   end.setUTCDate(end.getUTCDate() + (6 - end.getUTCDay()));
   return end.toISOString().slice(0, 10);
+}
+
+function getSundayUtcStartIso(todayIso: string): string {
+  const date = new Date(`${todayIso}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+  return date.toISOString().slice(0, 10);
 }
