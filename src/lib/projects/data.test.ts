@@ -1,10 +1,97 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { getTasksFiltered, getTodayData } from "@/lib/projects/data";
+import {
+  deriveProjectHealth,
+  getCompletionHeatmapData,
+  getTasksFiltered,
+  getTodayData,
+} from "@/lib/projects/data";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/dashboard/dates", () => ({
+  getTodayIso: () => "2026-05-08",
+}));
 
 describe("project data", () => {
+  it("derives red health from open past-due tasks", () => {
+    expect(
+      deriveProjectHealth({
+        lastEventAt: "2026-05-08T10:00:00.000Z",
+        now: new Date("2026-05-08T12:00:00.000Z"),
+        openPastDueCount: 1,
+      }),
+    ).toBe("red");
+  });
+
+  it("derives yellow health from stale project activity", () => {
+    expect(
+      deriveProjectHealth({
+        lastEventAt: "2026-04-20T10:00:00.000Z",
+        now: new Date("2026-05-08T12:00:00.000Z"),
+        openPastDueCount: 0,
+      }),
+    ).toBe("yellow");
+  });
+
+  it("derives green health from fresh activity without past-due tasks", () => {
+    expect(
+      deriveProjectHealth({
+        lastEventAt: "2026-05-01T10:00:00.000Z",
+        now: new Date("2026-05-08T12:00:00.000Z"),
+        openPastDueCount: 0,
+      }),
+    ).toBe("green");
+  });
+
+  it("returns dense completion heatmap days sorted ascending", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const supabase = {
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: userId } },
+          error: null,
+        }),
+      },
+      from(table: string) {
+        if (table !== "project_events") {
+          throw new Error(`Unexpected table: ${table}`);
+        }
+
+        return {
+          select() {
+            const chain = {
+              eq() {
+                return chain;
+              },
+              gte() {
+                return chain;
+              },
+              then(resolve: (value: unknown) => void) {
+                resolve({
+                  data: [
+                    { created_at: "2026-05-07T12:00:00.000Z" },
+                    { created_at: "2026-05-07T13:00:00.000Z" },
+                  ],
+                  error: null,
+                });
+              },
+            };
+            return chain;
+          },
+        };
+      },
+    };
+
+    const days = await getCompletionHeatmapData(supabase as never, projectId, 3);
+
+    expect(days).toEqual([
+      { date: "2026-05-06", count: 0 },
+      { date: "2026-05-07", count: 2 },
+      { date: "2026-05-08", count: 0 },
+    ]);
+  });
+
   it("partitions today tasks from later this-week tasks", async () => {
     const userId = "11111111-1111-4111-8111-111111111111";
     const todayTaskId = "7a11066f-1389-837d-986a-81d0468d0555";

@@ -87,6 +87,10 @@ export function ProjectBar({
                   <span aria-hidden="true" className="text-lg leading-none">
                     {identity.emoji}
                   </span>
+                  <span
+                    aria-hidden="true"
+                    className={`h-2 w-2 shrink-0 rounded-full ${healthDotClass(project.health)}`}
+                  />
                   <Link
                     className="truncate text-base font-semibold text-[#0f172a] transition hover:text-[#1d4ed8]"
                     href={`/projects/${project.id}`}
@@ -182,4 +186,16 @@ function formatDeadline(value: string): string {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function healthDotClass(health: ProjectItem["health"]): string {
+  if (health === "red") {
+    return "bg-rose-500";
+  }
+
+  if (health === "yellow") {
+    return "bg-amber-500";
+  }
+
+  return "bg-emerald-500";
 }

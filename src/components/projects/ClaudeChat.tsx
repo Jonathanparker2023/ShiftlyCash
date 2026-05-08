@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { DailyBriefButton } from "@/components/projects/DailyBriefButton";
 import { VoiceInput } from "@/components/projects/VoiceInput";
 
 type ChatMessage = {
@@ -40,6 +41,8 @@ export function ClaudeChat() {
   const [input, setInput] = useState("");
   const [usage, setUsage] = useState<TokenUsage | null>(null);
   const [dailyUsage, setDailyUsage] = useState<DailyUsage | null>(null);
+  const [dailyBrief, setDailyBrief] = useState<string | null>(null);
+  const [isBriefPending, setIsBriefPending] = useState(false);
   const [capExceededUntil, setCapExceededUntil] = useState<string | null>(null);
   const [toolCount, setToolCount] = useState(0);
   const [isPending, setIsPending] = useState(false);
@@ -177,6 +180,26 @@ export function ClaudeChat() {
       </div>
 
       <UsageBudget usage={dailyUsage} />
+
+      <div className="mb-3 rounded-md border border-[#d7dee8] bg-white px-3 py-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#64748b]">
+            Daily Brief
+          </p>
+          <DailyBriefButton
+            disabled={isBriefPending || isPending || isCapLocked}
+            onBrief={setDailyBrief}
+            onError={setError}
+            onUsage={refreshDailyUsage}
+            setPending={setIsBriefPending}
+          />
+        </div>
+        {dailyBrief ? (
+          <p className="mt-2 rounded-md bg-[#f8fafc] px-3 py-2 text-sm leading-6 text-[#334155]">
+            {dailyBrief}
+          </p>
+        ) : null}
+      </div>
 
       <div className="mb-3 flex h-[320px] flex-col gap-2 overflow-y-auto rounded-md border border-[#d7dee8] bg-white p-3">
         {messages.length === 0 ? (

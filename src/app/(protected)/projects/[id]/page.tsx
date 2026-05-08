@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CompletionHeatmap } from "@/components/projects/CompletionHeatmap";
 import { TaskList } from "@/components/projects/TaskList";
 import { getProjectDetailData } from "@/lib/projects/data";
 import type { ProjectEventItem } from "@/lib/projects/types";
@@ -97,6 +98,7 @@ export default async function ProjectDetailPage({
                   </p>
                 )}
               </div>
+              <CompletionHeatmap projectId={project.id} />
             </section>
           </div>
         </div>

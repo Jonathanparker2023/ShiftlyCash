@@ -4,10 +4,13 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireUser } from "@/lib/auth";
+import { getTodayIso } from "@/lib/dashboard/dates";
 import { mark, since, timed } from "@/lib/perf";
 import type {
+  CompletionHeatmapDay,
   ProjectDetailData,
   ProjectEventItem,
+  ProjectHealth,
   ProjectItem,
   ProjectsData,
   ProjectStatus,
@@ -69,6 +72,15 @@ type ProjectEventRow = {
   created_at: string;
 };
 
+type HealthEventRow = {
+  project_id: string;
+  created_at: string;
+};
+
+type PastDueTaskRow = {
+  project_id: string;
+};
+
 type WeeklyReflectionRow = {
   id: string;
   week_start: string;
@@ -108,6 +120,8 @@ export async function getProjectsData(): Promise<ProjectsData> {
   }
 
   const taskRows = (tasksRes.data ?? []) as TaskRow[];
+  const projectRows = (projectsRes.data ?? []) as ProjectRow[];
+  const projectIds = projectRows.map((project) => project.id);
   const [allTags, taskTags] = await Promise.all([
     getTagsForUser(supabase),
     getTaskTagsForTasks(
@@ -129,7 +143,14 @@ export async function getProjectsData(): Promise<ProjectsData> {
     tasks.sort(compareTasks);
   }
 
-  const projects = ((projectsRes.data ?? []) as ProjectRow[])
+  const healthByProject = await getProjectHealthMap(
+    supabase,
+    user.id,
+    projectIds,
+    getTodayIso(),
+  );
+
+  const projects = projectRows
     .map((row): ProjectItem => {
       const tasks = tasksByProject.get(row.id) ?? [];
       const done = tasks.filter((task) => task.status === "done").length;
@@ -144,6 +165,7 @@ export async function getProjectsData(): Promise<ProjectsData> {
         sortOrder: Number(row.sort_order ?? 0),
         deadline: row.deadline,
         isInbox: Boolean(row.is_inbox),
+        health: healthByProject.get(row.id) ?? "yellow",
         progress: {
           total,
           done,
@@ -420,6 +442,46 @@ export async function getCurrentWeekReflection(
   return data ? mapWeeklyReflection(data as WeeklyReflectionRow) : null;
 }
 
+export async function getCompletionHeatmapData(
+  supabase: SupabaseClient,
+  projectId: string,
+  days = 84,
+): Promise<CompletionHeatmapDay[]> {
+  const userId = await getAuthedUserId(supabase);
+  if (!userId) return [];
+
+  const end = new Date(`${getTodayIso()}T00:00:00.000Z`);
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - Math.max(1, days) + 1);
+  const startIso = start.toISOString().slice(0, 10);
+  const startTimestamp = `${startIso}T00:00:00.000Z`;
+
+  const { data, error } = await supabase
+    .from("project_events")
+    .select("created_at")
+    .eq("user_id", userId)
+    .eq("project_id", projectId)
+    .eq("kind", "task.completed")
+    .gte("created_at", startTimestamp);
+
+  if (error) {
+    throw new Error(`Completion heatmap: ${error.message}`);
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as { created_at: string }[]) {
+    const date = new Date(row.created_at).toISOString().slice(0, 10);
+    counts.set(date, (counts.get(date) ?? 0) + 1);
+  }
+
+  return Array.from({ length: Math.max(1, days) }, (_, index) => {
+    const date = new Date(start);
+    date.setUTCDate(start.getUTCDate() + index);
+    const iso = date.toISOString().slice(0, 10);
+    return { date: iso, count: counts.get(iso) ?? 0 };
+  });
+}
+
 function mapProject(
   row: ProjectRow,
   tasks: ProjectTask[],
@@ -437,6 +499,7 @@ function mapProject(
     sortOrder: Number(row.sort_order ?? 0),
     deadline: row.deadline,
     isInbox: Boolean(row.is_inbox),
+    health: "yellow",
     progress: {
       total,
       done,
@@ -445,6 +508,28 @@ function mapProject(
     tags,
     tasks,
   };
+}
+
+export function deriveProjectHealth(input: {
+  lastEventAt: string | null;
+  now: Date;
+  openPastDueCount: number;
+}): ProjectHealth {
+  if (input.openPastDueCount > 0) {
+    return "red";
+  }
+
+  if (!input.lastEventAt) {
+    return "yellow";
+  }
+
+  const lastEventTime = new Date(input.lastEventAt).getTime();
+  if (Number.isNaN(lastEventTime)) {
+    return "yellow";
+  }
+
+  const staleMs = 14 * 24 * 60 * 60 * 1000;
+  return input.now.getTime() - lastEventTime > staleMs ? "yellow" : "green";
 }
 
 function mapTask(
@@ -572,6 +657,68 @@ async function getTaskTagsForTasks(
   }
 
   return byTask;
+}
+
+async function getProjectHealthMap(
+  supabase: SupabaseClient,
+  userId: string,
+  projectIds: string[],
+  todayIso: string,
+): Promise<Map<string, ProjectHealth>> {
+  if (projectIds.length === 0) {
+    return new Map();
+  }
+
+  const [eventsRes, pastDueRes] = await Promise.all([
+    supabase
+      .from("project_events")
+      .select("project_id,created_at")
+      .eq("user_id", userId)
+      .in("project_id", projectIds)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("tasks")
+      .select("project_id")
+      .eq("user_id", userId)
+      .in("project_id", projectIds)
+      .in("status", ["todo", "in_progress"])
+      .lt("due_date", todayIso),
+  ]);
+
+  if (eventsRes.error) {
+    throw new Error(`Project health events: ${eventsRes.error.message}`);
+  }
+
+  if (pastDueRes.error) {
+    throw new Error(`Project health tasks: ${pastDueRes.error.message}`);
+  }
+
+  const lastEventByProject = new Map<string, string>();
+  for (const row of (eventsRes.data ?? []) as HealthEventRow[]) {
+    if (!lastEventByProject.has(row.project_id)) {
+      lastEventByProject.set(row.project_id, row.created_at);
+    }
+  }
+
+  const pastDueByProject = new Map<string, number>();
+  for (const row of (pastDueRes.data ?? []) as PastDueTaskRow[]) {
+    pastDueByProject.set(
+      row.project_id,
+      (pastDueByProject.get(row.project_id) ?? 0) + 1,
+    );
+  }
+
+  const now = new Date(`${todayIso}T12:00:00.000Z`);
+  return new Map(
+    projectIds.map((projectId) => [
+      projectId,
+      deriveProjectHealth({
+        lastEventAt: lastEventByProject.get(projectId) ?? null,
+        now,
+        openPastDueCount: pastDueByProject.get(projectId) ?? 0,
+      }),
+    ]),
+  );
 }
 
 function getProjectName(value: TaskRow["projects"]): string | undefined {

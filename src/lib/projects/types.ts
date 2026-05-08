@@ -1,6 +1,7 @@
 export type ProjectStatus = "active" | "archived";
 export type TaskStatus = "todo" | "in_progress" | "done";
 export type RecurUnit = "day" | "week" | "month" | "year";
+export type ProjectHealth = "green" | "yellow" | "red";
 
 export type Tag = {
   id: string;
@@ -40,6 +41,7 @@ export type ProjectItem = {
   sortOrder: number;
   deadline: string | null;
   isInbox: boolean;
+  health: ProjectHealth;
   progress: {
     total: number;
     done: number;
@@ -86,4 +88,9 @@ export type WeeklyReflection = {
   stuck: string | null;
   nextWeek: string | null;
   updatedAt: string;
+};
+
+export type CompletionHeatmapDay = {
+  date: string;
+  count: number;
 };
