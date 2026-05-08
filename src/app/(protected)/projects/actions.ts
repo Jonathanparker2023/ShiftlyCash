@@ -4,15 +4,21 @@ import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
 import {
+  addTagToTask,
   archiveProject,
+  archiveTag,
   completeTask,
   createProject,
+  createTag,
   createTask,
   deleteProject,
   deleteTask,
   getProjectForUser,
   reorderProjects,
   reorderTasks,
+  reorderTags,
+  removeTagFromTask,
+  updateTag,
   updateProject,
   updateTask,
   type CreateProjectInput,
@@ -138,6 +144,77 @@ export async function reorderTasksAction(input: {
   if (!result.ok) throw new Error(result.error);
 
   revalidateProjectPaths(input.projectId);
+  return { ok: true };
+}
+
+export async function createTagAction(input: {
+  name: string;
+  color?: string | null;
+}): Promise<{ ok: true; id: string }> {
+  const { supabase } = await requireUser();
+  const result = await createTag(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths();
+  return { ok: true, id: result.data.id };
+}
+
+export async function updateTagAction(input: {
+  id: string;
+  name?: string;
+  color?: string;
+}): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const result = await updateTag(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths();
+  return { ok: true };
+}
+
+export async function archiveTagAction(input: {
+  id: string;
+}): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const result = await archiveTag(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths();
+  return { ok: true };
+}
+
+export async function addTagToTaskAction(input: {
+  taskId: string;
+  tagId: string;
+}): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const result = await addTagToTask(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths(result.data.projectId);
+  return { ok: true };
+}
+
+export async function removeTagFromTaskAction(input: {
+  taskId: string;
+  tagId: string;
+}): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const result = await removeTagFromTask(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths(result.data.projectId);
+  return { ok: true };
+}
+
+export async function reorderTagsAction(input: {
+  orderedIds: string[];
+}): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const result = await reorderTags(supabase, input);
+  if (!result.ok) throw new Error(result.error);
+
+  revalidateProjectPaths();
   return { ok: true };
 }
 

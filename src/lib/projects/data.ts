@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireUser } from "@/lib/auth";
 import { mark, since, timed } from "@/lib/perf";
@@ -11,6 +12,8 @@ import type {
   ProjectsData,
   ProjectStatus,
   ProjectTask,
+  Tag,
+  TaskFilterInput,
   TaskStatus,
 } from "@/lib/projects/types";
 
@@ -33,6 +36,24 @@ type TaskRow = {
   status: TaskStatus;
   sort_order: number | null;
   completed_at: string | null;
+  recur_unit: ProjectTask["recurUnit"];
+  recur_interval: number | null;
+  recur_anchor_date: string | null;
+  projects?: { name: string } | { name: string }[] | null;
+};
+
+type TagRow = {
+  id: string;
+  name: string;
+  color: string | null;
+  sort_order: number | null;
+  archived_at: string | null;
+};
+
+type TaskTagRow = {
+  task_id: string;
+  tag_id: string;
+  tags: TagRow | TagRow[] | null;
 };
 
 type ProjectEventRow = {
@@ -57,7 +78,9 @@ export async function getProjectsData(): Promise<ProjectsData> {
       .eq("user_id", user.id),
     supabase
       .from("tasks")
-      .select("id,project_id,title,description,due_date,status,sort_order,completed_at")
+      .select(
+        "id,project_id,title,description,due_date,status,sort_order,completed_at,recur_unit,recur_interval,recur_anchor_date",
+      )
       .eq("user_id", user.id),
   ]);
   since("projects:reads(projects+tasks)", tReads);
@@ -70,9 +93,19 @@ export async function getProjectsData(): Promise<ProjectsData> {
     throw new Error(`Tasks: ${tasksRes.error.message}`);
   }
 
+  const taskRows = (tasksRes.data ?? []) as TaskRow[];
+  const [allTags, taskTags] = await Promise.all([
+    getTagsForUser(supabase),
+    getTaskTagsForTasks(
+      supabase,
+      user.id,
+      taskRows.map((task) => task.id),
+    ),
+  ]);
+
   const tasksByProject = new Map<string, ProjectTask[]>();
-  for (const row of (tasksRes.data ?? []) as TaskRow[]) {
-    const task = mapTask(row);
+  for (const row of taskRows) {
+    const task = mapTask(row, taskTags.get(row.id) ?? []);
     const bucket = tasksByProject.get(row.project_id) ?? [];
     bucket.push(task);
     tasksByProject.set(row.project_id, bucket);
@@ -101,13 +134,14 @@ export async function getProjectsData(): Promise<ProjectsData> {
           done,
           percent: total > 0 ? Math.round((done / total) * 100) : 0,
         },
+        tags: allTags,
         tasks,
       };
     })
     .sort(compareProjects);
 
   since("projects:total", tTotal);
-  return { projects };
+  return { projects, tags: allTags };
 }
 
 export async function getProjectDetailData(
@@ -128,7 +162,9 @@ export async function getProjectDetailData(
       .maybeSingle(),
     supabase
       .from("tasks")
-      .select("id,project_id,title,description,due_date,status,sort_order,completed_at")
+      .select(
+        "id,project_id,title,description,due_date,status,sort_order,completed_at,recur_unit,recur_interval,recur_anchor_date",
+      )
       .eq("user_id", user.id)
       .eq("project_id", id),
     supabase
@@ -156,8 +192,19 @@ export async function getProjectDetailData(
     redirect("/projects");
   }
 
-  const tasks = ((tasksRes.data ?? []) as TaskRow[]).map(mapTask).sort(compareTasks);
-  const project = mapProject(projectRes.data as ProjectRow, tasks);
+  const taskRows = (tasksRes.data ?? []) as TaskRow[];
+  const [allTags, taskTags] = await Promise.all([
+    getTagsForUser(supabase),
+    getTaskTagsForTasks(
+      supabase,
+      user.id,
+      taskRows.map((task) => task.id),
+    ),
+  ]);
+  const tasks = taskRows
+    .map((task) => mapTask(task, taskTags.get(task.id) ?? []))
+    .sort(compareTasks);
+  const project = mapProject(projectRes.data as ProjectRow, tasks, allTags);
 
   return {
     project,
@@ -165,7 +212,101 @@ export async function getProjectDetailData(
   };
 }
 
-function mapProject(row: ProjectRow, tasks: ProjectTask[]): ProjectItem {
+export async function getTagsForUser(
+  supabase: SupabaseClient,
+): Promise<Tag[]> {
+  const userId = await getAuthedUserId(supabase);
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from("tags")
+    .select("id,name,color,sort_order,archived_at")
+    .eq("user_id", userId)
+    .is("archived_at", null)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(`Tags: ${error.message}`);
+  }
+
+  return ((data ?? []) as TagRow[]).map(mapTag);
+}
+
+export async function getTasksFiltered(
+  supabase: SupabaseClient,
+  filters: TaskFilterInput,
+): Promise<ProjectTask[]> {
+  const userId = await getAuthedUserId(supabase);
+  if (!userId) return [];
+
+  const tagIds = (filters.tagIds ?? []).filter((id) => requireUuid(id));
+  let taskIdsFromTags: string[] | null = null;
+
+  if (tagIds.length > 0) {
+    const { data, error } = await supabase
+      .from("task_tags")
+      .select("task_id")
+      .eq("user_id", userId)
+      .in("tag_id", tagIds);
+
+    if (error) {
+      throw new Error(`Filtered task tags: ${error.message}`);
+    }
+
+    taskIdsFromTags = Array.from(
+      new Set(((data ?? []) as { task_id: string }[]).map((row) => row.task_id)),
+    );
+
+    if (taskIdsFromTags.length === 0) {
+      return [];
+    }
+  }
+
+  let query = supabase
+    .from("tasks")
+    .select(
+      "id,project_id,title,description,due_date,status,sort_order,completed_at,recur_unit,recur_interval,recur_anchor_date,projects(name)",
+    )
+    .eq("user_id", userId);
+
+  if (filters.statuses && filters.statuses.length > 0) {
+    query = query.in("status", filters.statuses);
+  }
+
+  if (filters.dueBefore) {
+    query = query.not("due_date", "is", null).lte("due_date", filters.dueBefore);
+  }
+
+  if (taskIdsFromTags) {
+    query = query.in("id", taskIdsFromTags);
+  }
+
+  const { data, error } = await query
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    throw new Error(`Filtered tasks: ${error.message}`);
+  }
+
+  const taskRows = (data ?? []) as TaskRow[];
+  const taskTags = await getTaskTagsForTasks(
+    supabase,
+    userId,
+    taskRows.map((task) => task.id),
+  );
+
+  return taskRows.map((task) =>
+    mapTask(task, taskTags.get(task.id) ?? [], getProjectName(task.projects)),
+  );
+}
+
+function mapProject(
+  row: ProjectRow,
+  tasks: ProjectTask[],
+  tags: Tag[] = [],
+): ProjectItem {
   const done = tasks.filter((task) => task.status === "done").length;
   const total = tasks.length;
 
@@ -182,19 +323,40 @@ function mapProject(row: ProjectRow, tasks: ProjectTask[]): ProjectItem {
       done,
       percent: total > 0 ? Math.round((done / total) * 100) : 0,
     },
+    tags,
     tasks,
   };
 }
 
-function mapTask(row: TaskRow): ProjectTask {
+function mapTask(
+  row: TaskRow,
+  tags: Tag[] = [],
+  projectName?: string,
+): ProjectTask {
   return {
     id: row.id,
+    projectId: row.project_id,
+    projectName,
     title: row.title,
     description: row.description,
     dueDate: row.due_date,
     status: row.status,
     sortOrder: Number(row.sort_order ?? 0),
     completedAt: row.completed_at,
+    recurUnit: row.recur_unit,
+    recurInterval: row.recur_interval,
+    recurAnchorDate: row.recur_anchor_date,
+    tags,
+  };
+}
+
+function mapTag(row: TagRow): Tag {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color ?? "#94a3b8",
+    sortOrder: Number(row.sort_order ?? 0),
+    archivedAt: row.archived_at,
   };
 }
 
@@ -227,6 +389,64 @@ function compareTasks(a: ProjectTask, b: ProjectTask): number {
   }
 
   return a.sortOrder - b.sortOrder || a.title.localeCompare(b.title);
+}
+
+async function getAuthedUserId(
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return null;
+  }
+
+  return user.id;
+}
+
+async function getTaskTagsForTasks(
+  supabase: SupabaseClient,
+  userId: string,
+  taskIds: string[],
+): Promise<Map<string, Tag[]>> {
+  if (taskIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("task_tags")
+    .select("task_id,tag_id,tags(id,name,color,sort_order,archived_at)")
+    .eq("user_id", userId)
+    .in("task_id", taskIds);
+
+  if (error) {
+    throw new Error(`Task tags: ${error.message}`);
+  }
+
+  const byTask = new Map<string, Tag[]>();
+  for (const row of (data ?? []) as TaskTagRow[]) {
+    const tagRow = Array.isArray(row.tags) ? row.tags[0] : row.tags;
+    if (!tagRow || tagRow.archived_at) {
+      continue;
+    }
+
+    const tags = byTask.get(row.task_id) ?? [];
+    tags.push(mapTag(tagRow));
+    byTask.set(row.task_id, tags);
+  }
+
+  for (const tags of byTask.values()) {
+    tags.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  }
+
+  return byTask;
+}
+
+function getProjectName(value: TaskRow["projects"]): string | undefined {
+  const project = Array.isArray(value) ? value[0] : value;
+  return project?.name;
 }
 
 function requireUuid(value: string): string | null {

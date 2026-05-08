@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logProjectEvent } from "@/lib/projects/events";
-import type { ProjectStatus, TaskStatus } from "@/lib/projects/types";
+import type { ProjectStatus, RecurUnit, TaskStatus } from "@/lib/projects/types";
 
 export type MutationResult<T> =
   | { ok: true; data: T; error: null }
@@ -35,6 +35,9 @@ export type CreateTaskInput = {
   description?: string | null;
   dueDate?: string | null;
   status?: TaskStatus;
+  recurUnit?: RecurUnit | null;
+  recurInterval?: number | null;
+  recurAnchorDate?: string | null;
 };
 
 export type UpdateTaskFields = {
@@ -43,6 +46,9 @@ export type UpdateTaskFields = {
   dueDate?: string | null;
   status?: TaskStatus;
   sortOrder?: number;
+  recurUnit?: RecurUnit | null;
+  recurInterval?: number | null;
+  recurAnchorDate?: string | null;
 };
 
 export type UpdateTaskInput = {
@@ -61,7 +67,20 @@ type TaskOwnershipRow = {
   user_id: string;
   project_id: string;
   title: string;
+  description: string | null;
+  due_date: string | null;
   status: TaskStatus;
+  sort_order: number | null;
+  recur_unit: RecurUnit | null;
+  recur_interval: number | null;
+  recur_anchor_date: string | null;
+};
+
+type TagOwnershipRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
 };
 
 type SortRow = {
@@ -252,6 +271,13 @@ export async function createTask(
   const status = input.status ? requireTaskStatus(input.status) : ok("todo" as const);
   if (!status.ok) return status;
 
+  const recurrence = normalizeRecurrence({
+    recurUnit: input.recurUnit,
+    recurInterval: input.recurInterval,
+    recurAnchorDate: input.recurAnchorDate,
+  });
+  if (!recurrence.ok) return recurrence;
+
   const orderResult = await nextTaskSortOrder(
     supabase,
     project.data.user_id,
@@ -271,6 +297,9 @@ export async function createTask(
       status: status.data,
       sort_order: orderResult.data,
       completed_at: completedAt,
+      recur_unit: recurrence.data.recurUnit,
+      recur_interval: recurrence.data.recurInterval,
+      recur_anchor_date: recurrence.data.recurAnchorDate,
     })
     .select("id")
     .single();
@@ -336,6 +365,33 @@ export async function updateTask(
     changedFields.push("sortOrder");
   }
 
+  const hasRecurrenceChange =
+    "recurUnit" in input.fields ||
+    "recurInterval" in input.fields ||
+    "recurAnchorDate" in input.fields;
+  if (hasRecurrenceChange) {
+    const recurrence = normalizeRecurrence({
+      recurUnit:
+        "recurUnit" in input.fields
+          ? input.fields.recurUnit
+          : owner.data.recur_unit,
+      recurInterval:
+        "recurInterval" in input.fields
+          ? input.fields.recurInterval
+          : owner.data.recur_interval,
+      recurAnchorDate:
+        "recurAnchorDate" in input.fields
+          ? input.fields.recurAnchorDate
+          : owner.data.recur_anchor_date,
+    });
+    if (!recurrence.ok) return recurrence;
+
+    patch.recur_unit = recurrence.data.recurUnit;
+    patch.recur_interval = recurrence.data.recurInterval;
+    patch.recur_anchor_date = recurrence.data.recurAnchorDate;
+    changedFields.push("recurrence");
+  }
+
   if (Object.keys(patch).length === 0) {
     return ok({ id: owner.data.id, projectId: owner.data.project_id });
   }
@@ -382,6 +438,9 @@ export async function completeTask(
     kind: "task.completed",
     payload: { previousStatus: owner.data.status, title: owner.data.title },
   });
+
+  const recurringTask = await createNextRecurringTask(supabase, owner.data);
+  if (!recurringTask.ok) return recurringTask;
 
   return ok({ id: owner.data.id, projectId: owner.data.project_id });
 }
@@ -511,6 +570,188 @@ export async function reorderTasks(
   return ok({ ids: ids.data });
 }
 
+export async function createTag(
+  supabase: SupabaseClient,
+  input: { name: string; color?: string | null },
+): Promise<MutationResult<{ id: string }>> {
+  const userResult = await getAuthedUserId(supabase);
+  if (!userResult.ok) return userResult;
+
+  const name = requireName(input.name, "tag name");
+  if (!name.ok) return name;
+
+  const color = input.color ? requireColor(input.color) : ok("#94a3b8");
+  if (!color.ok) return color;
+
+  const orderResult = await nextTagSortOrder(supabase, userResult.data);
+  if (!orderResult.ok) return orderResult;
+
+  const { data, error } = await supabase
+    .from("tags")
+    .insert({
+      user_id: userResult.data,
+      name: name.data,
+      color: color.data,
+      sort_order: orderResult.data,
+    })
+    .select("id")
+    .single();
+
+  if (error) return fail(`Unable to create tag: ${error.message}`);
+
+  return ok({ id: (data as { id: string }).id });
+}
+
+export async function updateTag(
+  supabase: SupabaseClient,
+  input: { id: string; name?: string; color?: string },
+): Promise<MutationResult<{ id: string }>> {
+  const tag = await getTagForUser(supabase, input.id);
+  if (!tag.ok) return tag;
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.name !== undefined) {
+    const name = requireName(input.name, "tag name");
+    if (!name.ok) return name;
+    patch.name = name.data;
+  }
+
+  if (input.color !== undefined) {
+    const color = requireColor(input.color);
+    if (!color.ok) return color;
+    patch.color = color.data;
+  }
+
+  const { error } = await supabase
+    .from("tags")
+    .update(patch)
+    .eq("id", tag.data.id);
+
+  if (error) return fail(`Unable to update tag: ${error.message}`);
+
+  return ok({ id: tag.data.id });
+}
+
+export async function archiveTag(
+  supabase: SupabaseClient,
+  input: { id: string },
+): Promise<MutationResult<{ id: string }>> {
+  const tag = await getTagForUser(supabase, input.id);
+  if (!tag.ok) return tag;
+
+  const { error } = await supabase
+    .from("tags")
+    .update({
+      archived_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", tag.data.id);
+
+  if (error) return fail(`Unable to archive tag: ${error.message}`);
+
+  return ok({ id: tag.data.id });
+}
+
+export async function addTagToTask(
+  supabase: SupabaseClient,
+  input: { taskId: string; tagId: string },
+): Promise<MutationResult<{ taskId: string; projectId: string; tagId: string }>> {
+  const task = await getTaskForUser(supabase, input.taskId);
+  if (!task.ok) return task;
+
+  const tag = await getTagForUser(supabase, input.tagId);
+  if (!tag.ok) return tag;
+
+  if (tag.data.user_id !== task.data.user_id) {
+    return fail("Tag does not belong to the task owner.");
+  }
+
+  const { error } = await supabase.from("task_tags").upsert(
+    {
+      task_id: task.data.id,
+      tag_id: tag.data.id,
+      user_id: task.data.user_id,
+    },
+    { onConflict: "task_id,tag_id" },
+  );
+
+  if (error) return fail(`Unable to add tag to task: ${error.message}`);
+
+  return ok({
+    taskId: task.data.id,
+    projectId: task.data.project_id,
+    tagId: tag.data.id,
+  });
+}
+
+export async function removeTagFromTask(
+  supabase: SupabaseClient,
+  input: { taskId: string; tagId: string },
+): Promise<MutationResult<{ taskId: string; projectId: string; tagId: string }>> {
+  const task = await getTaskForUser(supabase, input.taskId);
+  if (!task.ok) return task;
+
+  const tagId = requireUuid(input.tagId, "tag id");
+  if (!tagId.ok) return tagId;
+
+  const { error } = await supabase
+    .from("task_tags")
+    .delete()
+    .eq("task_id", task.data.id)
+    .eq("tag_id", tagId.data)
+    .eq("user_id", task.data.user_id);
+
+  if (error) return fail(`Unable to remove tag from task: ${error.message}`);
+
+  return ok({
+    taskId: task.data.id,
+    projectId: task.data.project_id,
+    tagId: tagId.data,
+  });
+}
+
+export async function reorderTags(
+  supabase: SupabaseClient,
+  input: { orderedIds: string[] },
+): Promise<MutationResult<{ ids: string[] }>> {
+  const userResult = await getAuthedUserId(supabase);
+  if (!userResult.ok) return userResult;
+
+  const ids = normalizeOrderedIds(input.orderedIds, "tag id");
+  if (!ids.ok) return ids;
+
+  if (ids.data.length === 0) {
+    return ok({ ids: [] });
+  }
+
+  const { data, error } = await supabase
+    .from("tags")
+    .select("id,user_id,name,color")
+    .in("id", ids.data);
+
+  if (error) return fail(`Unable to validate tag order: ${error.message}`);
+
+  const rows = (data ?? []) as TagOwnershipRow[];
+  if (
+    rows.length !== ids.data.length ||
+    rows.some((row) => row.user_id !== userResult.data)
+  ) {
+    return fail("Tag order contains an unavailable tag.");
+  }
+
+  const updates = ids.data.map((id, index) =>
+    supabase
+      .from("tags")
+      .update({ sort_order: (index + 1) * 10, updated_at: new Date().toISOString() })
+      .eq("id", id),
+  );
+  const results = await Promise.all(updates);
+  const failed = results.find((result) => result.error);
+  if (failed?.error) return fail(`Unable to reorder tags: ${failed.error.message}`);
+
+  return ok({ ids: ids.data });
+}
+
 export async function getProjectForUser(
   supabase: SupabaseClient,
   projectId: string,
@@ -544,7 +785,9 @@ export async function getTaskForUser(
 
   const { data, error } = await supabase
     .from("tasks")
-    .select("id,user_id,project_id,title,status")
+    .select(
+      "id,user_id,project_id,title,description,due_date,status,sort_order,recur_unit,recur_interval,recur_anchor_date",
+    )
     .eq("id", taskId)
     .maybeSingle();
 
@@ -554,6 +797,33 @@ export async function getTaskForUser(
   const row = data as TaskOwnershipRow;
   if (row.user_id !== userResult.data) {
     return fail("Task does not belong to the current user.");
+  }
+
+  return ok(row);
+}
+
+export async function getTagForUser(
+  supabase: SupabaseClient,
+  tagId: string,
+): Promise<MutationResult<TagOwnershipRow>> {
+  const id = requireUuid(tagId, "tag id");
+  if (!id.ok) return id;
+
+  const userResult = await getAuthedUserId(supabase);
+  if (!userResult.ok) return userResult;
+
+  const { data, error } = await supabase
+    .from("tags")
+    .select("id,user_id,name,color")
+    .eq("id", id.data)
+    .maybeSingle();
+
+  if (error) return fail(`Unable to validate tag: ${error.message}`);
+  if (!data) return fail("Tag not found.");
+
+  const row = data as TagOwnershipRow;
+  if (row.user_id !== userResult.data) {
+    return fail("Tag does not belong to the current user.");
   }
 
   return ok(row);
@@ -618,6 +888,103 @@ async function nextTaskSortOrder(
   return ok((((data as SortRow | null)?.sort_order ?? 0) + 10));
 }
 
+async function nextTagSortOrder(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<MutationResult<number>> {
+  const { data, error } = await supabase
+    .from("tags")
+    .select("sort_order")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return fail(`Unable to prepare tag order: ${error.message}`);
+
+  return ok((((data as SortRow | null)?.sort_order ?? 0) + 10));
+}
+
+async function createNextRecurringTask(
+  supabase: SupabaseClient,
+  task: TaskOwnershipRow,
+): Promise<MutationResult<null>> {
+  if (!task.recur_unit || !task.recur_interval) {
+    return ok(null);
+  }
+
+  const anchorDate = task.recur_anchor_date ?? task.due_date;
+  if (!anchorDate) {
+    return ok(null);
+  }
+
+  const nextDueDate = addDateInterval(
+    anchorDate,
+    task.recur_interval,
+    task.recur_unit,
+  );
+  const orderResult = await nextTaskSortOrder(
+    supabase,
+    task.user_id,
+    task.project_id,
+  );
+  if (!orderResult.ok) return orderResult;
+
+  const { data: existingTags, error: existingTagsError } = await supabase
+    .from("task_tags")
+    .select("tag_id")
+    .eq("user_id", task.user_id)
+    .eq("task_id", task.id);
+
+  if (existingTagsError) {
+    return fail(`Unable to copy recurring task tags: ${existingTagsError.message}`);
+  }
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      user_id: task.user_id,
+      project_id: task.project_id,
+      title: task.title,
+      description: task.description,
+      due_date: nextDueDate,
+      status: "todo" satisfies TaskStatus,
+      sort_order: orderResult.data,
+      completed_at: null,
+      recur_unit: task.recur_unit,
+      recur_interval: task.recur_interval,
+      recur_anchor_date: nextDueDate,
+    })
+    .select("id")
+    .single();
+
+  if (error) return fail(`Unable to create next recurring task: ${error.message}`);
+
+  const newTaskId = (data as { id: string }).id;
+  const tagRows = ((existingTags ?? []) as { tag_id: string }[]).map((row) => ({
+    task_id: newTaskId,
+    tag_id: row.tag_id,
+    user_id: task.user_id,
+  }));
+
+  if (tagRows.length > 0) {
+    const { error: tagCopyError } = await supabase.from("task_tags").insert(tagRows);
+    if (tagCopyError) {
+      return fail(`Unable to copy recurring task tags: ${tagCopyError.message}`);
+    }
+  }
+
+  await logProjectEvent({
+    supabase,
+    projectId: task.project_id,
+    taskId: newTaskId,
+    kind: "task.created",
+    payload: { title: task.title, projectId: task.project_id, recurringFrom: task.id },
+  });
+
+  return ok(null);
+}
+
 function requireName(value: string, fieldName: string): MutationResult<string> {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -672,6 +1039,65 @@ function requireTaskStatus(value: string): MutationResult<TaskStatus> {
   return fail("Invalid task status.");
 }
 
+function requireRecurUnit(value: string): MutationResult<RecurUnit> {
+  if (
+    value === "day" ||
+    value === "week" ||
+    value === "month" ||
+    value === "year"
+  ) {
+    return ok(value);
+  }
+
+  return fail("Invalid recurrence unit.");
+}
+
+function normalizeRecurrence(input: {
+  recurUnit?: RecurUnit | null;
+  recurInterval?: number | null;
+  recurAnchorDate?: string | null;
+}): MutationResult<{
+  recurUnit: RecurUnit | null;
+  recurInterval: number | null;
+  recurAnchorDate: string | null;
+}> {
+  const hasAny =
+    input.recurUnit !== undefined ||
+    input.recurInterval !== undefined ||
+    input.recurAnchorDate !== undefined;
+
+  if (!hasAny) {
+    return ok({ recurUnit: null, recurInterval: null, recurAnchorDate: null });
+  }
+
+  if (!input.recurUnit && !input.recurInterval && !input.recurAnchorDate) {
+    return ok({ recurUnit: null, recurInterval: null, recurAnchorDate: null });
+  }
+
+  const recurUnit = input.recurUnit
+    ? requireRecurUnit(input.recurUnit)
+    : ok(null);
+  if (!recurUnit.ok) return recurUnit;
+
+  const recurInterval =
+    input.recurInterval === null || input.recurInterval === undefined
+      ? ok(null)
+      : requirePositiveInteger(input.recurInterval, "recurInterval");
+  if (!recurInterval.ok) return recurInterval;
+
+  const recurAnchorDate = normalizeDate(
+    input.recurAnchorDate,
+    "recurrence anchor date",
+  );
+  if (!recurAnchorDate.ok) return recurAnchorDate;
+
+  return ok({
+    recurUnit: recurUnit.data,
+    recurInterval: recurInterval.data,
+    recurAnchorDate: recurAnchorDate.data,
+  });
+}
+
 function requireUuid(value: string, fieldName: string): MutationResult<string> {
   const uuidPattern =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -689,6 +1115,40 @@ function requireInteger(value: number, fieldName: string): MutationResult<number
   }
 
   return ok(value);
+}
+
+function requirePositiveInteger(
+  value: number,
+  fieldName: string,
+): MutationResult<number> {
+  const integer = requireInteger(value, fieldName);
+  if (!integer.ok) return integer;
+
+  if (integer.data <= 0) {
+    return fail(`Invalid ${fieldName}.`);
+  }
+
+  return integer;
+}
+
+function addDateInterval(
+  isoDate: string,
+  interval: number,
+  unit: RecurUnit,
+): string {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+
+  if (unit === "day") {
+    date.setUTCDate(date.getUTCDate() + interval);
+  } else if (unit === "week") {
+    date.setUTCDate(date.getUTCDate() + interval * 7);
+  } else if (unit === "month") {
+    date.setUTCMonth(date.getUTCMonth() + interval);
+  } else {
+    date.setUTCFullYear(date.getUTCFullYear() + interval);
+  }
+
+  return date.toISOString().slice(0, 10);
 }
 
 function normalizeOrderedIds(

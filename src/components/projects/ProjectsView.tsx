@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
 
 import {
@@ -29,7 +29,15 @@ import type { ProjectItem, ProjectsData } from "@/lib/projects/types";
 
 const PROJECT_ACCENT = "#1d4ed8";
 
-export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
+export function ProjectsView({
+  filterSlot,
+  initialData,
+  showProjectList = true,
+}: {
+  filterSlot?: ReactNode;
+  initialData: ProjectsData;
+  showProjectList?: boolean;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -150,7 +158,9 @@ export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
               </p>
             ) : null}
 
-            {projects.length > 0 ? (
+            {filterSlot}
+
+            {showProjectList && projects.length > 0 ? (
               <DndContext
                 collisionDetection={closestCenter}
                 onDragEnd={reorderProjectBars}
@@ -171,11 +181,11 @@ export function ProjectsView({ initialData }: { initialData: ProjectsData }) {
                   </div>
                 </SortableContext>
               </DndContext>
-            ) : (
+            ) : showProjectList ? (
               <div className="rounded-md border border-dashed border-[#cbd5e1] bg-white p-8 text-center text-sm text-[#64748b]">
                 No projects yet.
               </div>
-            )}
+            ) : null}
           </div>
         </section>
 

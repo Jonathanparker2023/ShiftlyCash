@@ -25,6 +25,8 @@ import {
   reorderTasksAction,
   updateTaskAction,
 } from "@/app/(protected)/projects/actions";
+import { TagPicker } from "@/components/projects/TagPicker";
+import { TagPill } from "@/components/projects/TagPill";
 import type { ProjectItem, ProjectTask } from "@/lib/projects/types";
 
 export function TaskList({ project }: { project: ProjectItem }) {
@@ -33,6 +35,7 @@ export function TaskList({ project }: { project: ProjectItem }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tagPickerTaskId, setTagPickerTaskId] = useState<string | null>(null);
   const tasks = project.tasks;
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -131,8 +134,15 @@ export function TaskList({ project }: { project: ProjectItem }) {
                 <SortableTaskRow
                   disabled={Boolean(pendingId)}
                   key={task.id}
+                  onToggleTagPicker={() =>
+                    setTagPickerTaskId((current) =>
+                      current === task.id ? null : task.id,
+                    )
+                  }
                   onToggle={toggleTask}
+                  showTagPicker={tagPickerTaskId === task.id}
                   task={task}
+                  tags={project.tags}
                 />
               ))}
             </SortableContext>
@@ -173,12 +183,18 @@ export function TaskList({ project }: { project: ProjectItem }) {
 
 function SortableTaskRow({
   disabled,
+  onToggleTagPicker,
   onToggle,
+  showTagPicker,
   task,
+  tags,
 }: {
   disabled: boolean;
+  onToggleTagPicker: () => void;
   onToggle: (task: ProjectTask) => void;
+  showTagPicker: boolean;
   task: ProjectTask;
+  tags: ProjectItem["tags"];
 }) {
   const {
     attributes,
@@ -194,48 +210,68 @@ function SortableTaskRow({
   };
 
   return (
-    <div
-      className={
-        isDragging
-          ? "mb-2 flex items-center gap-2 rounded-md border border-[#1d4ed8] bg-white p-2 opacity-80 shadow-sm"
-          : "mb-2 flex items-center gap-2 rounded-md border border-[#d7dee8] bg-white p-2 shadow-sm"
-      }
-      ref={setNodeRef}
-      style={style}
-    >
-      <input
-        checked={task.status === "done"}
-        className="h-4 w-4 accent-[#1d4ed8]"
-        disabled={disabled}
-        onChange={() => onToggle(task)}
-        type="checkbox"
-      />
-      <div className="min-w-0 flex-1">
-        <p
-          className={
-            task.status === "done"
-              ? "truncate text-sm font-semibold text-[#64748b] line-through"
-              : "truncate text-sm font-semibold text-[#0f172a]"
-          }
-        >
-          {task.title}
-        </p>
-        <div className="mt-0.5 flex flex-wrap gap-2 text-xs text-[#64748b]">
-          <span>{formatStatus(task.status)}</span>
-          {task.dueDate ? <span>Due {formatDate(task.dueDate)}</span> : null}
-        </div>
-      </div>
-      <button
-        aria-label={`Drag ${task.title}`}
-        className="h-8 w-8 shrink-0 touch-none rounded-md border border-[#cbd5e1] bg-[#f8fafc] text-sm font-bold text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={disabled}
-        title="Drag to reorder"
-        type="button"
-        {...attributes}
-        {...listeners}
+    <div className="mb-2" ref={setNodeRef} style={style}>
+      <div
+        className={
+          isDragging
+            ? "flex items-center gap-2 rounded-md border border-[#1d4ed8] bg-white p-2 opacity-80 shadow-sm"
+            : "flex items-center gap-2 rounded-md border border-[#d7dee8] bg-white p-2 shadow-sm"
+        }
       >
-        ::
-      </button>
+        <input
+          checked={task.status === "done"}
+          className="h-4 w-4 accent-[#1d4ed8]"
+          disabled={disabled}
+          onChange={() => onToggle(task)}
+          type="checkbox"
+        />
+        <div className="min-w-0 flex-1">
+          <p
+            className={
+              task.status === "done"
+                ? "truncate text-sm font-semibold text-[#64748b] line-through"
+                : "truncate text-sm font-semibold text-[#0f172a]"
+            }
+          >
+            {task.title}
+          </p>
+          <div className="mt-0.5 flex flex-wrap gap-2 text-xs text-[#64748b]">
+            <span>{formatStatus(task.status)}</span>
+            {task.dueDate ? <span>Due {formatDate(task.dueDate)}</span> : null}
+            {task.tags.map((tag) => (
+              <TagPill key={tag.id} tag={tag} />
+            ))}
+          </div>
+        </div>
+        <div className="relative">
+          <button
+            aria-label={`Edit tags for ${task.title}`}
+            className="h-8 w-8 shrink-0 rounded-md border border-[#cbd5e1] bg-[#f8fafc] text-sm font-bold text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={disabled}
+            onClick={onToggleTagPicker}
+            title="Edit tags"
+            type="button"
+          >
+            ...
+          </button>
+          {showTagPicker ? (
+            <div className="absolute right-0 z-20 mt-2">
+              <TagPicker availableTags={tags} task={task} />
+            </div>
+          ) : null}
+        </div>
+        <button
+          aria-label={`Drag ${task.title}`}
+          className="h-8 w-8 shrink-0 touch-none rounded-md border border-[#cbd5e1] bg-[#f8fafc] text-sm font-bold text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={disabled}
+          title="Drag to reorder"
+          type="button"
+          {...attributes}
+          {...listeners}
+        >
+          ::
+        </button>
+      </div>
     </div>
   );
 }
