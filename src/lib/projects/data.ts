@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { mark, since, timed } from "@/lib/perf";
 import type {
+  ProjectDetailData,
+  ProjectEventItem,
   ProjectItem,
   ProjectsData,
   ProjectStatus,
@@ -31,6 +33,15 @@ type TaskRow = {
   status: TaskStatus;
   sort_order: number | null;
   completed_at: string | null;
+};
+
+type ProjectEventRow = {
+  id: string;
+  project_id: string;
+  task_id: string | null;
+  kind: string;
+  payload: Record<string, unknown> | null;
+  created_at: string;
 };
 
 export async function getProjectsData(): Promise<ProjectsData> {
@@ -99,6 +110,82 @@ export async function getProjectsData(): Promise<ProjectsData> {
   return { projects };
 }
 
+export async function getProjectDetailData(
+  projectId: string,
+): Promise<ProjectDetailData> {
+  const id = requireUuid(projectId);
+  if (!id) redirect("/projects");
+
+  const { supabase, user } = await requireUser();
+  if (!user) redirect("/login");
+
+  const [projectRes, tasksRes, eventsRes] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id,name,description,color,status,sort_order,deadline")
+      .eq("user_id", user.id)
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("tasks")
+      .select("id,project_id,title,description,due_date,status,sort_order,completed_at")
+      .eq("user_id", user.id)
+      .eq("project_id", id),
+    supabase
+      .from("project_events")
+      .select("id,project_id,task_id,kind,payload,created_at")
+      .eq("user_id", user.id)
+      .eq("project_id", id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+
+  if (projectRes.error) {
+    throw new Error(`Project: ${projectRes.error.message}`);
+  }
+
+  if (tasksRes.error) {
+    throw new Error(`Tasks: ${tasksRes.error.message}`);
+  }
+
+  if (eventsRes.error) {
+    throw new Error(`Project activity: ${eventsRes.error.message}`);
+  }
+
+  if (!projectRes.data) {
+    redirect("/projects");
+  }
+
+  const tasks = ((tasksRes.data ?? []) as TaskRow[]).map(mapTask).sort(compareTasks);
+  const project = mapProject(projectRes.data as ProjectRow, tasks);
+
+  return {
+    project,
+    events: ((eventsRes.data ?? []) as ProjectEventRow[]).map(mapEvent),
+  };
+}
+
+function mapProject(row: ProjectRow, tasks: ProjectTask[]): ProjectItem {
+  const done = tasks.filter((task) => task.status === "done").length;
+  const total = tasks.length;
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    color: row.color ?? "#1d4ed8",
+    status: row.status,
+    sortOrder: Number(row.sort_order ?? 0),
+    deadline: row.deadline,
+    progress: {
+      total,
+      done,
+      percent: total > 0 ? Math.round((done / total) * 100) : 0,
+    },
+    tasks,
+  };
+}
+
 function mapTask(row: TaskRow): ProjectTask {
   return {
     id: row.id,
@@ -108,6 +195,17 @@ function mapTask(row: TaskRow): ProjectTask {
     status: row.status,
     sortOrder: Number(row.sort_order ?? 0),
     completedAt: row.completed_at,
+  };
+}
+
+function mapEvent(row: ProjectEventRow): ProjectEventItem {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    taskId: row.task_id,
+    kind: row.kind,
+    payload: row.payload ?? {},
+    createdAt: row.created_at,
   };
 }
 
@@ -129,4 +227,11 @@ function compareTasks(a: ProjectTask, b: ProjectTask): number {
   }
 
   return a.sortOrder - b.sortOrder || a.title.localeCompare(b.title);
+}
+
+function requireUuid(value: string): string | null {
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  return uuidPattern.test(value) ? value : null;
 }

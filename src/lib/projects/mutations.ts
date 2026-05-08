@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { logProjectEvent } from "@/lib/projects/events";
 import type { ProjectStatus, TaskStatus } from "@/lib/projects/types";
 
 export type MutationResult<T> =
@@ -60,6 +61,7 @@ type TaskOwnershipRow = {
   user_id: string;
   project_id: string;
   title: string;
+  status: TaskStatus;
 };
 
 type SortRow = {
@@ -101,7 +103,15 @@ export async function createProject(
 
   if (error) return fail(`Unable to create project: ${error.message}`);
 
-  return ok({ id: (data as { id: string }).id });
+  const projectId = (data as { id: string }).id;
+  await logProjectEvent({
+    supabase,
+    projectId,
+    kind: "project.created",
+    payload: { name: name.data, color: color.data, deadline: deadline.data },
+  });
+
+  return ok({ id: projectId });
 }
 
 export async function updateProject(
@@ -115,32 +125,38 @@ export async function updateProject(
   if (!owner.ok) return owner;
 
   const patch: Record<string, unknown> = {};
+  const changedFields: string[] = [];
   if ("name" in input.fields) {
     const name = requireName(input.fields.name ?? "", "project name");
     if (!name.ok) return name;
     patch.name = name.data;
+    changedFields.push("name");
   }
 
   if ("description" in input.fields) {
     patch.description = normalizeOptionalText(input.fields.description);
+    changedFields.push("description");
   }
 
   if ("color" in input.fields && input.fields.color !== undefined) {
     const color = requireColor(input.fields.color);
     if (!color.ok) return color;
     patch.color = color.data;
+    changedFields.push("color");
   }
 
   if ("deadline" in input.fields) {
     const deadline = normalizeDate(input.fields.deadline, "deadline");
     if (!deadline.ok) return deadline;
     patch.deadline = deadline.data;
+    changedFields.push("deadline");
   }
 
   if ("sortOrder" in input.fields && input.fields.sortOrder !== undefined) {
     const sortOrder = requireInteger(input.fields.sortOrder, "sortOrder");
     if (!sortOrder.ok) return sortOrder;
     patch.sort_order = sortOrder.data;
+    changedFields.push("sortOrder");
   }
 
   if (Object.keys(patch).length === 0) {
@@ -153,6 +169,13 @@ export async function updateProject(
     .eq("id", owner.data.id);
 
   if (error) return fail(`Unable to update project: ${error.message}`);
+
+  await logProjectEvent({
+    supabase,
+    projectId: owner.data.id,
+    kind: "project.updated",
+    payload: { changedFields },
+  });
 
   return ok({ id: owner.data.id });
 }
@@ -174,6 +197,12 @@ export async function archiveProject(
 
   if (error) return fail(`Unable to archive project: ${error.message}`);
 
+  await logProjectEvent({
+    supabase,
+    projectId: owner.data.id,
+    kind: "project.archived",
+  });
+
   return ok({ id: owner.data.id });
 }
 
@@ -194,13 +223,20 @@ export async function deleteProject(
 
   if (error) return fail(`Unable to delete project: ${error.message}`);
 
+  await logProjectEvent({
+    supabase,
+    projectId: owner.data.id,
+    kind: "project.deleted",
+    payload: { name: owner.data.name },
+  });
+
   return ok({ id: owner.data.id });
 }
 
 export async function createTask(
   supabase: SupabaseClient,
   input: CreateTaskInput,
-): Promise<MutationResult<{ id: string }>> {
+): Promise<MutationResult<{ id: string; projectId: string }>> {
   const projectId = requireUuid(input.projectId, "project id");
   if (!projectId.ok) return projectId;
 
@@ -241,13 +277,22 @@ export async function createTask(
 
   if (error) return fail(`Unable to create task: ${error.message}`);
 
-  return ok({ id: (data as { id: string }).id });
+  const taskId = (data as { id: string }).id;
+  await logProjectEvent({
+    supabase,
+    projectId: project.data.id,
+    taskId,
+    kind: "task.created",
+    payload: { title: title.data, projectId: project.data.id },
+  });
+
+  return ok({ id: taskId, projectId: project.data.id });
 }
 
 export async function updateTask(
   supabase: SupabaseClient,
   input: UpdateTaskInput,
-): Promise<MutationResult<{ id: string }>> {
+): Promise<MutationResult<{ id: string; projectId: string }>> {
   const id = requireUuid(input.id, "task id");
   if (!id.ok) return id;
 
@@ -255,20 +300,24 @@ export async function updateTask(
   if (!owner.ok) return owner;
 
   const patch: Record<string, unknown> = {};
+  const changedFields: string[] = [];
   if ("title" in input.fields) {
     const title = requireName(input.fields.title ?? "", "task title");
     if (!title.ok) return title;
     patch.title = title.data;
+    changedFields.push("title");
   }
 
   if ("description" in input.fields) {
     patch.description = normalizeOptionalText(input.fields.description);
+    changedFields.push("description");
   }
 
   if ("dueDate" in input.fields) {
     const dueDate = normalizeDate(input.fields.dueDate, "due date");
     if (!dueDate.ok) return dueDate;
     patch.due_date = dueDate.data;
+    changedFields.push("dueDate");
   }
 
   if ("status" in input.fields && input.fields.status !== undefined) {
@@ -277,16 +326,18 @@ export async function updateTask(
     patch.status = status.data;
     patch.completed_at =
       status.data === "done" ? new Date().toISOString() : null;
+    changedFields.push("status");
   }
 
   if ("sortOrder" in input.fields && input.fields.sortOrder !== undefined) {
     const sortOrder = requireInteger(input.fields.sortOrder, "sortOrder");
     if (!sortOrder.ok) return sortOrder;
     patch.sort_order = sortOrder.data;
+    changedFields.push("sortOrder");
   }
 
   if (Object.keys(patch).length === 0) {
-    return ok({ id: owner.data.id });
+    return ok({ id: owner.data.id, projectId: owner.data.project_id });
   }
 
   const { error } = await supabase
@@ -296,13 +347,21 @@ export async function updateTask(
 
   if (error) return fail(`Unable to update task: ${error.message}`);
 
-  return ok({ id: owner.data.id });
+  await logProjectEvent({
+    supabase,
+    projectId: owner.data.project_id,
+    taskId: owner.data.id,
+    kind: "task.updated",
+    payload: { changedFields },
+  });
+
+  return ok({ id: owner.data.id, projectId: owner.data.project_id });
 }
 
 export async function completeTask(
   supabase: SupabaseClient,
   input: { id: string },
-): Promise<MutationResult<{ id: string }>> {
+): Promise<MutationResult<{ id: string; projectId: string }>> {
   const id = requireUuid(input.id, "task id");
   if (!id.ok) return id;
 
@@ -316,13 +375,21 @@ export async function completeTask(
 
   if (error) return fail(`Unable to complete task: ${error.message}`);
 
-  return ok({ id: owner.data.id });
+  await logProjectEvent({
+    supabase,
+    projectId: owner.data.project_id,
+    taskId: owner.data.id,
+    kind: "task.completed",
+    payload: { previousStatus: owner.data.status, title: owner.data.title },
+  });
+
+  return ok({ id: owner.data.id, projectId: owner.data.project_id });
 }
 
 export async function deleteTask(
   supabase: SupabaseClient,
   input: { id: string },
-): Promise<MutationResult<{ id: string }>> {
+): Promise<MutationResult<{ id: string; projectId: string }>> {
   const id = requireUuid(input.id, "task id");
   if (!id.ok) return id;
 
@@ -333,7 +400,15 @@ export async function deleteTask(
 
   if (error) return fail(`Unable to delete task: ${error.message}`);
 
-  return ok({ id: owner.data.id });
+  await logProjectEvent({
+    supabase,
+    projectId: owner.data.project_id,
+    taskId: owner.data.id,
+    kind: "task.deleted",
+    payload: { title: owner.data.title, projectId: owner.data.project_id },
+  });
+
+  return ok({ id: owner.data.id, projectId: owner.data.project_id });
 }
 
 export async function reorderProjects(
@@ -375,6 +450,9 @@ export async function reorderProjects(
   const failed = results.find((result) => result.error);
   if (failed?.error) return fail(`Unable to reorder projects: ${failed.error.message}`);
 
+  // project_events.project_id is required, so there is no natural single row
+  // for a cross-project reorder in v0. We skip this low-signal event until the
+  // activity model has a project-list scoped target.
   return ok({ ids: ids.data });
 }
 
@@ -423,6 +501,13 @@ export async function reorderTasks(
   const failed = results.find((result) => result.error);
   if (failed?.error) return fail(`Unable to reorder tasks: ${failed.error.message}`);
 
+  await logProjectEvent({
+    supabase,
+    projectId: project.data.id,
+    kind: "tasks.reordered",
+    payload: { projectId: project.data.id, orderedIds: ids.data },
+  });
+
   return ok({ ids: ids.data });
 }
 
@@ -459,7 +544,7 @@ export async function getTaskForUser(
 
   const { data, error } = await supabase
     .from("tasks")
-    .select("id,user_id,project_id,title")
+    .select("id,user_id,project_id,title,status")
     .eq("id", taskId)
     .maybeSingle();
 

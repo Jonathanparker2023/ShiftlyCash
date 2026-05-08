@@ -27,6 +27,20 @@ export type ProjectItem = {
   tasks: ProjectTask[];
 };
 
+export type ProjectEventItem = {
+  id: string;
+  projectId: string;
+  taskId: string | null;
+  kind: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
 export type ProjectsData = {
   projects: ProjectItem[];
+};
+
+export type ProjectDetailData = {
+  project: ProjectItem;
+  events: ProjectEventItem[];
 };

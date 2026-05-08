@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -71,20 +72,27 @@ export function ProjectBar({
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2 p-3 sm:p-4">
-          <button
-            className="block min-w-0 flex-1 text-left"
-            onClick={() => setIsExpanded((current) => !current)}
-            type="button"
-          >
+          <div className="block min-w-0 flex-1 text-left">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    aria-label={isExpanded ? "Collapse project" : "Expand project"}
+                    className="h-7 w-7 rounded-md border border-[#cbd5e1] bg-white text-sm font-bold text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                    onClick={() => setIsExpanded((current) => !current)}
+                    type="button"
+                  >
+                    {isExpanded ? "-" : "+"}
+                  </button>
                   <span aria-hidden="true" className="text-lg leading-none">
                     {identity.emoji}
                   </span>
-                  <h2 className="truncate text-base font-semibold text-[#0f172a]">
+                  <Link
+                    className="truncate text-base font-semibold text-[#0f172a] transition hover:text-[#1d4ed8]"
+                    href={`/projects/${project.id}`}
+                  >
                     {project.name}
-                  </h2>
+                  </Link>
                   {project.status === "archived" ? (
                     <span className="rounded-full border border-[#cbd5e1] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
                       Archived
@@ -116,7 +124,7 @@ export function ProjectBar({
                 }}
               />
             </div>
-          </button>
+          </div>
           <div className="flex shrink-0 flex-col gap-2">
             {dragHandle}
             <button

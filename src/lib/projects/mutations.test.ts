@@ -18,6 +18,12 @@ describe("project mutations", () => {
         }),
       },
       from(table: string) {
+        if (table === "project_events") {
+          return {
+            insert: async () => ({ error: null }),
+          };
+        }
+
         if (table !== "tasks") {
           throw new Error(`Unexpected table: ${table}`);
         }
@@ -33,6 +39,7 @@ describe("project mutations", () => {
                       user_id: userId,
                       project_id: projectId,
                       title: "Imported task",
+                      status: "todo",
                     },
                     error: null,
                   }),
@@ -52,7 +59,11 @@ describe("project mutations", () => {
 
     const result = await completeTask(supabase as never, { id: taskId });
 
-    expect(result).toEqual({ ok: true, data: { id: taskId }, error: null });
+    expect(result).toEqual({
+      ok: true,
+      data: { id: taskId, projectId },
+      error: null,
+    });
     expect(updates).toHaveLength(1);
     expect(updates[0]).toMatchObject({ status: "done" });
   });

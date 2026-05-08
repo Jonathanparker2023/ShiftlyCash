@@ -28,7 +28,7 @@ export async function createProjectAction(
   const result = await createProject(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths();
   return { ok: true, id: result.data.id };
 }
 
@@ -40,7 +40,7 @@ export async function updateProjectAction(input: {
   const result = await updateProject(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths(input.id);
   return { ok: true };
 }
 
@@ -51,7 +51,7 @@ export async function archiveProjectAction(input: {
   const result = await archiveProject(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths(input.id);
   return { ok: true };
 }
 
@@ -69,7 +69,7 @@ export async function deleteProjectAction(input: {
   const result = await deleteProject(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths(input.id);
   return { ok: true };
 }
 
@@ -80,7 +80,7 @@ export async function createTaskAction(
   const result = await createTask(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths(result.data.projectId);
   return { ok: true, id: result.data.id };
 }
 
@@ -92,7 +92,7 @@ export async function updateTaskAction(input: {
   const result = await updateTask(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths(result.data.projectId);
   return { ok: true };
 }
 
@@ -103,7 +103,7 @@ export async function completeTaskAction(input: {
   const result = await completeTask(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths(result.data.projectId);
   return { ok: true };
 }
 
@@ -114,7 +114,7 @@ export async function deleteTaskAction(input: {
   const result = await deleteTask(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths(result.data.projectId);
   return { ok: true };
 }
 
@@ -125,7 +125,7 @@ export async function reorderProjectsAction(input: {
   const result = await reorderProjects(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths();
   return { ok: true };
 }
 
@@ -137,6 +137,14 @@ export async function reorderTasksAction(input: {
   const result = await reorderTasks(supabase, input);
   if (!result.ok) throw new Error(result.error);
 
-  revalidatePath("/projects");
+  revalidateProjectPaths(input.projectId);
   return { ok: true };
+}
+
+function revalidateProjectPaths(projectId?: string) {
+  revalidatePath("/projects");
+
+  if (projectId) {
+    revalidatePath(`/projects/${projectId}`);
+  }
 }
