@@ -6,8 +6,12 @@ import { estimateBiweeklyWithholding } from "@/lib/domain/withholding";
 
 const ABILITY_REGULAR_GROSS_RATE = 19.055;
 const ABILITY_OVERTIME_GROSS_RATE = 28.5825;
+const PRESTIGE_WITHHOLDING_RATE = 0.18;
+const DEFAULT_PRESTIGE_REGULAR_NET_RATE = 14.28;
+const DEFAULT_PRESTIGE_OVERTIME_NET_RATE = 21.42;
 
 type NumericValue = number | string | null;
+export type PaycheckJobKey = "ability" | "prestige";
 
 type WeekTotalRow = {
   week_id: string;
@@ -34,6 +38,34 @@ type EarnSlotRow = {
 type PaycheckActualRow = {
   week_id: string;
   ability_actual_amount: NumericValue;
+  prestige_actual_amount: NumericValue;
+};
+
+type SettingsRow = {
+  prestige_regular_net_rate: NumericValue;
+  prestige_ot_net_rate: NumericValue;
+};
+
+type PaycheckWeekJobSummary = {
+  regularHours: number;
+  overtimeHours: number;
+  totalHours: number;
+  grossCents: number;
+};
+
+export type PaycheckJobSummary = {
+  label: string;
+  rateNote: string;
+  regularRate: number;
+  overtimeRate: number;
+  regularHours: number;
+  overtimeHours: number;
+  totalHours: number;
+  grossCents: number;
+  estimatedTaxCents: number;
+  estimatedNetCents: number;
+  actualNetCents: number | null;
+  differenceCents: number | null;
 };
 
 export type PaycheckWeekSummary = {
@@ -43,12 +75,7 @@ export type PaycheckWeekSummary = {
   displayWeekNumber: number;
   role: "week_1" | "week_2";
   status: "active" | "closed";
-  ability: {
-    regularHours: number;
-    overtimeHours: number;
-    totalHours: number;
-    grossCents: number;
-  };
+  jobs: Record<PaycheckJobKey, PaycheckWeekJobSummary>;
 };
 
 export type PaycheckPeriod = {
@@ -59,18 +86,7 @@ export type PaycheckPeriod = {
   paycheckDueDate: string | null;
   actualWeekId: string | null;
   weeks: PaycheckWeekSummary[];
-  ability: {
-    regularRate: number;
-    overtimeRate: number;
-    regularHours: number;
-    overtimeHours: number;
-    totalHours: number;
-    grossCents: number;
-    estimatedTaxCents: number;
-    estimatedNetCents: number;
-    actualNetCents: number | null;
-    differenceCents: number | null;
-  };
+  jobs: Record<PaycheckJobKey, PaycheckJobSummary>;
 };
 
 export type PaycheckAuditData = {
@@ -100,6 +116,15 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
 
   if (weekError) {
     throw new Error(`Unable to load paycheck weeks: ${weekError.message}`);
+  }
+
+  const { data: settingsData, error: settingsError } = await supabase
+    .from("settings")
+    .select("prestige_regular_net_rate,prestige_ot_net_rate")
+    .single();
+
+  if (settingsError) {
+    throw new Error(`Unable to load paycheck settings: ${settingsError.message}`);
   }
 
   const weeks = (weekData ?? []) as WeekTotalRow[];
@@ -134,7 +159,7 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
     weekTwoIds.length > 0
       ? await supabase
           .from("paycheck_actuals")
-          .select("week_id,ability_actual_amount")
+          .select("week_id,ability_actual_amount,prestige_actual_amount")
           .in("week_id", weekTwoIds)
       : { data: [], error: null };
 
@@ -148,6 +173,7 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
         id: "previous",
         label: "Previous pay period",
         periodStart: previousPeriodStart,
+        settings: settingsData as SettingsRow,
         weeks,
         days,
         slots: (slotData ?? []) as EarnSlotRow[],
@@ -157,6 +183,7 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
         id: "current",
         label: "Current pay period",
         periodStart: currentPeriodStart,
+        settings: settingsData as SettingsRow,
         weeks,
         days,
         slots: (slotData ?? []) as EarnSlotRow[],
@@ -170,6 +197,7 @@ function buildPeriod({
   id,
   label,
   periodStart,
+  settings,
   weeks,
   days,
   slots,
@@ -178,6 +206,7 @@ function buildPeriod({
   id: "previous" | "current";
   label: string;
   periodStart: string;
+  settings: SettingsRow;
   weeks: WeekTotalRow[];
   days: DayRow[];
   slots: EarnSlotRow[];
@@ -188,11 +217,21 @@ function buildPeriod({
     .filter((week) => week.start_date >= periodStart && week.start_date <= periodEnd)
     .sort((left, right) => left.start_date.localeCompare(right.start_date));
   const dayToWeekId = new Map(days.map((day) => [day.id, day.week_id]));
+  const prestigeRegularGrossRate = netToGrossRate(
+    toNumber(settings.prestige_regular_net_rate) || DEFAULT_PRESTIGE_REGULAR_NET_RATE,
+  );
+  const prestigeOvertimeGrossRate = netToGrossRate(
+    toNumber(settings.prestige_ot_net_rate) || DEFAULT_PRESTIGE_OVERTIME_NET_RATE,
+  );
   const weekSummaries = periodWeeks.map((week) => {
-    const abilityHours = sumAbilityHoursForWeek(week.week_id, dayToWeekId, slots);
-    const gross =
+    const abilityHours = sumHoursForWeek("ability", week.week_id, dayToWeekId, slots);
+    const prestigeHours = sumHoursForWeek("prestige", week.week_id, dayToWeekId, slots);
+    const abilityGross =
       abilityHours.regularHours * ABILITY_REGULAR_GROSS_RATE +
       abilityHours.overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
+    const prestigeGross =
+      prestigeHours.regularHours * prestigeRegularGrossRate +
+      prestigeHours.overtimeHours * prestigeOvertimeGrossRate;
 
     return {
       id: week.week_id,
@@ -201,37 +240,22 @@ function buildPeriod({
       displayWeekNumber: week.display_week_number,
       role: week.pay_period_role,
       status: week.status,
-      ability: {
-        regularHours: abilityHours.regularHours,
-        overtimeHours: abilityHours.overtimeHours,
-        totalHours: abilityHours.regularHours + abilityHours.overtimeHours,
-        grossCents: dollarsToCents(gross),
+      jobs: {
+        ability: buildWeekJobSummary(abilityHours, abilityGross),
+        prestige: buildWeekJobSummary(prestigeHours, prestigeGross),
       },
     };
   });
-  const abilityHours = weekSummaries.reduce(
-    (total, slot) => {
-      total.regularHours += slot.ability.regularHours;
-      total.overtimeHours += slot.ability.overtimeHours;
-      return total;
-    },
-    { regularHours: 0, overtimeHours: 0 },
-  );
-  const gross =
+  const abilityHours = sumJobHours(weekSummaries, "ability");
+  const prestigeHours = sumJobHours(weekSummaries, "prestige");
+  const abilityGross =
     abilityHours.regularHours * ABILITY_REGULAR_GROSS_RATE +
     abilityHours.overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
-  const withholding = estimateBiweeklyWithholding({
-    jobType: "ability",
-    biweeklyGross: gross,
-  });
+  const prestigeGross =
+    prestigeHours.regularHours * prestigeRegularGrossRate +
+    prestigeHours.overtimeHours * prestigeOvertimeGrossRate;
   const actualWeek = periodWeeks.find((week) => week.pay_period_role === "week_2");
   const actual = actuals.find((row) => row.week_id === actualWeek?.week_id);
-  const actualNetCents =
-    actual?.ability_actual_amount === null ||
-    actual?.ability_actual_amount === undefined
-      ? null
-      : dollarsToCents(toNumber(actual.ability_actual_amount));
-  const estimatedNetCents = dollarsToCents(gross - withholding.tax);
 
   return {
     id,
@@ -241,30 +265,116 @@ function buildPeriod({
     paycheckDueDate: actualWeek?.paycheck_due_date ?? null,
     actualWeekId: actualWeek?.week_id ?? null,
     weeks: weekSummaries,
-    ability: {
-      regularRate: ABILITY_REGULAR_GROSS_RATE,
-      overtimeRate: ABILITY_OVERTIME_GROSS_RATE,
-      regularHours: abilityHours.regularHours,
-      overtimeHours: abilityHours.overtimeHours,
-      totalHours: abilityHours.regularHours + abilityHours.overtimeHours,
-      grossCents: dollarsToCents(gross),
-      estimatedTaxCents: dollarsToCents(withholding.tax),
-      estimatedNetCents,
-      actualNetCents,
-      differenceCents:
-        actualNetCents === null ? null : actualNetCents - estimatedNetCents,
+    jobs: {
+      ability: buildJobSummary({
+        label: "Ability",
+        rateNote: "UKG gross rates",
+        jobType: "ability",
+        regularRate: ABILITY_REGULAR_GROSS_RATE,
+        overtimeRate: ABILITY_OVERTIME_GROSS_RATE,
+        regularHours: abilityHours.regularHours,
+        overtimeHours: abilityHours.overtimeHours,
+        gross: abilityGross,
+        actualValue: actual?.ability_actual_amount,
+      }),
+      prestige: buildJobSummary({
+        label: "Prestige",
+        rateNote: "gross estimate from saved Prestige net rates",
+        jobType: "prestige",
+        regularRate: prestigeRegularGrossRate,
+        overtimeRate: prestigeOvertimeGrossRate,
+        regularHours: prestigeHours.regularHours,
+        overtimeHours: prestigeHours.overtimeHours,
+        gross: prestigeGross,
+        actualValue: actual?.prestige_actual_amount,
+      }),
     },
   };
 }
 
-function sumAbilityHoursForWeek(
+function buildWeekJobSummary(
+  hours: { regularHours: number; overtimeHours: number },
+  gross: number,
+): PaycheckWeekJobSummary {
+  return {
+    regularHours: hours.regularHours,
+    overtimeHours: hours.overtimeHours,
+    totalHours: hours.regularHours + hours.overtimeHours,
+    grossCents: dollarsToCents(gross),
+  };
+}
+
+function sumJobHours(
+  weeks: PaycheckWeekSummary[],
+  jobType: PaycheckJobKey,
+): { regularHours: number; overtimeHours: number } {
+  return weeks.reduce(
+    (total, week) => {
+      total.regularHours += week.jobs[jobType].regularHours;
+      total.overtimeHours += week.jobs[jobType].overtimeHours;
+      return total;
+    },
+    { regularHours: 0, overtimeHours: 0 },
+  );
+}
+
+function buildJobSummary({
+  label,
+  rateNote,
+  jobType,
+  regularRate,
+  overtimeRate,
+  regularHours,
+  overtimeHours,
+  gross,
+  actualValue,
+}: {
+  label: string;
+  rateNote: string;
+  jobType: PaycheckJobKey;
+  regularRate: number;
+  overtimeRate: number;
+  regularHours: number;
+  overtimeHours: number;
+  gross: number;
+  actualValue: NumericValue | undefined;
+}): PaycheckJobSummary {
+  const withholding = estimateBiweeklyWithholding({
+    jobType,
+    biweeklyGross: gross,
+  });
+  const actualNetCents =
+    actualValue === null || actualValue === undefined
+      ? null
+      : dollarsToCents(toNumber(actualValue));
+  const estimatedNetCents = dollarsToCents(gross - withholding.tax);
+
+  return {
+    label,
+    rateNote,
+    regularRate,
+    overtimeRate,
+    regularHours,
+    overtimeHours,
+    totalHours: regularHours + overtimeHours,
+    grossCents: dollarsToCents(gross),
+    estimatedTaxCents: dollarsToCents(withholding.tax),
+    estimatedNetCents,
+    actualNetCents,
+    differenceCents:
+      actualNetCents === null ? null : actualNetCents - estimatedNetCents,
+  };
+}
+
+function sumHoursForWeek(
+  jobType: PaycheckJobKey,
   weekId: string,
   dayToWeekId: Map<string, string>,
   slots: EarnSlotRow[],
 ): { regularHours: number; overtimeHours: number } {
   return slots.reduce(
     (total, slot) => {
-      if (dayToWeekId.get(slot.day_id) !== weekId || slot.job_type !== "ability") {
+      if (dayToWeekId.get(slot.day_id) !== weekId || slot.job_type !== jobType) {
         return total;
       }
 
@@ -280,6 +390,10 @@ function sumAbilityHoursForWeek(
     },
     { regularHours: 0, overtimeHours: 0 },
   );
+}
+
+function netToGrossRate(netRate: number): number {
+  return netRate / (1 - PRESTIGE_WITHHOLDING_RATE);
 }
 
 function toNumber(value: NumericValue): number {

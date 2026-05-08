@@ -4,13 +4,16 @@ import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
 import { dollarsToCents, centsToDollars } from "@/lib/domain/money";
+import type { PaycheckJobKey } from "@/lib/paychecks/data";
 
-export async function saveAbilityPaycheckActualAction(input: {
+export async function savePaycheckActualAction(input: {
   weekId: string;
+  jobType: PaycheckJobKey;
   actualCents: number | null;
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
   const weekId = requireUuid(input.weekId, "weekId");
+  const jobType = requirePaycheckJob(input.jobType);
   const actualCents =
     input.actualCents === null
       ? null
@@ -33,7 +36,7 @@ export async function saveAbilityPaycheckActualAction(input: {
     {
       week_id: weekId,
       user_id: user.id,
-      ability_actual_amount:
+      [jobType === "ability" ? "ability_actual_amount" : "prestige_actual_amount"]:
         actualCents === null ? null : centsToDollars(actualCents),
     },
     { onConflict: "week_id" },
@@ -46,6 +49,14 @@ export async function saveAbilityPaycheckActualAction(input: {
   revalidatePath("/paychecks");
 
   return { ok: true };
+}
+
+function requirePaycheckJob(value: PaycheckJobKey): PaycheckJobKey {
+  if (value !== "ability" && value !== "prestige") {
+    throw new Error("Invalid paycheck job.");
+  }
+
+  return value;
 }
 
 function requireUuid(value: string, fieldName: string): string {

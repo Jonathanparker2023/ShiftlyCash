@@ -3,9 +3,14 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 
-import { saveAbilityPaycheckActualAction } from "@/app/(protected)/paychecks/actions";
+import { savePaycheckActualAction } from "@/app/(protected)/paychecks/actions";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
-import type { PaycheckAuditData, PaycheckPeriod } from "@/lib/paychecks/data";
+import type {
+  PaycheckAuditData,
+  PaycheckJobKey,
+  PaycheckJobSummary,
+  PaycheckPeriod,
+} from "@/lib/paychecks/data";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -15,10 +20,11 @@ export function PaycheckAuditPage({
   initialData: PaycheckAuditData;
 }) {
   const [periods, setPeriods] = useState(initialData.periods);
+  const [activeJob, setActiveJob] = useState<PaycheckJobKey>("ability");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  async function saveActual(period: PaycheckPeriod, value: string) {
+  async function saveActual(period: PaycheckPeriod, jobType: PaycheckJobKey, value: string) {
     if (!period.actualWeekId) {
       return;
     }
@@ -35,8 +41,9 @@ export function PaycheckAuditPage({
     setSaveState("saving");
 
     try {
-      await saveAbilityPaycheckActualAction({
+      await savePaycheckActualAction({
         weekId: period.actualWeekId,
+        jobType,
         actualCents,
       });
       setPeriods((current) =>
@@ -47,13 +54,16 @@ export function PaycheckAuditPage({
 
           return {
             ...item,
-            ability: {
-              ...item.ability,
-              actualNetCents: actualCents,
-              differenceCents:
-                actualCents === null
-                  ? null
-                  : actualCents - item.ability.estimatedNetCents,
+            jobs: {
+              ...item.jobs,
+              [jobType]: {
+                ...item.jobs[jobType],
+                actualNetCents: actualCents,
+                differenceCents:
+                  actualCents === null
+                    ? null
+                    : actualCents - item.jobs[jobType].estimatedNetCents,
+              },
             },
           };
         }),
@@ -76,19 +86,42 @@ export function PaycheckAuditPage({
                 Paycheck audit
               </p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-3xl">
-                Ability pay-period check
+                Pay-period check
               </h1>
               <p className="mt-1 text-sm text-[#64748b]">
-                Compare expected Ability take-home against what UKG actually paid.
+                Compare expected take-home against what UKG actually paid.
               </p>
             </div>
             <SaveBadge state={saveState} error={error} />
           </div>
 
+          <div className="mb-4 inline-flex rounded-md border border-[#cbd5e1] bg-white p-1 shadow-sm">
+            {(["ability", "prestige"] as const).map((jobType) => (
+              <button
+                key={jobType}
+                className={[
+                  "rounded px-3 py-1.5 text-sm font-semibold transition",
+                  activeJob === jobType
+                    ? "bg-[#0b1220] text-white"
+                    : "text-[#475569] hover:bg-[#f1f5f9]",
+                ].join(" ")}
+                onClick={() => {
+                  setActiveJob(jobType);
+                  setSaveState("idle");
+                  setError(null);
+                }}
+                type="button"
+              >
+                {jobType === "ability" ? "Ability" : "Prestige"}
+              </button>
+            ))}
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             {periods.map((period) => (
               <PaycheckPeriodCard
-                key={period.id}
+                key={`${period.id}-${activeJob}`}
+                jobType={activeJob}
                 period={period}
                 onSaveActual={saveActual}
               />
@@ -101,18 +134,25 @@ export function PaycheckAuditPage({
 }
 
 function PaycheckPeriodCard({
+  jobType,
   period,
   onSaveActual,
 }: {
+  jobType: PaycheckJobKey;
   period: PaycheckPeriod;
-  onSaveActual: (period: PaycheckPeriod, value: string) => Promise<void>;
+  onSaveActual: (
+    period: PaycheckPeriod,
+    jobType: PaycheckJobKey,
+    value: string,
+  ) => Promise<void>;
 }) {
+  const job = period.jobs[jobType];
   const [actualValue, setActualValue] = useState(
-    period.ability.actualNetCents === null
+    job.actualNetCents === null
       ? ""
-      : centsToDollars(period.ability.actualNetCents).toFixed(2),
+      : centsToDollars(job.actualNetCents).toFixed(2),
   );
-  const difference = period.ability.differenceCents;
+  const difference = job.differenceCents;
   const tone =
     difference === null
       ? "neutral"
@@ -124,7 +164,7 @@ function PaycheckPeriodCard({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onSaveActual(period, actualValue);
+    await onSaveActual(period, jobType, actualValue);
   }
 
   return (
@@ -140,9 +180,9 @@ function PaycheckPeriodCard({
       </div>
 
       <div className="grid gap-2 text-sm sm:grid-cols-2">
-        <Metric label="Regular hours" value={`${formatHours(period.ability.regularHours)}h`} />
-        <Metric label="OT hours" value={`${formatHours(period.ability.overtimeHours)}h`} />
-        <Metric label="Total hours" value={`${formatHours(period.ability.totalHours)}h`} />
+        <Metric label="Regular hours" value={`${formatHours(job.regularHours)}h`} />
+        <Metric label="OT hours" value={`${formatHours(job.overtimeHours)}h`} />
+        <Metric label="Total hours" value={`${formatHours(job.totalHours)}h`} />
         <Metric label="Pay date" value={period.paycheckDueDate ? formatDate(period.paycheckDueDate) : "Not ready"} />
       </div>
 
@@ -150,14 +190,15 @@ function PaycheckPeriodCard({
 
       <div className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-sm font-semibold text-[#0f172a]">Ability hours by week</h3>
+          <h3 className="text-sm font-semibold text-[#0f172a]">{job.label} hours by week</h3>
           <span className="text-xs font-semibold text-[#475569]">
-            {formatRate(period.ability.regularRate)} base / {formatRate(period.ability.overtimeRate)} OT
+            {formatRate(job.regularRate)} base / {formatRate(job.overtimeRate)} OT
           </span>
         </div>
+        <p className="mt-1 text-xs text-[#64748b]">{job.rateNote}</p>
         <div className="mt-3 grid gap-2">
           {period.weeks.map((week) => (
-            <WeekBreakdown key={week.id} week={week} />
+            <WeekBreakdown key={week.id} jobType={jobType} week={week} />
           ))}
         </div>
       </div>
@@ -165,26 +206,26 @@ function PaycheckPeriodCard({
       <div className="my-4 border-t border-[#e2e8f0]" />
 
       <div className="grid gap-2 text-sm">
-        <MoneyLine label="Expected gross" value={period.ability.grossCents} />
-        <MoneyLine label="Est. withholding" tone="negative" value={period.ability.estimatedTaxCents} />
-        <MoneyLine strong label="Expected take-home" value={period.ability.estimatedNetCents} />
-        {period.ability.actualNetCents !== null ? (
+        <MoneyLine label="Expected gross" value={job.grossCents} />
+        <MoneyLine label="Est. withholding" tone="negative" value={job.estimatedTaxCents} />
+        <MoneyLine strong label="Expected take-home" value={job.estimatedNetCents} />
+        {job.actualNetCents !== null ? (
           <>
-            <MoneyLine label="Actual take-home" value={period.ability.actualNetCents} />
+            <MoneyLine label="Actual take-home" value={job.actualNetCents} />
             <MoneyLine
               label="Difference"
-              tone={period.ability.differenceCents !== null && period.ability.differenceCents < 0 ? "negative" : undefined}
-              value={Math.abs(period.ability.differenceCents ?? 0)}
+              tone={job.differenceCents !== null && job.differenceCents < 0 ? "negative" : undefined}
+              value={Math.abs(job.differenceCents ?? 0)}
             />
           </>
         ) : null}
       </div>
 
-      <AuditRead period={period} />
+      <AuditRead job={job} />
 
       <form className="mt-4 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3" onSubmit={submit}>
         <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-[#334155]">
-          Actual Ability check
+          Actual {job.label} check
         </label>
         <div className="mt-2 flex gap-2">
           <input
@@ -205,7 +246,7 @@ function PaycheckPeriodCard({
           </button>
         </div>
         <p className="mt-2 text-xs text-[#64748b]">
-          Paste the net Ability amount from UKG. ShiftlyCash compares it to expected take-home.
+          Paste the net {job.label} amount from UKG. ShiftlyCash compares it to expected take-home.
         </p>
       </form>
     </article>
@@ -213,10 +254,14 @@ function PaycheckPeriodCard({
 }
 
 function WeekBreakdown({
+  jobType,
   week,
 }: {
+  jobType: PaycheckJobKey;
   week: PaycheckPeriod["weeks"][number];
 }) {
+  const job = week.jobs[jobType];
+
   return (
     <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
       <div>
@@ -231,9 +276,9 @@ function WeekBreakdown({
         </p>
       </div>
       <div className="grid grid-cols-3 gap-2 text-right">
-        <MiniStat label="Reg" value={`${formatHours(week.ability.regularHours)}h`} />
-        <MiniStat label="OT" value={`${formatHours(week.ability.overtimeHours)}h`} />
-        <MiniStat label="Gross" value={formatMoney(week.ability.grossCents)} />
+        <MiniStat label="Reg" value={`${formatHours(job.regularHours)}h`} />
+        <MiniStat label="OT" value={`${formatHours(job.overtimeHours)}h`} />
+        <MiniStat label="Gross" value={formatMoney(job.grossCents)} />
       </div>
     </div>
   );
@@ -250,8 +295,8 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AuditRead({ period }: { period: PaycheckPeriod }) {
-  const difference = period.ability.differenceCents;
+function AuditRead({ job }: { job: PaycheckJobSummary }) {
+  const difference = job.differenceCents;
   const classes =
     difference === null
       ? "border-[#d7dee8] bg-[#f8fafc] text-[#475569]"
@@ -262,9 +307,9 @@ function AuditRead({ period }: { period: PaycheckPeriod }) {
           : "border-[#bae6fd] bg-[#e0f2fe] text-[#075985]";
   const message =
     difference === null
-      ? `Expected Ability net is ${formatMoney(period.ability.estimatedNetCents)} from ${formatHours(period.ability.totalHours)} total hours. Add the UKG net check to see if the paycheck is short.`
+      ? `Expected ${job.label} net is ${formatMoney(job.estimatedNetCents)} from ${formatHours(job.totalHours)} total hours. Add the UKG net check to see if the paycheck is short.`
       : difference < -100
-        ? `Short by ${formatMoney(Math.abs(difference))}. First compare UKG gross to ${formatMoney(period.ability.grossCents)}; if gross matches, the gap is likely deductions or withholding.`
+        ? `Short by ${formatMoney(Math.abs(difference))}. First compare UKG gross to ${formatMoney(job.grossCents)}; if gross matches, the gap is likely deductions or withholding.`
         : difference > 100
           ? `Over by ${formatMoney(difference)}. Check UKG for extra pay, bonus pay, or lower withholding than the model expected.`
           : `Within ${formatMoney(Math.abs(difference))} of the estimate. This paycheck is close enough to call matched.`;
