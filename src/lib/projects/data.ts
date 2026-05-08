@@ -669,12 +669,17 @@ async function getProjectHealthMap(
     return new Map();
   }
 
+  const lookbackDate = new Date(`${todayIso}T00:00:00.000Z`);
+  lookbackDate.setUTCDate(lookbackDate.getUTCDate() - 30);
+  const lookbackIso = lookbackDate.toISOString();
+
   const [eventsRes, pastDueRes] = await Promise.all([
     supabase
       .from("project_events")
       .select("project_id,created_at")
       .eq("user_id", userId)
       .in("project_id", projectIds)
+      .gte("created_at", lookbackIso)
       .order("created_at", { ascending: false }),
     supabase
       .from("tasks")
