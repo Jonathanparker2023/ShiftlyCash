@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { toggleProjectionExclusionAction } from "@/app/(protected)/history/actions";
+import { HistorySummary } from "@/components/history/HistorySummary";
 import { cashflowWeeklyColor } from "@/lib/domain/legacyRules";
 import { centsToDollars } from "@/lib/domain/money";
 import type {
@@ -71,6 +72,8 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
           are ignored by projection averages, not deleted.
         </p>
       </header>
+
+      <HistorySummary weeks={weeks} />
 
       {error ? (
         <div className="mx-auto mb-4 max-w-7xl rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
