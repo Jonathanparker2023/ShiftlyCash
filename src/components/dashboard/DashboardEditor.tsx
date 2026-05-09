@@ -61,7 +61,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
-  const [closeBannerDismissed, setCloseBannerDismissed] = useState(false);
   const [closeToast, setCloseToast] = useState<string | null>(null);
   const [pendingTransactionIds, setPendingTransactionIds] = useState<Set<string>>(
     new Set(),
@@ -516,37 +515,6 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
   return (
     <div className="min-h-screen bg-[#0b1220]/35 px-3 py-4 text-[#f8fafc] sm:px-4 lg:px-6">
-      {canCloseWeek && !closeBannerDismissed ? (
-        <section className="mx-auto mb-5 flex max-w-7xl flex-col gap-3 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-4 text-sm text-[#c2410c] shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-semibold">
-              Week {initialData.week.displayWeekNumber} ended{" "}
-              {formatLongDate(initialData.week.endDate)}.
-            </p>
-            <p className="mt-1 text-[#c2410c]">
-              Close it to lock this week and start the next template-filled week.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              className="h-9 rounded-md bg-[#0b1220] px-3 text-sm font-medium text-white transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#d7dee8]"
-              disabled={isClosing}
-              onClick={closeWeek}
-              type="button"
-            >
-              {isClosing ? "Closing..." : "Close week"}
-            </button>
-            <button
-              className="h-9 rounded-md border border-[#fed7aa] bg-white px-3 text-sm font-medium text-[#c2410c] transition hover:border-[#c2410c]"
-              onClick={() => setCloseBannerDismissed(true)}
-              type="button"
-            >
-              Dismiss
-            </button>
-          </div>
-        </section>
-      ) : null}
-
       {closeError ? (
         <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[#fecaca] bg-[#fff1f2] p-3 text-sm font-medium text-[#b91c1c]">
           {closeError}
