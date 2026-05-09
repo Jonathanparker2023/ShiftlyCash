@@ -6,5 +6,12 @@ export default async function HomePage() {
   // Only remount when the active week changes (week close). For any other
   // edit, React reconciles props and preserves client state (focused day,
   // expanded drawers, etc.).
-  return <DashboardEditor initialData={dashboardData} key={dashboardData.week.id} />;
+  return (
+    <div
+      className="min-h-screen bg-cover bg-center bg-fixed"
+      style={{ backgroundImage: "url('/images/penthouse.png')" }}
+    >
+      <DashboardEditor initialData={dashboardData} key={dashboardData.week.id} />
+    </div>
+  );
 }

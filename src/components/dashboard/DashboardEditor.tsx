@@ -515,7 +515,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#101827] px-3 py-4 text-[#f8fafc] sm:px-4 lg:px-6">
+    <div className="min-h-screen bg-[#0b1220]/35 px-3 py-4 text-[#f8fafc] sm:px-4 lg:px-6">
       {canCloseWeek && !closeBannerDismissed ? (
         <section className="mx-auto mb-5 flex max-w-7xl flex-col gap-3 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-4 text-sm text-[#c2410c] shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -560,20 +560,20 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       ) : null}
 
       <main className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-xl border border-[#d7dee8] bg-[#f8fafc] shadow-[0_24px_70px_rgba(41,37,31,0.16)]">
-          <div className="h-2 bg-[#0b1220]" />
+        <section className="overflow-hidden rounded-xl border border-white/20 bg-white/10 shadow-[0_24px_70px_rgba(8,15,28,0.34)] backdrop-blur-md">
+          <div className="h-2 bg-white/20" />
           <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#334155]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
                 Week {initialData.week.displayWeekNumber}
               </p>
-              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-3xl">
+              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
                 {formatFullRange(initialData.week.startDate, initialData.week.endDate)}
                 <CalendarIcon />
               </h1>
               <div className="mt-3 flex flex-wrap gap-2">
-                <p className="inline-flex rounded-full border border-[#bae6fd] bg-[#e0f2fe] px-3 py-1 text-xs font-semibold text-[#0e7490]">
+                <p className="inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
                   {initialData.week.payPeriodRole === "week_1"
                     ? "Week 1 of Pay Period"
                     : "Week 2 of Pay Period"}
@@ -588,7 +588,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
             <div>
               <div className="mb-3 flex justify-start lg:justify-end">
-                <span className="inline-flex rounded-full border border-[#d7dee8] bg-white px-2 py-1 text-xs font-semibold text-[#334155] shadow-sm">
+                <span className="inline-flex rounded-full border border-white/25 bg-white/15 px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
                   Active week
                 </span>
               </div>
@@ -640,8 +640,8 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             />
           ) : null}
 
-          <div className="mt-4 flex flex-col gap-3 border-t border-[#d7dee8] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#475569]">
+          <div className="mt-4 flex flex-col gap-3 border-t border-white/20 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-white">
               <span>Total: {weekTotals.wageHours.toFixed(2)}h</span>
               <span>Ability: {formatHoursFromSlots(days, "ability")}h</span>
               <span>
@@ -798,7 +798,7 @@ function CalendarIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4 text-[#334155]"
+      className="h-4 w-4 text-white"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -836,30 +836,30 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? "min-w-0 rounded-md border-2 border-[#0e7490] bg-white px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(16,16,15,0.12)] sm:p-3"
+          ? "min-w-0 rounded-md border-2 border-white/80 bg-black/35 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.24)] backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
           : day.spendLocked
-            ? "min-w-0 rounded-md border border-[#d7dee8] bg-[#e8eef6] px-1.5 py-2 text-left opacity-70 transition hover:border-[#0e7490] sm:p-3"
-            : "min-w-0 rounded-md border border-[#d7dee8] bg-white px-1.5 py-2 text-left shadow-sm transition hover:border-[#0e7490] hover:bg-[#eef4fb] sm:p-3"
+            ? "min-w-0 rounded-md border border-white/15 bg-black/20 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-sm transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            : "min-w-0 rounded-md border border-white/20 bg-black/30 px-1.5 py-2 text-left shadow-sm backdrop-blur-sm transition hover:border-white/50 hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
     >
       <div className="flex min-w-0 items-center justify-between gap-1 sm:gap-2">
-        <span className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-[#334155] sm:text-[10px] sm:tracking-[0.14em]">
+        <span className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.14em]">
           {shortDayName(day.date)}
         </span>
         {day.spendLocked ? (
-          <span className="hidden rounded-full bg-[#fff7ed] px-1.5 py-0.5 text-[10px] font-semibold text-[#c2410c] sm:inline-flex">
+          <span className="hidden rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
             Locked
           </span>
         ) : null}
       </div>
       <div className="mt-1 flex min-w-0 items-center justify-between gap-1 sm:gap-2">
-        <span className="text-base font-semibold text-[#0f172a] sm:text-lg">
+        <span className="text-base font-semibold text-white sm:text-lg">
           {formatDayOnly(day.date)}
         </span>
         {isToday ? (
-          <span className="hidden rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[10px] font-semibold text-[#0e7490] sm:inline-flex">
+          <span className="hidden rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
             Today
           </span>
         ) : null}
