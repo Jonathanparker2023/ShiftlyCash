@@ -514,7 +514,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1220]/35 px-3 py-4 text-[#f8fafc] sm:px-4 lg:px-6">
+    <div className="min-h-screen bg-[#0b1220]/10 px-3 py-4 text-[#f8fafc] sm:px-4 lg:px-6">
       {closeError ? (
         <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[#fecaca] bg-[#fff1f2] p-3 text-sm font-medium text-[#b91c1c]">
           {closeError}
@@ -528,7 +528,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       ) : null}
 
       <main className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-xl border border-white/15 bg-black/15 shadow-[0_24px_70px_rgba(8,15,28,0.28)] backdrop-blur-sm">
+        <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
           <div className="h-2 bg-white/10" />
           <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
@@ -719,7 +719,7 @@ function TopMetric({
       className={
         dark
           ? `rounded-md bg-[#0b1220] px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border border-white/20 bg-black/25 px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-sm before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
+          : `relative overflow-hidden rounded-md border border-white/20 bg-black/10 px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.16)] backdrop-blur-[1px] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
       <div className="flex items-start justify-between gap-2">
@@ -804,10 +804,10 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? "min-w-0 rounded-md border-2 border-white/80 bg-black/25 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.2)] backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+          ? "min-w-0 rounded-md border-2 border-white/80 bg-black/10 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-[1px] transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
           : day.spendLocked
             ? "min-w-0 rounded-md border border-white/15 bg-black/10 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-sm transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
-            : "min-w-0 rounded-md border border-white/20 bg-black/20 px-1.5 py-2 text-left shadow-sm backdrop-blur-sm transition hover:border-white/50 hover:bg-black/25 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            : "min-w-0 rounded-md border border-white/20 bg-black/5 px-1.5 py-2 text-left shadow-sm backdrop-blur-[1px] transition hover:border-white/50 hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
@@ -886,7 +886,7 @@ function FocusedDayEditor({
   ) => void;
 }) {
   return (
-    <section className="mt-4 rounded-lg border border-white/15 bg-black/20 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-sm">
+    <section className="mt-4 rounded-lg border border-white/15 bg-black/5 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-[1px]">
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
         <ShiftList
           day={day}
@@ -955,7 +955,7 @@ function TransactionDrawer({
   }
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 p-3 text-white shadow-sm backdrop-blur-sm">
+    <div className="rounded-md border border-white/15 bg-black/5 p-3 text-white shadow-sm backdrop-blur-[1px]">
       {error ? (
         <div className="mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
           {error}
@@ -990,14 +990,14 @@ function TransactionDrawer({
             onSubmit={submitManualTransaction}
           >
             <input
-              className="h-10 rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
+              className="h-10 rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
               onChange={(event) => setMerchantName(event.target.value)}
               placeholder="Merchant"
               type="text"
               value={merchantName}
             />
             <input
-              className="h-10 rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
+              className="h-10 rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
               min="0"
               onChange={(event) => setAmount(event.target.value)}
               placeholder="Amount"
@@ -1026,7 +1026,7 @@ function TransactionDrawer({
           </form>
         ) : (
           <button
-            className="h-9 rounded-md border border-dashed border-white/25 bg-black/20 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/25"
+            className="h-9 rounded-md border border-dashed border-white/25 bg-black/5 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/10"
             onClick={() => setIsAdding(true)}
             type="button"
           >
@@ -1052,7 +1052,7 @@ function TransactionColumn({
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
   return (
-    <div className="min-h-0 rounded-md border border-white/15 bg-black/20 p-3 backdrop-blur-sm">
+    <div className="min-h-0 rounded-md border border-white/15 bg-black/5 p-3 backdrop-blur-[1px]">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
           {heading}
@@ -1090,7 +1090,7 @@ function TransactionRowButton({
 }) {
   return (
     <button
-      className="grid w-full grid-cols-[1fr_auto] gap-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-left text-sm shadow-sm transition hover:border-white/40 hover:bg-black/25 focus:outline-none focus:ring-2 focus:ring-white"
+      className="grid w-full grid-cols-[1fr_auto] gap-3 rounded-md border border-white/10 bg-black/10 px-3 py-2 text-left text-sm shadow-sm transition hover:border-white/40 hover:bg-black/15 focus:outline-none focus:ring-2 focus:ring-white"
       disabled={disabled}
       onClick={() => onToggle(transaction)}
       type="button"
@@ -1181,13 +1181,13 @@ function ShiftList({
             />
           ))
         ) : (
-          <div className="rounded-md border border-dashed border-white/25 bg-black/20 p-4 text-sm text-white/70">
+          <div className="rounded-md border border-dashed border-white/25 bg-black/5 p-4 text-sm text-white/70">
             No shifts logged for this day.
           </div>
         )}
       </div>
       <button
-        className="h-10 w-full rounded-md border border-dashed border-white/25 bg-black/20 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-10 w-full rounded-md border border-dashed border-white/25 bg-black/5 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={day.spendLocked || activeSlots.length >= 4}
         onClick={() => onAddShift(day)}
         type="button"
@@ -1282,7 +1282,7 @@ function ShiftRow({
       </button>
 
       {expanded && !locked ? (
-        <div className="grid gap-3 border-t border-dashed border-white/25 bg-black/25 p-3 sm:grid-cols-2">
+        <div className="grid gap-3 border-t border-dashed border-white/25 bg-black/10 p-3 sm:grid-cols-2">
           <SelectField
             label="Job"
             value={slot.jobType}
@@ -1389,7 +1389,7 @@ function TotalsPanel({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-white/15 bg-black/20 p-2.5 text-sm backdrop-blur-sm">
+      <div className="rounded-md border border-white/15 bg-black/5 p-2.5 text-sm backdrop-blur-[1px]">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
           label="- Spend"
@@ -1488,7 +1488,7 @@ function NumberField({
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition read-only:bg-white/10 read-only:text-white/60 focus:border-white/60 focus:ring-2 focus:ring-white"
+        className="h-10 w-full rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition read-only:bg-white/10 read-only:text-white/60 focus:border-white/60 focus:ring-2 focus:ring-white"
         min="0"
         onChange={(event) => onChange?.(parsePositiveNumber(event.target.value))}
         readOnly={readOnly}
@@ -1515,7 +1515,7 @@ function TextField({
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white"
+        className="h-10 w-full rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white"
         onChange={(event) => onChange(event.target.value)}
         type="text"
         value={value}
