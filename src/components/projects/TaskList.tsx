@@ -25,6 +25,7 @@ import {
   reorderTasksAction,
   updateTaskAction,
 } from "@/app/(protected)/projects/actions";
+import { TaskEditor } from "@/components/projects/TaskEditor";
 import { TagPicker } from "@/components/projects/TagPicker";
 import { TagPill } from "@/components/projects/TagPill";
 import type { ProjectItem, ProjectTask } from "@/lib/projects/types";
@@ -36,7 +37,9 @@ export function TaskList({ project }: { project: ProjectItem }) {
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tagPickerTaskId, setTagPickerTaskId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const tasks = project.tasks;
+  const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -140,6 +143,7 @@ export function TaskList({ project }: { project: ProjectItem }) {
                     )
                   }
                   onToggle={toggleTask}
+                  onEdit={() => setEditingTaskId(task.id)}
                   showTagPicker={tagPickerTaskId === task.id}
                   task={task}
                   tags={project.tags}
@@ -177,12 +181,21 @@ export function TaskList({ project }: { project: ProjectItem }) {
           {error}
         </p>
       ) : null}
+
+      {editingTask ? (
+        <TaskEditor
+          onClose={() => setEditingTaskId(null)}
+          onSaved={() => router.refresh()}
+          task={editingTask}
+        />
+      ) : null}
     </div>
   );
 }
 
 function SortableTaskRow({
   disabled,
+  onEdit,
   onToggleTagPicker,
   onToggle,
   showTagPicker,
@@ -190,6 +203,7 @@ function SortableTaskRow({
   tags,
 }: {
   disabled: boolean;
+  onEdit: () => void;
   onToggleTagPicker: () => void;
   onToggle: (task: ProjectTask) => void;
   showTagPicker: boolean;
@@ -226,15 +240,18 @@ function SortableTaskRow({
           type="checkbox"
         />
         <div className="min-w-0 flex-1">
-          <p
+          <button
             className={
               task.status === "done"
-                ? "truncate text-sm font-semibold text-[#64748b] line-through"
-                : "truncate text-sm font-semibold text-[#0f172a]"
+                ? "block max-w-full truncate text-left text-sm font-semibold text-[#64748b] line-through transition hover:text-[#334155]"
+                : "block max-w-full truncate text-left text-sm font-semibold text-[#0f172a] transition hover:text-[#1d4ed8]"
             }
+            disabled={disabled}
+            onClick={onEdit}
+            type="button"
           >
             {task.title}
-          </p>
+          </button>
           <div className="mt-0.5 flex flex-wrap gap-2 text-xs text-[#64748b]">
             <span>{formatStatus(task.status)}</span>
             {task.dueDate ? <span>Due {formatDate(task.dueDate)}</span> : null}
