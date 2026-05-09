@@ -2,7 +2,6 @@ import { requireUser } from "@/lib/auth";
 import {
   getCurrentWeekReflection,
 } from "@/lib/projects/data";
-import type { WeeklyReflection as WeeklyReflectionData } from "@/lib/projects/types";
 
 import { WeeklyReflectionClient } from "./WeeklyReflectionClient";
 
@@ -16,7 +15,7 @@ export async function WeeklyReflection({
   const { supabase } = await requireUser();
   const reflection = await getCurrentWeekReflection(supabase, weekStartIso);
 
-  if (!shouldRenderWeeklyReflection(todayIso, reflection)) {
+  if (!shouldRenderWeeklyReflection(todayIso, weekStartIso)) {
     return null;
   }
 
@@ -30,12 +29,10 @@ export async function WeeklyReflection({
 
 export function shouldRenderWeeklyReflection(
   todayIso: string,
-  reflection: WeeklyReflectionData | null,
+  weekStartIso: string,
 ): boolean {
-  if (!reflection) {
-    return true;
-  }
+  const finalDay = new Date(`${weekStartIso}T00:00:00.000Z`);
+  finalDay.setUTCDate(finalDay.getUTCDate() + 6);
 
-  const day = new Date(`${todayIso}T00:00:00.000Z`).getUTCDay();
-  return day === 5 || day === 6 || day === 0;
+  return todayIso === finalDay.toISOString().slice(0, 10);
 }
