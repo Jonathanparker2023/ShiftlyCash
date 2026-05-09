@@ -42,6 +42,7 @@ export type ProjectItem = {
   deadline: string | null;
   isInbox: boolean;
   health: ProjectHealth;
+  healthReason: string;
   progress: {
     total: number;
     done: number;

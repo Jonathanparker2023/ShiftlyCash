@@ -20,7 +20,27 @@ describe("project data", () => {
         now: new Date("2026-05-08T12:00:00.000Z"),
         openPastDueCount: 1,
       }),
-    ).toBe("red");
+    ).toEqual({ health: "red", reason: "1 task past due" });
+  });
+
+  it("derives plural red health reason from multiple open past-due tasks", () => {
+    expect(
+      deriveProjectHealth({
+        lastEventAt: "2026-05-08T10:00:00.000Z",
+        now: new Date("2026-05-08T12:00:00.000Z"),
+        openPastDueCount: 3,
+      }),
+    ).toEqual({ health: "red", reason: "3 tasks past due" });
+  });
+
+  it("derives yellow health from missing project activity", () => {
+    expect(
+      deriveProjectHealth({
+        lastEventAt: null,
+        now: new Date("2026-05-08T12:00:00.000Z"),
+        openPastDueCount: 0,
+      }),
+    ).toEqual({ health: "yellow", reason: "No activity yet" });
   });
 
   it("derives yellow health from stale project activity", () => {
@@ -30,7 +50,7 @@ describe("project data", () => {
         now: new Date("2026-05-08T12:00:00.000Z"),
         openPastDueCount: 0,
       }),
-    ).toBe("yellow");
+    ).toEqual({ health: "yellow", reason: "No activity in 18 days" });
   });
 
   it("derives green health from fresh activity without past-due tasks", () => {
@@ -40,7 +60,7 @@ describe("project data", () => {
         now: new Date("2026-05-08T12:00:00.000Z"),
         openPastDueCount: 0,
       }),
-    ).toBe("green");
+    ).toEqual({ health: "green", reason: "Active" });
   });
 
   it("returns dense completion heatmap days sorted ascending", async () => {

@@ -165,7 +165,8 @@ export async function getProjectsData(): Promise<ProjectsData> {
         sortOrder: Number(row.sort_order ?? 0),
         deadline: row.deadline,
         isInbox: Boolean(row.is_inbox),
-        health: healthByProject.get(row.id) ?? "yellow",
+        health: healthByProject.get(row.id)?.health ?? "yellow",
+        healthReason: healthByProject.get(row.id)?.reason ?? "No activity yet",
         progress: {
           total,
           done,
@@ -500,6 +501,7 @@ function mapProject(
     deadline: row.deadline,
     isInbox: Boolean(row.is_inbox),
     health: "yellow",
+    healthReason: "No activity yet",
     progress: {
       total,
       done,
@@ -514,22 +516,33 @@ export function deriveProjectHealth(input: {
   lastEventAt: string | null;
   now: Date;
   openPastDueCount: number;
-}): ProjectHealth {
+}): { health: ProjectHealth; reason: string } {
   if (input.openPastDueCount > 0) {
-    return "red";
+    return {
+      health: "red",
+      reason:
+        input.openPastDueCount === 1
+          ? "1 task past due"
+          : `${input.openPastDueCount} tasks past due`,
+    };
   }
 
   if (!input.lastEventAt) {
-    return "yellow";
+    return { health: "yellow", reason: "No activity yet" };
   }
 
   const lastEventTime = new Date(input.lastEventAt).getTime();
   if (Number.isNaN(lastEventTime)) {
-    return "yellow";
+    return { health: "yellow", reason: "No activity yet" };
   }
 
   const staleMs = 14 * 24 * 60 * 60 * 1000;
-  return input.now.getTime() - lastEventTime > staleMs ? "yellow" : "green";
+  const daysSinceActivity = Math.floor(
+    (input.now.getTime() - lastEventTime) / 86_400_000,
+  );
+  return input.now.getTime() - lastEventTime > staleMs
+    ? { health: "yellow", reason: `No activity in ${daysSinceActivity} days` }
+    : { health: "green", reason: "Active" };
 }
 
 function mapTask(
@@ -664,7 +677,7 @@ async function getProjectHealthMap(
   userId: string,
   projectIds: string[],
   todayIso: string,
-): Promise<Map<string, ProjectHealth>> {
+): Promise<Map<string, { health: ProjectHealth; reason: string }>> {
   if (projectIds.length === 0) {
     return new Map();
   }

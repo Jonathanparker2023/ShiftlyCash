@@ -90,6 +90,7 @@ export function ProjectBar({
                   <span
                     aria-hidden="true"
                     className={`h-2 w-2 shrink-0 rounded-full ${healthDotClass(project.health)}`}
+                    title={project.healthReason}
                   />
                   <Link
                     className="truncate text-base font-semibold text-[#0f172a] transition hover:text-[#1d4ed8]"
