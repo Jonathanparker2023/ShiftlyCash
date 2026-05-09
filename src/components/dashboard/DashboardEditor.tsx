@@ -528,8 +528,8 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       ) : null}
 
       <main className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-xl border border-white/20 bg-white/10 shadow-[0_24px_70px_rgba(8,15,28,0.34)] backdrop-blur-md">
-          <div className="h-2 bg-white/20" />
+        <section className="overflow-hidden rounded-xl border border-white/15 bg-black/15 shadow-[0_24px_70px_rgba(8,15,28,0.28)] backdrop-blur-sm">
+          <div className="h-2 bg-white/10" />
           <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
             <div>
@@ -719,7 +719,7 @@ function TopMetric({
       className={
         dark
           ? `rounded-md bg-[#0b1220] px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border border-[#d7dee8] bg-white px-2.5 py-3 shadow-sm before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
+          : `relative overflow-hidden rounded-md border border-white/20 bg-black/25 px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-sm before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
       <div className="flex items-start justify-between gap-2">
@@ -727,7 +727,7 @@ function TopMetric({
           className={
             dark
               ? "text-[9px] font-semibold uppercase tracking-[0.12em] text-[#cbd5e1] sm:text-[10px] sm:tracking-[0.14em]"
-              : "text-[9px] font-semibold uppercase tracking-[0.12em] text-[#334155] sm:text-[10px] sm:tracking-[0.14em]"
+              : "text-[9px] font-semibold uppercase tracking-[0.12em] text-white/85 sm:text-[10px] sm:tracking-[0.14em]"
           }
         >
           {label}
@@ -753,7 +753,7 @@ function TopMetric({
             ? "mt-1 text-base font-semibold text-white sm:text-lg"
             : tone
               ? `mt-1 text-base font-semibold sm:text-lg ${cashflowColorFromTone(tone)}`
-              : "mt-1 text-base font-semibold text-[#0f172a] sm:text-lg"
+              : "mt-1 text-base font-semibold text-white sm:text-lg"
         }
       >
         {value}
@@ -804,10 +804,10 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? "min-w-0 rounded-md border-2 border-white/80 bg-black/35 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.24)] backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+          ? "min-w-0 rounded-md border-2 border-white/80 bg-black/25 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.2)] backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
           : day.spendLocked
-            ? "min-w-0 rounded-md border border-white/15 bg-black/20 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-sm transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
-            : "min-w-0 rounded-md border border-white/20 bg-black/30 px-1.5 py-2 text-left shadow-sm backdrop-blur-sm transition hover:border-white/50 hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            ? "min-w-0 rounded-md border border-white/15 bg-black/10 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-sm transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            : "min-w-0 rounded-md border border-white/20 bg-black/20 px-1.5 py-2 text-left shadow-sm backdrop-blur-sm transition hover:border-white/50 hover:bg-black/25 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
@@ -886,17 +886,17 @@ function FocusedDayEditor({
   ) => void;
 }) {
   return (
-    <section className="mt-4 rounded-lg border border-[#d7dee8] bg-white p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+    <section className="mt-4 rounded-lg border border-white/15 bg-black/20 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-sm">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <span className="rounded-full bg-[#0b1220] px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">
+          <span className="rounded-full bg-white/15 px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">
             {shortDayName(day.date)}
           </span>
           <h2 className="min-w-0 text-lg font-semibold sm:text-xl">
             {formatLongDate(day.date)}
           </h2>
           {day.spendLocked ? (
-            <span className="rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-semibold text-[#c2410c]">
+            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
               Locked
             </span>
           ) : null}
@@ -971,12 +971,12 @@ function TransactionDrawer({
   }
 
   return (
-    <div className="rounded-md border border-[#d7dee8] bg-white p-3 shadow-sm">
+    <div className="rounded-md border border-white/15 bg-black/20 p-3 text-white shadow-sm backdrop-blur-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155]">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
           Transactions
         </h3>
-        <span className="rounded-full bg-[#e8eef6] px-2 py-0.5 text-xs font-semibold text-[#475569]">
+        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
           {appliedTransactions.length + excludedTransactions.length}
         </span>
       </div>
@@ -1007,21 +1007,21 @@ function TransactionDrawer({
         />
       </div>
 
-      <div className="mt-3 border-t border-dashed border-[#d7dee8] pt-3">
+      <div className="mt-3 border-t border-dashed border-white/20 pt-3">
         {isAdding ? (
           <form
             className="grid gap-2 sm:grid-cols-[1fr_140px_auto_auto]"
             onSubmit={submitManualTransaction}
           >
             <input
-              className="h-10 rounded-md border border-[#d7dee8] bg-white px-3 text-sm outline-none transition focus:border-[#0e7490] focus:ring-2 focus:ring-[#bae6fd]"
+              className="h-10 rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
               onChange={(event) => setMerchantName(event.target.value)}
               placeholder="Merchant"
               type="text"
               value={merchantName}
             />
             <input
-              className="h-10 rounded-md border border-[#d7dee8] bg-white px-3 text-sm outline-none transition focus:border-[#0e7490] focus:ring-2 focus:ring-[#bae6fd]"
+              className="h-10 rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
               min="0"
               onChange={(event) => setAmount(event.target.value)}
               placeholder="Amount"
@@ -1037,7 +1037,7 @@ function TransactionDrawer({
               {isManualTransactionPending ? "Saving..." : "Save"}
             </button>
             <button
-              className="h-10 rounded-md border border-[#d7dee8] bg-white px-3 text-sm font-semibold text-[#334155] transition hover:border-[#0e7490]"
+              className="h-10 rounded-md border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-white/15"
               onClick={() => {
                 setIsAdding(false);
                 setMerchantName("");
@@ -1050,7 +1050,7 @@ function TransactionDrawer({
           </form>
         ) : (
           <button
-            className="h-9 rounded-md border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm font-semibold text-[#334155] transition hover:border-[#0e7490] hover:bg-[#f8fafc]"
+            className="h-9 rounded-md border border-dashed border-white/25 bg-black/20 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/25"
             onClick={() => setIsAdding(true)}
             type="button"
           >
@@ -1076,12 +1076,12 @@ function TransactionColumn({
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
   return (
-    <div className="min-h-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3">
+    <div className="min-h-0 rounded-md border border-white/15 bg-black/20 p-3 backdrop-blur-sm">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155]">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
           {heading}
         </h3>
-        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#475569]">
+        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
           {transactions.length}
         </span>
       </div>
@@ -1114,7 +1114,7 @@ function TransactionRowButton({
 }) {
   return (
     <button
-      className="grid w-full grid-cols-[1fr_auto] gap-3 rounded-md border border-transparent bg-white px-3 py-2 text-left text-sm shadow-sm transition hover:border-[#0e7490] hover:bg-[#eef4fb]"
+      className="grid w-full grid-cols-[1fr_auto] gap-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-left text-sm shadow-sm transition hover:border-white/40 hover:bg-black/25 focus:outline-none focus:ring-2 focus:ring-white"
       disabled={disabled}
       onClick={() => onToggle(transaction)}
       type="button"
@@ -1124,7 +1124,7 @@ function TransactionRowButton({
           className={
             variant === "exempt"
               ? "block truncate font-semibold text-[#64748b] line-through"
-              : "block truncate font-semibold text-[#0f172a]"
+              : "block truncate font-semibold text-white"
           }
         >
           {transaction.merchantName}
@@ -1186,7 +1186,7 @@ function ShiftList({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155]">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
           Shifts
         </h3>
       </div>
@@ -1210,13 +1210,13 @@ function ShiftList({
             />
           ))
         ) : (
-          <div className="rounded-md border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+          <div className="rounded-md border border-dashed border-white/25 bg-black/20 p-4 text-sm text-white/70">
             No shifts logged for this day.
           </div>
         )}
       </div>
       <button
-        className="h-10 w-full rounded-md border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm font-semibold text-[#334155] transition hover:border-[#0e7490] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-10 w-full rounded-md border border-dashed border-white/25 bg-black/20 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={day.spendLocked || activeSlots.length >= 4}
         onClick={() => onAddShift(day)}
         type="button"
@@ -1311,7 +1311,7 @@ function ShiftRow({
       </button>
 
       {expanded && !locked ? (
-        <div className="grid gap-3 border-t border-dashed border-[#d7dee8] bg-[#f8fafc] p-3 sm:grid-cols-2">
+        <div className="grid gap-3 border-t border-dashed border-white/25 bg-black/25 p-3 sm:grid-cols-2">
           <SelectField
             label="Job"
             value={slot.jobType}
@@ -1354,7 +1354,7 @@ function ShiftRow({
             }
           />
           <div className="flex items-center justify-between sm:col-span-2">
-            <span className="text-xs text-[#64748b]">
+            <span className="text-xs text-white/70">
               Auto-saves after edits.
             </span>
             <button
@@ -1418,10 +1418,10 @@ function TotalsPanel({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155]">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
         Totals
       </h3>
-      <div className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-2.5 text-sm">
+      <div className="rounded-md border border-white/15 bg-black/20 p-2.5 text-sm backdrop-blur-sm">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
           label="- Spend"
@@ -1429,7 +1429,7 @@ function TotalsPanel({
           value={formatMoney(spendCents)}
         />
         <TotalLine label="- Base" value={formatMoney(baseCents)} />
-        <div className="my-2 border-t border-[#cbd5e1]" />
+        <div className="my-2 border-t border-white/20" />
         <TotalLine
           strong
           label="= Cashflow"
@@ -1454,14 +1454,14 @@ function TotalLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <span className={strong ? "font-semibold" : "text-[#475569]"}>{label}</span>
+      <span className={strong ? "font-semibold text-white" : "text-white/75"}>{label}</span>
       <span
         className={
           tone
             ? `font-semibold ${cashflowColorFromTone(tone)}`
             : strong
-              ? "font-semibold text-[#0f172a]"
-              : "font-medium text-[#0f172a]"
+              ? "font-semibold text-white"
+              : "font-medium text-white"
         }
       >
         {value}
@@ -1485,11 +1485,11 @@ function SelectField({
 }) {
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[#334155]">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
         {label}
       </span>
       <select
-        className="h-9 w-full rounded-md border border-[#d7dee8] bg-white px-2 text-sm outline-none transition focus:border-[#0e7490] focus:ring-2 focus:ring-[#bae6fd]"
+        className="h-9 w-full rounded-md border border-white/20 bg-[#111827] px-2 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white"
         onChange={(event) => onChange(event.target.value)}
         value={value}
       >
@@ -1516,11 +1516,11 @@ function NumberField({
 }) {
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[#334155]">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-[#d7dee8] bg-white px-3 text-sm outline-none transition read-only:bg-[#e8eef6] read-only:text-[#64748b] focus:border-[#0e7490] focus:ring-2 focus:ring-[#bae6fd]"
+        className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition read-only:bg-white/10 read-only:text-white/60 focus:border-white/60 focus:ring-2 focus:ring-white"
         min="0"
         onChange={(event) => onChange?.(parsePositiveNumber(event.target.value))}
         readOnly={readOnly}
@@ -1543,11 +1543,11 @@ function TextField({
 }) {
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[#334155]">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-[#d7dee8] bg-white px-3 text-sm outline-none transition focus:border-[#0e7490] focus:ring-2 focus:ring-[#bae6fd]"
+        className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white"
         onChange={(event) => onChange(event.target.value)}
         type="text"
         value={value}
@@ -1577,7 +1577,7 @@ function SaveIndicator({
       className={
         state === "error"
           ? "rounded-full bg-[#fff1f2] px-3 py-1 text-xs font-medium text-[#b91c1c]"
-          : "rounded-full bg-[#e8eef6] px-3 py-1 text-xs font-medium text-[#334155]"
+          : "rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white"
       }
     >
       {label}
