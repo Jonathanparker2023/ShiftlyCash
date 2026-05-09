@@ -719,7 +719,7 @@ function TopMetric({
       className={
         dark
           ? `rounded-md bg-[#0b1220] px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border-2 border-white/35 bg-black/40 px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.16)] backdrop-blur-[1px] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
+          : `relative overflow-hidden rounded-md border-2 border-white/35 bg-black/25 px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.16)] backdrop-blur-md before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
       <div className="flex items-start justify-between gap-2">
@@ -804,10 +804,10 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? "min-w-0 rounded-md border-2 border-white/90 bg-black/45 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-[1px] transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+          ? "min-w-0 rounded-md border-2 border-white/90 bg-black/30 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-lg transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
           : day.spendLocked
-            ? "min-w-0 rounded-md border-2 border-white/30 bg-black/25 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-sm transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
-            : "min-w-0 rounded-md border-2 border-white/40 bg-black/35 px-1.5 py-2 text-left shadow-sm backdrop-blur-[1px] transition hover:border-white/50 hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            ? "min-w-0 rounded-md border-2 border-white/30 bg-black/15 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-md transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            : "min-w-0 rounded-md border-2 border-white/40 bg-black/20 px-1.5 py-2 text-left shadow-sm backdrop-blur-md transition hover:border-white/50 hover:bg-black/25 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
@@ -886,7 +886,7 @@ function FocusedDayEditor({
   ) => void;
 }) {
   return (
-    <section className="mt-4 rounded-lg border border-white/15 bg-black/5 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-[1px]">
+    <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
         <ShiftList
           day={day}
@@ -955,7 +955,7 @@ function TransactionDrawer({
   }
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/5 p-3 text-white shadow-sm backdrop-blur-[1px]">
+    <div className="rounded-md border border-white/15 bg-black/15 p-3 text-white shadow-sm backdrop-blur-md">
       {error ? (
         <div className="mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
           {error}
@@ -1052,7 +1052,7 @@ function TransactionColumn({
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
   return (
-    <div className="min-h-0 rounded-md border border-white/15 bg-black/5 p-3 backdrop-blur-[1px]">
+    <div className="min-h-0 rounded-md border border-white/15 bg-black/15 p-3 backdrop-blur-md">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
           {heading}
@@ -1282,7 +1282,7 @@ function ShiftRow({
       </button>
 
       {expanded && !locked ? (
-        <div className="grid gap-3 border-t border-dashed border-white/25 bg-black/10 p-3 sm:grid-cols-2">
+        <div className="grid gap-3 border-t border-dashed border-white/25 bg-black/15 p-3 backdrop-blur-md sm:grid-cols-2">
           <SelectField
             label="Job"
             value={slot.jobType}
@@ -1389,7 +1389,7 @@ function TotalsPanel({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-white/15 bg-black/5 p-2.5 text-sm backdrop-blur-[1px]">
+      <div className="rounded-md border border-white/15 bg-black/15 p-2.5 text-sm backdrop-blur-md">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
           label="Spend"
