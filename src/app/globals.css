@@ -50,6 +50,27 @@ html {
   background: rgba(14, 116, 144, 0.32);
 }
 
+.dashboard-penthouse-bg {
+  background-position: 35% center;
+  background-size: auto 125%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dashboard-penthouse-bg {
+    animation: dashboard-penthouse-pan 60s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes dashboard-penthouse-pan {
+  from {
+    background-position: 35% center;
+  }
+
+  to {
+    background-position: 65% center;
+  }
+}
+
 /*
   App-wide palette bridge.
   Most early screens were built with Tailwind neutrals. These overrides pull

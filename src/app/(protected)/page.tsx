@@ -8,7 +8,7 @@ export default async function HomePage() {
   // expanded drawers, etc.).
   return (
     <div
-      className="min-h-screen bg-cover bg-center bg-fixed"
+      className="dashboard-penthouse-bg min-h-screen bg-fixed"
       style={{ backgroundImage: "url('/images/penthouse.png')" }}
     >
       <DashboardEditor initialData={dashboardData} key={dashboardData.week.id} />
