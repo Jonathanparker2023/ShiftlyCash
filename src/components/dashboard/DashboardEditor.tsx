@@ -887,23 +887,7 @@ function FocusedDayEditor({
 }) {
   return (
     <section className="mt-4 rounded-lg border border-white/15 bg-black/20 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-sm">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <span className="rounded-full bg-white/15 px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">
-            {shortDayName(day.date)}
-          </span>
-          <h2 className="min-w-0 text-lg font-semibold sm:text-xl">
-            {formatLongDate(day.date)}
-          </h2>
-          {day.spendLocked ? (
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
-              Locked
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
         <ShiftList
           day={day}
           expandedSlotIndex={expandedSlotIndex}
@@ -972,14 +956,6 @@ function TransactionDrawer({
 
   return (
     <div className="rounded-md border border-white/15 bg-black/20 p-3 text-white shadow-sm backdrop-blur-sm">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
-          Transactions
-        </h3>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
-          {appliedTransactions.length + excludedTransactions.length}
-        </span>
-      </div>
       {error ? (
         <div className="mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
           {error}
@@ -1185,11 +1161,6 @@ function ShiftList({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
-          Shifts
-        </h3>
-      </div>
       <div className="space-y-2">
         {activeSlots.length > 0 ? (
           activeSlots.map((slot) => (
@@ -1418,9 +1389,6 @@ function TotalsPanel({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
-        Totals
-      </h3>
       <div className="rounded-md border border-white/15 bg-black/20 p-2.5 text-sm backdrop-blur-sm">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
@@ -1837,15 +1805,6 @@ function buildMedianTrend(
     percent,
     tone: isFavorable ? "positive" : "negative",
   };
-}
-
-function formatLongDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
 function formatFullRange(startDate: string, endDate: string): string {
