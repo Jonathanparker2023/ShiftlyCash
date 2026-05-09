@@ -719,7 +719,7 @@ function TopMetric({
       className={
         dark
           ? `rounded-md bg-[#0b1220] px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border border-white/20 bg-black/10 px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.16)] backdrop-blur-[1px] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
+          : `relative overflow-hidden rounded-md border-2 border-white/35 bg-black/40 px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.16)] backdrop-blur-[1px] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
       <div className="flex items-start justify-between gap-2">
@@ -804,10 +804,10 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? "min-w-0 rounded-md border-2 border-white/80 bg-black/10 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-[1px] transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+          ? "min-w-0 rounded-md border-2 border-white/90 bg-black/45 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-[1px] transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
           : day.spendLocked
-            ? "min-w-0 rounded-md border border-white/15 bg-black/10 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-sm transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
-            : "min-w-0 rounded-md border border-white/20 bg-black/5 px-1.5 py-2 text-left shadow-sm backdrop-blur-[1px] transition hover:border-white/50 hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            ? "min-w-0 rounded-md border-2 border-white/30 bg-black/25 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-sm transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            : "min-w-0 rounded-md border-2 border-white/40 bg-black/35 px-1.5 py-2 text-left shadow-sm backdrop-blur-[1px] transition hover:border-white/50 hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
@@ -1392,15 +1392,15 @@ function TotalsPanel({
       <div className="rounded-md border border-white/15 bg-black/5 p-2.5 text-sm backdrop-blur-[1px]">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
-          label="- Spend"
+          label="Spend"
           tone="negative"
           value={formatMoney(spendCents)}
         />
-        <TotalLine label="- Base" value={formatMoney(baseCents)} />
+        <TotalLine label="Base" value={formatMoney(baseCents)} />
         <div className="my-2 border-t border-white/20" />
         <TotalLine
           strong
-          label="= Cashflow"
+          label="Cashflow"
           tone={cashflowDailyTone(displayCashflowCents)}
           value={formatMoney(displayCashflowCents)}
         />
