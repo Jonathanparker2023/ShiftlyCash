@@ -51,38 +51,58 @@ describe("/api/export/ledger-fields", () => {
           data: [
             {
               week_id: "week-1",
-              start_date: "2026-05-04",
-              end_date: "2026-05-10",
+              start_date: "2026-04-27",
+              end_date: "2026-05-03",
               status: "closed",
-              pay_period_role: "week_1",
-              paycheck_due_date: "2026-05-15",
+              pay_period_role: "week_2",
+              paycheck_due_date: "2026-05-08",
               earnings_total: 1400,
               ability_paycheck_earnings: 900,
               prestige_paycheck_earnings: 500,
               spend_total: 600,
-              cashflow_total: 800,
+              base_total: 200,
+              cashflow_total: 600,
             },
             {
               week_id: "week-2",
-              start_date: "2026-05-11",
-              end_date: "2026-05-17",
+              start_date: "2026-05-04",
+              end_date: "2026-05-10",
               status: "active",
-              pay_period_role: "week_2",
-              paycheck_due_date: "2026-05-22",
-              earnings_total: 1500,
-              ability_paycheck_earnings: 1000,
-              prestige_paycheck_earnings: 500,
-              spend_total: 650,
-              cashflow_total: 850,
+              pay_period_role: "week_1",
+              paycheck_due_date: null,
+              earnings_total: 600,
+              ability_paycheck_earnings: 400,
+              prestige_paycheck_earnings: 200,
+              spend_total: 180,
+              base_total: 60,
+              cashflow_total: 360,
             },
           ],
           error: null,
         },
         v_day_totals: {
           data: [
-            { date: "2026-05-04", earnings_total: 100, spend_total: 40 },
-            { date: "2026-05-05", earnings_total: 200, spend_total: 60 },
-            { date: "2026-05-10", earnings_total: 300, spend_total: 80 },
+            {
+              date: "2026-05-04",
+              earnings_total: 100,
+              spend_total: 40,
+              base_amount: 10,
+              cashflow_total: 50,
+            },
+            {
+              date: "2026-05-05",
+              earnings_total: 200,
+              spend_total: 60,
+              base_amount: 20,
+              cashflow_total: 120,
+            },
+            {
+              date: "2026-05-10",
+              earnings_total: 300,
+              spend_total: 80,
+              base_amount: 30,
+              cashflow_total: 190,
+            },
           ],
           error: null,
         },
@@ -178,11 +198,11 @@ describe("/api/export/ledger-fields", () => {
         { id: "property_fund", label: "Property fund", balance: 250 },
       ],
       cashflow: {
-        week_start: "2026-05-11",
-        actual_deployable_this_week: 850,
-        target_weekly_deployable: 800,
-        current_pay_period_total: 1500,
-        ytd_deployable_actual: 1650,
+        week_start: "2026-05-04",
+        actual_deployable_this_week: 360,
+        target_weekly_deployable: 600,
+        current_pay_period_total: 360,
+        ytd_deployable_actual: 960,
       },
     });
     expect(payload.as_of).toEqual(expect.any(String));
@@ -195,7 +215,7 @@ describe("/api/export/ledger-fields", () => {
       ytd_net: expect.any(Number),
       ytd_gross: expect.any(Number),
       paychecks_this_period: [
-        { date: "2026-05-22", amount: expect.any(Number) },
+        { date: "2026-05-17", amount: expect.any(Number) },
       ],
     });
     expect(payload.spending).toMatchObject({
@@ -207,6 +227,12 @@ describe("/api/export/ledger-fields", () => {
         { category: "Food", amount: 50, pct_of_total: expect.any(Number) },
         { category: "Transport", amount: 25, pct_of_total: expect.any(Number) },
       ],
+    });
+    expect(payload.baseline).toMatchObject({
+      this_week_total: expect.any(Number),
+      current_pay_period_total: expect.any(Number),
+      rolling_30d_total: expect.any(Number),
+      ytd_total: expect.any(Number),
     });
     const topCategoryTotal = payload.spending.top_categories_rolling_30d.reduce(
       (sum: number, category: { amount: number }) => sum + category.amount,
@@ -227,10 +253,35 @@ describe("/api/export/ledger-fields", () => {
       payload.spending.current_pay_period_total,
       payload.spending.rolling_30d_total,
       payload.spending.ytd_total,
+      payload.baseline.this_week_total,
+      payload.baseline.current_pay_period_total,
+      payload.baseline.rolling_30d_total,
+      payload.baseline.ytd_total,
     ].forEach((value) => {
       expect(typeof value).toBe("number");
       expect(hasAtMostTwoDecimals(value)).toBe(true);
     });
+    expect(
+      round2(
+        payload.income.this_week_net -
+          payload.spending.this_week_total -
+          payload.baseline.this_week_total,
+      ),
+    ).toBe(payload.cashflow.actual_deployable_this_week);
+    expect(
+      round2(
+        payload.income.current_pay_period_net -
+          payload.spending.current_pay_period_total -
+          payload.baseline.current_pay_period_total,
+      ),
+    ).toBe(payload.cashflow.current_pay_period_total);
+    expect(
+      round2(
+        payload.income.ytd_net -
+          payload.spending.ytd_total -
+          payload.baseline.ytd_total,
+      ),
+    ).toBe(payload.cashflow.ytd_deployable_actual);
   });
 
   it("returns 401 when the token is missing or wrong", async () => {
@@ -306,6 +357,10 @@ function createSupabaseMock(
 
 function hasAtMostTwoDecimals(value: number) {
   return Math.abs(value * 100 - Math.round(value * 100)) < 1e-9;
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function restoreEnv(key: string, value: string | undefined) {

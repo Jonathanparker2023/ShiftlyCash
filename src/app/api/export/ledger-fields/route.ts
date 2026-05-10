@@ -33,6 +33,7 @@ type WeekTotalRow = {
   ability_paycheck_earnings: NumericValue;
   prestige_paycheck_earnings: NumericValue;
   spend_total: NumericValue;
+  base_total: NumericValue;
   cashflow_total: NumericValue;
 };
 
@@ -40,6 +41,8 @@ type DayTotalRow = {
   date: string;
   earnings_total: NumericValue;
   spend_total: NumericValue;
+  base_amount: NumericValue;
+  cashflow_total: NumericValue;
 };
 
 type DayRow = {
@@ -119,13 +122,13 @@ export async function GET(request: Request) {
       supabase
         .from("v_week_totals")
         .select(
-          "week_id,start_date,end_date,status,pay_period_role,paycheck_due_date,earnings_total,ability_paycheck_earnings,prestige_paycheck_earnings,spend_total,cashflow_total",
+          "week_id,start_date,end_date,status,pay_period_role,paycheck_due_date,earnings_total,ability_paycheck_earnings,prestige_paycheck_earnings,spend_total,base_total,cashflow_total",
         )
         .eq("user_id", userId)
         .order("start_date", { ascending: true }),
       supabase
         .from("v_day_totals")
-        .select("date,earnings_total,spend_total")
+        .select("date,earnings_total,spend_total,base_amount,cashflow_total")
         .eq("user_id", userId)
         .gte("date", yearStartIso)
         .lte("date", todayIso)
@@ -181,12 +184,13 @@ export async function GET(request: Request) {
     const settings = settingsRes.data as SettingsRow;
     const activeWeek =
       weeks.find((week) => week.status === "active") ?? weeks.at(-1) ?? null;
+    const thisWeekStartIso = activeWeek?.start_date ?? weekOf;
+    const thisWeekEndIso = activeWeek?.end_date ?? addDaysIso(thisWeekStartIso, 6);
     const payPeriodStartIso =
       activeWeek?.pay_period_role === "week_2"
         ? addDaysIso(activeWeek.start_date, -7)
         : activeWeek?.start_date ?? weekOf;
     const payPeriodEndIso = addDaysIso(payPeriodStartIso, 13);
-    const thisWeekEndIso = addDaysIso(weekOf, 6);
     const currentPayPeriodWeeks = weeks.filter(
       (week) =>
         week.start_date >= payPeriodStartIso && week.start_date <= payPeriodEndIso,
@@ -194,9 +198,9 @@ export async function GET(request: Request) {
     const activeCashflowCents = dollarsToCents(
       toNumber(activeWeek?.cashflow_total ?? 0),
     );
-    const activePayPeriodCents = dollarsToCents(
-      toNumber(activeWeek?.ability_paycheck_earnings ?? 0) +
-        toNumber(activeWeek?.prestige_paycheck_earnings ?? 0),
+    const activePayPeriodCashflowCents = currentPayPeriodWeeks.reduce(
+      (sum, week) => sum + dollarsToCents(toNumber(week.cashflow_total)),
+      0,
     );
     const ytdDeployableCents = weeks.reduce(
       (sum, week) => sum + dollarsToCents(toNumber(week.cashflow_total)),
@@ -213,11 +217,12 @@ export async function GET(request: Request) {
           )
         : activeCashflowCents;
     const income = buildIncome({
+      weeks,
       dayTotals,
       days,
       slots,
       settings,
-      thisWeekStartIso: weekOf,
+      thisWeekStartIso,
       thisWeekEndIso,
       payPeriodStartIso,
       payPeriodEndIso,
@@ -227,8 +232,19 @@ export async function GET(request: Request) {
     });
     const spending = buildSpending({
       dayTotals,
+      weeks,
       transactions: (transactionsRes.data ?? []) as TransactionRow[],
-      thisWeekStartIso: weekOf,
+      thisWeekStartIso,
+      thisWeekEndIso,
+      payPeriodStartIso,
+      payPeriodEndIso,
+      rolling30StartIso,
+      todayIso,
+    });
+    const baseline = buildBaseline({
+      dayTotals,
+      weeks,
+      thisWeekStartIso,
       thisWeekEndIso,
       payPeriodStartIso,
       payPeriodEndIso,
@@ -245,11 +261,12 @@ export async function GET(request: Request) {
         week_start: activeWeek?.start_date ?? weekOf,
         actual_deployable_this_week: money(activeCashflowCents),
         target_weekly_deployable: money(targetWeeklyDeployableCents),
-        current_pay_period_total: money(activePayPeriodCents),
+        current_pay_period_total: money(activePayPeriodCashflowCents),
         ytd_deployable_actual: money(ytdDeployableCents),
       },
       income,
       spending,
+      baseline,
     });
   } catch (error) {
     return NextResponse.json(
@@ -260,6 +277,7 @@ export async function GET(request: Request) {
 }
 
 function buildIncome({
+  weeks,
   dayTotals,
   days,
   slots,
@@ -272,6 +290,7 @@ function buildIncome({
   todayIso,
   currentPayPeriodWeeks,
 }: {
+  weeks: WeekTotalRow[];
   dayTotals: DayTotalRow[];
   days: DayRow[];
   slots: EarnSlotRow[];
@@ -303,6 +322,10 @@ function buildIncome({
     todayIso,
   );
   const ytdNetCents = sumDayMoney(dayTotals, "earnings_total");
+  const ytdNetRollupCents = weeks.reduce(
+    (sum, week) => sum + dollarsToCents(toNumber(week.earnings_total)),
+    0,
+  );
   const currentPayPeriodNetCents = currentPayPeriodWeeks.reduce(
     (sum, week) => sum + dollarsToCents(toNumber(week.earnings_total)),
     0,
@@ -323,7 +346,7 @@ function buildIncome({
       sumGrossCents({ days, slots, settings, startIso: payPeriodStartIso, endIso: payPeriodEndIso }),
     ),
     rolling_30d_net: money(rolling30NetCents),
-    ytd_net: money(ytdNetCents),
+    ytd_net: money(ytdNetRollupCents || ytdNetCents),
     ytd_gross: money(sumGrossCents({ days, slots, settings })),
     paychecks_this_period: [
       {
@@ -334,8 +357,47 @@ function buildIncome({
   };
 }
 
+function buildBaseline({
+  dayTotals,
+  weeks,
+  thisWeekStartIso,
+  thisWeekEndIso,
+  payPeriodStartIso,
+  payPeriodEndIso,
+  rolling30StartIso,
+  todayIso,
+}: {
+  dayTotals: DayTotalRow[];
+  weeks: WeekTotalRow[];
+  thisWeekStartIso: string;
+  thisWeekEndIso: string;
+  payPeriodStartIso: string;
+  payPeriodEndIso: string;
+  rolling30StartIso: string;
+  todayIso: string;
+}) {
+  const ytdRollupCents = weeks.reduce(
+    (sum, week) => sum + dollarsToCents(toNumber(week.base_total)),
+    0,
+  );
+
+  return {
+    this_week_total: money(
+      sumDayMoney(dayTotals, "base_amount", thisWeekStartIso, thisWeekEndIso),
+    ),
+    current_pay_period_total: money(
+      sumDayMoney(dayTotals, "base_amount", payPeriodStartIso, payPeriodEndIso),
+    ),
+    rolling_30d_total: money(
+      sumDayMoney(dayTotals, "base_amount", rolling30StartIso, todayIso),
+    ),
+    ytd_total: money(ytdRollupCents || sumDayMoney(dayTotals, "base_amount")),
+  };
+}
+
 function buildSpending({
   dayTotals,
+  weeks,
   transactions,
   thisWeekStartIso,
   thisWeekEndIso,
@@ -345,6 +407,7 @@ function buildSpending({
   todayIso,
 }: {
   dayTotals: DayTotalRow[];
+  weeks: WeekTotalRow[];
   transactions: TransactionRow[];
   thisWeekStartIso: string;
   thisWeekEndIso: string;
@@ -359,6 +422,10 @@ function buildSpending({
     rolling30StartIso,
     todayIso,
   );
+  const ytdRollupCents = weeks.reduce(
+    (sum, week) => sum + dollarsToCents(toNumber(week.spend_total)),
+    0,
+  );
 
   return {
     this_week_total: money(
@@ -368,7 +435,7 @@ function buildSpending({
       sumDayMoney(dayTotals, "spend_total", payPeriodStartIso, payPeriodEndIso),
     ),
     rolling_30d_total: money(rolling30TotalCents),
-    ytd_total: money(sumDayMoney(dayTotals, "spend_total")),
+    ytd_total: money(ytdRollupCents || sumDayMoney(dayTotals, "spend_total")),
     top_categories_rolling_30d: buildTopCategories(
       transactions,
       rolling30StartIso,
@@ -414,7 +481,7 @@ function buildTopCategories(
 
 function sumDayMoney(
   dayTotals: DayTotalRow[],
-  field: "earnings_total" | "spend_total",
+  field: "earnings_total" | "spend_total" | "base_amount" | "cashflow_total",
   startIso?: string,
   endIso?: string,
 ) {
