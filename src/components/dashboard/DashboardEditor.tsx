@@ -578,6 +578,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                   isFocused={dayIndex === focusedDayIndex}
                   isToday={day.date === initialData.todayIso}
                   key={day.id}
+                  projectedDailySpendCents={
+                    initialData.spendProjection.projectedDailySpendCents
+                  }
+                  todayIso={initialData.todayIso}
                   totals={dayTotals.get(day.id)}
                   onFocus={focusDay}
                 />
@@ -787,6 +791,8 @@ function WeekStripCell({
   dayIndex,
   isFocused,
   isToday,
+  projectedDailySpendCents,
+  todayIso,
   totals,
   onFocus,
 }: {
@@ -794,11 +800,29 @@ function WeekStripCell({
   dayIndex: number;
   isFocused: boolean;
   isToday: boolean;
+  projectedDailySpendCents: number;
+  todayIso: string;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
   onFocus: (dayIndex: number) => void;
 }) {
+  const earningsCents = totals?.earningsCents ?? 0;
+  const spendCents = totals?.spendCents ?? 0;
+  const baseCents = totals?.baseCents ?? day.baseCents ?? 0;
   const cashflowCents = totals?.cashflowCents ?? 0;
-  const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
+
+  const isFutureUnspent =
+    day.date >= todayIso
+    && spendCents === 0
+    && !day.spendLocked
+    && projectedDailySpendCents > 0;
+
+  const projectedCashflowCents = isFutureUnspent
+    ? earningsCents - projectedDailySpendCents - baseCents
+    : null;
+
+  const displayCashflowCents = roundCashflowToNearestFiveDollars(
+    projectedCashflowCents ?? cashflowCents,
+  );
 
   return (
     <button
@@ -832,8 +856,18 @@ function WeekStripCell({
           </span>
         ) : null}
       </div>
-      <p className={`mt-3 truncate text-xs font-semibold sm:mt-6 sm:text-sm ${cashflowDailyColor(displayCashflowCents)}`}>
+      <p
+        className={`mt-3 truncate text-xs font-semibold sm:mt-6 sm:text-sm ${cashflowDailyColor(
+          displayCashflowCents,
+        )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
+        title={
+          isFutureUnspent
+            ? `Projected: assumes $${(projectedDailySpendCents / 100).toFixed(0)} spend (last week ÷ 7)`
+            : undefined
+        }
+      >
         {formatMoney(displayCashflowCents)}
+        {isFutureUnspent ? " est." : ""}
       </p>
     </button>
   );

@@ -374,7 +374,25 @@ function mapDashboardData(input: {
       ),
     },
     abilityPayPeriod: input.adjacentAbilityPayPeriod,
+    spendProjection: deriveSpendProjection(input.closedWeekMetrics),
   };
+}
+
+function deriveSpendProjection(
+  closedWeekMetrics: ClosedWeekMetricRow[],
+): { previousWeekSpendCents: number; projectedDailySpendCents: number } {
+  // closedWeekMetrics is ordered by start_date ASC, so the last entry is the
+  // most recent closed week. If there is no closed week yet, the projection is
+  // zero — UI will simply not render the placeholder.
+  if (closedWeekMetrics.length === 0) {
+    return { previousWeekSpendCents: 0, projectedDailySpendCents: 0 };
+  }
+
+  const previous = closedWeekMetrics[closedWeekMetrics.length - 1];
+  const previousWeekSpendCents = dollarsToCents(toNumber(previous.spend_total));
+  const projectedDailySpendCents = Math.round(previousWeekSpendCents / 7);
+
+  return { previousWeekSpendCents, projectedDailySpendCents };
 }
 
 async function loadAdjacentAbilityPayPeriod({

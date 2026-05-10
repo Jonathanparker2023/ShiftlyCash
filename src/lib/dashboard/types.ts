@@ -64,6 +64,11 @@ export type DashboardBaselineTotals = {
   projectedDailyBaseCents: number;
 };
 
+export type DashboardSpendProjection = {
+  previousWeekSpendCents: number;
+  projectedDailySpendCents: number;
+};
+
 export type DashboardMetricMedians = {
   earningsCents: number;
   spendCents: number;
@@ -86,6 +91,7 @@ export type DashboardData = {
   baselineTotals: DashboardBaselineTotals;
   metricMedians: DashboardMetricMedians;
   abilityPayPeriod: DashboardAbilityPayPeriod;
+  spendProjection: DashboardSpendProjection;
 };
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
