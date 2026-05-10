@@ -1903,9 +1903,7 @@ function formatShiftQuantityValue(slot: DashboardSlot): string {
   }
 
   if (slot.payType === "split") {
-    return `${formatPlainHours(slot.hoursOrUnits)}h - ${formatPlainHours(
-      slot.regularHours,
-    )} REG / ${formatPlainHours(slot.overtimeHours)} OT`;
+    return `${formatPlainHours(slot.hoursOrUnits)}h`;
   }
 
   return `${formatPlainHours(slot.hoursOrUnits)}h`;
