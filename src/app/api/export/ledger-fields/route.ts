@@ -303,14 +303,14 @@ function buildIncome({
   todayIso: string;
   currentPayPeriodWeeks: WeekTotalRow[];
 }) {
-  const thisWeekNetCents = sumDayMoney(
-    dayTotals,
+  const thisWeekNetRollupCents = sumWeekMoney(
+    weeks,
     "earnings_total",
     thisWeekStartIso,
     thisWeekEndIso,
   );
-  const payPeriodNetCents = sumDayMoney(
-    dayTotals,
+  const payPeriodNetCents = sumWeekMoney(
+    weeks,
     "earnings_total",
     payPeriodStartIso,
     payPeriodEndIso,
@@ -337,7 +337,7 @@ function buildIncome({
     payPeriodEndIso;
 
   return {
-    this_week_net: money(thisWeekNetCents),
+    this_week_net: money(thisWeekNetRollupCents),
     this_week_gross: money(
       sumGrossCents({ days, slots, settings, startIso: thisWeekStartIso, endIso: thisWeekEndIso }),
     ),
@@ -383,10 +383,10 @@ function buildBaseline({
 
   return {
     this_week_total: money(
-      sumDayMoney(dayTotals, "base_amount", thisWeekStartIso, thisWeekEndIso),
+      sumWeekMoney(weeks, "base_total", thisWeekStartIso, thisWeekEndIso),
     ),
     current_pay_period_total: money(
-      sumDayMoney(dayTotals, "base_amount", payPeriodStartIso, payPeriodEndIso),
+      sumWeekMoney(weeks, "base_total", payPeriodStartIso, payPeriodEndIso),
     ),
     rolling_30d_total: money(
       sumDayMoney(dayTotals, "base_amount", rolling30StartIso, todayIso),
@@ -429,10 +429,10 @@ function buildSpending({
 
   return {
     this_week_total: money(
-      sumDayMoney(dayTotals, "spend_total", thisWeekStartIso, thisWeekEndIso),
+      sumWeekMoney(weeks, "spend_total", thisWeekStartIso, thisWeekEndIso),
     ),
     current_pay_period_total: money(
-      sumDayMoney(dayTotals, "spend_total", payPeriodStartIso, payPeriodEndIso),
+      sumWeekMoney(weeks, "spend_total", payPeriodStartIso, payPeriodEndIso),
     ),
     rolling_30d_total: money(rolling30TotalCents),
     ytd_total: money(ytdRollupCents || sumDayMoney(dayTotals, "spend_total")),
@@ -489,6 +489,19 @@ function sumDayMoney(
     if (startIso && day.date < startIso) return sum;
     if (endIso && day.date > endIso) return sum;
     return sum + dollarsToCents(toNumber(day[field]));
+  }, 0);
+}
+
+function sumWeekMoney(
+  weeks: WeekTotalRow[],
+  field: "earnings_total" | "spend_total" | "base_total" | "cashflow_total",
+  startIso?: string,
+  endIso?: string,
+) {
+  return weeks.reduce((sum, week) => {
+    if (startIso && week.start_date < startIso) return sum;
+    if (endIso && week.start_date > endIso) return sum;
+    return sum + dollarsToCents(toNumber(week[field]));
   }, 0);
 }
 
