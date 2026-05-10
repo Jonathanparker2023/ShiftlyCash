@@ -867,7 +867,6 @@ function WeekStripCell({
         }
       >
         {formatMoney(displayCashflowCents)}
-        {isFutureUnspent ? " est." : ""}
       </p>
     </button>
   );
