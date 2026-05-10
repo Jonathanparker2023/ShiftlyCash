@@ -23,16 +23,68 @@ type AssetRow = {
 };
 
 type WeekTotalRow = {
+  week_id: string;
   start_date: string;
+  end_date: string;
   status: string;
+  pay_period_role: "week_1" | "week_2";
+  paycheck_due_date: string | null;
   earnings_total: NumericValue;
   ability_paycheck_earnings: NumericValue;
   prestige_paycheck_earnings: NumericValue;
+  spend_total: NumericValue;
   cashflow_total: NumericValue;
+};
+
+type DayTotalRow = {
+  date: string;
+  earnings_total: NumericValue;
+  spend_total: NumericValue;
+};
+
+type DayRow = {
+  id: string;
+  date: string;
+};
+
+type EarnSlotRow = {
+  day_id: string;
+  job_type:
+    | "ability"
+    | "prestige"
+    | "prestige_ilst"
+    | "incentive"
+    | "other"
+    | "none";
+  pay_type: "regular" | "overtime" | "split" | "unit" | "none";
+  hours_or_units: NumericValue;
+  regular_hours: NumericValue;
+  overtime_hours: NumericValue;
+};
+
+type SettingsRow = {
+  prestige_regular_net_rate: NumericValue;
+  prestige_ot_net_rate: NumericValue;
+  prestige_ilst_net_rate: NumericValue;
+  prestige_ilst_ot_net_rate: NumericValue;
+};
+
+type TransactionRow = {
+  date: string;
+  amount: NumericValue;
+  category: string | null;
+  status: string;
 };
 
 const LEDGER_TOKEN_ENV = "SHIFTLYCASH_LEDGER_TOKEN";
 const LEDGER_USER_ID_ENV = "SHIFTLYCASH_LEDGER_USER_ID";
+const ABILITY_REGULAR_GROSS_RATE = 19.055;
+const ABILITY_OVERTIME_GROSS_RATE = 28.5825;
+const PRESTIGE_WITHHOLDING_RATE = 0.14;
+const DEFAULT_PRESTIGE_REGULAR_NET_RATE = 14.62;
+const DEFAULT_PRESTIGE_OVERTIME_NET_RATE = 21.93;
+const DEFAULT_PRESTIGE_ILST_REGULAR_NET_RATE = 15.48;
+const DEFAULT_PRESTIGE_ILST_OVERTIME_NET_RATE = 23.22;
 
 export async function GET(request: Request) {
   const authResult = authorizeLedgerRequest(request);
@@ -44,7 +96,14 @@ export async function GET(request: Request) {
   try {
     const supabase = createAdminClient();
     const userId = await resolveLedgerUserId(supabase);
-    const [debtsRes, assetsRes, weeksRes] = await Promise.all([
+    const asOf = new Date();
+    const asOfIso = asOf.toISOString();
+    const todayIso = getTodayIso();
+    const weekOf = mondayOnOrBeforeIso(todayIso);
+    const rolling30StartIso = addDaysIso(todayIso, -29);
+    const yearStartIso = `${todayIso.slice(0, 4)}-01-01`;
+    const [debtsRes, assetsRes, weeksRes, dayTotalsRes, daysRes, settingsRes, transactionsRes] =
+      await Promise.all([
       supabase
         .from("debts")
         .select("id,name,balance,minimum_payment,apr,status")
@@ -60,20 +119,78 @@ export async function GET(request: Request) {
       supabase
         .from("v_week_totals")
         .select(
-          "start_date,status,earnings_total,ability_paycheck_earnings,prestige_paycheck_earnings,cashflow_total",
+          "week_id,start_date,end_date,status,pay_period_role,paycheck_due_date,earnings_total,ability_paycheck_earnings,prestige_paycheck_earnings,spend_total,cashflow_total",
         )
         .eq("user_id", userId)
         .order("start_date", { ascending: true }),
+      supabase
+        .from("v_day_totals")
+        .select("date,earnings_total,spend_total")
+        .eq("user_id", userId)
+        .gte("date", yearStartIso)
+        .lte("date", todayIso)
+        .order("date", { ascending: true }),
+      supabase
+        .from("days")
+        .select("id,date")
+        .eq("user_id", userId)
+        .gte("date", yearStartIso)
+        .lte("date", todayIso)
+        .order("date", { ascending: true }),
+      supabase
+        .from("settings")
+        .select(
+          "prestige_regular_net_rate,prestige_ot_net_rate,prestige_ilst_net_rate,prestige_ilst_ot_net_rate",
+        )
+        .eq("user_id", userId)
+        .single(),
+      supabase
+        .from("transactions")
+        .select("date,amount,category,status")
+        .eq("user_id", userId)
+        .gte("date", yearStartIso)
+        .lte("date", todayIso)
+        .order("date", { ascending: true }),
     ]);
 
     if (debtsRes.error) throw new Error(`Debts: ${debtsRes.error.message}`);
     if (assetsRes.error) throw new Error(`Assets: ${assetsRes.error.message}`);
     if (weeksRes.error) throw new Error(`Weeks: ${weeksRes.error.message}`);
+    if (dayTotalsRes.error) throw new Error(`Day totals: ${dayTotalsRes.error.message}`);
+    if (daysRes.error) throw new Error(`Days: ${daysRes.error.message}`);
+    if (settingsRes.error) throw new Error(`Settings: ${settingsRes.error.message}`);
+    if (transactionsRes.error) {
+      throw new Error(`Transactions: ${transactionsRes.error.message}`);
+    }
 
     const weeks = (weeksRes.data ?? []) as WeekTotalRow[];
+    const dayTotals = (dayTotalsRes.data ?? []) as DayTotalRow[];
+    const days = (daysRes.data ?? []) as DayRow[];
+    const dayIds = days.map((day) => day.id);
+    const slotsRes =
+      dayIds.length > 0
+        ? await supabase
+            .from("earn_slots")
+            .select("day_id,job_type,pay_type,hours_or_units,regular_hours,overtime_hours")
+            .in("day_id", dayIds)
+        : { data: [], error: null };
+
+    if (slotsRes.error) throw new Error(`Earn slots: ${slotsRes.error.message}`);
+
+    const slots = (slotsRes.data ?? []) as EarnSlotRow[];
+    const settings = settingsRes.data as SettingsRow;
     const activeWeek =
       weeks.find((week) => week.status === "active") ?? weeks.at(-1) ?? null;
-    const weekOf = mondayOnOrBeforeIso(getTodayIso());
+    const payPeriodStartIso =
+      activeWeek?.pay_period_role === "week_2"
+        ? addDaysIso(activeWeek.start_date, -7)
+        : activeWeek?.start_date ?? weekOf;
+    const payPeriodEndIso = addDaysIso(payPeriodStartIso, 13);
+    const thisWeekEndIso = addDaysIso(weekOf, 6);
+    const currentPayPeriodWeeks = weeks.filter(
+      (week) =>
+        week.start_date >= payPeriodStartIso && week.start_date <= payPeriodEndIso,
+    );
     const activeCashflowCents = dollarsToCents(
       toNumber(activeWeek?.cashflow_total ?? 0),
     );
@@ -95,9 +212,32 @@ export async function GET(request: Request) {
               closedCashflowCents.length,
           )
         : activeCashflowCents;
+    const income = buildIncome({
+      dayTotals,
+      days,
+      slots,
+      settings,
+      thisWeekStartIso: weekOf,
+      thisWeekEndIso,
+      payPeriodStartIso,
+      payPeriodEndIso,
+      rolling30StartIso,
+      todayIso,
+      currentPayPeriodWeeks,
+    });
+    const spending = buildSpending({
+      dayTotals,
+      transactions: (transactionsRes.data ?? []) as TransactionRow[],
+      thisWeekStartIso: weekOf,
+      thisWeekEndIso,
+      payPeriodStartIso,
+      payPeriodEndIso,
+      rolling30StartIso,
+      todayIso,
+    });
 
     return NextResponse.json({
-      as_of: new Date().toISOString(),
+      as_of: asOfIso,
       week_of: weekOf,
       debts: ((debtsRes.data ?? []) as DebtRow[]).map(mapDebt),
       accounts: mapAccounts((assetsRes.data ?? []) as AssetRow[]),
@@ -108,6 +248,8 @@ export async function GET(request: Request) {
         current_pay_period_total: money(activePayPeriodCents),
         ytd_deployable_actual: money(ytdDeployableCents),
       },
+      income,
+      spending,
     });
   } catch (error) {
     return NextResponse.json(
@@ -115,6 +257,253 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function buildIncome({
+  dayTotals,
+  days,
+  slots,
+  settings,
+  thisWeekStartIso,
+  thisWeekEndIso,
+  payPeriodStartIso,
+  payPeriodEndIso,
+  rolling30StartIso,
+  todayIso,
+  currentPayPeriodWeeks,
+}: {
+  dayTotals: DayTotalRow[];
+  days: DayRow[];
+  slots: EarnSlotRow[];
+  settings: SettingsRow;
+  thisWeekStartIso: string;
+  thisWeekEndIso: string;
+  payPeriodStartIso: string;
+  payPeriodEndIso: string;
+  rolling30StartIso: string;
+  todayIso: string;
+  currentPayPeriodWeeks: WeekTotalRow[];
+}) {
+  const thisWeekNetCents = sumDayMoney(
+    dayTotals,
+    "earnings_total",
+    thisWeekStartIso,
+    thisWeekEndIso,
+  );
+  const payPeriodNetCents = sumDayMoney(
+    dayTotals,
+    "earnings_total",
+    payPeriodStartIso,
+    payPeriodEndIso,
+  );
+  const rolling30NetCents = sumDayMoney(
+    dayTotals,
+    "earnings_total",
+    rolling30StartIso,
+    todayIso,
+  );
+  const ytdNetCents = sumDayMoney(dayTotals, "earnings_total");
+  const currentPayPeriodNetCents = currentPayPeriodWeeks.reduce(
+    (sum, week) => sum + dollarsToCents(toNumber(week.earnings_total)),
+    0,
+  );
+  const paycheckDueDate =
+    currentPayPeriodWeeks.find((week) => week.pay_period_role === "week_2")
+      ?.paycheck_due_date ??
+    currentPayPeriodWeeks.at(-1)?.paycheck_due_date ??
+    payPeriodEndIso;
+
+  return {
+    this_week_net: money(thisWeekNetCents),
+    this_week_gross: money(
+      sumGrossCents({ days, slots, settings, startIso: thisWeekStartIso, endIso: thisWeekEndIso }),
+    ),
+    current_pay_period_net: money(payPeriodNetCents),
+    current_pay_period_gross: money(
+      sumGrossCents({ days, slots, settings, startIso: payPeriodStartIso, endIso: payPeriodEndIso }),
+    ),
+    rolling_30d_net: money(rolling30NetCents),
+    ytd_net: money(ytdNetCents),
+    ytd_gross: money(sumGrossCents({ days, slots, settings })),
+    paychecks_this_period: [
+      {
+        date: paycheckDueDate,
+        amount: money(currentPayPeriodNetCents || payPeriodNetCents),
+      },
+    ],
+  };
+}
+
+function buildSpending({
+  dayTotals,
+  transactions,
+  thisWeekStartIso,
+  thisWeekEndIso,
+  payPeriodStartIso,
+  payPeriodEndIso,
+  rolling30StartIso,
+  todayIso,
+}: {
+  dayTotals: DayTotalRow[];
+  transactions: TransactionRow[];
+  thisWeekStartIso: string;
+  thisWeekEndIso: string;
+  payPeriodStartIso: string;
+  payPeriodEndIso: string;
+  rolling30StartIso: string;
+  todayIso: string;
+}) {
+  const rolling30TotalCents = sumDayMoney(
+    dayTotals,
+    "spend_total",
+    rolling30StartIso,
+    todayIso,
+  );
+
+  return {
+    this_week_total: money(
+      sumDayMoney(dayTotals, "spend_total", thisWeekStartIso, thisWeekEndIso),
+    ),
+    current_pay_period_total: money(
+      sumDayMoney(dayTotals, "spend_total", payPeriodStartIso, payPeriodEndIso),
+    ),
+    rolling_30d_total: money(rolling30TotalCents),
+    ytd_total: money(sumDayMoney(dayTotals, "spend_total")),
+    top_categories_rolling_30d: buildTopCategories(
+      transactions,
+      rolling30StartIso,
+      todayIso,
+      rolling30TotalCents,
+    ),
+  };
+}
+
+function buildTopCategories(
+  transactions: TransactionRow[],
+  startIso: string,
+  endIso: string,
+  totalCents: number,
+) {
+  const byCategory = new Map<string, number>();
+
+  transactions.forEach((transaction) => {
+    if (
+      transaction.status !== "applied" ||
+      transaction.date < startIso ||
+      transaction.date > endIso
+    ) {
+      return;
+    }
+
+    const amountCents = Math.max(0, dollarsToCents(toNumber(transaction.amount)));
+    if (amountCents <= 0) return;
+
+    const category = transaction.category?.trim() || "Uncategorized";
+    byCategory.set(category, (byCategory.get(category) ?? 0) + amountCents);
+  });
+
+  return [...byCategory.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 7)
+    .map(([category, amountCents]) => ({
+      category,
+      amount: money(amountCents),
+      pct_of_total: totalCents > 0 ? round2((amountCents / totalCents) * 100) : 0,
+    }));
+}
+
+function sumDayMoney(
+  dayTotals: DayTotalRow[],
+  field: "earnings_total" | "spend_total",
+  startIso?: string,
+  endIso?: string,
+) {
+  return dayTotals.reduce((sum, day) => {
+    if (startIso && day.date < startIso) return sum;
+    if (endIso && day.date > endIso) return sum;
+    return sum + dollarsToCents(toNumber(day[field]));
+  }, 0);
+}
+
+function sumGrossCents({
+  days,
+  slots,
+  settings,
+  startIso,
+  endIso,
+}: {
+  days: DayRow[];
+  slots: EarnSlotRow[];
+  settings: SettingsRow;
+  startIso?: string;
+  endIso?: string;
+}) {
+  const dayById = new Map(days.map((day) => [day.id, day]));
+  const prestigeRegularGrossRate = netToGrossRate(
+    toNumber(settings.prestige_regular_net_rate) || DEFAULT_PRESTIGE_REGULAR_NET_RATE,
+  );
+  const prestigeOvertimeGrossRate = netToGrossRate(
+    toNumber(settings.prestige_ot_net_rate) || DEFAULT_PRESTIGE_OVERTIME_NET_RATE,
+  );
+  const prestigeIlstRegularGrossRate = netToGrossRate(
+    toNumber(settings.prestige_ilst_net_rate) ||
+      DEFAULT_PRESTIGE_ILST_REGULAR_NET_RATE,
+  );
+  const prestigeIlstOvertimeGrossRate = netToGrossRate(
+    toNumber(settings.prestige_ilst_ot_net_rate) ||
+      DEFAULT_PRESTIGE_ILST_OVERTIME_NET_RATE,
+  );
+
+  return slots.reduce((sum, slot) => {
+    const day = dayById.get(slot.day_id);
+    if (!day) return sum;
+    if (startIso && day.date < startIso) return sum;
+    if (endIso && day.date > endIso) return sum;
+
+    return sum + dollarsToCents(grossForSlot(slot, {
+      prestigeRegularGrossRate,
+      prestigeOvertimeGrossRate,
+      prestigeIlstRegularGrossRate,
+      prestigeIlstOvertimeGrossRate,
+    }));
+  }, 0);
+}
+
+function grossForSlot(
+  slot: EarnSlotRow,
+  rates: {
+    prestigeRegularGrossRate: number;
+    prestigeOvertimeGrossRate: number;
+    prestigeIlstRegularGrossRate: number;
+    prestigeIlstOvertimeGrossRate: number;
+  },
+) {
+  const regularHours =
+    slot.pay_type === "split" || slot.pay_type === "regular"
+      ? toNumber(slot.regular_hours || slot.hours_or_units)
+      : 0;
+  const overtimeHours =
+    slot.pay_type === "split" || slot.pay_type === "overtime"
+      ? toNumber(slot.overtime_hours || slot.hours_or_units)
+      : 0;
+
+  if (slot.job_type === "ability") {
+    return regularHours * ABILITY_REGULAR_GROSS_RATE + overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
+  }
+
+  if (slot.job_type === "prestige") {
+    return regularHours * rates.prestigeRegularGrossRate + overtimeHours * rates.prestigeOvertimeGrossRate;
+  }
+
+  if (slot.job_type === "prestige_ilst") {
+    return regularHours * rates.prestigeIlstRegularGrossRate + overtimeHours * rates.prestigeIlstOvertimeGrossRate;
+  }
+
+  return toNumber(slot.hours_or_units);
+}
+
+function netToGrossRate(netRate: number): number {
+  return netRate / (1 - PRESTIGE_WITHHOLDING_RATE);
 }
 
 export const POST = methodNotAllowed;
