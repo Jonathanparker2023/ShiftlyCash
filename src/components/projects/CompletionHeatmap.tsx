@@ -8,12 +8,12 @@ export async function CompletionHeatmap({ projectId }: { projectId: string }) {
   const weeks = chunkWeeks(days);
 
   return (
-    <section className="mt-4 rounded-md border border-[#d7dee8] bg-white p-4 shadow-sm">
+    <section className="mt-4 rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#334155]">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-white/85">
           Completion Heatmap
         </h2>
-        <span className="text-xs font-semibold text-[#64748b]">12 weeks</span>
+        <span className="text-xs font-semibold text-white/70">12 weeks</span>
       </div>
       <div className="mt-3 overflow-x-auto">
         <div className="grid w-max grid-flow-col grid-rows-7 gap-1">
@@ -45,7 +45,7 @@ function heatClass(count: number): string {
   if (count >= 6) return "bg-emerald-600";
   if (count >= 3) return "bg-emerald-400";
   if (count >= 1) return "bg-emerald-200";
-  return "bg-zinc-200/30";
+  return "bg-white/10";
 }
 
 function formatDate(value: string): string {

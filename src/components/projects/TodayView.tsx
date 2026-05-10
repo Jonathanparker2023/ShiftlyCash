@@ -9,25 +9,25 @@ export async function TodayView({ todayIso }: { todayIso: string }) {
   const data = await getTodayData(supabase, todayIso);
 
   return (
-    <section className="mb-4 rounded-md border border-[#d7dee8] bg-white p-3 shadow-sm">
+    <section className="mb-4 rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-3 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#64748b]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
             Today
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-[#0f172a]">
+          <h2 className="mt-1 text-lg font-semibold text-white">
             Due now
           </h2>
         </div>
-        <span className="rounded-full border border-[#d7dee8] bg-[#f8fafc] px-3 py-1 text-xs font-semibold text-[#334155]">
+        <span className="rounded-full border border-white/15 bg-black/15 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white/85">
           {formatDate(todayIso)}
         </span>
       </div>
 
       <TaskGroup emptyText="Nothing due today." tasks={data.dueToday} />
 
-      <div className="mt-4 border-t border-[#e2e8f0] pt-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#64748b]">
+      <div className="mt-4 border-t border-white/10 pt-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
           This Week
         </p>
         <TaskGroup emptyText="No more dated tasks this week." tasks={data.dueThisWeek} />
@@ -45,7 +45,7 @@ function TaskGroup({
 }) {
   if (tasks.length === 0) {
     return (
-      <p className="mt-2 rounded-md border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 text-sm text-[#64748b]">
+      <p className="mt-2 rounded-md border border-dashed border-white/20 bg-black/15 backdrop-blur-md px-3 py-3 text-sm text-white/70">
         {emptyText}
       </p>
     );
@@ -55,19 +55,19 @@ function TaskGroup({
     <div className="mt-2 space-y-2">
       {tasks.map((task) => (
         <Link
-          className="block rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 transition hover:border-[#1d4ed8] hover:bg-[#eff6ff]"
+          className="block rounded-md border border-white/10 bg-black/15 backdrop-blur-md px-3 py-2 transition hover:border-white/50 hover:bg-white/15"
           href={`/projects/${task.projectId}`}
           key={task.id}
         >
           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[#0f172a]">
+              <p className="truncate text-sm font-semibold text-white">
                 {task.title}
               </p>
-              <p className="text-xs text-[#64748b]">{task.projectName ?? "Project"}</p>
+              <p className="text-xs text-white/70">{task.projectName ?? "Project"}</p>
             </div>
             {task.dueDate ? (
-              <span className="shrink-0 text-xs font-semibold text-[#1d4ed8]">
+              <span className="shrink-0 text-xs font-semibold text-sky-200">
                 {formatDate(task.dueDate)}
               </span>
             ) : null}

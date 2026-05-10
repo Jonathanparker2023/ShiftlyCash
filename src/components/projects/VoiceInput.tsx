@@ -45,8 +45,8 @@ export function VoiceInput({
   const isUnavailable = !isSupported || disabled;
   const buttonClassName = [
     isListening
-      ? "h-10 rounded-md border border-[#bfdbfe] bg-[#1d4ed8] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1e40af]"
-      : "h-10 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#334155] shadow-sm transition hover:border-[#1d4ed8] hover:text-[#1d4ed8]",
+      ? "h-10 rounded-md border border-white/40 bg-sky-500/70 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500/85"
+      : "h-10 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm font-semibold text-white/85 shadow-sm transition hover:border-white/50 hover:text-white",
     isUnavailable ? "cursor-not-allowed opacity-60" : "",
   ]
     .filter(Boolean)

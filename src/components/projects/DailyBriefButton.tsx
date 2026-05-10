@@ -76,7 +76,7 @@ export function DailyBriefButton({
 
   return (
     <button
-      className="h-9 rounded-md border border-[#cbd5e1] bg-white px-3 text-xs font-semibold text-[#334155] shadow-sm transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
+      className="h-9 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-xs font-semibold text-white/85 shadow-sm transition hover:border-white/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
       disabled={disabled}
       onClick={requestBrief}
       type="button"

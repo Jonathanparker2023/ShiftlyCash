@@ -64,7 +64,7 @@ export function ProjectBar({
   }
 
   return (
-    <article className="flex overflow-hidden rounded-md border border-[#d7dee8] bg-[#f8fafc] shadow-[0_16px_38px_rgba(0,0,0,0.16)]">
+    <article className="flex overflow-hidden rounded-md border border-white/15 bg-black/15 backdrop-blur-md shadow-[0_16px_38px_rgba(0,0,0,0.16)]">
       <div
         aria-hidden="true"
         className="w-1.5 shrink-0"
@@ -78,7 +78,7 @@ export function ProjectBar({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     aria-label={isExpanded ? "Collapse project" : "Expand project"}
-                    className="h-7 w-7 rounded-md border border-[#cbd5e1] bg-white text-sm font-bold text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                    className="h-7 w-7 rounded-md border border-white/20 bg-black/20 backdrop-blur-md text-sm font-bold text-white/85 transition hover:border-white/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
                     onClick={() => setIsExpanded((current) => !current)}
                     type="button"
                   >
@@ -92,34 +92,34 @@ export function ProjectBar({
                     className={`h-2 w-2 shrink-0 rounded-full ${healthDotClass(project.health)}`}
                   />
                   <Link
-                    className="truncate text-base font-semibold text-[#0f172a] transition hover:text-[#1d4ed8]"
+                    className="truncate text-base font-semibold text-white transition hover:text-white"
                     href={`/projects/${project.id}`}
                   >
                     {project.name}
                   </Link>
                   {project.status === "archived" ? (
-                    <span className="rounded-full border border-[#cbd5e1] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                    <span className="rounded-full border border-white/20 bg-black/20 backdrop-blur-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/70">
                       Archived
                     </span>
                   ) : null}
                 </div>
                 {project.description ? (
-                  <p className="mt-1 line-clamp-2 text-sm text-[#64748b]">
+                  <p className="mt-1 line-clamp-2 text-sm text-white/70">
                     {project.description}
                   </p>
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold text-[#0f172a]">{progressLabel}</p>
+                <p className="text-sm font-semibold text-white">{progressLabel}</p>
                 {project.deadline ? (
-                  <p className="mt-1 text-xs text-[#64748b]">
+                  <p className="mt-1 text-xs text-white/70">
                     {formatDeadline(project.deadline)}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
               <div
                 className="h-full rounded-full transition-all"
                 style={{
@@ -133,7 +133,7 @@ export function ProjectBar({
             {dragHandle}
             <button
               aria-label={`Delete ${project.name}`}
-              className="h-8 rounded-md border border-[#fecaca] bg-white px-2 text-xs font-semibold text-[#b91c1c] transition hover:border-[#ef4444] hover:bg-[#fff1f2] focus:outline-none focus:ring-2 focus:ring-[#fecaca] disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-8 rounded-md border border-red-300/60 bg-black/20 backdrop-blur-md px-2 text-xs font-semibold text-red-300 transition hover:border-red-300/70 hover:bg-red-500/15 focus:outline-none focus:ring-2 focus:ring-red-300/50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isDeleting}
               onClick={deleteProject}
               title="Delete project"
@@ -145,7 +145,7 @@ export function ProjectBar({
         </div>
 
         {error ? (
-          <p className="mx-3 mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-sm font-medium text-[#b91c1c] sm:mx-4">
+          <p className="mx-3 mb-3 rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-300 sm:mx-4">
             {error}
           </p>
         ) : null}

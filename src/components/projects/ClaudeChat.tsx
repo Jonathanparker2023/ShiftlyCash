@@ -164,26 +164,26 @@ export function ClaudeChat() {
   }
 
   return (
-    <section className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3 text-[#0f172a] shadow-[0_18px_50px_rgba(0,0,0,0.16)] sm:p-4">
+    <section className="rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3 text-white shadow-[0_18px_50px_rgba(0,0,0,0.16)] sm:p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#334155]">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/85">
             Claude Projects
           </h2>
-          <p className="mt-1 text-sm text-[#64748b]">
+          <p className="mt-1 text-sm text-white/70">
             Short project and task updates.
           </p>
         </div>
-        <span className="rounded-full bg-[#dbeafe] px-2.5 py-1 text-xs font-semibold text-[#1d4ed8]">
+        <span className="rounded-full bg-sky-500/15 px-2.5 py-1 text-xs font-semibold text-sky-200">
           Opus 4.7
         </span>
       </div>
 
       <UsageBudget usage={dailyUsage} />
 
-      <div className="mb-3 rounded-md border border-[#d7dee8] bg-white px-3 py-2">
+      <div className="mb-3 rounded-md border border-white/15 bg-black/20 backdrop-blur-md px-3 py-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#64748b]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
             Daily Brief
           </p>
           <DailyBriefButton
@@ -195,15 +195,15 @@ export function ClaudeChat() {
           />
         </div>
         {dailyBrief ? (
-          <p className="mt-2 rounded-md bg-[#f8fafc] px-3 py-2 text-sm leading-6 text-[#334155]">
+          <p className="mt-2 rounded-md bg-black/15 backdrop-blur-md px-3 py-2 text-sm leading-6 text-white/85">
             {dailyBrief}
           </p>
         ) : null}
       </div>
 
-      <div className="mb-3 flex h-[320px] flex-col gap-2 overflow-y-auto rounded-md border border-[#d7dee8] bg-white p-3">
+      <div className="mb-3 flex h-[320px] flex-col gap-2 overflow-y-auto rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-3">
         {messages.length === 0 ? (
-          <div className="flex min-h-full items-center justify-center text-center text-sm text-[#64748b]">
+          <div className="flex min-h-full items-center justify-center text-center text-sm text-white/70">
             Ask Claude to create, update, archive, or delete projects and tasks.
           </div>
         ) : (
@@ -211,8 +211,8 @@ export function ClaudeChat() {
             <div
               className={
                 message.role === "user"
-                  ? "ml-8 rounded-md bg-[#1d4ed8] px-3 py-2 text-sm text-white"
-                  : "mr-8 rounded-md border border-[#d7dee8] bg-[#f8fafc] px-3 py-2 text-sm text-[#0f172a]"
+                  ? "ml-8 rounded-md bg-sky-500/70 px-3 py-2 text-sm text-white"
+                  : "mr-8 rounded-md border border-white/15 bg-black/15 backdrop-blur-md px-3 py-2 text-sm text-white"
               }
               key={`${message.role}-${index}`}
             >
@@ -224,7 +224,7 @@ export function ClaudeChat() {
 
       <form className="flex gap-2" onSubmit={submit}>
         <input
-          className="h-10 min-w-0 flex-1 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm outline-none transition placeholder:text-[#94a3b8] focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#bfdbfe]"
+          className="h-10 min-w-0 flex-1 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
           disabled={isPending || isCapLocked}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Ask for a project or task change"
@@ -234,7 +234,7 @@ export function ClaudeChat() {
         />
         <VoiceInput disabled={isPending || isCapLocked} onTranscript={appendTranscript} />
         <button
-          className="h-10 rounded-md bg-[#0b1220] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+          className="h-10 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
           disabled={isPending || isCapLocked || !input.trim()}
           type="submit"
         >
@@ -243,12 +243,12 @@ export function ClaudeChat() {
       </form>
 
       {error ? (
-        <p className="mt-2 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-sm font-medium text-[#b91c1c]">
+        <p className="mt-2 rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-300">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-3 grid gap-2 text-xs text-[#475569] sm:grid-cols-5">
+      <div className="mt-3 grid gap-2 text-xs text-white/70 sm:grid-cols-5">
         <TokenPill label="Input" value={usage?.input_tokens ?? 0} />
         <TokenPill label="Output" value={usage?.output_tokens ?? 0} />
         <TokenPill
@@ -272,9 +272,9 @@ function TokenPill({
   suffix?: string;
 }) {
   return (
-    <div className="rounded-md border border-[#d7dee8] bg-white px-2.5 py-2">
-      <span className="block font-semibold text-[#334155]">{label}</span>
-      <span className="font-mono text-[#0f172a]">
+    <div className="rounded-md border border-white/15 bg-black/20 backdrop-blur-md px-2.5 py-2">
+      <span className="block font-semibold text-white/85">{label}</span>
+      <span className="font-mono text-white">
         {value.toLocaleString()}
         {suffix}
       </span>
@@ -288,19 +288,19 @@ function UsageBudget({ usage }: { usage: DailyUsage | null }) {
   const progress = capCents > 0 ? Math.min(100, (usedCents / capCents) * 100) : 0;
 
   return (
-    <div className="mb-3 rounded-md border border-[#d7dee8] bg-white px-3 py-2">
-      <div className="mb-1 flex items-center justify-between gap-3 text-xs font-semibold text-[#334155]">
+    <div className="mb-3 rounded-md border border-white/15 bg-black/20 backdrop-blur-md px-3 py-2">
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs font-semibold text-white/85">
         <span>
           Today: {formatMoneyFromCents(usedCents)} of{" "}
           {formatMoneyFromCents(capCents)}
         </span>
-        <span className="text-[#64748b]">
+        <span className="text-white/70">
           Resets {usage ? formatResetTime(usage.resetsAtIso) : "at midnight UTC"}
         </span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-[#e2e8f0]">
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-full rounded-full bg-[#1d4ed8] transition-[width]"
+          className="h-full rounded-full bg-sky-500/70 transition-[width]"
           style={{ width: `${progress}%` }}
         />
       </div>

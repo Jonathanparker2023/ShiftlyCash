@@ -31,7 +31,7 @@ export default async function HistoryDetailPage({
             <h1 className="text-3xl font-semibold tracking-tight">
               Week {data.week.displayWeekNumber}
             </h1>
-            <span className="rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
+            <span className="rounded-full border border-white/20 bg-black/20 backdrop-blur-md/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
               {statusLabel}
             </span>
           </div>
@@ -40,7 +40,7 @@ export default async function HistoryDetailPage({
 
         <div className="flex flex-wrap items-center gap-3">
           <Link
-            className="h-9 rounded-md border border-white/25 bg-white/15 px-3 py-2 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white"
+            className="h-9 rounded-md border border-white/25 bg-black/20 backdrop-blur-md/15 px-3 py-2 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/20 backdrop-blur-md/20 focus:outline-none focus:ring-2 focus:ring-white"
             href="/history"
           >
             Back to History

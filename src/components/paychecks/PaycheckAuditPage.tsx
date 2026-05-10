@@ -76,34 +76,34 @@ export function PaycheckAuditPage({
   }
 
   return (
-    <main className="min-h-screen bg-[#101827] px-3 py-4 text-[#0f172a] sm:px-4 lg:px-6">
-      <section className="mx-auto max-w-7xl rounded-xl border border-[#d7dee8] bg-[#f8fafc] shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
-        <div className="h-2 bg-[#0b1220]" />
+    <main className="min-h-screen px-3 py-4 text-white sm:px-4 lg:px-6">
+      <section className="mx-auto max-w-7xl rounded-xl border border-white/15 bg-black/15 backdrop-blur-md shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
+        <div className="h-2 bg-zinc-950" />
         <div className="p-4 sm:p-5">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#334155]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/85">
                 Paycheck audit
               </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-3xl">
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
                 Pay-period check
               </h1>
-              <p className="mt-1 text-sm text-[#64748b]">
+              <p className="mt-1 text-sm text-white/70">
                 Compare expected take-home against what UKG actually paid.
               </p>
             </div>
             <SaveBadge state={saveState} error={error} />
           </div>
 
-          <div className="mb-4 inline-flex rounded-md border border-[#cbd5e1] bg-white p-1 shadow-sm">
+          <div className="mb-4 inline-flex rounded-md border border-white/20 bg-black/20 backdrop-blur-md p-1 shadow-sm">
             {(["ability", "prestige"] as const).map((jobType) => (
               <button
                 key={jobType}
                 className={[
                   "rounded px-3 py-1.5 text-sm font-semibold transition",
                   activeJob === jobType
-                    ? "bg-[#0b1220] text-white"
-                    : "text-[#475569] hover:bg-[#f1f5f9]",
+                    ? "bg-zinc-950 text-white"
+                    : "text-white/70 hover:bg-white/10",
                 ].join(" ")}
                 onClick={() => {
                   setActiveJob(jobType);
@@ -168,11 +168,11 @@ function PaycheckPeriodCard({
   }
 
   return (
-    <article className="rounded-md border border-[#d7dee8] bg-white p-4 shadow-sm">
+    <article className="rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-4 shadow-sm">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[#0f172a]">{period.label}</h2>
-          <p className="mt-1 text-sm text-[#64748b]">
+          <h2 className="text-lg font-semibold text-white">{period.label}</h2>
+          <p className="mt-1 text-sm text-white/70">
             {formatDate(period.startDate)} - {formatDate(period.endDate)}
           </p>
         </div>
@@ -186,16 +186,16 @@ function PaycheckPeriodCard({
         <Metric label="Pay date" value={period.paycheckDueDate ? formatDate(period.paycheckDueDate) : "Not ready"} />
       </div>
 
-      <div className="my-4 border-t border-[#e2e8f0]" />
+      <div className="my-4 border-t border-white/10" />
 
-      <div className="rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3">
+      <div className="rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-sm font-semibold text-[#0f172a]">{job.label} hours by week</h3>
-          <span className="text-xs font-semibold text-[#475569]">
+          <h3 className="text-sm font-semibold text-white">{job.label} hours by week</h3>
+          <span className="text-xs font-semibold text-white/70">
             {formatRate(job.regularRate)} base / {formatRate(job.overtimeRate)} OT
           </span>
         </div>
-        <p className="mt-1 text-xs text-[#64748b]">{job.rateNote}</p>
+        <p className="mt-1 text-xs text-white/70">{job.rateNote}</p>
         <div className="mt-3 grid gap-2">
           {period.weeks.map((week) => (
             <WeekBreakdown key={week.id} jobType={jobType} week={week} />
@@ -203,7 +203,7 @@ function PaycheckPeriodCard({
         </div>
       </div>
 
-      <div className="my-4 border-t border-[#e2e8f0]" />
+      <div className="my-4 border-t border-white/10" />
 
       <div className="grid gap-2 text-sm">
         <MoneyLine label="Expected gross" value={job.grossCents} />
@@ -223,13 +223,13 @@ function PaycheckPeriodCard({
 
       <AuditRead job={job} />
 
-      <form className="mt-4 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3" onSubmit={submit}>
-        <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-[#334155]">
+      <form className="mt-4 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3" onSubmit={submit}>
+        <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-white/85">
           Actual {job.label} check
         </label>
         <div className="mt-2 flex gap-2">
           <input
-            className="h-10 min-w-0 flex-1 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm outline-none transition focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#bfdbfe]"
+            className="h-10 min-w-0 flex-1 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
             disabled={!period.actualWeekId}
             inputMode="decimal"
             onChange={(event) => setActualValue(event.target.value)}
@@ -238,14 +238,14 @@ function PaycheckPeriodCard({
             value={actualValue}
           />
           <button
-            className="h-10 rounded-md bg-[#0b1220] px-3 text-sm font-semibold text-white transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+            className="h-10 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
             disabled={!period.actualWeekId}
             type="submit"
           >
             Save
           </button>
         </div>
-        <p className="mt-2 text-xs text-[#64748b]">
+        <p className="mt-2 text-xs text-white/70">
           Paste the net {job.label} amount from UKG. ShiftlyCash compares it to expected take-home.
         </p>
       </form>
@@ -263,15 +263,15 @@ function WeekBreakdown({
   const job = week.jobs[jobType];
 
   return (
-    <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+    <div className="grid gap-2 rounded-md border border-white/10 bg-black/20 backdrop-blur-md px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
       <div>
-        <p className="font-semibold text-[#0f172a]">
+        <p className="font-semibold text-white">
           Week {week.displayWeekNumber}{" "}
-          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-[#64748b]">
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-white/70">
             {week.role === "week_1" ? "first half" : "paycheck week"}
           </span>
         </p>
-        <p className="text-xs text-[#64748b]">
+        <p className="text-xs text-white/70">
           {formatDate(week.startDate)} - {formatDate(week.endDate)}
         </p>
       </div>
@@ -287,10 +287,10 @@ function WeekBreakdown({
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+      <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-white/70">
         {label}
       </span>
-      <span className="font-semibold text-[#0f172a]">{value}</span>
+      <span className="font-semibold text-white">{value}</span>
     </div>
   );
 }
@@ -299,12 +299,12 @@ function AuditRead({ job }: { job: PaycheckJobSummary }) {
   const difference = job.differenceCents;
   const classes =
     difference === null
-      ? "border-[#d7dee8] bg-[#f8fafc] text-[#475569]"
+      ? "border-white/15 bg-black/15 backdrop-blur-md text-white/70"
       : difference < -100
-        ? "border-[#fecaca] bg-[#fff1f2] text-[#991b1b]"
+        ? "border-red-300/60 bg-red-500/15 text-red-200"
         : difference > 100
-          ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]"
-          : "border-[#bae6fd] bg-[#e0f2fe] text-[#075985]";
+          ? "border-emerald-300/50 bg-emerald-500/15 text-emerald-300"
+          : "border-sky-300/50 bg-sky-500/15 text-sky-200";
   const message =
     difference === null
       ? `Expected ${job.label} net is ${formatMoney(job.estimatedNetCents)} from ${formatHours(job.totalHours)} total hours. Add the UKG net check to see if the paycheck is short.`
@@ -323,11 +323,11 @@ function AuditRead({ job }: { job: PaycheckJobSummary }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[#64748b]">
+    <div className="rounded-md border border-white/10 bg-black/15 backdrop-blur-md px-3 py-2">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/70">
         {label}
       </span>
-      <span className="text-base font-semibold text-[#0f172a]">{value}</span>
+      <span className="text-base font-semibold text-white">{value}</span>
     </div>
   );
 }
@@ -345,11 +345,11 @@ function MoneyLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className={strong ? "font-semibold" : "text-[#475569]"}>{label}</span>
+      <span className={strong ? "font-semibold" : "text-white/70"}>{label}</span>
       <span
         className={[
           strong ? "text-base font-bold" : "font-semibold",
-          tone === "negative" ? "text-[#b91c1c]" : "text-[#0f172a]",
+          tone === "negative" ? "text-red-300" : "text-white",
         ].join(" ")}
       >
         {tone === "negative" ? "-" : ""}
@@ -367,10 +367,10 @@ function StatusPill({
   differenceCents: number | null;
 }) {
   const classes = {
-    neutral: "border-[#d7dee8] bg-[#f8fafc] text-[#475569]",
-    short: "border-[#fecaca] bg-[#fff1f2] text-[#b91c1c]",
-    over: "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]",
-    match: "border-[#bae6fd] bg-[#e0f2fe] text-[#0e7490]",
+    neutral: "border-white/15 bg-black/15 backdrop-blur-md text-white/70",
+    short: "border-red-300/60 bg-red-500/15 text-red-300",
+    over: "border-emerald-300/50 bg-emerald-500/15 text-emerald-300",
+    match: "border-sky-300/50 bg-sky-500/15 text-emerald-300",
   };
   const label =
     differenceCents === null
@@ -397,8 +397,8 @@ function SaveBadge({ state, error }: { state: SaveState; error: string | null })
     <span
       className={
         state === "error"
-          ? "rounded-full bg-[#fff1f2] px-3 py-1 text-xs font-semibold text-[#b91c1c]"
-          : "rounded-full bg-[#e0f2fe] px-3 py-1 text-xs font-semibold text-[#0e7490]"
+          ? "rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-300"
+          : "rounded-full bg-sky-500/15 px-3 py-1 text-xs font-semibold text-emerald-300"
       }
     >
       {state === "saving" ? "Saving..." : state === "saved" ? "Saved" : error}

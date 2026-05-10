@@ -149,20 +149,20 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
     [chartWeekLimit, initialData.principalMillionaireBalances],
   );
   return (
-    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#101827] px-3 py-5 text-[#f8fafc] sm:px-6 lg:px-8">
-      <header className="mx-auto mb-5 max-w-7xl border-b border-[#2f3d52] pb-4">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden  px-3 py-5 text-white sm:px-6 lg:px-8">
+      <header className="mx-auto mb-5 max-w-7xl border-b border-white/15 pb-4">
         <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_296px] lg:items-start">
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8ea0b8]">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">
               ShiftlyCash
             </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#f8fafc]">
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">
               Debt Obligations
             </h1>
-            <p className="mt-2 text-sm text-[#cbd5e1]">
+            <p className="mt-2 text-sm text-white/75">
               Predict your future. Own your future.
             </p>
-            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#8ea0b8]">
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/60">
               Pulling {initialData.projectionSource.closedWeekCount} closed
               weeks from week totals. Rolling window: wk{" "}
               {initialData.projectionSource.recentWeekNumbers.join(", ")}.
@@ -178,7 +178,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
       </header>
 
       {error ? (
-        <div className="mx-auto mb-4 max-w-7xl rounded-md border border-[#fecaca] bg-[#fff1f2] p-3 text-sm font-medium text-[#b91c1c]">
+        <div className="mx-auto mb-4 max-w-7xl rounded-md border border-red-300/60 bg-red-500/15 p-3 text-sm font-medium text-red-300">
           {error}
         </div>
       ) : null}
@@ -248,13 +248,13 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
         </section>
 
-        <section className="min-w-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-3 shadow-lg shadow-black/20 sm:p-4">
+        <section className="min-w-0 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3 shadow-lg shadow-black/20 sm:p-4">
           <div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-[#334155]">
+              <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white/85">
                 Path to $1M
               </h2>
-              <p className="mt-1 text-sm text-[#64748b]">
+              <p className="mt-1 text-sm text-white/70">
                 Starts at negative debt, invests post-tax weekly cashflow, and
                 compounds at 10%.
               </p>
@@ -266,8 +266,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                   onClick={() => setChartRange(r)}
                   className={
                     chartRange === r
-                      ? "min-w-0 flex-1 rounded bg-[#0f172a] px-2 py-1 text-xs font-semibold text-white sm:flex-none sm:px-3"
-                      : "min-w-0 flex-1 rounded border border-[#cbd5e1] px-2 py-1 text-xs font-medium text-[#475569] hover:bg-[#eef4fb] sm:flex-none sm:px-3"
+                      ? "min-w-0 flex-1 rounded bg-zinc-950 px-2 py-1 text-xs font-semibold text-white sm:flex-none sm:px-3"
+                      : "min-w-0 flex-1 rounded border border-white/20 px-2 py-1 text-xs font-medium text-white/70 hover:bg-white/10 sm:flex-none sm:px-3"
                   }
                 >
                   {r === "full" ? "$1M" : r.toUpperCase()}
@@ -282,12 +282,12 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
         </section>
 
-        <section className="min-w-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-4 shadow-lg shadow-black/20">
+        <section className="min-w-0 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-4 shadow-lg shadow-black/20">
           <div className="mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-[#334155]">
+            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white/85">
               Debt breakdown
             </h2>
-            <p className="mt-1 text-sm text-[#64748b]">
+            <p className="mt-1 text-sm text-white/70">
               Sorted by remaining balance, largest account first.
             </p>
           </div>
@@ -295,21 +295,21 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
         </section>
 
         {/* Debts list */}
-        <section className="min-w-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] shadow-lg shadow-black/20">
-          <div className="flex items-center justify-between border-b border-[#d7dee8] p-3">
-            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-[#334155]">
+        <section className="min-w-0 rounded-md border border-white/15 bg-black/15 backdrop-blur-md shadow-lg shadow-black/20">
+          <div className="flex items-center justify-between border-b border-white/15 p-3">
+            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white/85">
               Debts ({debts.length})
             </h2>
             <button
               onClick={addDebt}
-              className="rounded-md bg-[#0f172a] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1e293b]"
+              className="rounded-md bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
             >
               + Add debt
             </button>
           </div>
           <div className="w-full max-w-full overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="border-b border-[#d7dee8] bg-[#e8eef6] text-xs uppercase tracking-[0.12em] text-[#334155]">
+            <thead className="border-b border-white/15 bg-white/10 text-xs uppercase tracking-[0.12em] text-white/85">
               <tr>
                 <th className="p-3 text-left font-semibold">Order</th>
                 <th className="p-3 text-left font-semibold">Name</th>
@@ -322,14 +322,14 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
             </thead>
             <tbody>
               {debts.map((debt, idx) => (
-                <tr key={debt.id} className="border-b border-[#e2e8f0] last:border-0">
+                <tr key={debt.id} className="border-b border-white/10 last:border-0">
                   <td className="p-2">
                     <div className="flex flex-col gap-0.5">
                       <button
                         aria-label={`Move ${debt.name} up`}
                         disabled={idx === 0}
                         onClick={() => moveDebt(debt.id, "up")}
-                        className="text-xs text-[#64748b] disabled:opacity-30 hover:text-[#0e7490]"
+                        className="text-xs text-white/70 disabled:opacity-30 hover:text-emerald-300"
                       >
                         ^
                       </button>
@@ -337,7 +337,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                         aria-label={`Move ${debt.name} down`}
                         disabled={idx === debts.length - 1}
                         onClick={() => moveDebt(debt.id, "down")}
-                        className="text-xs text-[#64748b] disabled:opacity-30 hover:text-[#0e7490]"
+                        className="text-xs text-white/70 disabled:opacity-30 hover:text-emerald-300"
                       >
                         v
                       </button>
@@ -346,7 +346,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                   <td className="p-2">
                     <input
                       value={debt.name}
-                      className="w-full rounded border border-[#cbd5e1] bg-white px-2 py-1 text-sm outline-none focus:border-[#0f172a]"
+                      className="w-full rounded border border-white/20 bg-black/20 backdrop-blur-md px-2 py-1 text-sm outline-none focus:border-white/60"
                       onChange={(e) => {
                         const value = e.target.value;
                         patchDebtLocal(debt.id, { name: value });
@@ -360,7 +360,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       step="1"
                       min="0"
                       value={centsToDollars(debt.balanceCents)}
-                      className="w-full rounded border border-[#cbd5e1] bg-white px-2 py-1 text-right text-sm outline-none focus:border-[#0f172a]"
+                      className="w-full rounded border border-white/20 bg-black/20 backdrop-blur-md px-2 py-1 text-right text-sm outline-none focus:border-white/60"
                       onChange={(e) => {
                         const cents = dollarsToCents(parseFloat(e.target.value) || 0);
                         patchDebtLocal(debt.id, {
@@ -380,7 +380,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       step="1"
                       min="0"
                       value={centsToDollars(debt.minimumPaymentCents)}
-                      className="w-full rounded border border-[#cbd5e1] bg-white px-2 py-1 text-right text-sm outline-none focus:border-[#0f172a]"
+                      className="w-full rounded border border-white/20 bg-black/20 backdrop-blur-md px-2 py-1 text-right text-sm outline-none focus:border-white/60"
                       onChange={(e) => {
                         const cents = dollarsToCents(parseFloat(e.target.value) || 0);
                         patchDebtLocal(debt.id, { minimumPaymentCents: cents });
@@ -398,7 +398,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       min="0"
                       max="100"
                       value={(debt.aprBps / 100).toFixed(2)}
-                      className="w-full rounded border border-[#cbd5e1] bg-white px-2 py-1 text-right text-sm outline-none focus:border-[#0f172a]"
+                      className="w-full rounded border border-white/20 bg-black/20 backdrop-blur-md px-2 py-1 text-right text-sm outline-none focus:border-white/60"
                       onChange={(e) => {
                         const bps = Math.round((parseFloat(e.target.value) || 0) * 100);
                         patchDebtLocal(debt.id, { aprBps: bps });
@@ -410,8 +410,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                     <span
                       className={
                         debt.status === "paid"
-                          ? "rounded bg-[#e0f2fe] px-2 py-1 text-xs font-semibold text-[#0e7490]"
-                          : "rounded bg-[#f1f5f9] px-2 py-1 text-xs font-semibold text-[#475569]"
+                          ? "rounded bg-sky-500/15 px-2 py-1 text-xs font-semibold text-emerald-300"
+                          : "rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white/70"
                       }
                     >
                       {debt.status}
@@ -420,7 +420,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                   <td className="p-2 text-right">
                     <button
                       onClick={() => deleteDebt(debt.id)}
-                      className="text-xs font-medium text-[#c2410c] hover:underline"
+                      className="text-xs font-medium text-red-300 hover:underline"
                     >
                       Delete
                     </button>
@@ -429,7 +429,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
               ))}
               {debts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-sm text-[#64748b]">
+                  <td colSpan={7} className="p-6 text-center text-sm text-white/70">
                     No debts tracked. Click &ldquo;Add debt&rdquo; to start.
                   </td>
                 </tr>
@@ -456,24 +456,24 @@ function Metric({
 }) {
   const valueClass =
     tone === "green"
-      ? "text-[#0e7490]"
+      ? "text-emerald-300"
       : tone === "red"
-        ? "text-[#c2410c]"
+        ? "text-red-300"
         : tone === "amber"
-          ? "text-[#a16207]"
+          ? "text-amber-200"
           : tone === "purple"
-            ? "text-[#7e22ce]"
-            : "text-[#0f172a]";
+            ? "text-violet-200"
+            : "text-white";
   return (
-    <div className="min-h-[132px] min-w-0 rounded-md border border-[#d7dee8] bg-[#f8fafc] p-4 shadow-lg shadow-black/20">
-      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#334155]">
+    <div className="min-h-[132px] min-w-0 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-4 shadow-lg shadow-black/20">
+      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/85">
         {label}
       </div>
       <div className={`mt-2 text-2xl font-semibold tracking-tight ${valueClass}`}>
         {value}
       </div>
       {sub ? (
-        <div className="mt-2 min-w-0 break-words text-sm leading-snug text-[#64748b]">
+        <div className="mt-2 min-w-0 break-words text-sm leading-snug text-white/70">
           {sub}
         </div>
       ) : null}
@@ -494,7 +494,7 @@ function Chart({
 }) {
   if (values.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-[#64748b]">
+      <div className="flex h-64 items-center justify-center text-sm text-white/70">
         No data.
       </div>
     );
@@ -591,7 +591,7 @@ function Chart({
         <text
           x={PAD.l - 8}
           y={yy + 4}
-          fill="#64748b"
+          fill="rgba(255,255,255,0.62)"
           fontSize="10"
           textAnchor="end"
           fontFamily="ui-monospace, monospace"
@@ -603,7 +603,7 @@ function Chart({
           y1={yy}
           x2={W - PAD.r}
           y2={yy}
-          stroke="#dbe3ec"
+          stroke="rgba(255,255,255,0.14)"
           strokeWidth="1"
         />
       </g>,
@@ -620,7 +620,7 @@ function Chart({
         key={`x-${year}`}
         x={px(wkIdx)}
         y={H - 8}
-        fill="#64748b"
+        fill="rgba(255,255,255,0.62)"
         fontSize="10"
         textAnchor="middle"
       >
@@ -635,7 +635,7 @@ function Chart({
         key="x-end"
         x={px(wkIdx)}
         y={H - 8}
-        fill="#64748b"
+        fill="rgba(255,255,255,0.62)"
         fontSize="10"
         textAnchor="middle"
       >
@@ -656,7 +656,7 @@ function Chart({
     <div className="relative">
       {/* Total above the chart — sits in HTML so it scales independently of
           the SVG and can never collide with the interest endpoint label. */}
-      <div className="mb-1 text-center text-sm font-extrabold tracking-tight text-[#0f172a]">
+      <div className="mb-1 text-center text-sm font-extrabold tracking-tight text-white">
         Total {formatMoney(endVal)}
       </div>
       <svg
@@ -671,7 +671,7 @@ function Chart({
           y1={zero}
           x2={W - PAD.r}
           y2={zero}
-          stroke="#64748b"
+          stroke="rgba(255,255,255,0.48)"
           strokeWidth="1"
           strokeDasharray="4 4"
         />
@@ -729,7 +729,7 @@ function Chart({
             <circle
               cx={px(principalTargetIndex)}
               cy={py(targetCents)}
-              fill="#0f172a"
+              fill="white"
               r="4"
               stroke="#fff"
               strokeWidth="2"
@@ -737,7 +737,7 @@ function Chart({
             <text
               x={px(principalTargetIndex) - 4}
               y={py(targetCents) + 16}
-              fill="#0f172a"
+              fill="white"
               fontSize="10"
               fontWeight="700"
               textAnchor="end"
@@ -873,16 +873,16 @@ function Chart({
           );
         })()}
       </svg>
-      <div className="mt-2 flex items-center justify-between text-xs font-medium text-[#64748b]">
+      <div className="mt-2 flex items-center justify-between text-xs font-medium text-white/70">
         <span className="flex flex-wrap items-center gap-3">
           <span className="flex items-center gap-1">
-            <span className="h-0.5 w-4 bg-[#0f172a]" /> Principal only
+            <span className="h-0.5 w-4 bg-zinc-950" /> Principal only
           </span>
           <span className="flex items-center gap-1">
             <span className="h-0.5 w-4 bg-[#0e7490]" /> Invested at 10%
           </span>
         </span>
-        <span className="text-[#64748b]">
+        <span className="text-white/70">
           {formatWeekDuration(series.length - 1)} projection
         </span>
       </div>
@@ -900,8 +900,8 @@ function DebtBreakdown({ debts }: { debts: DebtRow[] }) {
     <div className="grid gap-3">
       {activeDebts.map((debt, index) => (
         <div key={debt.id} className="grid gap-2 sm:grid-cols-[180px_1fr_96px] sm:items-center">
-          <div className="text-sm font-medium text-[#1e293b]">{debt.name}</div>
-          <div className="h-3 overflow-hidden rounded-full bg-[#e2e8f0]">
+          <div className="text-sm font-medium text-white">{debt.name}</div>
+          <div className="h-3 overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-[#0e7490]"
               style={{
@@ -910,7 +910,7 @@ function DebtBreakdown({ debts }: { debts: DebtRow[] }) {
               }}
             />
           </div>
-          <div className="text-right text-sm font-semibold text-[#0e7490]">
+          <div className="text-right text-sm font-semibold text-emerald-300">
             {formatMoney(debt.balanceCents)}
           </div>
         </div>

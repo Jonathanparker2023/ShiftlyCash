@@ -179,17 +179,17 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-5 text-zinc-950 sm:px-6 lg:px-8">
+    <main className="min-h-screen px-4 py-5 text-white sm:px-6 lg:px-8">
       <section className="mx-auto max-w-7xl">
-        <header className="mb-5 flex flex-col gap-3 border-b border-zinc-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <header className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-500">
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-white/70">
               ShiftlyCash
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
               Baseline Expenses
             </h1>
-            <p className="mt-1 text-sm text-zinc-600">
+            <p className="mt-1 text-sm text-white/75">
               Monthly recurring costs converted into weekly and daily base.
             </p>
           </div>
@@ -212,8 +212,8 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
           weeklyAverageCents={totals.weeklyAverageCents}
         />
 
-        <section className="mt-5 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm">
-          <div className="hidden grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] gap-3 border-b border-zinc-200 bg-zinc-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.12em] text-zinc-500 md:grid">
+        <section className="mt-5 overflow-hidden rounded-md border border-white/10 bg-black/20 backdrop-blur-md shadow-sm">
+          <div className="hidden grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] gap-3 border-b border-white/10 bg-white/10 px-4 py-3 text-xs font-medium uppercase tracking-[0.12em] text-white/70 md:grid">
             <div>Name</div>
             <div>Monthly</div>
             <div>Withdraws</div>
@@ -223,7 +223,7 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
           </div>
 
           {expenses.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-zinc-600">
+            <div className="px-4 py-10 text-center text-sm text-white/75">
               No baseline expenses yet.
             </div>
           ) : (
@@ -281,13 +281,13 @@ function TotalCard({
   sublabel?: string;
 }) {
   return (
-    <div className="rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-500">
+    <div className="rounded-md border border-white/10 bg-black/20 backdrop-blur-md p-4 shadow-sm">
+      <div className="text-xs font-medium uppercase tracking-[0.12em] text-white/70">
         {label}
       </div>
       <div className="mt-2 text-3xl font-semibold tracking-tight">{value}</div>
       {sublabel ? (
-        <div className="mt-1 text-xs font-medium text-zinc-500">{sublabel}</div>
+        <div className="mt-1 text-xs font-medium text-white/70">{sublabel}</div>
       ) : null}
     </div>
   );
@@ -311,7 +311,7 @@ function ExpenseRow({
   const rowClassName = [
     "grid gap-3 px-4 py-4 transition md:grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] md:items-center",
     expired ? "opacity-50" : "",
-    isDatedActive ? "bg-amber-50/80 ring-1 ring-inset ring-amber-300" : "",
+    isDatedActive ? "bg-amber-500/15 ring-1 ring-inset ring-amber-300/60" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -322,7 +322,7 @@ function ExpenseRow({
         <MobileLabel>Name</MobileLabel>
         <div className="flex items-center gap-2">
           <input
-            className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm"
+            className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
             onChange={(event) =>
               onUpdate(expense.id, { name: event.target.value })
             }
@@ -338,7 +338,7 @@ function ExpenseRow({
       <label className="block">
         <MobileLabel>Monthly</MobileLabel>
         <input
-          className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm"
+          className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
           min="0"
           onChange={(event) =>
             onUpdate(expense.id, {
@@ -356,7 +356,7 @@ function ExpenseRow({
       <label className="block">
         <MobileLabel>Withdraws</MobileLabel>
         <input
-          className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm"
+          className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
           max="31"
           min="1"
           onChange={(event) =>
@@ -376,8 +376,8 @@ function ExpenseRow({
         <input
           className={
             isDatedActive
-              ? "h-10 w-full rounded-md border border-amber-400 bg-amber-50 px-3 text-sm text-amber-950"
-              : "h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm"
+              ? "h-10 w-full rounded-md border border-amber-300/60 bg-amber-500/15 px-3 text-sm text-amber-100"
+              : "h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
           }
           onChange={(event) =>
             onUpdate(expense.id, {
@@ -402,7 +402,7 @@ function ExpenseRow({
       </label>
 
       <button
-        className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium transition hover:border-red-700 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 md:justify-self-end"
+        className="h-10 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm font-medium transition hover:border-red-300 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60 md:justify-self-end"
         disabled={deleting}
         onClick={() => onDelete(expense.id)}
         type="button"
@@ -415,7 +415,7 @@ function ExpenseRow({
 
 function MobileLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-zinc-500 md:hidden">
+    <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-white/70 md:hidden">
       {children}
     </span>
   );
@@ -423,7 +423,7 @@ function MobileLabel({ children }: { children: ReactNode }) {
 
 function ExpiredBadge() {
   return (
-    <span className="rounded-full border border-zinc-300 bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600">
+    <span className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs font-medium text-white/75">
       Expired
     </span>
   );
@@ -431,7 +431,7 @@ function ExpiredBadge() {
 
 function ExpiresBadge() {
   return (
-    <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+    <span className="rounded-full border border-amber-300/60 bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-200">
       Expires
     </span>
   );
@@ -458,13 +458,13 @@ function SaveIndicator({
       <div
         className={
           state === "error"
-            ? "text-sm font-medium text-red-700"
-            : "text-sm font-medium text-zinc-600"
+            ? "text-sm font-medium text-red-300"
+            : "text-sm font-medium text-white/75"
         }
       >
         {label}
       </div>
-      {error ? <div className="max-w-64 text-xs text-red-700">{error}</div> : null}
+      {error ? <div className="max-w-64 text-xs text-red-300">{error}</div> : null}
     </div>
   );
 }

@@ -159,7 +159,7 @@ function WeekStripCell({
           {shortDayName(day.date)}
         </span>
         {day.spendLocked ? (
-          <span className="hidden rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
+          <span className="hidden rounded-full bg-black/20 backdrop-blur-md/20 px-1.5 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
             Locked
           </span>
         ) : null}
@@ -183,7 +183,7 @@ function FocusedDayPanel({ day }: { day: HistoryDetailDay }) {
     <section className="rounded-md border border-white/20 bg-black/15 p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-white px-3 py-1 text-sm font-bold uppercase text-[#0b1220]">
+          <span className="rounded-full bg-black/20 backdrop-blur-md px-3 py-1 text-sm font-bold uppercase text-white">
             {shortDayName(day.date)}
           </span>
           <div>
@@ -196,7 +196,7 @@ function FocusedDayPanel({ day }: { day: HistoryDetailDay }) {
           </div>
         </div>
         {day.spendLocked ? (
-          <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-white">
+          <span className="rounded-full border border-white/20 bg-black/20 backdrop-blur-md/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-white">
             Locked
           </span>
         ) : null}
@@ -309,7 +309,7 @@ function TransactionPanel({
         <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-white/80">
           Transactions
         </h3>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
+        <span className="rounded-full bg-black/20 backdrop-blur-md/15 px-2 py-0.5 text-xs font-semibold text-white">
           {transactions.length}
         </span>
       </div>
@@ -392,26 +392,26 @@ function historyShiftBarClass(jobType: string): string {
   const base = "rounded-md border p-3 text-sm shadow-sm";
 
   if (jobType === "ability" || jobType === "incentive") {
-    return `${base} border-[#1e3a8a] bg-[#1d4ed8] text-white`;
+    return `${base} border-[#1e3a8a] bg-sky-500/70 text-white`;
   }
 
   if (jobType === "prestige" || jobType === "prestige_ilst") {
     return `${base} border-[#d97706] bg-[#facc15] text-[#1f2937]`;
   }
 
-  return `${base} border-white/20 bg-white/15 text-white`;
+  return `${base} border-white/20 bg-black/20 backdrop-blur-md/15 text-white`;
 }
 
 function payTypeBadgeClass(payType: string): string {
   if (payType === "split") {
-    return "rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-[#0f172a]";
+    return "rounded-full bg-black/20 backdrop-blur-md px-2 py-0.5 text-[10px] font-bold uppercase text-white";
   }
 
   if (payType === "overtime") {
     return "rounded-full bg-[#22c55e] px-2 py-0.5 text-[10px] font-bold uppercase text-white";
   }
 
-  return "rounded-full bg-[#dbeafe] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#1d4ed8]";
+  return "rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-200";
 }
 
 function formatPayBadge(payType: string): string {

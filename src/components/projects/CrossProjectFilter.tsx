@@ -21,10 +21,10 @@ export function CrossProjectFilter({
   const selected = new Set(selectedTagIds);
 
   return (
-    <div className="mb-4 rounded-md border border-[#d7dee8] bg-white p-3 shadow-sm">
+    <div className="mb-4 rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-3 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#64748b]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
             Filters
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -46,7 +46,7 @@ export function CrossProjectFilter({
                 </Link>
               ))
             ) : (
-              <span className="text-xs text-[#64748b]">No tags yet</span>
+              <span className="text-xs text-white/70">No tags yet</span>
             )}
           </div>
         </div>
@@ -55,8 +55,8 @@ export function CrossProjectFilter({
           <Link
             className={
               dueThisWeek
-                ? "rounded-md border border-[#1d4ed8] bg-[#dbeafe] px-3 py-2 text-[#1d4ed8]"
-                : "rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8]"
+                ? "rounded-md border border-white/50 bg-sky-500/15 px-3 py-2 text-sky-200"
+                : "rounded-md border border-white/20 bg-black/15 backdrop-blur-md px-3 py-2 text-white/85 transition hover:border-white/50 hover:text-white"
             }
             href={hrefForToggle("due", dueThisWeek ? null : "week", {
               selectedTagIds,
@@ -68,8 +68,8 @@ export function CrossProjectFilter({
           <Link
             className={
               showCompleted
-                ? "rounded-md border border-[#1d4ed8] bg-[#dbeafe] px-3 py-2 text-[#1d4ed8]"
-                : "rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-[#334155] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8]"
+                ? "rounded-md border border-white/50 bg-sky-500/15 px-3 py-2 text-sky-200"
+                : "rounded-md border border-white/20 bg-black/15 backdrop-blur-md px-3 py-2 text-white/85 transition hover:border-white/50 hover:text-white"
             }
             href={hrefForToggle("completed", showCompleted ? null : "1", {
               dueThisWeek,
@@ -80,7 +80,7 @@ export function CrossProjectFilter({
           </Link>
           {isActive ? (
             <Link
-              className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-[#64748b] transition hover:border-[#1d4ed8] hover:text-[#1d4ed8]"
+              className="rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 py-2 text-white/70 transition hover:border-white/50 hover:text-white"
               href="/projects"
             >
               Clear
@@ -90,24 +90,24 @@ export function CrossProjectFilter({
       </div>
 
       {isActive ? (
-        <div className="mt-4 space-y-2 border-t border-[#e2e8f0] pt-3">
+        <div className="mt-4 space-y-2 border-t border-white/10 pt-3">
           {filteredTasks.length > 0 ? (
             filteredTasks.map((task) => (
               <div
-                className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2"
+                className="rounded-md border border-white/10 bg-black/15 backdrop-blur-md px-3 py-2"
                 key={task.id}
               >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[#0f172a]">
+                    <p className="truncate text-sm font-semibold text-white">
                       {task.title}
                     </p>
-                    <p className="mt-0.5 text-xs text-[#64748b]">
+                    <p className="mt-0.5 text-xs text-white/70">
                       {task.projectName ?? "Project"}
                       {task.dueDate ? ` - Due ${formatDate(task.dueDate)}` : ""}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs font-semibold text-[#64748b]">
+                  <span className="shrink-0 text-xs font-semibold text-white/70">
                     {formatStatus(task.status)}
                   </span>
                 </div>
@@ -121,7 +121,7 @@ export function CrossProjectFilter({
               </div>
             ))
           ) : (
-            <p className="rounded-md border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 py-4 text-sm text-[#64748b]">
+            <p className="rounded-md border border-dashed border-white/20 bg-black/15 backdrop-blur-md px-3 py-4 text-sm text-white/70">
               No tasks match these filters.
             </p>
           )}

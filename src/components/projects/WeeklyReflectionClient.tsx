@@ -46,17 +46,17 @@ export function WeeklyReflectionClient({
   }
 
   return (
-    <section className="mt-4 rounded-md border border-[#d7dee8] bg-white p-3 shadow-sm">
+    <section className="mt-4 rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-3 shadow-sm">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#64748b]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
             Reflection
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-[#0f172a]">
+          <h2 className="mt-1 text-lg font-semibold text-white">
             Weekly reset
           </h2>
         </div>
-        <span className="text-xs font-semibold text-[#64748b]">
+        <span className="text-xs font-semibold text-white/70">
           Week of {formatDate(weekStartIso)}
         </span>
       </div>
@@ -83,14 +83,14 @@ export function WeeklyReflectionClient({
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <button
-            className="h-10 rounded-md bg-[#1d4ed8] px-3 text-sm font-semibold text-white transition hover:bg-[#1e40af] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+            className="h-10 rounded-md bg-sky-500/70 px-3 text-sm font-semibold text-white transition hover:bg-sky-500/85 disabled:cursor-not-allowed disabled:bg-white/20"
             disabled={isSaving}
             type="submit"
           >
             {isSaving ? "Saving..." : "Save reflection"}
           </button>
           {savedAt ? (
-            <span className="text-xs font-semibold text-[#64748b]">
+            <span className="text-xs font-semibold text-white/70">
               Last saved {formatDateTime(savedAt)}
             </span>
           ) : null}
@@ -98,7 +98,7 @@ export function WeeklyReflectionClient({
       </form>
 
       {error ? (
-        <p className="mt-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-sm font-medium text-[#b91c1c]">
+        <p className="mt-3 rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-300">
           {error}
         </p>
       ) : null}
@@ -119,11 +119,11 @@ function ReflectionField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#64748b]">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70">
         {label}
       </span>
       <textarea
-        className="mt-1 min-h-20 w-full resize-y rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#bfdbfe]"
+        className="mt-1 min-h-20 w-full resize-y rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         value={value}

@@ -78,12 +78,12 @@ export function TagPicker({
   }
 
   return (
-    <div className="w-64 rounded-md border border-[#cbd5e1] bg-white p-3 shadow-lg">
+    <div className="w-64 rounded-md border border-white/20 bg-black/20 backdrop-blur-md p-3 shadow-lg">
       <div className="space-y-1">
         {availableTags.length > 0 ? (
           availableTags.map((tag) => (
             <button
-              className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-[#334155] transition hover:bg-[#f1f5f9] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-white/85 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={pending}
               key={tag.id}
               onClick={() => toggleTag(tag)}
@@ -100,15 +100,15 @@ export function TagPicker({
             </button>
           ))
         ) : (
-          <p className="rounded-md border border-dashed border-[#cbd5e1] px-2 py-2 text-xs text-[#64748b]">
+          <p className="rounded-md border border-dashed border-white/20 px-2 py-2 text-xs text-white/70">
             No tags yet.
           </p>
         )}
       </div>
 
-      <form className="mt-3 space-y-2 border-t border-[#e2e8f0] pt-3" onSubmit={createAndAttachTag}>
+      <form className="mt-3 space-y-2 border-t border-white/10 pt-3" onSubmit={createAndAttachTag}>
         <input
-          className="h-9 w-full rounded-md border border-[#cbd5e1] px-2 text-xs outline-none focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#bfdbfe]"
+          className="h-9 w-full rounded-md border border-white/20 px-2 text-xs outline-none focus:border-white/60 focus:ring-2 focus:ring-white/40"
           disabled={pending}
           onChange={(event) => setName(event.target.value)}
           placeholder="New tag"
@@ -133,7 +133,7 @@ export function TagPicker({
             ))}
           </div>
           <button
-            className="h-8 rounded-md bg-[#1d4ed8] px-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+            className="h-8 rounded-md bg-sky-500/70 px-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-white/20"
             disabled={pending || !name.trim()}
             type="submit"
           >
@@ -142,7 +142,7 @@ export function TagPicker({
         </div>
       </form>
 
-      {error ? <p className="mt-2 text-xs font-semibold text-[#b91c1c]">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs font-semibold text-red-300">{error}</p> : null}
     </div>
   );
 }
