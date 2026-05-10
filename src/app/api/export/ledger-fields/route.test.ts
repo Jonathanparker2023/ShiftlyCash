@@ -32,6 +32,7 @@ describe("/api/export/ledger-fields", () => {
               minimum_payment: 304.12,
               apr: 0.0799,
               status: "active",
+              priority_order: 1,
             },
           ],
           error: null,
@@ -53,6 +54,7 @@ describe("/api/export/ledger-fields", () => {
               week_id: "week-1",
               start_date: "2026-04-27",
               end_date: "2026-05-03",
+              display_week_number: 17,
               status: "closed",
               pay_period_role: "week_2",
               paycheck_due_date: "2026-05-08",
@@ -67,6 +69,7 @@ describe("/api/export/ledger-fields", () => {
               week_id: "week-2",
               start_date: "2026-05-04",
               end_date: "2026-05-10",
+              display_week_number: 18,
               status: "active",
               pay_period_role: "week_1",
               paycheck_due_date: null,
@@ -120,6 +123,19 @@ describe("/api/export/ledger-fields", () => {
               prestige_ot_net_rate: 21.93,
               prestige_ilst_net_rate: 15.48,
               prestige_ilst_ot_net_rate: 23.22,
+              ability_withholding_rate: 0.2652,
+              prestige_withholding_rate: 0.14,
+              filing_fee: 160,
+              standard_deduction: 15000,
+            },
+          ],
+          error: null,
+        },
+        v_active_expense_totals: {
+          data: [
+            {
+              monthly_total: 1200,
+              projected_daily_base: 42,
             },
           ],
           error: null,
@@ -178,6 +194,7 @@ describe("/api/export/ledger-fields", () => {
     );
     const payload = await response.json();
 
+    expect(payload.error).toBeUndefined();
     expect(response.status).toBe(200);
     expect(payload).toMatchObject({
       week_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
@@ -191,6 +208,7 @@ describe("/api/export/ledger-fields", () => {
           minimum_due_date: null,
           status: "active",
           starting_balance: 14823.45,
+          priority_order: 1,
         },
       ],
       accounts: [
@@ -233,6 +251,42 @@ describe("/api/export/ledger-fields", () => {
       current_pay_period_total: expect.any(Number),
       rolling_30d_total: expect.any(Number),
       ytd_total: expect.any(Number),
+      current_daily_base: expect.any(Number),
+      monthly_total: expect.any(Number),
+    });
+    expect(payload.debt_totals).toMatchObject({
+      total_active_debt: 14823.45,
+      active_debt_count: 1,
+      total_min_pay_monthly: 304.12,
+      total_min_pay_weekly: expect.any(Number),
+    });
+    expect(payload.projection).toMatchObject({
+      wpc: expect.any(Number),
+      mwe: expect.any(Number),
+      avg_earnings: expect.any(Number),
+      recent_earnings: expect.any(Array),
+      recent_cashflow: expect.any(Array),
+      weeks_remaining: expect.any(Number),
+      ytd_cashflow: expect.any(Number),
+      ytd_earnings: expect.any(Number),
+      ypgc: expect.any(Number),
+      ypwi_net: expect.any(Number),
+      ypwi_gross: expect.any(Number),
+      withheld_year_to_date: expect.any(Number),
+      fed_liability: expect.any(Number),
+      ct_liability: expect.any(Number),
+      fica_liability: expect.any(Number),
+      total_liability: expect.any(Number),
+      est_remaining_tax_owed: expect.any(Number),
+      ypnc: expect.any(Number),
+    });
+    expect(payload.plan_metrics).toMatchObject({
+      weekly_tax_due: expect.any(Number),
+      investable_weekly_cashflow: expect.any(Number),
+      debt_free_date_iso: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      millionaire_date_iso: expect.any(String),
+      age_at_millionaire: expect.any(Number),
+      millionaire_duration_label: expect.any(String),
     });
     const topCategoryTotal = payload.spending.top_categories_rolling_30d.reduce(
       (sum: number, category: { amount: number }) => sum + category.amount,
@@ -257,10 +311,44 @@ describe("/api/export/ledger-fields", () => {
       payload.baseline.current_pay_period_total,
       payload.baseline.rolling_30d_total,
       payload.baseline.ytd_total,
+      payload.baseline.current_daily_base,
+      payload.baseline.monthly_total,
+      payload.debt_totals.total_active_debt,
+      payload.debt_totals.total_min_pay_monthly,
+      payload.debt_totals.total_min_pay_weekly,
+      payload.projection.wpc,
+      payload.projection.mwe,
+      payload.projection.avg_earnings,
+      payload.projection.ytd_cashflow,
+      payload.projection.ytd_earnings,
+      payload.projection.ypgc,
+      payload.projection.ypwi_net,
+      payload.projection.ypwi_gross,
+      payload.projection.withheld_year_to_date,
+      payload.projection.fed_liability,
+      payload.projection.ct_liability,
+      payload.projection.fica_liability,
+      payload.projection.total_liability,
+      payload.projection.est_remaining_tax_owed,
+      payload.projection.ypnc,
+      payload.plan_metrics.weekly_tax_due,
+      payload.plan_metrics.investable_weekly_cashflow,
     ].forEach((value) => {
       expect(typeof value).toBe("number");
       expect(hasAtMostTwoDecimals(value)).toBe(true);
     });
+    expect(payload.debt_totals.total_active_debt).toBe(
+      payload.debts.reduce(
+        (sum: number, debt: { balance: number; status: string }) =>
+          debt.status === "active" ? sum + debt.balance : sum,
+        0,
+      ),
+    );
+    expect(payload.plan_metrics.investable_weekly_cashflow).toBe(
+      Math.max(0, round2(payload.projection.wpc - payload.plan_metrics.weekly_tax_due)),
+    );
+    expect(Date.parse(payload.plan_metrics.debt_free_date_iso)).not.toBeNaN();
+    expect(Date.parse(payload.plan_metrics.millionaire_date_iso)).not.toBeNaN();
     expect(
       round2(
         payload.income.this_week_net -
@@ -345,6 +433,12 @@ function createSupabaseMock(
           return this;
         },
         single() {
+          return {
+            data: result.data[0] ?? null,
+            error: result.error,
+          };
+        },
+        maybeSingle() {
           return {
             data: result.data[0] ?? null,
             error: result.error,

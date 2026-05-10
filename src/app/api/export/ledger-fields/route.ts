@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 
 import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
+import { formatWeekDuration } from "@/lib/domain/projection-format";
+import {
+  calcWeeklyProjection,
+  simulateLegacyMillionaire,
+  type DebtRow as ProjectionDebtRow,
+  type WeekRow as ProjectionWeekRow,
+} from "@/lib/domain/projections";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type NumericValue = number | string | null;
@@ -13,6 +20,7 @@ type DebtRow = {
   minimum_payment: NumericValue;
   apr: NumericValue;
   status: "active" | "paid";
+  priority_order: NumericValue;
 };
 
 type AssetRow = {
@@ -26,6 +34,7 @@ type WeekTotalRow = {
   week_id: string;
   start_date: string;
   end_date: string;
+  display_week_number: NumericValue;
   status: string;
   pay_period_role: "week_1" | "week_2";
   paycheck_due_date: string | null;
@@ -70,6 +79,15 @@ type SettingsRow = {
   prestige_ot_net_rate: NumericValue;
   prestige_ilst_net_rate: NumericValue;
   prestige_ilst_ot_net_rate: NumericValue;
+  ability_withholding_rate: NumericValue;
+  prestige_withholding_rate: NumericValue;
+  filing_fee: NumericValue;
+  standard_deduction: NumericValue;
+};
+
+type BaselineTotalRow = {
+  monthly_total: NumericValue;
+  projected_daily_base: NumericValue;
 };
 
 type TransactionRow = {
@@ -88,6 +106,12 @@ const DEFAULT_PRESTIGE_REGULAR_NET_RATE = 14.62;
 const DEFAULT_PRESTIGE_OVERTIME_NET_RATE = 21.93;
 const DEFAULT_PRESTIGE_ILST_REGULAR_NET_RATE = 15.48;
 const DEFAULT_PRESTIGE_ILST_OVERTIME_NET_RATE = 23.22;
+const MILLIONAIRE_TARGET_CENTS = 100_000_000;
+const MILLIONAIRE_ANNUAL_RETURN = 0.1;
+const ROLLING_WINDOW_WEEKS = 2;
+const OWNER_BIRTH_YEAR = 1998;
+const OWNER_BIRTH_MONTH = 0;
+const OWNER_BIRTH_DAY = 12;
 
 export async function GET(request: Request) {
   const authResult = authorizeLedgerRequest(request);
@@ -105,11 +129,20 @@ export async function GET(request: Request) {
     const weekOf = mondayOnOrBeforeIso(todayIso);
     const rolling30StartIso = addDaysIso(todayIso, -29);
     const yearStartIso = `${todayIso.slice(0, 4)}-01-01`;
-    const [debtsRes, assetsRes, weeksRes, dayTotalsRes, daysRes, settingsRes, transactionsRes] =
+    const [
+      debtsRes,
+      assetsRes,
+      weeksRes,
+      dayTotalsRes,
+      daysRes,
+      settingsRes,
+      baselineTotalsRes,
+      transactionsRes,
+    ] =
       await Promise.all([
       supabase
         .from("debts")
-        .select("id,name,balance,minimum_payment,apr,status")
+        .select("id,name,balance,minimum_payment,apr,status,priority_order")
         .eq("user_id", userId)
         .eq("status", "active")
         .gt("balance", 0)
@@ -122,7 +155,7 @@ export async function GET(request: Request) {
       supabase
         .from("v_week_totals")
         .select(
-          "week_id,start_date,end_date,status,pay_period_role,paycheck_due_date,earnings_total,ability_paycheck_earnings,prestige_paycheck_earnings,spend_total,base_total,cashflow_total",
+          "week_id,start_date,end_date,display_week_number,status,pay_period_role,paycheck_due_date,earnings_total,ability_paycheck_earnings,prestige_paycheck_earnings,spend_total,base_total,cashflow_total",
         )
         .eq("user_id", userId)
         .order("start_date", { ascending: true }),
@@ -143,10 +176,15 @@ export async function GET(request: Request) {
       supabase
         .from("settings")
         .select(
-          "prestige_regular_net_rate,prestige_ot_net_rate,prestige_ilst_net_rate,prestige_ilst_ot_net_rate",
+          "prestige_regular_net_rate,prestige_ot_net_rate,prestige_ilst_net_rate,prestige_ilst_ot_net_rate,ability_withholding_rate,prestige_withholding_rate,filing_fee,standard_deduction",
         )
         .eq("user_id", userId)
         .single(),
+      supabase
+        .from("v_active_expense_totals")
+        .select("monthly_total,projected_daily_base")
+        .eq("user_id", userId)
+        .maybeSingle(),
       supabase
         .from("transactions")
         .select("date,amount,category,status")
@@ -162,6 +200,9 @@ export async function GET(request: Request) {
     if (dayTotalsRes.error) throw new Error(`Day totals: ${dayTotalsRes.error.message}`);
     if (daysRes.error) throw new Error(`Days: ${daysRes.error.message}`);
     if (settingsRes.error) throw new Error(`Settings: ${settingsRes.error.message}`);
+    if (baselineTotalsRes.error) {
+      throw new Error(`Baseline totals: ${baselineTotalsRes.error.message}`);
+    }
     if (transactionsRes.error) {
       throw new Error(`Transactions: ${transactionsRes.error.message}`);
     }
@@ -182,6 +223,8 @@ export async function GET(request: Request) {
 
     const slots = (slotsRes.data ?? []) as EarnSlotRow[];
     const settings = settingsRes.data as SettingsRow;
+    const baselineTotals = baselineTotalsRes.data as BaselineTotalRow | null;
+    const debts = ((debtsRes.data ?? []) as DebtRow[]).map(mapDebt);
     const activeWeek =
       weeks.find((week) => week.status === "active") ?? weeks.at(-1) ?? null;
     const thisWeekStartIso = activeWeek?.start_date ?? weekOf;
@@ -244,6 +287,7 @@ export async function GET(request: Request) {
     const baseline = buildBaseline({
       dayTotals,
       weeks,
+      baselineTotals,
       thisWeekStartIso,
       thisWeekEndIso,
       payPeriodStartIso,
@@ -251,11 +295,17 @@ export async function GET(request: Request) {
       rolling30StartIso,
       todayIso,
     });
+    const projectionContext = buildProjectionContext({
+      debts,
+      weeks,
+      settings,
+      activeWeek,
+    });
 
     return NextResponse.json({
       as_of: asOfIso,
       week_of: weekOf,
-      debts: ((debtsRes.data ?? []) as DebtRow[]).map(mapDebt),
+      debts,
       accounts: mapAccounts((assetsRes.data ?? []) as AssetRow[]),
       cashflow: {
         week_start: activeWeek?.start_date ?? weekOf,
@@ -267,6 +317,9 @@ export async function GET(request: Request) {
       income,
       spending,
       baseline,
+      debt_totals: projectionContext.debtTotals,
+      projection: projectionContext.projection,
+      plan_metrics: projectionContext.planMetrics,
     });
   } catch (error) {
     return NextResponse.json(
@@ -360,6 +413,7 @@ function buildIncome({
 function buildBaseline({
   dayTotals,
   weeks,
+  baselineTotals,
   thisWeekStartIso,
   thisWeekEndIso,
   payPeriodStartIso,
@@ -369,6 +423,7 @@ function buildBaseline({
 }: {
   dayTotals: DayTotalRow[];
   weeks: WeekTotalRow[];
+  baselineTotals: BaselineTotalRow | null;
   thisWeekStartIso: string;
   thisWeekEndIso: string;
   payPeriodStartIso: string;
@@ -392,6 +447,156 @@ function buildBaseline({
       sumDayMoney(dayTotals, "base_amount", rolling30StartIso, todayIso),
     ),
     ytd_total: money(ytdRollupCents || sumDayMoney(dayTotals, "base_amount")),
+    current_daily_base: money(
+      dollarsToCents(toNumber(baselineTotals?.projected_daily_base ?? 0)),
+    ),
+    monthly_total: money(
+      dollarsToCents(toNumber(baselineTotals?.monthly_total ?? 0)),
+    ),
+  };
+}
+
+function buildProjectionContext({
+  debts,
+  weeks,
+  settings,
+  activeWeek,
+}: {
+  debts: ReturnType<typeof mapDebt>[];
+  weeks: WeekTotalRow[];
+  settings: SettingsRow;
+  activeWeek: WeekTotalRow | null;
+}) {
+  const projectionDebts: ProjectionDebtRow[] = debts.map((debt) => ({
+    id: debt.id,
+    name: debt.id,
+    balanceCents: dollarsToCents(debt.balance),
+    minimumPaymentCents: dollarsToCents(debt.minimum_payment),
+    aprBps: Math.round(debt.apr * 100),
+    status: debt.status,
+    priorityOrder: debt.priority_order,
+  }));
+  const totalActiveDebtCents = projectionDebts
+    .filter((debt) => debt.status === "active")
+    .reduce((sum, debt) => sum + debt.balanceCents, 0);
+  const totalMinPayMonthlyCents = projectionDebts
+    .filter((debt) => debt.status === "active")
+    .reduce((sum, debt) => sum + debt.minimumPaymentCents, 0);
+  const activeDebtCount = projectionDebts.filter(
+    (debt) => debt.status === "active",
+  ).length;
+  const closedWeeks: ProjectionWeekRow[] = weeks
+    .filter((week) => week.status === "closed")
+    .map((week) => ({
+      startDate: week.start_date,
+      earningsCents: dollarsToCents(toNumber(week.earnings_total)),
+      cashflowCents: dollarsToCents(toNumber(week.cashflow_total)),
+      abilityPaycheckCents: dollarsToCents(
+        toNumber(week.ability_paycheck_earnings),
+      ),
+      prestigePaycheckCents: dollarsToCents(
+        toNumber(week.prestige_paycheck_earnings),
+      ),
+    }));
+  const currentWeekNumber =
+    toNumber(activeWeek?.display_week_number ?? 0) || closedWeeks.length + 1;
+  const projection = calcWeeklyProjection({
+    closedWeeks,
+    currentWeekNumber,
+    rollingWindowWeeks: ROLLING_WINDOW_WEEKS,
+    settings: {
+      abilityRegularNetRateCents: 1563,
+      abilityOvertimeNetRateCents: 2173,
+      prestigeRegularNetRateCents: 1462,
+      prestigeOvertimeNetRateCents: 2193,
+      prestigeIlstRegularNetRateCents: 1548,
+      prestigeIlstOvertimeNetRateCents: 2322,
+      abilityNetMultiplier:
+        1 - toNumber(settings.ability_withholding_rate ?? 0.2652),
+    },
+    withholding: {
+      ability: toNumber(settings.ability_withholding_rate ?? 0.2652),
+      prestige: toNumber(settings.prestige_withholding_rate ?? 0.14),
+      incentive: toNumber(settings.ability_withholding_rate ?? 0.2652),
+      filingFeeCents: dollarsToCents(toNumber(settings.filing_fee ?? 160)),
+      standardDeductionCents: dollarsToCents(
+        toNumber(settings.standard_deduction ?? 15000),
+      ),
+      overtimeExemptionCents: dollarsToCents(900),
+    },
+  });
+  const weeklyTaxDueCents = Math.round(projection.estTaxCents / 52);
+  const investableWeeklyCashflowCents = Math.max(
+    0,
+    projection.wpcCents - weeklyTaxDueCents,
+  );
+  const debtFreeWeeks =
+    projection.wpcCents > 0
+      ? Math.ceil(totalActiveDebtCents / projection.wpcCents)
+      : null;
+  const millionaireDebts = projectionDebts
+    .filter(
+      (debt) =>
+        debt.status === "active" &&
+        debt.balanceCents > 0 &&
+        debt.minimumPaymentCents > 0,
+    )
+    .map((debt) => ({
+      name: debt.name,
+      balanceCents: debt.balanceCents,
+      minimumPaymentWeeklyCents: Math.round(debt.minimumPaymentCents / 4.33),
+    }));
+  const millionaireSim = simulateLegacyMillionaire({
+    startingBalanceCents: -totalActiveDebtCents,
+    weeklyCashflowCents: investableWeeklyCashflowCents,
+    debtsList: millionaireDebts,
+    targetCents: MILLIONAIRE_TARGET_CENTS,
+    annualGrowthRate: MILLIONAIRE_ANNUAL_RETURN,
+  });
+  const debtFreeDateIso = addWeeksFromToday(debtFreeWeeks);
+  const millionaireDateIso = addWeeksFromToday(millionaireSim.weeksToTarget);
+
+  return {
+    debtTotals: {
+      total_active_debt: money(totalActiveDebtCents),
+      active_debt_count: activeDebtCount,
+      total_min_pay_monthly: money(totalMinPayMonthlyCents),
+      total_min_pay_weekly: money(Math.round(totalMinPayMonthlyCents / 4.33)),
+    },
+    projection: {
+      wpc: money(projection.wpcCents),
+      mwe: money(projection.mweCents),
+      avg_earnings: money(projection.avgEarningsCents),
+      recent_earnings: projection.recentEarningsCents.map(money),
+      recent_cashflow: projection.recentCashflowCents.map(money),
+      weeks_remaining: projection.weeksRemaining,
+      ytd_cashflow: money(projection.ytdCfCents),
+      ytd_earnings: money(projection.ytdEarningsCents),
+      ypgc: money(projection.ypgcCents),
+      ypwi_net: money(projection.ypwiNetCents),
+      ypwi_gross: money(projection.ypwiGrossCents),
+      withheld_year_to_date: money(projection.withheldYrCents),
+      fed_liability: money(projection.fedLiabilityCents),
+      ct_liability: money(projection.ctLiabilityCents),
+      fica_liability: money(projection.ficaLiabilityCents),
+      total_liability: money(projection.totalLiabilityCents),
+      est_remaining_tax_owed: money(
+        Math.max(0, projection.totalLiabilityCents - projection.withheldYrCents),
+      ),
+      ypnc: money(projection.ypncCents),
+    },
+    planMetrics: {
+      weekly_tax_due: money(weeklyTaxDueCents),
+      investable_weekly_cashflow: money(investableWeeklyCashflowCents),
+      debt_free_date_iso: debtFreeDateIso,
+      millionaire_date_iso: millionaireDateIso,
+      age_at_millionaire:
+        millionaireDateIso === null ? null : calculateAgeOnDate(millionaireDateIso),
+      millionaire_duration_label:
+        millionaireSim.weeksToTarget === null
+          ? null
+          : formatWeekDuration(millionaireSim.weeksToTarget),
+    },
   };
 }
 
@@ -659,6 +864,7 @@ function mapDebt(row: DebtRow) {
     minimum_due_date: null,
     status: row.status,
     starting_balance: money(balanceCents),
+    priority_order: Math.round(toNumber(row.priority_order)),
   };
 }
 
@@ -715,6 +921,29 @@ function mondayOnOrBeforeIso(todayIso: string): string {
   const dayIndex = date.getUTCDay();
   const daysSinceMonday = (dayIndex + 6) % 7;
   return addDaysIso(todayIso, -daysSinceMonday);
+}
+
+function addWeeksFromToday(weeks: number | null): string | null {
+  if (weeks === null) {
+    return null;
+  }
+
+  const todayIso = getTodayIso();
+  return addDaysIso(todayIso, weeks * 7);
+}
+
+function calculateAgeOnDate(iso: string): number {
+  const date = new Date(`${iso}T00:00:00.000Z`);
+  const birthdayHasPassed =
+    date.getUTCMonth() > OWNER_BIRTH_MONTH ||
+    (date.getUTCMonth() === OWNER_BIRTH_MONTH &&
+      date.getUTCDate() >= OWNER_BIRTH_DAY);
+
+  return (
+    date.getUTCFullYear() -
+    OWNER_BIRTH_YEAR -
+    (birthdayHasPassed ? 0 : 1)
+  );
 }
 
 function money(cents: number): number {
