@@ -7,11 +7,6 @@ export default async function HomePage() {
   // edit, React reconciles props and preserves client state (focused day,
   // expanded drawers, etc.).
   return (
-    <div
-      className="dashboard-penthouse-bg min-h-screen bg-fixed"
-      style={{ backgroundImage: "url('/images/penthouse.png')" }}
-    >
-      <DashboardEditor initialData={dashboardData} key={dashboardData.week.id} />
-    </div>
+    <DashboardEditor initialData={dashboardData} key={dashboardData.week.id} />
   );
 }

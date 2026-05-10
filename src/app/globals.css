@@ -50,24 +50,54 @@ html {
   background: rgba(14, 116, 144, 0.32);
 }
 
-.dashboard-penthouse-bg {
-  background-position: 35% center;
-  background-size: auto 125%;
+/*
+  Penthouse background layer — fixed, viewport-sized, scaled up so a
+  transform-based pan animation has slack to drift through. Living on a
+  single layout-level element so every protected route shares it.
+*/
+.penthouse-bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/images/penthouse.png');
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+  transform: scale(1.15);
+  transform-origin: center;
+}
+
+@media (min-width: 768px) {
+  .penthouse-bg-layer {
+    background-position: 30% 30%;
+    transform: scale(1.18);
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .dashboard-penthouse-bg {
-    animation: dashboard-penthouse-pan 60s ease-in-out infinite alternate;
+  .penthouse-bg-layer {
+    animation: penthouse-pan 40s ease-in-out infinite alternate;
+    will-change: transform;
   }
 }
 
-@keyframes dashboard-penthouse-pan {
+@keyframes penthouse-pan {
   from {
-    background-position: 35% center;
+    transform: scale(1.15) translateX(-3%);
   }
-
   to {
-    background-position: 65% center;
+    transform: scale(1.15) translateX(3%);
+  }
+}
+
+@media (min-width: 768px) {
+  @keyframes penthouse-pan {
+    from {
+      transform: scale(1.18) translateX(-3%);
+    }
+    to {
+      transform: scale(1.18) translateX(3%);
+    }
   }
 }
 

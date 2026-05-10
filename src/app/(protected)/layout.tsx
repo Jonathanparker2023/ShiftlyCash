@@ -16,6 +16,7 @@ export default async function ProtectedLayout({
 
   return (
     <>
+      <div aria-hidden="true" className="penthouse-bg-layer" />
       <nav className="sticky top-0 z-50 border-b border-[#2f3d52] bg-[#0b1220] px-3 py-3 text-white shadow-[0_10px_30px_rgba(0,0,0,0.24)] sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
           <div className="flex items-center justify-between gap-3">

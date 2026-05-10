@@ -61,13 +61,13 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 py-5 text-zinc-950 sm:px-6 lg:px-8">
-      <header className="mx-auto mb-5 max-w-7xl border-b border-zinc-200 pb-4">
-        <p className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-500">
+    <div className="min-h-screen px-4 py-5 text-white sm:px-6 lg:px-8">
+      <header className="mx-auto mb-5 max-w-7xl border-b border-white/15 pb-4">
+        <p className="text-sm font-medium uppercase tracking-[0.18em] text-white/70">
           ShiftlyCash
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">History</h1>
-        <p className="mt-1 text-sm text-zinc-600">
+        <p className="mt-1 text-sm text-white/85">
           Closed and archived weeks, with projection exclusions. Excluded values
           are ignored by projection averages, not deleted.
         </p>
@@ -76,20 +76,20 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
       <HistorySummary weeks={weeks} />
 
       {error ? (
-        <div className="mx-auto mb-4 max-w-7xl rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
+        <div className="mx-auto mb-4 max-w-7xl rounded-md border border-red-300/60 bg-red-500/15 p-3 text-sm font-medium text-red-200 backdrop-blur-md">
           {error}
         </div>
       ) : null}
 
       <main className="mx-auto max-w-7xl">
         {weeks.length === 0 ? (
-          <section className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-600 shadow-sm">
+          <section className="rounded-md border border-white/15 bg-black/15 p-6 text-sm text-white/85 shadow-sm backdrop-blur-md">
             No closed weeks yet. Once you close your first week, it will appear here.
           </section>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-md border border-white/15 bg-black/15 shadow-sm backdrop-blur-md">
             <table className="min-w-[980px] w-full border-collapse text-left text-sm">
-              <thead className="border-b border-zinc-200 bg-zinc-100 text-xs uppercase tracking-[0.12em] text-zinc-500">
+              <thead className="border-b border-white/15 bg-white/10 text-xs uppercase tracking-[0.12em] text-white/70">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Week #</th>
                   <th className="px-4 py-3 font-semibold">Date range</th>
@@ -106,18 +106,18 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
               <tbody>
                 {weeks.map((week) => (
                   <tr
-                    className="border-b border-zinc-100 last:border-0"
+                    className="border-b border-white/10 last:border-0"
                     key={week.id}
                   >
                     <td className="px-4 py-3 font-medium">
                       Week {week.displayWeekNumber}
                       {week.archivedAt ? (
-                        <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                        <span className="ml-2 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80">
                           Archived
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 text-zinc-600">
+                    <td className="px-4 py-3 text-white/85">
                       {formatDateRange(week.startDate, week.endDate)}
                     </td>
                     <ProjectionCell
@@ -125,7 +125,7 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                       isPending={isPending(pendingAction, week.id, "earnings")}
                       isExcluded={week.exclusions.earnings}
                       value={week.earningsCents}
-                      colorClass="text-emerald-600"
+                      colorClass="text-emerald-300"
                       week={week}
                       onToggle={toggleExclusion}
                     />
@@ -134,11 +134,11 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                       isPending={isPending(pendingAction, week.id, "spend")}
                       isExcluded={week.exclusions.spend}
                       value={week.spendCents}
-                      colorClass="text-red-600"
+                      colorClass="text-red-300"
                       week={week}
                       onToggle={toggleExclusion}
                     />
-                    <td className="px-4 py-3 text-right font-medium text-zinc-400">
+                    <td className="px-4 py-3 text-right font-medium text-white/60">
                       {formatMoney(week.baseCents)}
                     </td>
                     <ProjectionCell
@@ -160,7 +160,7 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Link
-                          className="h-8 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition hover:border-zinc-950 hover:text-zinc-950"
+                          className="h-8 rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white/85 transition hover:border-white/50 hover:text-white"
                           href={`/history/${week.id}`}
                         >
                           View
@@ -200,7 +200,7 @@ function ProjectionCell({
       <button
         className={
           isExcluded
-            ? "inline-flex items-center justify-end gap-2 font-medium text-zinc-400 line-through transition hover:text-zinc-600"
+            ? "inline-flex items-center justify-end gap-2 font-medium text-white/50 line-through transition hover:text-white/80"
             : `inline-flex items-center justify-end gap-2 font-semibold ${colorClass} transition hover:opacity-80`
         }
         disabled={isPending}
@@ -210,7 +210,7 @@ function ProjectionCell({
       >
         {formatMoney(value)}
         {isExcluded ? (
-          <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500 no-underline">
+          <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80 no-underline">
             EXCL
           </span>
         ) : null}
@@ -220,7 +220,7 @@ function ProjectionCell({
 }
 
 function runningColor(cents: number): string {
-  return cents < 0 ? "text-red-600" : "text-zinc-950";
+  return cents < 0 ? "text-red-300" : "text-white";
 }
 
 function isPending(

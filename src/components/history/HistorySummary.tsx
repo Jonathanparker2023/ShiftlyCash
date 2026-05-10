@@ -96,13 +96,13 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
   const visibleTiles = orderedTiles.filter((tile) => !hidden.has(tile.id));
 
   return (
-    <section className="mx-auto mb-5 max-w-7xl rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+    <section className="mx-auto mb-5 max-w-7xl rounded-md border border-white/15 bg-black/15 p-4 shadow-sm backdrop-blur-md">
       {weeks.length === 0 ? (
-        <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-600">
+        <div className="rounded-md border border-white/15 bg-black/20 p-4 backdrop-blur-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
             No history yet
           </p>
-          <p className="mt-2 text-sm text-zinc-700">
+          <p className="mt-2 text-sm text-white/85">
             Close your first week from the dashboard to start filling in metrics.
           </p>
         </div>
@@ -110,15 +110,15 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-600">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
                 History summary
               </p>
-              <p className="mt-1 text-sm text-zinc-600">
+              <p className="mt-1 text-sm text-white/85">
                 Totals, averages, and medians across closed weeks.
               </p>
             </div>
             <button
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/40"
               onClick={() => setIsCustomizing((current) => !current)}
               type="button"
             >
@@ -223,7 +223,7 @@ function CustomizePanel({
   }
 
   return (
-    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+    <div className="rounded-md border border-white/15 bg-black/20 p-3 backdrop-blur-md">
       <DndContext
         collisionDetection={closestCenter}
         onDragEnd={reorderTiles}
@@ -244,7 +244,7 @@ function CustomizePanel({
       </DndContext>
       <div className="mt-3 flex justify-end">
         <button
-          className="rounded-md bg-zinc-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+          className="rounded-md bg-zinc-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-white/40"
           onClick={onClose}
           type="button"
         >
@@ -281,15 +281,15 @@ function SortableCustomizeRow({
     <div
       className={
         isDragging
-          ? "flex items-center gap-3 rounded-md border border-[#1d4ed8] bg-white p-2 opacity-80 shadow-sm"
-          : "flex items-center gap-3 rounded-md border border-zinc-200 bg-white p-2 shadow-sm"
+          ? "flex items-center gap-3 rounded-md border border-white/60 bg-white/15 p-2 opacity-80 shadow-sm"
+          : "flex items-center gap-3 rounded-md border border-white/15 bg-white/10 p-2 shadow-sm"
       }
       ref={setNodeRef}
       style={style}
     >
       <button
         aria-label={`Drag ${tile.label}`}
-        className="h-8 w-8 touch-none rounded-md border border-zinc-300 bg-zinc-50 text-sm font-bold text-zinc-700 transition hover:border-[#1d4ed8] hover:text-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+        className="h-8 w-8 touch-none rounded-md border border-white/20 bg-white/10 text-sm font-bold text-white transition hover:border-white/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
         title="Drag to reorder"
         type="button"
         {...attributes}
@@ -297,16 +297,16 @@ function SortableCustomizeRow({
       >
         ::
       </button>
-      <label className="flex min-w-0 flex-1 items-center gap-3 text-sm font-semibold text-zinc-800">
+      <label className="flex min-w-0 flex-1 items-center gap-3 text-sm font-semibold text-white">
         <input
           checked={!hidden}
-          className="h-4 w-4 accent-[#1d4ed8]"
+          className="h-4 w-4 accent-white"
           onChange={onToggle}
           type="checkbox"
         />
         <span className="truncate">{tile.label}</span>
       </label>
-      <span className="text-sm font-bold tabular-nums text-[#020617]">
+      <span className="text-sm font-bold tabular-nums text-white">
         {tile.displayValue}
       </span>
     </div>
@@ -315,11 +315,11 @@ function SortableCustomizeRow({
 
 function SummaryTileCard({ tile }: { tile: SummaryTile }) {
   return (
-    <div className="rounded-md border-2 border-zinc-300 bg-white p-4 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-700">
+    <div className="rounded-md border-2 border-white/30 bg-black/25 p-4 shadow-sm backdrop-blur-md">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/85">
         {tile.label}
       </p>
-      <p className="mt-3 rounded-md bg-white px-2 py-1 text-3xl font-black leading-none tracking-tight text-[#020617] shadow-sm ring-1 ring-zinc-200 sm:text-4xl">
+      <p className="mt-3 rounded-md bg-black/25 px-2 py-1 text-3xl font-black leading-none tracking-tight text-white shadow-sm ring-1 ring-white/20 sm:text-4xl">
         {tile.displayValue}
       </p>
     </div>
