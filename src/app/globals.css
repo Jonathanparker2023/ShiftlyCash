@@ -55,19 +55,37 @@ html {
   background-size: auto 125%;
 }
 
+/*
+  Desktop: bump zoom and shift focus toward the upper portion of the image
+  (sky + skyline). The default `auto 125%` left desktop viewports without
+  enough horizontal slack to make the pan visible. `auto 155%` gives clear
+  pan room without going overboard.
+*/
+@media (min-width: 768px) {
+  .dashboard-penthouse-bg {
+    background-position: 35% 30%;
+    background-size: auto 155%;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .dashboard-penthouse-bg {
     animation: dashboard-penthouse-pan 60s ease-in-out infinite alternate;
   }
 }
 
+/*
+  Animate only the X position so the desktop media query's vertical anchor
+  (35% / 30%) and the mobile default (center) are each preserved during the
+  pan. Animating the shorthand would clobber whichever vertical was set.
+*/
 @keyframes dashboard-penthouse-pan {
   from {
-    background-position: 35% center;
+    background-position-x: 35%;
   }
 
   to {
-    background-position: 65% center;
+    background-position-x: 65%;
   }
 }
 
