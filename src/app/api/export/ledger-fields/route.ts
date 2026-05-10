@@ -28,6 +28,7 @@ type AssetRow = {
   name: string;
   value: NumericValue;
   category: string;
+  linked_debt_id: string | null;
 };
 
 type WeekTotalRow = {
@@ -149,7 +150,7 @@ export async function GET(request: Request) {
         .order("priority_order", { ascending: true }),
       supabase
         .from("assets")
-        .select("id,name,value,category")
+        .select("id,name,value,category,linked_debt_id")
         .eq("user_id", userId)
         .order("name", { ascending: true }),
       supabase
@@ -300,6 +301,7 @@ export async function GET(request: Request) {
       weeks,
       settings,
       activeWeek,
+      assets: (assetsRes.data ?? []) as AssetRow[],
     });
 
     return NextResponse.json({
@@ -461,11 +463,13 @@ function buildProjectionContext({
   weeks,
   settings,
   activeWeek,
+  assets,
 }: {
   debts: ReturnType<typeof mapDebt>[];
   weeks: WeekTotalRow[];
   settings: SettingsRow;
   activeWeek: WeekTotalRow | null;
+  assets: AssetRow[];
 }) {
   const projectionDebts: ProjectionDebtRow[] = debts.map((debt) => ({
     id: debt.id,
@@ -534,12 +538,18 @@ function buildProjectionContext({
     projection.wpcCents > 0
       ? Math.ceil(totalActiveDebtCents / projection.wpcCents)
       : null;
+  const linkedDebtIds = new Set(
+    assets
+      .map((asset) => asset.linked_debt_id)
+      .filter((id): id is string => typeof id === "string"),
+  );
   const millionaireDebts = projectionDebts
     .filter(
       (debt) =>
         debt.status === "active" &&
         debt.balanceCents > 0 &&
-        debt.minimumPaymentCents > 0,
+        debt.minimumPaymentCents > 0 &&
+        linkedDebtIds.has(debt.id),
     )
     .map((debt) => ({
       name: debt.name,

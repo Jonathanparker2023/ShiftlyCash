@@ -44,6 +44,7 @@ describe("/api/export/ledger-fields", () => {
               name: "Property fund",
               value: 250,
               category: "cash",
+              linked_debt_id: "debt-1",
             },
           ],
           error: null,
