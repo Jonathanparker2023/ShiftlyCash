@@ -18,7 +18,7 @@ const JOB_OPTIONS: JobType[] = [
   "incentive",
   "other",
 ];
-const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "unit"];
+const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "split", "unit"];
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -167,31 +167,68 @@ function TemplateSlotRow({
       <select
         className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
         onChange={(event) =>
-          onChange(slot.dayIndex, slot.slotIndex, {
-            payType: event.target.value as PayType,
-          })
+          onChange(
+            slot.dayIndex,
+            slot.slotIndex,
+            normalizePayTypePatch(slot, event.target.value as PayType),
+          )
         }
         value={slot.payType}
       >
         {PAY_OPTIONS.map((payType) => (
           <option key={payType} value={payType}>
-            {payType}
+            {formatPayOptionLabel(payType)}
           </option>
         ))}
       </select>
 
-      <input
-        className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
-        min="0"
-        onChange={(event) =>
-          onChange(slot.dayIndex, slot.slotIndex, {
-            hoursOrUnits: parsePositiveNumber(event.target.value),
-          })
-        }
-        step="0.25"
-        type="number"
-        value={slot.hoursOrUnits}
-      />
+      {slot.payType === "split" ? (
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            aria-label="Regular hours"
+            className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            min="0"
+            onChange={(event) => {
+              const regularHours = parsePositiveNumber(event.target.value);
+              onChange(slot.dayIndex, slot.slotIndex, {
+                regularHours,
+                hoursOrUnits: regularHours + slot.overtimeHours,
+              });
+            }}
+            step="0.25"
+            type="number"
+            value={formatNumberInput(slot.regularHours)}
+          />
+          <input
+            aria-label="OT hours"
+            className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            min="0"
+            onChange={(event) => {
+              const overtimeHours = parsePositiveNumber(event.target.value);
+              onChange(slot.dayIndex, slot.slotIndex, {
+                overtimeHours,
+                hoursOrUnits: slot.regularHours + overtimeHours,
+              });
+            }}
+            step="0.25"
+            type="number"
+            value={formatNumberInput(slot.overtimeHours)}
+          />
+        </div>
+      ) : (
+        <input
+          className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
+          min="0"
+          onChange={(event) =>
+            onChange(slot.dayIndex, slot.slotIndex, {
+              hoursOrUnits: parsePositiveNumber(event.target.value),
+            })
+          }
+          step="0.25"
+          type="number"
+          value={formatNumberInput(slot.hoursOrUnits)}
+        />
+      )}
     </div>
   );
 }
@@ -231,6 +268,8 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       ...slot,
       payType: "none",
       hoursOrUnits: 0,
+      regularHours: 0,
+      overtimeHours: 0,
     };
   }
 
@@ -239,8 +278,24 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       ...slot,
       payType: "unit",
       hoursOrUnits: Math.max(0, slot.hoursOrUnits),
+      regularHours: 0,
+      overtimeHours: 0,
     };
   }
+
+  if (slot.payType === "split") {
+    const regularHours = Math.max(0, slot.regularHours);
+    const overtimeHours = Math.max(0, slot.overtimeHours);
+
+    return {
+      ...slot,
+      regularHours,
+      overtimeHours,
+      hoursOrUnits: regularHours + overtimeHours,
+    };
+  }
+
+  const hoursOrUnits = Math.max(0, slot.hoursOrUnits);
 
   return {
     ...slot,
@@ -248,7 +303,43 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       slot.payType === "regular" || slot.payType === "overtime"
         ? slot.payType
         : "regular",
-    hoursOrUnits: Math.max(0, slot.hoursOrUnits),
+    hoursOrUnits,
+    regularHours: slot.payType === "overtime" ? 0 : hoursOrUnits,
+    overtimeHours: slot.payType === "overtime" ? hoursOrUnits : 0,
+  };
+}
+
+function normalizePayTypePatch(
+  slot: TemplateSlotDraft,
+  payType: PayType,
+): Partial<TemplateSlotDraft> {
+  if (payType === "split") {
+    return {
+      payType,
+      hoursOrUnits: slot.hoursOrUnits,
+      regularHours: slot.payType === "overtime" ? 0 : slot.hoursOrUnits,
+      overtimeHours: slot.payType === "overtime" ? slot.hoursOrUnits : 0,
+    };
+  }
+
+  if (payType === "regular" || payType === "overtime") {
+    const hoursOrUnits =
+      slot.payType === "split"
+        ? slot.regularHours + slot.overtimeHours
+        : slot.hoursOrUnits;
+
+    return {
+      payType,
+      hoursOrUnits,
+      regularHours: payType === "regular" ? hoursOrUnits : 0,
+      overtimeHours: payType === "overtime" ? hoursOrUnits : 0,
+    };
+  }
+
+  return {
+    payType,
+    regularHours: 0,
+    overtimeHours: 0,
   };
 }
 
@@ -257,14 +348,26 @@ function parsePositiveNumber(value: string): number {
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
 
+function formatNumberInput(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
 function formatJobLabel(jobType: JobType): string {
   if (jobType === "prestige") {
     return "Prestige $17";
   }
 
   if (jobType === "prestige_ilst") {
-    return "Prestige ILST $18";
+    return "Prestige";
   }
 
   return jobType;
+}
+
+function formatPayOptionLabel(payType: PayType): string {
+  if (payType === "split") {
+    return "Split (Reg + OT)";
+  }
+
+  return payType;
 }

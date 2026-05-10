@@ -12,7 +12,7 @@ export type JobType =
   | "incentive"
   | "other"
   | "none";
-export type PayType = "regular" | "overtime" | "unit" | "none";
+export type PayType = "regular" | "overtime" | "split" | "unit" | "none";
 export type PayPeriodRole = "week_1" | "week_2";
 
 export type PaySettings = {
@@ -31,6 +31,8 @@ export type EarnSlotInput = {
   jobType: JobType;
   payType?: PayType;
   hoursOrUnits?: number;
+  regularHours?: number;
+  overtimeHours?: number;
   label?: string;
 };
 
@@ -90,22 +92,25 @@ export function calculateEarnSlot(
 ): EarnSlotTotals {
   const amount = Math.max(0, slot.hoursOrUnits ?? 0);
 
-  if (slot.jobType === "none" || amount === 0) {
+  if (slot.jobType === "none") {
     return emptyEarnSlotTotals();
   }
 
   if (slot.jobType === "ability") {
-    const rate =
-      slot.payType === "overtime"
-        ? settings.abilityOvertimeNetRateCents
-        : settings.abilityRegularNetRateCents;
-    const earningsCents = Math.round(amount * rate);
+    const { regularHours, overtimeHours, wageHours } = wageHourParts(slot);
+    if (wageHours === 0) {
+      return emptyEarnSlotTotals();
+    }
+
+    const earningsCents =
+      Math.round(regularHours * settings.abilityRegularNetRateCents) +
+      Math.round(overtimeHours * settings.abilityOvertimeNetRateCents);
 
     return {
       earningsCents,
       abilityPaycheckCents: earningsCents,
       prestigePaycheckCents: 0,
-      wageHours: amount,
+      wageHours,
     };
   }
 
@@ -113,22 +118,31 @@ export function calculateEarnSlot(
     // v0 stopgap: Prestige OT uses simple 1.5x net rates. Real Prestige OT is
     // FLSA weighted-average per workweek and belongs in the next rebuild.
     const isIlst = slot.jobType === "prestige_ilst";
-    const rate =
-      slot.payType === "overtime"
-        ? isIlst
-          ? settings.prestigeIlstOvertimeNetRateCents
-          : settings.prestigeOvertimeNetRateCents
-        : isIlst
-          ? settings.prestigeIlstRegularNetRateCents
-          : settings.prestigeRegularNetRateCents;
-    const earningsCents = Math.round(amount * rate);
+    const { regularHours, overtimeHours, wageHours } = wageHourParts(slot);
+    if (wageHours === 0) {
+      return emptyEarnSlotTotals();
+    }
+
+    const regularRate = isIlst
+      ? settings.prestigeIlstRegularNetRateCents
+      : settings.prestigeRegularNetRateCents;
+    const overtimeRate = isIlst
+      ? settings.prestigeIlstOvertimeNetRateCents
+      : settings.prestigeOvertimeNetRateCents;
+    const earningsCents =
+      Math.round(regularHours * regularRate) +
+      Math.round(overtimeHours * overtimeRate);
 
     return {
       earningsCents,
       abilityPaycheckCents: 0,
       prestigePaycheckCents: earningsCents,
-      wageHours: amount,
+      wageHours,
     };
+  }
+
+  if (amount === 0) {
+    return emptyEarnSlotTotals();
   }
 
   if (slot.jobType === "incentive") {
@@ -153,6 +167,36 @@ export function calculateEarnSlot(
     prestigePaycheckCents: 0,
     wageHours: 0,
   };
+}
+
+function wageHourParts(slot: EarnSlotInput): {
+  regularHours: number;
+  overtimeHours: number;
+  wageHours: number;
+} {
+  if (slot.payType === "split") {
+    const regularHours = Math.max(0, slot.regularHours ?? 0);
+    const overtimeHours = Math.max(0, slot.overtimeHours ?? 0);
+
+    return {
+      regularHours,
+      overtimeHours,
+      wageHours: regularHours + overtimeHours,
+    };
+  }
+
+  if (slot.payType === "overtime") {
+    const overtimeHours = Math.max(
+      0,
+      slot.overtimeHours ?? slot.hoursOrUnits ?? 0,
+    );
+
+    return { regularHours: 0, overtimeHours, wageHours: overtimeHours };
+  }
+
+  const regularHours = Math.max(0, slot.regularHours ?? slot.hoursOrUnits ?? 0);
+
+  return { regularHours, overtimeHours: 0, wageHours: regularHours };
 }
 
 export function calculateDayTotals(

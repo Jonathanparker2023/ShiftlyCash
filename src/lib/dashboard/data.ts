@@ -57,6 +57,8 @@ type EarnSlotRow = {
   job_type: JobType;
   pay_type: PayType;
   hours_or_units: NumericValue;
+  regular_hours: NumericValue;
+  overtime_hours: NumericValue;
   label: string | null;
   source: EarnSlotSource;
 };
@@ -65,6 +67,8 @@ type AdjacentEarnSlotRow = {
   job_type: JobType;
   pay_type: PayType;
   hours_or_units: NumericValue;
+  regular_hours: NumericValue;
+  overtime_hours: NumericValue;
 };
 
 type TransactionRow = {
@@ -240,7 +244,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           supabase
             .from("earn_slots")
             .select(
-              "id,day_id,slot_index,job_type,pay_type,hours_or_units,label,source",
+              "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,label,source",
             )
             .in("day_id", dayIds)
             .order("slot_index", { ascending: true }),
@@ -450,7 +454,7 @@ async function loadAdjacentAbilityPayPeriod({
     adjacentDayIds.length > 0
       ? await supabase
           .from("earn_slots")
-          .select("job_type,pay_type,hours_or_units")
+          .select("job_type,pay_type,hours_or_units,regular_hours,overtime_hours")
           .in("day_id", adjacentDayIds)
       : { data: [], error: null };
 
@@ -504,17 +508,28 @@ function sumAbilityHours(slots: AdjacentEarnSlotRow[]): {
       return total;
     }
 
+      if (slot.pay_type === "split") {
+        return {
+          regularHours: total.regularHours + toNumber(slot.regular_hours),
+          overtimeHours: total.overtimeHours + toNumber(slot.overtime_hours),
+        };
+      }
+
       if (slot.pay_type === "regular") {
         return {
           ...total,
-          regularHours: total.regularHours + toNumber(slot.hours_or_units),
+          regularHours:
+            total.regularHours +
+            toNumber(slot.regular_hours ?? slot.hours_or_units),
         };
       }
 
       if (slot.pay_type === "overtime") {
         return {
           ...total,
-          overtimeHours: total.overtimeHours + toNumber(slot.hours_or_units),
+          overtimeHours:
+            total.overtimeHours +
+            toNumber(slot.overtime_hours ?? slot.hours_or_units),
         };
       }
 
@@ -574,6 +589,8 @@ function mapDashboardDay(
         jobType: slot?.job_type ?? "none",
         payType: slot?.pay_type ?? "none",
         hoursOrUnits: toNumber(slot?.hours_or_units ?? 0),
+        regularHours: toNumber(slot?.regular_hours ?? 0),
+        overtimeHours: toNumber(slot?.overtime_hours ?? 0),
         label: slot?.label ?? "",
         source: slot?.source ?? "user",
       };

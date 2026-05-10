@@ -39,8 +39,10 @@ type EarnSlotRow = {
     | "incentive"
     | "other"
     | "none";
-  pay_type: "regular" | "overtime" | "unit" | "none";
+  pay_type: "regular" | "overtime" | "split" | "unit" | "none";
   hours_or_units: NumericValue;
+  regular_hours: NumericValue;
+  overtime_hours: NumericValue;
 };
 
 type PaycheckActualRow = {
@@ -156,7 +158,7 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
     dayIds.length > 0
       ? await supabase
           .from("earn_slots")
-          .select("day_id,job_type,pay_type,hours_or_units")
+          .select("day_id,job_type,pay_type,hours_or_units,regular_hours,overtime_hours")
           .in("day_id", dayIds)
       : { data: [], error: null };
 
@@ -421,12 +423,21 @@ function sumHoursForWeek(
         return total;
       }
 
+      if (slot.pay_type === "split") {
+        total.regularHours += toNumber(slot.regular_hours);
+        total.overtimeHours += toNumber(slot.overtime_hours);
+      }
+
       if (slot.pay_type === "regular") {
-        total.regularHours += toNumber(slot.hours_or_units);
+        total.regularHours += toNumber(
+          slot.regular_hours ?? slot.hours_or_units,
+        );
       }
 
       if (slot.pay_type === "overtime") {
-        total.overtimeHours += toNumber(slot.hours_or_units);
+        total.overtimeHours += toNumber(
+          slot.overtime_hours ?? slot.hours_or_units,
+        );
       }
 
       return total;

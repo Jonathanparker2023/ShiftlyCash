@@ -27,6 +27,8 @@ export type DashboardSlot = EarnSlotInput & {
   dayId: string;
   slotIndex: number;
   hoursOrUnits: number;
+  regularHours: number;
+  overtimeHours: number;
   label: string;
   source: EarnSlotSource;
 };

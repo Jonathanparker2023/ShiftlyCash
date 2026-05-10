@@ -28,6 +28,8 @@ export type SaveEarnSlotInput = {
   jobType: JobType;
   payType: PayType;
   hoursOrUnits: number;
+  regularHours?: number;
+  overtimeHours?: number;
   label: string;
 };
 
@@ -160,6 +162,8 @@ export async function saveEarnSlotAction(
         job_type: normalized.jobType,
         pay_type: normalized.payType,
         hours_or_units: normalized.hoursOrUnits,
+        regular_hours: normalized.regularHours ?? 0,
+        overtime_hours: normalized.overtimeHours ?? 0,
         label: normalized.label || null,
         source: "user",
       },
@@ -394,6 +398,8 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
       jobType,
       payType: "none",
       hoursOrUnits: 0,
+      regularHours: 0,
+      overtimeHours: 0,
       label: "",
     };
   }
@@ -405,22 +411,54 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
       jobType,
       payType: "unit",
       hoursOrUnits: requireNonNegativeNumber(input.hoursOrUnits, "hoursOrUnits"),
+      regularHours: 0,
+      overtimeHours: 0,
       label,
     };
   }
+
+  const payType = normalizeWagePayType(input.payType);
+  if (payType === "split") {
+    const regularHours = requirePositiveNumber(
+      input.regularHours ?? 0,
+      "regularHours",
+    );
+    const overtimeHours = requirePositiveNumber(
+      input.overtimeHours ?? 0,
+      "overtimeHours",
+    );
+
+    return {
+      dayId,
+      slotIndex,
+      jobType,
+      payType,
+      hoursOrUnits: regularHours + overtimeHours,
+      regularHours,
+      overtimeHours,
+      label,
+    };
+  }
+
+  const hoursOrUnits = requireNonNegativeNumber(
+    input.hoursOrUnits,
+    "hoursOrUnits",
+  );
 
   return {
     dayId,
     slotIndex,
     jobType,
-    payType: normalizeWagePayType(input.payType),
-    hoursOrUnits: requireNonNegativeNumber(input.hoursOrUnits, "hoursOrUnits"),
+    payType,
+    hoursOrUnits,
+    regularHours: payType === "regular" ? hoursOrUnits : 0,
+    overtimeHours: payType === "overtime" ? hoursOrUnits : 0,
     label,
   };
 }
 
 function normalizeWagePayType(payType: PayType): PayType {
-  if (payType === "regular" || payType === "overtime") {
+  if (payType === "regular" || payType === "overtime" || payType === "split") {
     return payType;
   }
 
@@ -464,6 +502,14 @@ function requirePositiveInteger(value: number, fieldName: string): number {
 
 function requireNonNegativeNumber(value: number, fieldName: string): number {
   if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`Invalid ${fieldName}.`);
+  }
+
+  return value;
+}
+
+function requirePositiveNumber(value: number, fieldName: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`Invalid ${fieldName}.`);
   }
 

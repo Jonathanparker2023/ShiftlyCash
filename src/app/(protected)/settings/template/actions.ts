@@ -59,6 +59,8 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       jobType,
       payType: "none",
       hoursOrUnits: 0,
+      regularHours: 0,
+      overtimeHours: 0,
     };
   }
 
@@ -72,20 +74,51 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
         slot.hoursOrUnits,
         "hoursOrUnits",
       ),
+      regularHours: 0,
+      overtimeHours: 0,
     };
   }
+
+  const payType = normalizeWagePayType(slot.payType);
+  if (payType === "split") {
+    const regularHours = requirePositiveNumber(
+      slot.regularHours,
+      "regularHours",
+    );
+    const overtimeHours = requirePositiveNumber(
+      slot.overtimeHours,
+      "overtimeHours",
+    );
+
+    return {
+      dayIndex,
+      slotIndex,
+      jobType,
+      payType,
+      hoursOrUnits: regularHours + overtimeHours,
+      regularHours,
+      overtimeHours,
+    };
+  }
+
+  const hoursOrUnits = requireNonNegativeNumber(
+    slot.hoursOrUnits,
+    "hoursOrUnits",
+  );
 
   return {
     dayIndex,
     slotIndex,
     jobType,
-    payType: normalizeWagePayType(slot.payType),
-    hoursOrUnits: requireNonNegativeNumber(slot.hoursOrUnits, "hoursOrUnits"),
+    payType,
+    hoursOrUnits,
+    regularHours: payType === "regular" ? hoursOrUnits : 0,
+    overtimeHours: payType === "overtime" ? hoursOrUnits : 0,
   };
 }
 
 function normalizeWagePayType(payType: PayType): PayType {
-  if (payType === "regular" || payType === "overtime") {
+  if (payType === "regular" || payType === "overtime" || payType === "split") {
     return payType;
   }
 
@@ -107,6 +140,14 @@ function requireIntegerInRange(
 
 function requireNonNegativeNumber(value: number, fieldName: string): number {
   if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`Invalid ${fieldName}.`);
+  }
+
+  return value;
+}
+
+function requirePositiveNumber(value: number, fieldName: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`Invalid ${fieldName}.`);
   }
 

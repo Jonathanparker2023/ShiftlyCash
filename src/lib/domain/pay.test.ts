@@ -95,6 +95,53 @@ describe("pay calculations", () => {
     });
   });
 
+  it("calculates split wage slots from regular and overtime hours", () => {
+    expect(
+      calculateEarnSlot({
+        jobType: "ability",
+        payType: "split",
+        hoursOrUnits: 12,
+        regularHours: 4,
+        overtimeHours: 8,
+      }),
+    ).toMatchObject({
+      earningsCents: 23_636,
+      abilityPaycheckCents: 23_636,
+      prestigePaycheckCents: 0,
+      wageHours: 12,
+    });
+
+    expect(
+      calculateEarnSlot({
+        jobType: "prestige",
+        payType: "split",
+        hoursOrUnits: 12,
+        regularHours: 4,
+        overtimeHours: 8,
+      }),
+    ).toMatchObject({
+      earningsCents: 23_392,
+      abilityPaycheckCents: 0,
+      prestigePaycheckCents: 23_392,
+      wageHours: 12,
+    });
+
+    expect(
+      calculateEarnSlot({
+        jobType: "prestige_ilst",
+        payType: "split",
+        hoursOrUnits: 12,
+        regularHours: 4,
+        overtimeHours: 8,
+      }),
+    ).toMatchObject({
+      earningsCents: 24_768,
+      abilityPaycheckCents: 0,
+      prestigePaycheckCents: 24_768,
+      wageHours: 12,
+    });
+  });
+
   it("counts incentive toward ability paycheck and other income only toward cashflow", () => {
     expect(
       calculateEarnSlot({

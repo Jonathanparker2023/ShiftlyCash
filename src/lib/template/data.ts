@@ -20,6 +20,8 @@ type TemplateSlotRow = {
   job_type: JobType;
   pay_type: PayType;
   hours_or_units: NumericValue;
+  regular_hours: NumericValue;
+  overtime_hours: NumericValue;
 };
 
 export async function getTemplateEditorData(): Promise<TemplateEditorData> {
@@ -38,7 +40,9 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
   const template = templateData as TemplateRow;
   const { data: slotData, error: slotError } = await supabase
     .from("template_slots")
-    .select("day_index,slot_index,job_type,pay_type,hours_or_units")
+    .select(
+      "day_index,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours",
+    )
     .eq("template_id", template.id)
     .order("day_index", { ascending: true })
     .order("slot_index", { ascending: true });
@@ -82,6 +86,8 @@ function mapTemplateSlot(
     jobType: row?.job_type ?? "none",
     payType: row?.pay_type ?? "none",
     hoursOrUnits: toNumber(row?.hours_or_units ?? 0),
+    regularHours: toNumber(row?.regular_hours ?? 0),
+    overtimeHours: toNumber(row?.overtime_hours ?? 0),
   };
 }
 

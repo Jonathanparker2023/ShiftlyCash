@@ -6,6 +6,8 @@ export type TemplateSlotInput = {
   jobType: JobType;
   payType: PayType;
   hoursOrUnits: number;
+  regularHours?: number;
+  overtimeHours?: number;
 };
 
 export type StickyLabelInput = {

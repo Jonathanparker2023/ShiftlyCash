@@ -45,7 +45,7 @@ const JOB_OPTIONS: JobType[] = [
   "incentive",
   "other",
 ];
-const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "unit"];
+const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "split", "unit"];
 
 type DashboardEditorProps = {
   initialData: DashboardData;
@@ -202,6 +202,13 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
         };
       }),
     );
+
+    const key = `slot:${nextSlot.dayId}:${nextSlot.slotIndex}`;
+    if (isIncompleteSplitSlot(nextSlot)) {
+      clearTimeout(timers.current[key]);
+      setSaveState("idle");
+      return;
+    }
 
     scheduleSlotSave(nextSlot);
   }
@@ -434,6 +441,8 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       jobType: slot.jobType,
       payType: slot.payType ?? "none",
       hoursOrUnits: slot.hoursOrUnits,
+      regularHours: slot.regularHours,
+      overtimeHours: slot.overtimeHours,
       label: slot.label,
     };
 
@@ -1288,9 +1297,11 @@ function ShiftRow({
           <span className="text-sm font-semibold">
             {formatJobLabel(slot.jobType)}
           </span>
-          {slot.payType === "regular" || slot.payType === "overtime" ? (
+          {slot.payType === "regular" ||
+          slot.payType === "overtime" ||
+          slot.payType === "split" ? (
             <span className={payTypeBadgeClass(slot.payType)}>
-              {slot.payType === "overtime" ? "OT" : "Reg"}
+              {formatPayBadge(slot.payType)}
             </span>
           ) : null}
           {shiftQuantityLabel ? (
@@ -1329,22 +1340,50 @@ function ShiftRow({
               label="Type"
               value={slot.payType ?? "none"}
               values={PAY_OPTIONS}
+              formatOption={formatPayOptionLabel}
+              onChange={(value) =>
+                onSlotChange(
+                  slot.dayId,
+                  slot.slotIndex,
+                  normalizePayTypePatch(slot, value as PayType),
+                )
+              }
+            />
+          )}
+          {slot.payType === "split" ? (
+            <>
+              <NumberField
+                label="Regular hours"
+                value={slot.regularHours}
+                onChange={(value) =>
+                  onSlotChange(slot.dayId, slot.slotIndex, {
+                    regularHours: value,
+                    hoursOrUnits: value + slot.overtimeHours,
+                  })
+                }
+              />
+              <NumberField
+                label="OT hours"
+                value={slot.overtimeHours}
+                onChange={(value) =>
+                  onSlotChange(slot.dayId, slot.slotIndex, {
+                    overtimeHours: value,
+                    hoursOrUnits: slot.regularHours + value,
+                  })
+                }
+              />
+            </>
+          ) : (
+            <NumberField
+              label={slot.payType === "unit" ? "Amount ($)" : "Hours / units"}
+              value={slot.hoursOrUnits}
               onChange={(value) =>
                 onSlotChange(slot.dayId, slot.slotIndex, {
-                  payType: value as PayType,
+                  hoursOrUnits: value,
                 })
               }
             />
           )}
-          <NumberField
-            label={slot.payType === "unit" ? "Amount ($)" : "Hours / units"}
-            value={slot.hoursOrUnits}
-            onChange={(value) =>
-              onSlotChange(slot.dayId, slot.slotIndex, {
-                hoursOrUnits: value,
-              })
-            }
-          />
           <TextField
             label="Label"
             value={slot.label}
@@ -1395,6 +1434,10 @@ function shiftDotClass(jobType: JobType): string {
 }
 
 function payTypeBadgeClass(payType: PayType | null | undefined): string {
+  if (payType === "split") {
+    return "rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-[#0f172a]";
+  }
+
   if (payType === "overtime") {
     return "rounded-full bg-[#22c55e] px-2 py-0.5 text-[10px] font-bold uppercase text-white";
   }
@@ -1656,6 +1699,8 @@ function toDayInput(day: DashboardDay) {
       jobType: slot.jobType,
       payType: slot.payType,
       hoursOrUnits: slot.hoursOrUnits,
+      regularHours: slot.regularHours,
+      overtimeHours: slot.overtimeHours,
       label: slot.label,
     })),
     spendCents: day.spendCents + day.transactionSpendCents,
@@ -1669,6 +1714,8 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
       ...slot,
       payType: "none",
       hoursOrUnits: 0,
+      regularHours: 0,
+      overtimeHours: 0,
       label: "",
       source: "user",
     };
@@ -1679,9 +1726,26 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
       ...slot,
       payType: "unit",
       hoursOrUnits: Math.max(0, slot.hoursOrUnits),
+      regularHours: 0,
+      overtimeHours: 0,
       source: "user",
     };
   }
+
+  if (slot.payType === "split") {
+    const regularHours = Math.max(0, slot.regularHours);
+    const overtimeHours = Math.max(0, slot.overtimeHours);
+
+    return {
+      ...slot,
+      regularHours,
+      overtimeHours,
+      hoursOrUnits: regularHours + overtimeHours,
+      source: "user",
+    };
+  }
+
+  const hoursOrUnits = Math.max(0, slot.hoursOrUnits);
 
   return {
     ...slot,
@@ -1689,9 +1753,53 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
       slot.payType === "regular" || slot.payType === "overtime"
         ? slot.payType
         : "regular",
-    hoursOrUnits: Math.max(0, slot.hoursOrUnits),
+    hoursOrUnits,
+    regularHours: slot.payType === "overtime" ? 0 : hoursOrUnits,
+    overtimeHours: slot.payType === "overtime" ? hoursOrUnits : 0,
     source: "user",
   };
+}
+
+function normalizePayTypePatch(
+  slot: DashboardSlot,
+  payType: PayType,
+): Partial<DashboardSlot> {
+  if (payType === "split") {
+    return {
+      payType,
+      hoursOrUnits: slot.hoursOrUnits,
+      regularHours: slot.payType === "overtime" ? 0 : slot.hoursOrUnits,
+      overtimeHours: slot.payType === "overtime" ? slot.hoursOrUnits : 0,
+    };
+  }
+
+  if (payType === "regular" || payType === "overtime") {
+    const hoursOrUnits =
+      slot.payType === "split"
+        ? slot.regularHours + slot.overtimeHours
+        : slot.hoursOrUnits;
+
+    return {
+      payType,
+      hoursOrUnits,
+      regularHours: payType === "regular" ? hoursOrUnits : 0,
+      overtimeHours: payType === "overtime" ? hoursOrUnits : 0,
+    };
+  }
+
+  return {
+    payType,
+    hoursOrUnits: slot.hoursOrUnits,
+    regularHours: 0,
+    overtimeHours: 0,
+  };
+}
+
+function isIncompleteSplitSlot(slot: DashboardSlot): boolean {
+  return (
+    slot.payType === "split" &&
+    (slot.regularHours <= 0 || slot.overtimeHours <= 0)
+  );
 }
 
 function makeEmptySlot(dayId: string, slotIndex: number): DashboardSlot {
@@ -1702,6 +1810,8 @@ function makeEmptySlot(dayId: string, slotIndex: number): DashboardSlot {
     jobType: "none",
     payType: "none",
     hoursOrUnits: 0,
+    regularHours: 0,
+    overtimeHours: 0,
     label: "",
     source: "user",
   };
@@ -1744,7 +1854,7 @@ function formatJobLabel(value: string): string {
   }
 
   if (value === "prestige_ilst") {
-    return "Prestige ILST $18";
+    return "Prestige";
   }
 
   return capitalize(value);
@@ -1752,6 +1862,26 @@ function formatJobLabel(value: string): string {
 
 function formatPlainHours(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatPayBadge(payType: PayType): string {
+  if (payType === "overtime") {
+    return "OT";
+  }
+
+  if (payType === "split") {
+    return "Split";
+  }
+
+  return "Reg";
+}
+
+function formatPayOptionLabel(payType: string): string {
+  if (payType === "split") {
+    return "Split (Reg + OT)";
+  }
+
+  return capitalize(payType);
 }
 
 function formatShiftAmountValue(
@@ -1770,6 +1900,12 @@ function formatShiftAmountValue(
 function formatShiftQuantityValue(slot: DashboardSlot): string {
   if (slot.payType === "unit") {
     return "";
+  }
+
+  if (slot.payType === "split") {
+    return `${formatPlainHours(slot.hoursOrUnits)}h - ${formatPlainHours(
+      slot.regularHours,
+    )} REG / ${formatPlainHours(slot.overtimeHours)} OT`;
   }
 
   return `${formatPlainHours(slot.hoursOrUnits)}h`;
