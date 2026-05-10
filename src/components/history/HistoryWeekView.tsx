@@ -159,7 +159,7 @@ function WeekStripCell({
           {shortDayName(day.date)}
         </span>
         {day.spendLocked ? (
-          <span className="hidden rounded-full bg-black/20 backdrop-blur-md/20 px-1.5 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
+          <span className="hidden rounded-full bg-black/20 backdrop-blur-md px-1.5 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
             Locked
           </span>
         ) : null}
@@ -196,7 +196,7 @@ function FocusedDayPanel({ day }: { day: HistoryDetailDay }) {
           </div>
         </div>
         {day.spendLocked ? (
-          <span className="rounded-full border border-white/20 bg-black/20 backdrop-blur-md/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-white">
+          <span className="rounded-full border border-white/20 bg-black/20 backdrop-blur-md px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-white">
             Locked
           </span>
         ) : null}
@@ -309,7 +309,7 @@ function TransactionPanel({
         <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-white/80">
           Transactions
         </h3>
-        <span className="rounded-full bg-black/20 backdrop-blur-md/15 px-2 py-0.5 text-xs font-semibold text-white">
+        <span className="rounded-full bg-black/20 backdrop-blur-md px-2 py-0.5 text-xs font-semibold text-white">
           {transactions.length}
         </span>
       </div>
@@ -399,7 +399,7 @@ function historyShiftBarClass(jobType: string): string {
     return `${base} border-[#d97706] bg-[#facc15] text-[#1f2937]`;
   }
 
-  return `${base} border-white/20 bg-black/20 backdrop-blur-md/15 text-white`;
+  return `${base} border-white/20 bg-black/20 backdrop-blur-md text-white`;
 }
 
 function payTypeBadgeClass(payType: string): string {
