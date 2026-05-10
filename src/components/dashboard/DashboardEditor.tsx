@@ -811,7 +811,7 @@ function WeekStripCell({
   const cashflowCents = totals?.cashflowCents ?? 0;
 
   const isFutureUnspent =
-    day.date >= todayIso
+    day.date > todayIso
     && spendCents === 0
     && !day.spendLocked
     && projectedDailySpendCents > 0;
@@ -860,11 +860,6 @@ function WeekStripCell({
         className={`mt-3 truncate text-xs font-semibold sm:mt-6 sm:text-sm ${cashflowDailyColor(
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
-        title={
-          isFutureUnspent
-            ? `Projected: assumes $${(projectedDailySpendCents / 100).toFixed(0)} spend (last week ÷ 7)`
-            : undefined
-        }
       >
         {formatMoney(displayCashflowCents)}
       </p>
