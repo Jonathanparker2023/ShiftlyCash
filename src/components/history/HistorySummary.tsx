@@ -306,7 +306,7 @@ function SortableCustomizeRow({
         />
         <span className="truncate">{tile.label}</span>
       </label>
-      <span className="text-sm font-semibold text-zinc-600">
+      <span className="text-sm font-bold tabular-nums text-[#020617]">
         {tile.displayValue}
       </span>
     </div>
@@ -315,11 +315,11 @@ function SortableCustomizeRow({
 
 function SummaryTileCard({ tile }: { tile: SummaryTile }) {
   return (
-    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-600">
+    <div className="rounded-md border-2 border-zinc-300 bg-white p-4 shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-700">
         {tile.label}
       </p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">
+      <p className="mt-3 rounded-md bg-white px-2 py-1 text-3xl font-black leading-none tracking-tight text-[#020617] shadow-sm ring-1 ring-zinc-200 sm:text-4xl">
         {tile.displayValue}
       </p>
     </div>
