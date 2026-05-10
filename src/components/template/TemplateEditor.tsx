@@ -353,11 +353,7 @@ function formatNumberInput(value: number): string {
 }
 
 function formatJobLabel(jobType: JobType): string {
-  if (jobType === "prestige") {
-    return "Prestige $17";
-  }
-
-  if (jobType === "prestige_ilst") {
+  if (jobType === "prestige" || jobType === "prestige_ilst") {
     return "Prestige";
   }
 

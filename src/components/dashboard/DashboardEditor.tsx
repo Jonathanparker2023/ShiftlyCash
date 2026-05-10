@@ -1849,11 +1849,7 @@ function formatHoursFromSlots(
 }
 
 function formatJobLabel(value: string): string {
-  if (value === "prestige") {
-    return "Prestige $17";
-  }
-
-  if (value === "prestige_ilst") {
+  if (value === "prestige" || value === "prestige_ilst") {
     return "Prestige";
   }
 
