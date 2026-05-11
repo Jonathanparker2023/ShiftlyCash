@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { DragEvent, FormEvent } from "react";
+import type { DragEvent, FormEvent, MouseEvent, TouchEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -639,7 +639,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             </div>
           </div>
 
-          <div className="-mx-3 overflow-x-auto px-3 pb-2 sm:mx-0 sm:px-0">
+          <div className="-mx-3 overflow-x-auto px-3 pb-2 sm:mx-0 sm:px-0" data-disable-swipe-nav>
             <div className="flex w-max min-w-full snap-x gap-2 sm:grid sm:w-auto sm:min-w-0 sm:grid-cols-7 sm:snap-none">
               {days.map((day, dayIndex) => (
                 <WeekStripCell
@@ -1246,6 +1246,9 @@ function TransactionRowButton({
   );
 }
 
+const LONG_PRESS_MS = 300;
+const TOUCH_MOVE_CANCEL_PX = 8;
+
 function ShiftList({
   day,
   expandedSlotIndex,
@@ -1274,7 +1277,24 @@ function ShiftList({
   ) => void;
 }) {
   const [draggedSlotIndex, setDraggedSlotIndex] = useState<number | null>(null);
+  const [touchDragSlotIndex, setTouchDragSlotIndex] = useState<number | null>(
+    null,
+  );
+  const [touchTargetSlotIndex, setTouchTargetSlotIndex] = useState<number | null>(
+    null,
+  );
+  const longPressTimerRef = useRef<number | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const touchTargetSlotRef = useRef<number | null>(null);
+  const suppressNextClickRef = useRef(false);
   const activeSlots = day.slots.filter((slot) => slot.jobType !== "none");
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
 
   function handleDrop(targetSlotIndex: number) {
     if (draggedSlotIndex === null || draggedSlotIndex === targetSlotIndex) {
@@ -1286,8 +1306,128 @@ function ShiftList({
     setDraggedSlotIndex(null);
   }
 
+  function handleRowTouchStart(
+    slotIndex: number,
+    event: TouchEvent<HTMLDivElement>,
+  ) {
+    if (day.spendLocked || event.touches.length !== 1) {
+      return;
+    }
+
+    const touch = event.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    clearLongPressTimer();
+
+    longPressTimerRef.current = window.setTimeout(() => {
+      setTouchDragSlotIndex(slotIndex);
+      touchTargetSlotRef.current = slotIndex;
+      setTouchTargetSlotIndex(slotIndex);
+      document.documentElement.dataset.shiftBarDragging = "true";
+      if (
+        typeof navigator !== "undefined" &&
+        typeof navigator.vibrate === "function"
+      ) {
+        navigator.vibrate(15);
+      }
+    }, LONG_PRESS_MS);
+  }
+
+  function handleRowTouchMove(event: TouchEvent<HTMLDivElement>) {
+    if (touchDragSlotIndex !== null) {
+      return;
+    }
+    const touch = event.touches[0];
+    const start = touchStartPosRef.current;
+    if (!touch || !start) {
+      return;
+    }
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.hypot(dx, dy) > TOUCH_MOVE_CANCEL_PX) {
+      clearLongPressTimer();
+      touchStartPosRef.current = null;
+    }
+  }
+
+  function handleRowTouchEnd() {
+    if (touchDragSlotIndex === null) {
+      clearLongPressTimer();
+      touchStartPosRef.current = null;
+    }
+  }
+
+  function handleRowClickCapture(event: MouseEvent<HTMLDivElement>) {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  useEffect(() => {
+    if (touchDragSlotIndex === null) {
+      return;
+    }
+
+    function onMove(event: globalThis.TouchEvent) {
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+      event.preventDefault();
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const rowEl =
+        element instanceof Element
+          ? (element.closest("[data-shift-slot-index]") as HTMLElement | null)
+          : null;
+      if (rowEl?.dataset.shiftSlotIndex !== undefined) {
+        const idx = Number(rowEl.dataset.shiftSlotIndex);
+        if (Number.isFinite(idx) && idx !== touchTargetSlotRef.current) {
+          touchTargetSlotRef.current = idx;
+          setTouchTargetSlotIndex(idx);
+        }
+      }
+    }
+
+    function onEnd(event: globalThis.TouchEvent) {
+      const fromIdx = touchDragSlotIndex;
+      const toIdx = touchTargetSlotRef.current;
+      if (fromIdx !== null && toIdx !== null && fromIdx !== toIdx) {
+        onReorderSlots(day.id, fromIdx, toIdx);
+      }
+      if (fromIdx !== null) {
+        event.preventDefault();
+        suppressNextClickRef.current = true;
+      }
+      setTouchDragSlotIndex(null);
+      touchTargetSlotRef.current = null;
+      setTouchTargetSlotIndex(null);
+      document.documentElement.dataset.shiftBarDragging = "false";
+    }
+
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd, { passive: false });
+    window.addEventListener("touchcancel", onEnd, { passive: false });
+
+    return () => {
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [touchDragSlotIndex, day.id, onReorderSlots]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      document.documentElement.dataset.shiftBarDragging = "false";
+    };
+  }, []);
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-disable-swipe-nav>
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155]">
           Shifts
@@ -1298,11 +1438,20 @@ function ShiftList({
           activeSlots.map((slot) => (
             <ShiftRow
               expanded={expandedSlotIndex === slot.slotIndex}
-              isDragging={draggedSlotIndex === slot.slotIndex}
+              isDragging={
+                draggedSlotIndex === slot.slotIndex ||
+                touchDragSlotIndex === slot.slotIndex
+              }
+              isDropTarget={
+                touchDragSlotIndex !== null &&
+                touchTargetSlotIndex === slot.slotIndex &&
+                touchTargetSlotIndex !== touchDragSlotIndex
+              }
               key={`${slot.dayId}-${slot.slotIndex}`}
               locked={day.spendLocked}
               settings={settings}
               slot={slot}
+              onClickCapture={handleRowClickCapture}
               onDragEnd={() => setDraggedSlotIndex(null)}
               onDragOver={(event) => event.preventDefault()}
               onDragStart={() => setDraggedSlotIndex(slot.slotIndex)}
@@ -1310,6 +1459,9 @@ function ShiftList({
               onRemove={onRemoveSlot}
               onSlotChange={onSlotChange}
               onToggle={() => onToggleSlot(slot.slotIndex)}
+              onTouchEnd={handleRowTouchEnd}
+              onTouchMove={handleRowTouchMove}
+              onTouchStart={(event) => handleRowTouchStart(slot.slotIndex, event)}
             />
           ))
         ) : (
@@ -1335,6 +1487,7 @@ function ShiftRow({
   expanded,
   locked,
   isDragging,
+  isDropTarget,
   settings,
   onToggle,
   onSlotChange,
@@ -1343,11 +1496,16 @@ function ShiftRow({
   onDragOver,
   onDrop,
   onDragEnd,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
+  onClickCapture,
 }: {
   slot: DashboardSlot;
   expanded: boolean;
   locked: boolean;
   isDragging: boolean;
+  isDropTarget: boolean;
   settings: PaySettings;
   onToggle: () => void;
   onSlotChange: (
@@ -1360,12 +1518,17 @@ function ShiftRow({
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDrop: () => void;
   onDragEnd: () => void;
+  onTouchStart: (event: TouchEvent<HTMLDivElement>) => void;
+  onTouchMove: (event: TouchEvent<HTMLDivElement>) => void;
+  onTouchEnd: (event: TouchEvent<HTMLDivElement>) => void;
+  onClickCapture: (event: MouseEvent<HTMLDivElement>) => void;
 }) {
   const rowClassName = [
-    "rounded-md border shadow-sm transition",
+    "rounded-md border shadow-sm transition select-none",
     shiftBarClass(slot.jobType),
     locked ? "opacity-60" : "",
     isDragging ? "scale-[0.99] opacity-70 ring-2 ring-[#0e7490]" : "",
+    isDropTarget ? "ring-2 ring-[#0e7490]" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -1375,11 +1538,18 @@ function ShiftRow({
   return (
     <div
       className={rowClassName}
+      data-shift-slot-index={slot.slotIndex}
       draggable={!locked}
+      onClickCapture={onClickCapture}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDragStart={onDragStart}
       onDrop={onDrop}
+      onTouchCancel={onTouchEnd}
+      onTouchEnd={onTouchEnd}
+      onTouchMove={onTouchMove}
+      onTouchStart={onTouchStart}
+      style={{ touchAction: isDragging ? "none" : "pan-y" }}
     >
       <button
         className="flex min-h-11 w-full cursor-grab items-center gap-3 px-3 py-2 text-left active:cursor-grabbing disabled:cursor-not-allowed"

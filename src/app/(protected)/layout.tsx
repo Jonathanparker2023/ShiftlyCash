@@ -2,7 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { MobileSwipeNavigator } from "@/components/protected/MobileSwipeNavigator";
 import { requireUser } from "@/lib/auth";
+import { PROTECTED_NAV, PROTECTED_SETTINGS_NAV } from "@/lib/protected-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -43,14 +45,16 @@ export default async function ProtectedLayout({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:flex-1">
             <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
               <div className="flex w-max min-w-full items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] p-1">
-                <NavLink href="/">Dashboard</NavLink>
-                <NavLink href="/baseline">Baseline</NavLink>
-                <NavLink href="/history">History</NavLink>
-                <NavLink href="/debt">Debt</NavLink>
-                <NavLink href="/net-worth">Net Worth</NavLink>
-                <NavLink href="/banking">Banking</NavLink>
-                <NavLink href="/settings/account">Account</NavLink>
-                <NavLink href="/settings/template">Settings</NavLink>
+                {PROTECTED_NAV.map((route) => (
+                  <NavLink href={route.href} key={route.href}>
+                    {route.label}
+                  </NavLink>
+                ))}
+                {PROTECTED_SETTINGS_NAV.map((route) => (
+                  <NavLink href={route.href} key={route.href}>
+                    {route.label}
+                  </NavLink>
+                ))}
               </div>
             </div>
 
@@ -70,7 +74,7 @@ export default async function ProtectedLayout({
           </div>
         </div>
       </nav>
-      <div className="w-full max-w-[100vw] overflow-x-hidden">{children}</div>
+      <MobileSwipeNavigator>{children}</MobileSwipeNavigator>
     </>
   );
 }
