@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { requireUser } from "@/lib/auth";
 import { NavLink } from "./NavLink";
+import { SwipeNavigation } from "./SwipeNavigation";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,9 @@ export default async function ProtectedLayout({
           </div>
         </div>
       </nav>
-      <div className="w-full max-w-[100vw] overflow-x-hidden">{children}</div>
+      <SwipeNavigation>
+        <div className="w-full max-w-[100vw] overflow-x-hidden">{children}</div>
+      </SwipeNavigation>
     </>
   );
 }
