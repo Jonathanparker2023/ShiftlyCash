@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import { getTodayIso } from "@/lib/dashboard/dates";
+import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
 import type { JobType, PayType } from "@/lib/domain/pay";
 
 const JOB_TYPES = [
@@ -236,40 +237,21 @@ export async function refreshDashboardProjectionMaintenanceAction(): Promise<Ref
     throw new Error(`Unable to load active week: ${activeWeekError.message}`);
   }
 
-  const { data: cleaned, error: cleanupError } = await supabase.rpc(
-    "cleanup_expired_projections",
-    { p_today: todayIso },
+  const { cleaned, projected } = await applyDashboardProjectionMaintenance(
+    supabase,
+    {
+      weekId: activeWeek?.id ?? null,
+      todayIso,
+    },
   );
 
-  if (cleanupError) {
-    throw new Error(`Unable to clean projections: ${cleanupError.message}`);
-  }
-
-  let projected = 0;
-
-  if (activeWeek?.id) {
-    const { data: projectedData, error: projectionError } = await supabase.rpc(
-      "apply_future_day_projection",
-      {
-        p_week_id: activeWeek.id,
-        p_today: todayIso,
-      },
-    );
-
-    if (projectionError) {
-      throw new Error(`Unable to apply projections: ${projectionError.message}`);
-    }
-
-    projected = Number(projectedData ?? 0);
-  }
-
-  if (Number(cleaned ?? 0) > 0 || projected > 0) {
+  if (cleaned > 0 || projected > 0) {
     revalidatePath("/");
   }
 
   return {
     ok: true,
-    cleaned: Number(cleaned ?? 0),
+    cleaned,
     projected,
   };
 }

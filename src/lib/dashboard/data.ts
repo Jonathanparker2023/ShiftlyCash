@@ -16,6 +16,7 @@ import type {
   DashboardWeek,
 } from "@/lib/dashboard/types";
 import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
+import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
 import {
   dollarsToCents,
   roundCentsToNearestTenDollars,
@@ -138,6 +139,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     requireUserWithBootstrapStatus(),
   );
   const startDate = getSundayOnOrBeforeTodayIso();
+  const todayIso = getTodayIso();
 
   const { data: weekId, error: ensureError } = await timed(
     "dashboard:ensureWeek",
@@ -152,6 +154,10 @@ export async function getDashboardData(): Promise<DashboardData> {
   if (typeof weekId !== "string") {
     throw new Error("Active week RPC did not return a week id.");
   }
+
+  await timed("dashboard:projectionMaintenance", () =>
+    applyDashboardProjectionMaintenance(supabase, { weekId, todayIso }),
+  );
 
   const tBatchA = mark();
   const [
@@ -290,7 +296,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     adjacentAbilityPayPeriod,
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
     closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
-    todayIso: getTodayIso(),
+    todayIso,
   });
   since("dashboard:total", tTotal);
   return result;
