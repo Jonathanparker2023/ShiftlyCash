@@ -306,10 +306,11 @@ function ExpenseRow({
   onUpdate: (id: string, patch: Partial<BaselineExpense>) => void;
   onDelete: (id: string) => void;
 }) {
+  const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const hasDatedExpiration = Boolean(expense.expirationDate);
   const isDatedActive = hasDatedExpiration && !expired;
   const rowClassName = [
-    "grid gap-3 px-4 py-4 transition md:grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] md:items-center",
+    "px-4 py-3 transition md:grid md:grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] md:items-center md:gap-3 md:py-4",
     expired ? "opacity-50" : "",
     isDatedActive ? "bg-amber-500/15 ring-1 ring-inset ring-amber-300/60" : "",
   ]
@@ -318,97 +319,131 @@ function ExpenseRow({
 
   return (
     <div className={rowClassName}>
-      <label className="block">
-        <MobileLabel>Name</MobileLabel>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 md:hidden">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-semibold">
+              {expense.name || "Untitled expense"}
+            </p>
+            {expired ? <ExpiredBadge /> : null}
+            {isDatedActive ? <ExpiresBadge /> : null}
+          </div>
+          <p className="mt-1 text-xs font-medium text-white/70">
+            {formatMoney(expense.amountCents)}
+            {expense.withdrawalDay ? ` · Day ${expense.withdrawalDay}` : ""}
+            {!expense.isActive ? " · inactive" : ""}
+          </p>
+        </div>
+        <button
+          className="h-9 shrink-0 rounded-md border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/20"
+          onClick={() => setIsMobileExpanded((current) => !current)}
+          type="button"
+        >
+          {isMobileExpanded ? "Done" : "Edit"}
+        </button>
+      </div>
+
+      <div
+        className={
+          isMobileExpanded
+            ? "mt-3 grid gap-3 md:mt-0 md:contents"
+            : "hidden md:contents"
+        }
+      >
+        <label className="block">
+          <MobileLabel>Name</MobileLabel>
+          <div className="flex items-center gap-2">
+            <input
+              className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
+              onChange={(event) =>
+                onUpdate(expense.id, { name: event.target.value })
+              }
+              placeholder="Expense name"
+              type="text"
+              value={expense.name}
+            />
+            <span className="hidden md:inline-flex">
+              {expired ? <ExpiredBadge /> : null}
+              {isDatedActive ? <ExpiresBadge /> : null}
+            </span>
+          </div>
+        </label>
+
+        <label className="block">
+          <MobileLabel>Monthly</MobileLabel>
           <input
             className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
+            min="0"
             onChange={(event) =>
-              onUpdate(expense.id, { name: event.target.value })
+              onUpdate(expense.id, {
+                amountCents: parseMonthlyAmountToCents(
+                  parsePositiveNumber(event.target.value),
+                ),
+              })
             }
-            placeholder="Expense name"
-            type="text"
-            value={expense.name}
+            step="0.01"
+            type="number"
+            value={formatNumberInput(centsToDollars(expense.amountCents))}
           />
-          {expired ? <ExpiredBadge /> : null}
-          {isDatedActive ? <ExpiresBadge /> : null}
-        </div>
-      </label>
+        </label>
 
-      <label className="block">
-        <MobileLabel>Monthly</MobileLabel>
-        <input
-          className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
-          min="0"
-          onChange={(event) =>
-            onUpdate(expense.id, {
-              amountCents: parseMonthlyAmountToCents(
-                parsePositiveNumber(event.target.value),
-              ),
-            })
-          }
-          step="0.01"
-          type="number"
-          value={formatNumberInput(centsToDollars(expense.amountCents))}
-        />
-      </label>
+        <label className="block">
+          <MobileLabel>Withdraws</MobileLabel>
+          <input
+            className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
+            max="31"
+            min="1"
+            onChange={(event) =>
+              onUpdate(expense.id, {
+                withdrawalDay: parseWithdrawalDay(event.target.value),
+              })
+            }
+            placeholder="Day"
+            step="1"
+            type="number"
+            value={expense.withdrawalDay ?? ""}
+          />
+        </label>
 
-      <label className="block">
-        <MobileLabel>Withdraws</MobileLabel>
-        <input
-          className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
-          max="31"
-          min="1"
-          onChange={(event) =>
-            onUpdate(expense.id, {
-              withdrawalDay: parseWithdrawalDay(event.target.value),
-            })
-          }
-          placeholder="Day"
-          step="1"
-          type="number"
-          value={expense.withdrawalDay ?? ""}
-        />
-      </label>
+        <label className="block">
+          <MobileLabel>Expiration</MobileLabel>
+          <input
+            className={
+              isDatedActive
+                ? "h-10 w-full rounded-md border border-amber-300/60 bg-amber-500/15 px-3 text-sm text-amber-100"
+                : "h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
+            }
+            onChange={(event) =>
+              onUpdate(expense.id, {
+                expirationDate: event.target.value || null,
+              })
+            }
+            type="date"
+            value={expense.expirationDate ?? ""}
+          />
+        </label>
 
-      <label className="block">
-        <MobileLabel>Expiration</MobileLabel>
-        <input
-          className={
-            isDatedActive
-              ? "h-10 w-full rounded-md border border-amber-300/60 bg-amber-500/15 px-3 text-sm text-amber-100"
-              : "h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
-          }
-          onChange={(event) =>
-            onUpdate(expense.id, {
-              expirationDate: event.target.value || null,
-            })
-          }
-          type="date"
-          value={expense.expirationDate ?? ""}
-        />
-      </label>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            checked={expense.isActive}
+            className="h-4 w-4"
+            onChange={(event) =>
+              onUpdate(expense.id, { isActive: event.target.checked })
+            }
+            type="checkbox"
+          />
+          Active
+        </label>
 
-      <label className="flex items-center gap-2 text-sm font-medium">
-        <input
-          checked={expense.isActive}
-          className="h-4 w-4"
-          onChange={(event) =>
-            onUpdate(expense.id, { isActive: event.target.checked })
-          }
-          type="checkbox"
-        />
-        Active
-      </label>
-
-      <button
-        className="h-10 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm font-medium transition hover:border-red-300 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60 md:justify-self-end"
-        disabled={deleting}
-        onClick={() => onDelete(expense.id)}
-        type="button"
-      >
-        {deleting ? "..." : "Delete"}
-      </button>
+        <button
+          className="h-10 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm font-medium transition hover:border-red-300 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60 md:justify-self-end"
+          disabled={deleting}
+          onClick={() => onDelete(expense.id)}
+          type="button"
+        >
+          {deleting ? "..." : "Delete"}
+        </button>
+      </div>
     </div>
   );
 }
