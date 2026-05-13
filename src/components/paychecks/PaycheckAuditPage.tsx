@@ -268,7 +268,7 @@ function WeekBreakdown({
         <p className="font-semibold text-white">
           Week {week.displayWeekNumber}{" "}
           <span className="text-xs font-semibold uppercase tracking-[0.1em] text-white/70">
-            {week.role === "week_1" ? "first half" : "paycheck week"}
+            {week.role === "week_1" ? "first week" : "second week"}
           </span>
         </p>
         <p className="text-xs text-white/70">
