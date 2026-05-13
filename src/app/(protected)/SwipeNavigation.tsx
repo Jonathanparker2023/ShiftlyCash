@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import type { PointerEvent, ReactNode } from "react";
+import type { ReactNode, TouchEvent } from "react";
 import { useRef } from "react";
 
 const SWIPE_ROUTES = [
@@ -14,14 +14,13 @@ const SWIPE_ROUTES = [
   "/net-worth",
 ] as const;
 
-const MIN_SWIPE_DISTANCE_PX = 70;
-const MAX_VERTICAL_DRIFT_PX = 80;
+const MIN_SWIPE_DISTANCE_PX = 35;
+const MAX_VERTICAL_DRIFT_PX = 120;
 const MOBILE_POINTER_WIDTH_PX = 768;
 
 type SwipeStart = {
   x: number;
   y: number;
-  pointerId: number;
 };
 
 export function SwipeNavigation({ children }: { children: ReactNode }) {
@@ -29,9 +28,11 @@ export function SwipeNavigation({ children }: { children: ReactNode }) {
   const router = useRouter();
   const swipeStart = useRef<SwipeStart | null>(null);
 
-  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+  function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
+    const touch = event.touches[0];
+
     if (
-      event.pointerType !== "touch"
+      !touch
       || window.innerWidth >= MOBILE_POINTER_WIDTH_PX
       || isInteractiveElement(event.target)
     ) {
@@ -40,27 +41,27 @@ export function SwipeNavigation({ children }: { children: ReactNode }) {
     }
 
     swipeStart.current = {
-      x: event.clientX,
-      y: event.clientY,
-      pointerId: event.pointerId,
+      x: touch.clientX,
+      y: touch.clientY,
     };
   }
 
-  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
+  function handleTouchEnd(event: TouchEvent<HTMLDivElement>) {
     const start = swipeStart.current;
     swipeStart.current = null;
+    const touch = event.changedTouches[0];
 
-    if (!start || start.pointerId !== event.pointerId) {
+    if (!start || !touch) {
       return;
     }
 
-    const deltaX = event.clientX - start.x;
-    const deltaY = event.clientY - start.y;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
 
     if (
       Math.abs(deltaX) < MIN_SWIPE_DISTANCE_PX
       || Math.abs(deltaY) > MAX_VERTICAL_DRIFT_PX
-      || Math.abs(deltaX) <= Math.abs(deltaY)
+      || Math.abs(deltaX) < Math.abs(deltaY) * 1.15
     ) {
       return;
     }
@@ -79,7 +80,14 @@ export function SwipeNavigation({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+    <div
+      onTouchCancel={() => {
+        swipeStart.current = null;
+      }}
+      onTouchEnd={handleTouchEnd}
+      onTouchStart={handleTouchStart}
+      style={{ touchAction: "pan-y" }}
+    >
       {children}
     </div>
   );
