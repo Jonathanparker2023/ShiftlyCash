@@ -206,9 +206,9 @@ function PaycheckPeriodCard({
       <div className="my-4 border-t border-white/10" />
 
       <div className="grid gap-2 text-sm">
-        <MoneyLine label="Expected gross" tone="positive" value={job.grossCents} />
+        <MoneyLine label="Expected gross" value={job.grossCents} />
         <MoneyLine label="Est. withholding" tone="negative" value={job.estimatedTaxCents} />
-        <MoneyLine strong label="Expected take-home" value={job.estimatedNetCents} />
+        <MoneyLine strong label="Expected take-home" tone="positive" value={job.estimatedNetCents} />
         {job.actualNetCents !== null ? (
           <>
             <MoneyLine label="Actual take-home" value={job.actualNetCents} />
