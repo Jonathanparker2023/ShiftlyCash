@@ -23,8 +23,8 @@ export function NavLink({
       className={
         "shrink-0 rounded-full px-3 py-1.5 text-sm transition " +
         (isActive
-          ? "bg-white text-[#0b1220] font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
-          : "font-medium text-zinc-300 hover:bg-white/[0.1] hover:text-white")
+          ? "border border-white/45 bg-white/20 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_8px_24px_rgba(255,255,255,0.12)] backdrop-blur-xl"
+          : "font-medium text-white/75 hover:bg-white/[0.12] hover:text-white")
       }
       href={href}
     >

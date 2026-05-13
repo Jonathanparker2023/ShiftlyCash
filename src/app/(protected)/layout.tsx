@@ -18,7 +18,7 @@ export default async function ProtectedLayout({
   return (
     <>
       <div aria-hidden="true" className="penthouse-bg-layer" />
-      <nav className="sticky top-0 z-50 border-b border-[#2f3d52] bg-[#0b1220] px-3 py-3 text-white shadow-[0_10px_30px_rgba(0,0,0,0.24)] sm:px-6 lg:px-8">
+      <nav className="sticky top-0 z-50 border-b border-white/15 bg-black/15 px-3 py-3 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
           <div className="flex items-center justify-between gap-3">
             <Link className="flex shrink-0 items-center gap-2.5 text-sm font-semibold uppercase tracking-[0.2em] sm:tracking-[0.24em]" href="/">
@@ -45,7 +45,7 @@ export default async function ProtectedLayout({
 
           <div className="min-w-0">
             <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
-              <div className="flex w-max min-w-full items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] p-1">
+              <div className="flex w-max min-w-full items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] backdrop-blur-md">
                 <NavLink href="/">Dashboard</NavLink>
                 <NavLink href="/baseline">Baseline</NavLink>
                 <NavLink href="/history">History</NavLink>
