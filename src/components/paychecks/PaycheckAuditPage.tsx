@@ -206,7 +206,7 @@ function PaycheckPeriodCard({
       <div className="my-4 border-t border-white/10" />
 
       <div className="grid gap-2 text-sm">
-        <MoneyLine label="Expected gross" value={job.grossCents} />
+        <MoneyLine label="Expected gross" tone="positive" value={job.grossCents} />
         <MoneyLine label="Est. withholding" tone="negative" value={job.estimatedTaxCents} />
         <MoneyLine strong label="Expected take-home" value={job.estimatedNetCents} />
         {job.actualNetCents !== null ? (
@@ -340,7 +340,7 @@ function MoneyLine({
 }: {
   label: string;
   value: number;
-  tone?: "negative";
+  tone?: "negative" | "positive";
   strong?: boolean;
 }) {
   return (
@@ -349,7 +349,11 @@ function MoneyLine({
       <span
         className={[
           strong ? "text-base font-bold" : "font-semibold",
-          tone === "negative" ? "text-red-300" : "text-white",
+          tone === "negative"
+            ? "text-red-300"
+            : tone === "positive"
+              ? "text-emerald-300 drop-shadow-[0_0_12px_rgba(110,231,183,0.6)]"
+              : "text-white",
         ].join(" ")}
       >
         {tone === "negative" ? "-" : ""}
