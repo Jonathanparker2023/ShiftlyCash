@@ -732,7 +732,7 @@ function TopMetric({
       className={
         dark
           ? `rounded-md bg-[#0b1220] px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border-2 border-white/35 bg-black/25 px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.16)] backdrop-blur-md before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
+          : `relative overflow-hidden rounded-md border-2 border-white/45 bg-white/10 px-2.5 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
       <div className="flex items-start justify-between gap-2">
@@ -837,10 +837,10 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? "min-w-0 rounded-md border-2 border-white/90 bg-black/30 px-1.5 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-lg transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+          ? "min-w-0 rounded-md border-2 border-white/90 bg-white/14 px-1.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
           : day.spendLocked
-            ? "min-w-0 rounded-md border-2 border-white/30 bg-black/15 px-1.5 py-2 text-left opacity-75 shadow-sm backdrop-blur-md transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
-            : "min-w-0 rounded-md border-2 border-white/40 bg-black/20 px-1.5 py-2 text-left shadow-sm backdrop-blur-md transition hover:border-white/50 hover:bg-black/25 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            ? "min-w-0 rounded-md border-2 border-white/35 bg-white/8 px-1.5 py-2 text-left opacity-75 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] backdrop-blur-lg transition hover:border-white/45 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            : "min-w-0 rounded-md border-2 border-white/45 bg-white/10 px-1.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-xl transition hover:border-white/60 hover:bg-white/14 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
