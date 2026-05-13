@@ -25,17 +25,18 @@ import type { HistoryWeek, ProjectionExclusionField } from "@/lib/history/types"
 const STORAGE_KEY = "shiftlycash-history-summary-v1";
 
 const TILE_DEFINITIONS = [
-  { id: "totalWeeks", label: "Total weeks", field: null },
   { id: "totalEarnings", label: "Total earnings", field: "earnings" },
   { id: "totalSpend", label: "Total spend", field: "spend" },
   { id: "avgEarnings", label: "Avg earnings", field: "earnings" },
   { id: "avgSpend", label: "Avg spend", field: "spend" },
+  { id: "avgCashflow", label: "Avg cashflow", field: "cashflow" },
   { id: "medianEarnings", label: "Median earnings", field: "earnings" },
   { id: "medianSpend", label: "Median spend", field: "spend" },
+  { id: "medianCashflow", label: "Median cashflow", field: "cashflow" },
 ] as const satisfies readonly {
   id: string;
   label: string;
-  field: ProjectionExclusionField | null;
+  field: ProjectionExclusionField;
 }[];
 
 type TileId = (typeof TILE_DEFINITIONS)[number]["id"];
@@ -329,13 +330,6 @@ function SummaryTileCard({ tile }: { tile: SummaryTile }) {
 function buildTiles(closedWeeks: HistoryWeek[]): SummaryTile[] {
   return [
     {
-      id: "totalWeeks",
-      label: "Total weeks",
-      value: closedWeeks.length,
-      displayValue: String(closedWeeks.length),
-      isMoney: false,
-    },
-    {
       id: "totalEarnings",
       label: "Total earnings",
       value: sumIncluded(closedWeeks, "earnings"),
@@ -364,6 +358,13 @@ function buildTiles(closedWeeks: HistoryWeek[]): SummaryTile[] {
       isMoney: true,
     },
     {
+      id: "avgCashflow",
+      label: "Avg cashflow",
+      value: averageIncluded(closedWeeks, "cashflow"),
+      displayValue: formatNullableMoney(averageIncluded(closedWeeks, "cashflow")),
+      isMoney: true,
+    },
+    {
       id: "medianEarnings",
       label: "Median earnings",
       value: medianIncluded(closedWeeks, "earnings"),
@@ -377,12 +378,18 @@ function buildTiles(closedWeeks: HistoryWeek[]): SummaryTile[] {
       displayValue: formatNullableMoney(medianIncluded(closedWeeks, "spend")),
       isMoney: true,
     },
+    {
+      id: "medianCashflow",
+      label: "Median cashflow",
+      value: medianIncluded(closedWeeks, "cashflow"),
+      displayValue: formatNullableMoney(medianIncluded(closedWeeks, "cashflow")),
+      isMoney: true,
+    },
   ];
 }
 
 function buildDefaultOrder(tiles: SummaryTile[]): TileId[] {
-  const [totalWeeks, ...remainingTiles] = tiles;
-  const sortedTiles = [...remainingTiles].sort((a, b) => {
+  return [...tiles].sort((a, b) => {
     if (a.value === null && b.value === null) {
       return a.id.localeCompare(b.id);
     }
@@ -396,9 +403,7 @@ function buildDefaultOrder(tiles: SummaryTile[]): TileId[] {
     }
 
     return b.value - a.value;
-  });
-
-  return [totalWeeks.id, ...sortedTiles.map((tile) => tile.id)];
+  }).map((tile) => tile.id);
 }
 
 function normalizeOrder(input: string[]): TileId[] {
