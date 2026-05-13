@@ -1857,7 +1857,7 @@ function formatJobLabel(value: string): string {
 }
 
 function formatPlainHours(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return value.toFixed(1);
 }
 
 function formatPayBadge(payType: PayType): string {
