@@ -53,6 +53,7 @@ export default async function ProtectedLayout({
                 <NavLink href="/projects">Projects</NavLink>
                 <NavLink href="/debt">Debt</NavLink>
                 <NavLink href="/net-worth">Net Worth</NavLink>
+                <NavLink href="/cal">ShiftlyCal</NavLink>
               </div>
             </div>
 
