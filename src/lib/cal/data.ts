@@ -10,6 +10,7 @@ import type {
   CalDay,
   CalTargets,
   CalTotals,
+  FoodCategory,
   FoodEntry,
   SavedFood,
   ShiftlyCalData,
@@ -20,6 +21,7 @@ type FoodEntryRow = {
   id: string;
   date: string;
   meal_name: string;
+  category: string | null;
   calories: number;
   protein_g: number | null;
   carbs_g: number | null;
@@ -32,6 +34,7 @@ type FoodEntryRow = {
 type SavedFoodRow = {
   id: string;
   name: string;
+  category: string | null;
   calories: number;
   protein_g: number | null;
   carbs_g: number | null;
@@ -67,7 +70,7 @@ export async function getShiftlyCalData(): Promise<ShiftlyCalData> {
     supabase
       .from("food_entries")
       .select(
-        "id,date,meal_name,calories,protein_g,carbs_g,fat_g,saved_food_id,created_at,updated_at",
+        "id,date,meal_name,category,calories,protein_g,carbs_g,fat_g,saved_food_id,created_at,updated_at",
       )
       .eq("user_id", user.id)
       .gte("date", weekStartIso)
@@ -76,7 +79,7 @@ export async function getShiftlyCalData(): Promise<ShiftlyCalData> {
     supabase
       .from("saved_foods")
       .select(
-        "id,name,calories,protein_g,carbs_g,fat_g,sort_order,archived_at,created_at,updated_at",
+        "id,name,category,calories,protein_g,carbs_g,fat_g,sort_order,archived_at,created_at,updated_at",
       )
       .eq("user_id", user.id)
       .is("archived_at", null)
@@ -204,6 +207,7 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
     id: row.id,
     date: row.date,
     mealName: row.meal_name,
+    category: mapCategory(row.category),
     calories: Number(row.calories),
     proteinG: nullableNumber(row.protein_g),
     carbsG: nullableNumber(row.carbs_g),
@@ -218,6 +222,7 @@ function mapSavedFood(row: SavedFoodRow): SavedFood {
   return {
     id: row.id,
     name: row.name,
+    category: mapCategory(row.category),
     calories: Number(row.calories),
     proteinG: nullableNumber(row.protein_g),
     carbsG: nullableNumber(row.carbs_g),
@@ -241,4 +246,17 @@ function mapWeightLog(row: WeightLogRow): WeightLog {
 
 function nullableNumber(value: number | null): number | null {
   return value === null ? null : Number(value);
+}
+
+function mapCategory(value: string | null): FoodCategory {
+  switch (value) {
+    case "healthy_snack":
+    case "unhealthy_snack":
+    case "drink":
+    case "other":
+      return value;
+    case "meal":
+    default:
+      return "meal";
+  }
 }

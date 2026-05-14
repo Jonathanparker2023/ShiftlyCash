@@ -12,7 +12,11 @@ import {
   logWeightAction,
   saveCalTargetsAction,
 } from "@/app/(protected)/cal/actions";
-import { magnitudeColorClass } from "@/lib/cal/color";
+import {
+  categoryBarClass,
+  categoryLabel,
+  magnitudeColorClass,
+} from "@/lib/cal/color";
 import {
   colorToneFromMagnitude,
   dailyDeviation,
@@ -25,6 +29,8 @@ import {
 import type {
   CalDay,
   CalTargets,
+  CalTotals,
+  FoodCategory,
   FoodEntry,
   SavedFood,
   ShiftlyCalData,
@@ -32,6 +38,7 @@ import type {
 
 type MealFormState = {
   mealName: string;
+  category: FoodCategory;
   calories: string;
   proteinG: string;
   carbsG: string;
@@ -41,6 +48,7 @@ type MealFormState = {
 
 type SavedFoodFormState = {
   name: string;
+  category: FoodCategory;
   calories: string;
   proteinG: string;
   carbsG: string;
@@ -56,6 +64,7 @@ type TargetFormState = {
 
 const emptyMealForm: MealFormState = {
   mealName: "",
+  category: "meal",
   calories: "",
   proteinG: "",
   carbsG: "",
@@ -65,11 +74,20 @@ const emptyMealForm: MealFormState = {
 
 const emptySavedFoodForm: SavedFoodFormState = {
   name: "",
+  category: "meal",
   calories: "",
   proteinG: "",
   carbsG: "",
   fatG: "",
 };
+
+const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
+  { value: "meal", label: "Meal" },
+  { value: "healthy_snack", label: "Healthy snack" },
+  { value: "unhealthy_snack", label: "Unhealthy snack" },
+  { value: "drink", label: "Drink" },
+  { value: "other", label: "Other" },
+];
 
 export function ShiftlyCalView({
   initialData,
@@ -124,6 +142,7 @@ export function ShiftlyCalView({
         await createFoodEntryAction({
           date: focusedDay.date,
           mealName: mealForm.mealName,
+          category: mealForm.category,
           calories: mealForm.calories,
           proteinG: mealForm.proteinG,
           carbsG: mealForm.carbsG,
@@ -211,6 +230,7 @@ export function ShiftlyCalView({
   function fillFromSavedFood(food: SavedFood) {
     setMealForm({
       mealName: food.name,
+      category: food.category,
       calories: food.calories.toString(),
       proteinG: food.proteinG?.toString() ?? "",
       carbsG: food.carbsG?.toString() ?? "",
@@ -221,154 +241,141 @@ export function ShiftlyCalView({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-md sm:p-4">
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-          {initialData.currentWeek.days.map((day, index) => (
-            <WeekStripCell
-              day={day}
-              isFocused={index === focusedDayIndex}
-              key={day.date}
-              onClick={() => setFocusedDayIndex(index)}
+      <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
+        <div className="h-2 bg-white/10" />
+        <div className="p-3 sm:p-4">
+          <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(520px,1.05fr)] lg:items-start">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
+                ShiftlyCal
+              </p>
+              <h2 className="mt-1 text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+                {formatWeekRange(
+                  initialData.currentWeek.weekStartIso,
+                  initialData.currentWeek.weekEndIso,
+                )}
+              </h2>
+              <p className="mt-3 inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                Energy balance tracker
+              </p>
+            </div>
+            <MetricStrip
+              currentWeight={currentWeight?.weightLbs ?? null}
+              projection={initialData.projection}
               targets={initialData.targets}
+              totals={initialData.currentWeek.totals}
+              weeklyCalorieDeviation={weeklyCalorieDeviation}
+              weeklyProteinDeviation={weeklyProteinDeviation}
             />
-          ))}
-        </div>
-      </section>
+          </div>
 
-      <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-md">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <TopMetric
-            label="Week calories"
-            tone={colorToneFromMagnitude(weeklyCalorieDeviation, WEEKLY_CALORIE_THRESHOLDS)}
-            value={initialData.currentWeek.totals.calories.toLocaleString()}
-          />
-          <TopMetric
-            label="Week protein"
-            tone={colorToneFromMagnitude(weeklyProteinDeviation, WEEKLY_MACRO_THRESHOLDS)}
-            value={`${initialData.currentWeek.totals.proteinG}g`}
-          />
-          <TopMetric
-            label="Weekly delta"
-            note={
-              initialData.targets.tdeeCalories === null
-                ? "Set your TDEE in targets to see projections."
-                : null
-            }
-            value={
-              initialData.targets.tdeeCalories === null
-                ? "--"
-                : formatSignedCalories(initialData.projection.weeklyDeficitCalories)
-            }
-          />
-          <TopMetric
-            label="Estimated weight change"
-            note={
-              initialData.targets.tdeeCalories === null
-                ? "Estimate unlocks after TDEE is set."
-                : null
-            }
-            value={
-              initialData.targets.tdeeCalories === null
-                ? "--"
-                : `${formatSignedNumber(initialData.projection.projectedWeightDeltaLbs, 2)} lbs`
-            }
-          />
-          <TopMetric
-            label="Current weight"
-            value={currentWeight === null ? "--" : `${currentWeight.weightLbs.toFixed(1)} lbs`}
-          />
-        </div>
-      </section>
-
-      {error ? (
-        <p className="rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-200">
-          {error}
-        </p>
-      ) : null}
-
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)_minmax(320px,0.7fr)]">
-        <div className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-          <FocusedDayHeader day={focusedDay} />
-          <MealEntryForm
-            disabled={isPending}
-            focusedDay={focusedDay}
-            mealForm={mealForm}
-            onMealFormChange={setMealForm}
-            onSubmit={submitMeal}
-          />
-          <div className="mt-4 space-y-2">
-            {focusedDay.entries.length > 0 ? (
-              focusedDay.entries.map((entry) => (
-                <FoodEntryRow
-                  disabled={isPending}
-                  entry={entry}
-                  key={entry.id}
-                  onDelete={deleteEntry}
+          <div className="pb-2">
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+              {initialData.currentWeek.days.map((day, index) => (
+                <WeekStripCell
+                  day={day}
+                  isFocused={index === focusedDayIndex}
+                  key={day.date}
+                  onClick={() => setFocusedDayIndex(index)}
+                  targets={initialData.targets}
                 />
-              ))
-            ) : (
-              <div className="rounded-md border border-dashed border-white/20 bg-black/15 p-6 text-center text-sm text-white/70">
-                No food logged for this day.
+              ))}
+            </div>
+          </div>
+
+          {error ? (
+            <p className="mt-4 rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-200">
+              {error}
+            </p>
+          ) : null}
+
+          <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(320px,0.72fr)]">
+              <div>
+                <FocusedDayHeader day={focusedDay} />
+                <MealEntryForm
+                  disabled={isPending}
+                  focusedDay={focusedDay}
+                  mealForm={mealForm}
+                  onMealFormChange={setMealForm}
+                  onSubmit={submitMeal}
+                />
+                <div className="mt-4 space-y-2">
+                  {focusedDay.entries.length > 0 ? (
+                    focusedDay.entries.map((entry) => (
+                      <FoodEntryRow
+                        disabled={isPending}
+                        entry={entry}
+                        key={entry.id}
+                        onDelete={deleteEntry}
+                      />
+                    ))
+                  ) : (
+                    <div className="rounded-md border border-dashed border-white/20 bg-black/15 p-6 text-center text-sm text-white/70">
+                      No food logged for this day.
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        <div className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-            Day totals
-          </p>
-          <h2 className="mt-1 text-xl font-semibold text-white">
-            {focusedDay.totals.calories.toLocaleString()} calories
-          </h2>
-          <div className="mt-4 grid gap-2">
-            <DayTotalLine
-              label="Calories"
-              target={initialData.targets.tdeeCalories}
-              thresholds={DAILY_CALORIE_THRESHOLDS}
-              unit="cal"
-              value={focusedDay.totals.calories}
-            />
-            <DayTotalLine
-              label="Protein"
-              target={initialData.targets.proteinTargetG}
-              thresholds={DAILY_MACRO_THRESHOLDS}
-              unit="g"
-              value={focusedDay.totals.proteinG}
-            />
-            <DayTotalLine
-              label="Carbs"
-              target={initialData.targets.carbsTargetG}
-              thresholds={DAILY_MACRO_THRESHOLDS}
-              unit="g"
-              value={focusedDay.totals.carbsG}
-            />
-            <DayTotalLine
-              label="Fat"
-              target={initialData.targets.fatTargetG}
-              thresholds={DAILY_MACRO_THRESHOLDS}
-              unit="g"
-              value={focusedDay.totals.fatG}
-            />
-          </div>
-        </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+                  Day totals
+                </p>
+                <h2 className="mt-1 text-xl font-semibold text-white">
+                  {focusedDay.totals.calories.toLocaleString()} calories
+                </h2>
+                <div className="mt-4 grid gap-2">
+                  <DayTotalLine
+                    label="Calories"
+                    target={initialData.targets.tdeeCalories}
+                    thresholds={DAILY_CALORIE_THRESHOLDS}
+                    unit="cal"
+                    value={focusedDay.totals.calories}
+                  />
+                  <DayTotalLine
+                    label="Protein"
+                    target={initialData.targets.proteinTargetG}
+                    thresholds={DAILY_MACRO_THRESHOLDS}
+                    unit="g"
+                    value={focusedDay.totals.proteinG}
+                  />
+                  <DayTotalLine
+                    label="Carbs"
+                    target={initialData.targets.carbsTargetG}
+                    thresholds={DAILY_MACRO_THRESHOLDS}
+                    unit="g"
+                    value={focusedDay.totals.carbsG}
+                  />
+                  <DayTotalLine
+                    label="Fat"
+                    target={initialData.targets.fatTargetG}
+                    thresholds={DAILY_MACRO_THRESHOLDS}
+                    unit="g"
+                    value={focusedDay.totals.fatG}
+                  />
+                </div>
+              </div>
 
-        <div className="space-y-4">
-          <WeightPanel
-            day={focusedDay}
-            disabled={isPending}
-            onSubmit={submitWeight}
-            setWeightValue={setWeightValue}
-            todayIso={initialData.todayIso}
-            weightValue={weightValue}
-          />
-          <TargetsPanel
-            disabled={isPending}
-            onSubmit={submitTargets}
-            setTargetForm={setTargetForm}
-            targetForm={targetForm}
-            targets={initialData.targets}
-          />
+              <div className="space-y-4">
+                <WeightPanel
+                  day={focusedDay}
+                  disabled={isPending}
+                  onSubmit={submitWeight}
+                  setWeightValue={setWeightValue}
+                  todayIso={initialData.todayIso}
+                  weightValue={weightValue}
+                />
+                <TargetsPanel
+                  disabled={isPending}
+                  onSubmit={submitTargets}
+                  setTargetForm={setTargetForm}
+                  targetForm={targetForm}
+                  targets={initialData.targets}
+                />
+              </div>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -392,25 +399,94 @@ export function ShiftlyCalView({
   );
 }
 
+function MetricStrip({
+  currentWeight,
+  projection,
+  targets,
+  totals,
+  weeklyCalorieDeviation,
+  weeklyProteinDeviation,
+}: {
+  currentWeight: number | null;
+  projection: ShiftlyCalData["projection"];
+  targets: CalTargets;
+  totals: CalTotals;
+  weeklyCalorieDeviation: number | null;
+  weeklyProteinDeviation: number | null;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+      <TopMetric
+        accent="green"
+        label="Week calories"
+        tone={colorToneFromMagnitude(weeklyCalorieDeviation, WEEKLY_CALORIE_THRESHOLDS)}
+        value={totals.calories.toLocaleString()}
+      />
+      <TopMetric
+        accent="blue"
+        label="Week protein"
+        tone={colorToneFromMagnitude(weeklyProteinDeviation, WEEKLY_MACRO_THRESHOLDS)}
+        value={`${totals.proteinG}g`}
+      />
+      <TopMetric
+        label="Weekly delta"
+        note={targets.tdeeCalories === null ? "Set TDEE for projections." : null}
+        value={
+          targets.tdeeCalories === null
+            ? "--"
+            : formatSignedCalories(projection.weeklyDeficitCalories)
+        }
+      />
+      <TopMetric
+        label="Estimated weight change"
+        note={targets.tdeeCalories === null ? "Estimate locked." : null}
+        value={
+          targets.tdeeCalories === null
+            ? "--"
+            : `${formatSignedNumber(projection.projectedWeightDeltaLbs, 2)} lbs`
+        }
+      />
+      <TopMetric
+        label="Current weight"
+        value={currentWeight === null ? "--" : `${currentWeight.toFixed(1)} lbs`}
+      />
+    </div>
+  );
+}
+
 function TopMetric({
+  accent,
   label,
   note,
   tone = "neutral",
   value,
 }: {
+  accent?: "green" | "blue" | "amber" | "negative";
   label: string;
   note?: string | null;
   tone?: MagnitudeTone;
   value: string;
 }) {
+  const accentClass =
+    accent === "green"
+      ? "before:bg-green-600"
+      : accent === "blue"
+        ? "before:bg-[#7e22ce]"
+        : accent === "amber"
+          ? "before:bg-amber-500"
+          : accent === "negative"
+            ? "before:bg-red-600"
+            : "before:bg-[#cbd5e1]";
+
   return (
-    <div className="overflow-hidden rounded-md border-2 border-white/35 bg-black/25 shadow-sm backdrop-blur-md">
-      <div className="h-1 bg-white/30" />
-      <div className="p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+    <div
+      className={`relative overflow-hidden rounded-md border-2 border-white/45 bg-white/10 px-2.5 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
+    >
+      <div>
+        <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/85 sm:text-[10px] sm:tracking-[0.14em]">
           {label}
         </p>
-        <p className={`mt-2 text-2xl font-bold ${magnitudeColorClass(tone)}`}>
+        <p className={`mt-1 text-base font-semibold sm:text-lg ${magnitudeColorClass(tone)}`}>
           {value}
         </p>
         {note ? <p className="mt-2 text-xs text-white/60">{note}</p> : null}
@@ -442,8 +518,8 @@ function WeekStripCell({
     <button
       className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white shadow-sm transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3 ${
         isFocused
-          ? "border-2 border-white/90 bg-black/30 backdrop-blur-lg"
-          : "border-2 border-white/40 bg-black/20 backdrop-blur-md hover:border-white/60 hover:bg-black/25"
+          ? "border-2 border-white/90 bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl"
+          : "border-2 border-white/45 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-xl hover:border-white/60 hover:bg-white/14"
       }`}
       onClick={onClick}
       type="button"
@@ -510,13 +586,18 @@ function MealEntryForm({
           </span>
         ) : null}
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <TextInput
           className="lg:col-span-2"
           label="Meal"
           onChange={(value) => onMealFormChange({ ...mealForm, mealName: value })}
           placeholder="Chicken bowl"
           value={mealForm.mealName}
+        />
+        <CategorySelect
+          label="Category"
+          onChange={(category) => onMealFormChange({ ...mealForm, category })}
+          value={mealForm.category}
         />
         <NumberInput
           label="Calories"
@@ -574,22 +655,26 @@ function FoodEntryRow({
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-white/15 bg-black/20 p-3 text-white backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="font-semibold">{entry.mealName || "Food entry"}</p>
-        <p className="text-sm text-white/70">
+    <div className={categoryBarClass(entry.category)}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold">
+          {entry.mealName || categoryLabel(entry.category)}
+        </span>
+        <span className="font-semibold opacity-90">
           {entry.calories.toLocaleString()} cal
-          {formatMacros(entry)}
-        </p>
+        </span>
       </div>
-      <button
-        className="self-start rounded-md border border-red-300/60 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
-        disabled={disabled}
-        onClick={() => onDelete(entry.id)}
-        type="button"
-      >
-        Delete
-      </button>
+      <div className="mt-1 flex items-center justify-between gap-3 text-xs opacity-85">
+        <span>{formatMacros(entry).replace(/^ · /, "") || categoryLabel(entry.category)}</span>
+        <button
+          className="rounded border border-white/30 bg-black/15 px-2 py-1 font-semibold text-white transition hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={disabled}
+          onClick={() => onDelete(entry.id)}
+          type="button"
+        >
+          Delete
+        </button>
+      </div>
     </div>
   );
 }
@@ -798,6 +883,7 @@ function SavedFoodRow({
         <div>
           <p className="font-semibold">{food.name}</p>
           <p className="text-sm text-white/70">
+            {categoryLabel(food.category)} ·{" "}
             {food.calories.toLocaleString()} cal
             {formatMacros(food)}
           </p>
@@ -844,6 +930,11 @@ function SavedFoodForm({
           placeholder="Greek yogurt"
           value={form.name}
         />
+        <CategorySelect
+          label="Category"
+          onChange={(category) => onChange({ ...form, category })}
+          value={form.category}
+        />
         <div className="grid grid-cols-2 gap-2">
           <NumberInput
             label="Calories"
@@ -879,6 +970,33 @@ function SavedFoodForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function CategorySelect({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: FoodCategory) => void;
+  value: FoodCategory;
+}) {
+  return (
+    <label className="block text-sm font-semibold text-white/80">
+      {label}
+      <select
+        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-[#111827] px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        onChange={(event) => onChange(event.target.value as FoodCategory)}
+        value={value}
+      >
+        {FOOD_CATEGORY_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -980,4 +1098,17 @@ function formatSignedNumber(value: number, digits: number): string {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits,
   })}`;
+}
+
+function formatWeekRange(startIso: string, endIso: string): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  const start = formatter.format(new Date(`${startIso}T00:00:00.000Z`));
+  const end = formatter.format(new Date(`${endIso}T00:00:00.000Z`));
+  const year = new Date(`${endIso}T00:00:00.000Z`).getUTCFullYear();
+
+  return `${start} - ${end}, ${year}`;
 }

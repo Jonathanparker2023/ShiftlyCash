@@ -3,13 +3,22 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
+import type { FoodCategory } from "@/lib/cal/types";
 import { getTodayIso } from "@/lib/dashboard/dates";
 
 type NullableMacroInput = number | string | null | undefined;
+const FOOD_CATEGORIES = new Set<FoodCategory>([
+  "meal",
+  "healthy_snack",
+  "unhealthy_snack",
+  "drink",
+  "other",
+]);
 
 export async function createFoodEntryAction(input: {
   date?: string;
   mealName?: string | null;
+  category?: FoodCategory | string | null;
   calories: number | string;
   proteinG?: NullableMacroInput;
   carbsG?: NullableMacroInput;
@@ -20,6 +29,7 @@ export async function createFoodEntryAction(input: {
   const calories = requireNonNegativeInteger(input.calories, "Calories");
   const date = normalizeIsoDate(input.date);
   const mealName = input.mealName?.trim() ?? "";
+  const category = parseCategory(input.category);
 
   const { data, error } = await supabase
     .from("food_entries")
@@ -27,6 +37,7 @@ export async function createFoodEntryAction(input: {
       user_id: user.id,
       date,
       meal_name: mealName,
+      category,
       calories,
       protein_g: optionalNonNegativeInteger(input.proteinG, "Protein"),
       carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
@@ -61,6 +72,7 @@ export async function deleteFoodEntryAction(input: {
 
 export async function createSavedFoodAction(input: {
   name: string;
+  category?: FoodCategory | string | null;
   calories: number | string;
   proteinG?: NullableMacroInput;
   carbsG?: NullableMacroInput;
@@ -86,6 +98,7 @@ export async function createSavedFoodAction(input: {
     .insert({
       user_id: user.id,
       name,
+      category: parseCategory(input.category),
       calories: requireNonNegativeInteger(input.calories, "Calories"),
       protein_g: optionalNonNegativeInteger(input.proteinG, "Protein"),
       carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
@@ -201,6 +214,12 @@ function optionalNonNegativeInteger(value: NullableMacroInput, label: string): n
   if (parsed === null) return null;
   if (parsed < 0) throw new Error(`${label} must be zero or greater.`);
   return parsed;
+}
+
+function parseCategory(value: FoodCategory | string | null | undefined): FoodCategory {
+  if (value === null || value === undefined || value === "") return "meal";
+  if (FOOD_CATEGORIES.has(value as FoodCategory)) return value as FoodCategory;
+  throw new Error("Unknown food category.");
 }
 
 function parseInteger(value: NullableMacroInput): number | null {

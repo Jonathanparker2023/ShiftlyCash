@@ -1,7 +1,15 @@
+export type FoodCategory =
+  | "meal"
+  | "healthy_snack"
+  | "unhealthy_snack"
+  | "drink"
+  | "other";
+
 export type FoodEntry = {
   id: string;
   date: string;
   mealName: string;
+  category: FoodCategory;
   calories: number;
   proteinG: number | null;
   carbsG: number | null;
@@ -14,6 +22,7 @@ export type FoodEntry = {
 export type SavedFood = {
   id: string;
   name: string;
+  category: FoodCategory;
   calories: number;
   proteinG: number | null;
   carbsG: number | null;
