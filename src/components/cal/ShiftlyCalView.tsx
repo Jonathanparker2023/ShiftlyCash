@@ -19,6 +19,7 @@ import {
   DAILY_CALORIE_THRESHOLDS,
   DAILY_MACRO_THRESHOLDS,
   WEEKLY_CALORIE_THRESHOLDS,
+  WEEKLY_MACRO_THRESHOLDS,
   type MagnitudeTone,
 } from "@/lib/cal/projection";
 import type {
@@ -229,7 +230,7 @@ export function ShiftlyCalView({
           />
           <TopMetric
             label="Week protein"
-            tone={colorToneFromMagnitude(weeklyProteinDeviation, DAILY_MACRO_THRESHOLDS)}
+            tone={colorToneFromMagnitude(weeklyProteinDeviation, WEEKLY_MACRO_THRESHOLDS)}
             value={`${initialData.currentWeek.totals.proteinG}g`}
           />
           <TopMetric

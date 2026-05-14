@@ -22,6 +22,11 @@ export const WEEKLY_CALORIE_THRESHOLDS: MagnitudeThresholds = {
   amber: 2100,
 };
 
+export const WEEKLY_MACRO_THRESHOLDS: MagnitudeThresholds = {
+  green: 70,
+  amber: 210,
+};
+
 export function computeWeeklyDeficit(week: CalWeek, tdee: number | null): number {
   if (tdee === null) return 0;
   return week.totals.calories - tdee * 7;
