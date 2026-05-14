@@ -1,9 +1,15 @@
 import "server-only";
 
 import { requireUser } from "@/lib/auth";
-import { getTodayIso } from "@/lib/dashboard/dates";
+import { addDaysIso, getSundayOnOrBeforeTodayIso, getTodayIso } from "@/lib/dashboard/dates";
+import {
+  computeWeeklyDeficit,
+  projectWeeklyWeightChangeLbs,
+} from "@/lib/cal/projection";
 import type {
+  CalDay,
   CalTargets,
+  CalTotals,
   FoodEntry,
   SavedFood,
   ShiftlyCalData,
@@ -54,6 +60,8 @@ type SettingsTargetsRow = {
 export async function getShiftlyCalData(): Promise<ShiftlyCalData> {
   const { supabase, user } = await requireUser();
   const todayIso = getTodayIso();
+  const weekStartIso = getSundayOnOrBeforeTodayIso();
+  const weekEndIso = addDaysIso(weekStartIso, 6);
 
   const [entriesRes, savedFoodsRes, settingsRes, weightRes] = await Promise.all([
     supabase
@@ -62,7 +70,8 @@ export async function getShiftlyCalData(): Promise<ShiftlyCalData> {
         "id,date,meal_name,calories,protein_g,carbs_g,fat_g,saved_food_id,created_at,updated_at",
       )
       .eq("user_id", user.id)
-      .eq("date", todayIso)
+      .gte("date", weekStartIso)
+      .lte("date", weekEndIso)
       .order("created_at", { ascending: false }),
     supabase
       .from("saved_foods")
@@ -82,8 +91,8 @@ export async function getShiftlyCalData(): Promise<ShiftlyCalData> {
       .from("weight_logs")
       .select("id,date,weight_lbs,created_at,updated_at")
       .eq("user_id", user.id)
-      .eq("date", todayIso)
-      .maybeSingle(),
+      .gte("date", weekStartIso)
+      .lte("date", weekEndIso),
   ]);
 
   if (entriesRes.error) throw new Error(`Food entries: ${entriesRes.error.message}`);
@@ -91,13 +100,94 @@ export async function getShiftlyCalData(): Promise<ShiftlyCalData> {
   if (settingsRes.error) throw new Error(`Cal targets: ${settingsRes.error.message}`);
   if (weightRes.error) throw new Error(`Weight log: ${weightRes.error.message}`);
 
+  const targets = mapTargets((settingsRes.data ?? null) as SettingsTargetsRow | null);
+  const entries = ((entriesRes.data ?? []) as FoodEntryRow[]).map(mapFoodEntry);
+  const weights = ((weightRes.data ?? []) as WeightLogRow[]).map(mapWeightLog);
+  const currentWeek = buildCalWeek(weekStartIso, weekEndIso, entries, weights);
+  const weeklyDeficitCalories = computeWeeklyDeficit(
+    currentWeek,
+    targets.tdeeCalories,
+  );
+
   return {
     todayIso,
-    targets: mapTargets((settingsRes.data ?? null) as SettingsTargetsRow | null),
-    todaysEntries: ((entriesRes.data ?? []) as FoodEntryRow[]).map(mapFoodEntry),
+    targets,
+    currentWeek,
+    projection: {
+      weeklyDeficitCalories,
+      projectedWeightDeltaLbs: projectWeeklyWeightChangeLbs(weeklyDeficitCalories),
+    },
     savedFoods: ((savedFoodsRes.data ?? []) as SavedFoodRow[]).map(mapSavedFood),
-    todaysWeight: weightRes.data ? mapWeightLog(weightRes.data as WeightLogRow) : null,
   };
+}
+
+function buildCalWeek(
+  weekStartIso: string,
+  weekEndIso: string,
+  entries: FoodEntry[],
+  weights: WeightLog[],
+) {
+  const entriesByDate = groupByDate(entries);
+  const weightsByDate = new Map(weights.map((weight) => [weight.date, weight]));
+  const days: CalDay[] = Array.from({ length: 7 }, (_, dayIndex) => {
+    const date = addDaysIso(weekStartIso, dayIndex);
+    const dayEntries = entriesByDate.get(date) ?? [];
+
+    return {
+      date,
+      dayIndex,
+      entries: dayEntries,
+      totals: sumTotals(dayEntries),
+      weight: weightsByDate.get(date) ?? null,
+    };
+  });
+
+  return {
+    weekStartIso,
+    weekEndIso,
+    days,
+    totals: days.reduce(
+      (totals, day) => addTotals(totals, day.totals),
+      emptyTotals(),
+    ),
+  };
+}
+
+function groupByDate(entries: FoodEntry[]): Map<string, FoodEntry[]> {
+  const byDate = new Map<string, FoodEntry[]>();
+
+  for (const entry of entries) {
+    const bucket = byDate.get(entry.date) ?? [];
+    bucket.push(entry);
+    byDate.set(entry.date, bucket);
+  }
+
+  return byDate;
+}
+
+function sumTotals(entries: FoodEntry[]): CalTotals {
+  return entries.reduce(
+    (totals, entry) => ({
+      calories: totals.calories + entry.calories,
+      proteinG: totals.proteinG + (entry.proteinG ?? 0),
+      carbsG: totals.carbsG + (entry.carbsG ?? 0),
+      fatG: totals.fatG + (entry.fatG ?? 0),
+    }),
+    emptyTotals(),
+  );
+}
+
+function addTotals(left: CalTotals, right: CalTotals): CalTotals {
+  return {
+    calories: left.calories + right.calories,
+    proteinG: left.proteinG + right.proteinG,
+    carbsG: left.carbsG + right.carbsG,
+    fatG: left.fatG + right.fatG,
+  };
+}
+
+function emptyTotals(): CalTotals {
+  return { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
 }
 
 function mapTargets(row: SettingsTargetsRow | null): CalTargets {

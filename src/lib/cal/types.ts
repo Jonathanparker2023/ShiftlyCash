@@ -39,10 +39,37 @@ export type CalTargets = {
   fatTargetG: number | null;
 };
 
+export type CalTotals = {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+};
+
+export type CalDay = {
+  date: string;
+  dayIndex: number;
+  entries: FoodEntry[];
+  totals: CalTotals;
+  weight: WeightLog | null;
+};
+
+export type CalWeek = {
+  weekStartIso: string;
+  weekEndIso: string;
+  days: CalDay[];
+  totals: CalTotals;
+};
+
+export type CalProjection = {
+  weeklyDeficitCalories: number;
+  projectedWeightDeltaLbs: number;
+};
+
 export type ShiftlyCalData = {
   todayIso: string;
   targets: CalTargets;
-  todaysEntries: FoodEntry[];
+  currentWeek: CalWeek;
+  projection: CalProjection;
   savedFoods: SavedFood[];
-  todaysWeight: WeightLog | null;
 };
