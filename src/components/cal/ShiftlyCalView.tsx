@@ -221,6 +221,20 @@ export function ShiftlyCalView({
 
   return (
     <div className="space-y-4">
+      <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-md sm:p-4">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          {initialData.currentWeek.days.map((day, index) => (
+            <WeekStripCell
+              day={day}
+              isFocused={index === focusedDayIndex}
+              key={day.date}
+              onClick={() => setFocusedDayIndex(index)}
+              targets={initialData.targets}
+            />
+          ))}
+        </div>
+      </section>
+
       <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-md">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <TopMetric
@@ -263,20 +277,6 @@ export function ShiftlyCalView({
             label="Current weight"
             value={currentWeight === null ? "--" : `${currentWeight.weightLbs.toFixed(1)} lbs`}
           />
-        </div>
-      </section>
-
-      <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-md">
-        <div className="grid grid-cols-7 gap-2">
-          {initialData.currentWeek.days.map((day, index) => (
-            <WeekStripCell
-              day={day}
-              isFocused={index === focusedDayIndex}
-              key={day.date}
-              onClick={() => setFocusedDayIndex(index)}
-              targets={initialData.targets}
-            />
-          ))}
         </div>
       </section>
 
@@ -440,28 +440,25 @@ function WeekStripCell({
 
   return (
     <button
-      className={`min-h-[112px] rounded-md p-3 text-left text-white shadow-sm transition hover:bg-black/25 ${
+      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white shadow-sm transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3 ${
         isFocused
           ? "border-2 border-white/90 bg-black/30 backdrop-blur-lg"
-          : "border-2 border-white/40 bg-black/20 backdrop-blur-md"
+          : "border-2 border-white/40 bg-black/20 backdrop-blur-md hover:border-white/60 hover:bg-black/25"
       }`}
       onClick={onClick}
       type="button"
     >
-      <p className="text-sm font-bold uppercase tracking-[0.16em] text-white/90">
+      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.14em]">
         {weekday}
       </p>
-      <p className="mt-1 text-2xl font-semibold text-white">{date.getUTCDate()}</p>
-      <p className="mt-4 text-sm font-semibold text-white">
-        {day.totals.calories.toLocaleString()} cal
+      <p className="mt-1 text-base font-semibold text-white sm:text-lg">
+        {date.getUTCDate()}
       </p>
-      {deviation === null ? (
-        <p className="mt-1 text-xs font-semibold text-white/60">No target</p>
-      ) : (
-        <p className={`mt-1 text-xs font-semibold ${magnitudeColorClass(tone)}`}>
-          {formatSignedCalories(deviation)}
-        </p>
-      )}
+      <p
+        className={`mt-3 truncate text-xs font-semibold sm:mt-6 sm:text-sm ${magnitudeColorClass(tone)}`}
+      >
+        {day.totals.calories.toLocaleString()}
+      </p>
     </button>
   );
 }
