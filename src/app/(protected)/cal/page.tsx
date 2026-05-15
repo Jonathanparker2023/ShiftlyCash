@@ -15,8 +15,8 @@ export default async function ShiftlyCalPage() {
             Food log
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-white/70">
-            Manual calories now, optional macros when you have them. Projection and the
-            weekly strip come next.
+            Manual calories, optional macros, quick saved-food logging, and a weekly
+            energy-balance view.
           </p>
         </div>
 

@@ -1,16 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useMemo, useState, useTransition } from "react";
 
 import {
-  archiveSavedFoodAction,
   createFoodEntryAction,
-  createSavedFoodAction,
   deleteFoodEntryAction,
   logWeightAction,
-  saveCalTargetsAction,
 } from "@/app/(protected)/cal/actions";
 import {
   categoryBarClass,
@@ -46,22 +44,6 @@ type MealFormState = {
   savedFoodId: string | null;
 };
 
-type SavedFoodFormState = {
-  name: string;
-  category: FoodCategory;
-  calories: string;
-  proteinG: string;
-  carbsG: string;
-  fatG: string;
-};
-
-type TargetFormState = {
-  tdeeCalories: string;
-  proteinTargetG: string;
-  carbsTargetG: string;
-  fatTargetG: string;
-};
-
 const emptyMealForm: MealFormState = {
   mealName: "",
   category: "meal",
@@ -70,15 +52,6 @@ const emptyMealForm: MealFormState = {
   carbsG: "",
   fatG: "",
   savedFoodId: null,
-};
-
-const emptySavedFoodForm: SavedFoodFormState = {
-  name: "",
-  category: "meal",
-  calories: "",
-  proteinG: "",
-  carbsG: "",
-  fatG: "",
 };
 
 const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
@@ -97,25 +70,21 @@ export function ShiftlyCalView({
   const router = useRouter();
   const todayIndex = Math.max(
     0,
-    initialData.currentWeek.days.findIndex((day) => day.date === initialData.todayIso),
+    initialData.currentWeek.days.findIndex(
+      (day) => day.date === initialData.todayIso,
+    ),
   );
   const [focusedDayIndex, setFocusedDayIndex] = useState(todayIndex);
   const [mealForm, setMealForm] = useState<MealFormState>(emptyMealForm);
-  const [savedFoodForm, setSavedFoodForm] = useState<SavedFoodFormState>(
-    emptySavedFoodForm,
-  );
-  const [targetForm, setTargetForm] = useState<TargetFormState>({
-    tdeeCalories: initialData.targets.tdeeCalories?.toString() ?? "",
-    proteinTargetG: initialData.targets.proteinTargetG?.toString() ?? "",
-    carbsTargetG: initialData.targets.carbsTargetG?.toString() ?? "",
-    fatTargetG: initialData.targets.fatTargetG?.toString() ?? "",
-  });
+  const [isMealFormOpen, setIsMealFormOpen] = useState(false);
   const [weightValue, setWeightValue] = useState(
     initialData.currentWeek.days[todayIndex]?.weight?.weightLbs.toString() ?? "",
   );
+  const [loggedFoodId, setLoggedFoodId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const focusedDay = initialData.currentWeek.days[focusedDayIndex] ?? initialData.currentWeek.days[0];
+  const focusedDay =
+    initialData.currentWeek.days[focusedDayIndex] ?? initialData.currentWeek.days[0];
   const currentWeight = useMemo(
     () => getMostRecentWeight(initialData.currentWeek.days),
     [initialData.currentWeek.days],
@@ -150,6 +119,7 @@ export function ShiftlyCalView({
           savedFoodId: mealForm.savedFoodId,
         });
         setMealForm(emptyMealForm);
+        setIsMealFormOpen(false);
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to log meal.");
@@ -157,31 +127,25 @@ export function ShiftlyCalView({
     });
   }
 
-  function submitSavedFood(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function instantLog(food: SavedFood) {
     setError(null);
-
     startTransition(async () => {
       try {
-        await createSavedFoodAction(savedFoodForm);
-        setSavedFoodForm(emptySavedFoodForm);
+        await createFoodEntryAction({
+          date: focusedDay.date,
+          mealName: food.name,
+          category: food.category,
+          calories: food.calories.toString(),
+          proteinG: food.proteinG?.toString() ?? "",
+          carbsG: food.carbsG?.toString() ?? "",
+          fatG: food.fatG?.toString() ?? "",
+          savedFoodId: food.id,
+        });
+        setLoggedFoodId(food.id);
+        window.setTimeout(() => setLoggedFoodId(null), 1500);
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to save food.");
-      }
-    });
-  }
-
-  function submitTargets(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-
-    startTransition(async () => {
-      try {
-        await saveCalTargetsAction(targetForm);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to save targets.");
+        setError(err instanceof Error ? err.message : "Unable to log.");
       }
     });
   }
@@ -215,18 +179,6 @@ export function ShiftlyCalView({
     });
   }
 
-  function archiveSavedFood(id: string) {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await archiveSavedFoodAction({ id });
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to archive saved food.");
-      }
-    });
-  }
-
   function fillFromSavedFood(food: SavedFood) {
     setMealForm({
       mealName: food.name,
@@ -237,6 +189,7 @@ export function ShiftlyCalView({
       fatG: food.fatG?.toString() ?? "",
       savedFoodId: food.id,
     });
+    setIsMealFormOpen(true);
   }
 
   return (
@@ -255,9 +208,17 @@ export function ShiftlyCalView({
                   initialData.currentWeek.weekEndIso,
                 )}
               </h2>
-              <p className="mt-3 inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
-                Energy balance tracker
-              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <p className="inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                  Energy balance tracker
+                </p>
+                <Link
+                  className="inline-flex rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                  href="/cal/trends"
+                >
+                  Trends →
+                </Link>
+              </div>
             </div>
             <MetricStrip
               currentWeight={currentWeight?.weightLbs ?? null}
@@ -290,16 +251,40 @@ export function ShiftlyCalView({
           ) : null}
 
           <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(320px,0.72fr)]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
+              <SavedFoodsList
+                disabled={isPending}
+                focusedDay={focusedDay}
+                loggedFoodId={loggedFoodId}
+                onFill={fillFromSavedFood}
+                onInstantLog={instantLog}
+                savedFoods={initialData.savedFoods}
+              />
+
               <div>
-                <FocusedDayHeader day={focusedDay} />
-                <MealEntryForm
-                  disabled={isPending}
-                  focusedDay={focusedDay}
-                  mealForm={mealForm}
-                  onMealFormChange={setMealForm}
-                  onSubmit={submitMeal}
+                <FocusedDayHeader
+                  day={focusedDay}
+                  dayTotals={focusedDay.totals}
+                  targets={initialData.targets}
                 />
+                <div className="mt-4">
+                  <button
+                    className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                    onClick={() => setIsMealFormOpen((current) => !current)}
+                    type="button"
+                  >
+                    {isMealFormOpen ? "Close form" : "+ Log food"}
+                  </button>
+                </div>
+                {isMealFormOpen ? (
+                  <MealEntryForm
+                    disabled={isPending}
+                    focusedDay={focusedDay}
+                    mealForm={mealForm}
+                    onMealFormChange={setMealForm}
+                    onSubmit={submitMeal}
+                  />
+                ) : null}
                 <div className="mt-4 space-y-2">
                   {focusedDay.entries.length > 0 ? (
                     focusedDay.entries.map((entry) => (
@@ -319,80 +304,23 @@ export function ShiftlyCalView({
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-                  Day totals
-                </p>
-                <h2 className="mt-1 text-xl font-semibold text-white">
-                  {focusedDay.totals.calories.toLocaleString()} calories
-                </h2>
-                <div className="mt-4 grid gap-2">
-                  <DayTotalLine
-                    label="Calories"
-                    target={initialData.targets.tdeeCalories}
-                    thresholds={DAILY_CALORIE_THRESHOLDS}
-                    unit="cal"
-                    value={focusedDay.totals.calories}
-                  />
-                  <DayTotalLine
-                    label="Protein"
-                    target={initialData.targets.proteinTargetG}
-                    thresholds={DAILY_MACRO_THRESHOLDS}
-                    unit="g"
-                    value={focusedDay.totals.proteinG}
-                  />
-                  <DayTotalLine
-                    label="Carbs"
-                    target={initialData.targets.carbsTargetG}
-                    thresholds={DAILY_MACRO_THRESHOLDS}
-                    unit="g"
-                    value={focusedDay.totals.carbsG}
-                  />
-                  <DayTotalLine
-                    label="Fat"
-                    target={initialData.targets.fatTargetG}
-                    thresholds={DAILY_MACRO_THRESHOLDS}
-                    unit="g"
-                    value={focusedDay.totals.fatG}
+                <DayTotalsPanel
+                  day={focusedDay}
+                  targets={initialData.targets}
+                />
+                <div className="mt-4">
+                  <WeightPanel
+                    day={focusedDay}
+                    disabled={isPending}
+                    onSubmit={submitWeight}
+                    setWeightValue={setWeightValue}
+                    todayIso={initialData.todayIso}
+                    weightValue={weightValue}
                   />
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <WeightPanel
-                  day={focusedDay}
-                  disabled={isPending}
-                  onSubmit={submitWeight}
-                  setWeightValue={setWeightValue}
-                  todayIso={initialData.todayIso}
-                  weightValue={weightValue}
-                />
-                <TargetsPanel
-                  disabled={isPending}
-                  onSubmit={submitTargets}
-                  setTargetForm={setTargetForm}
-                  targetForm={targetForm}
-                  targets={initialData.targets}
-                />
-              </div>
             </div>
           </section>
-        </div>
-      </section>
-
-      <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.7fr)]">
-          <SavedFoodsList
-            disabled={isPending}
-            onArchive={archiveSavedFood}
-            onFill={fillFromSavedFood}
-            savedFoods={initialData.savedFoods}
-          />
-          <SavedFoodForm
-            disabled={isPending}
-            form={savedFoodForm}
-            onChange={setSavedFoodForm}
-            onSubmit={submitSavedFood}
-          />
         </div>
       </section>
     </div>
@@ -482,15 +410,13 @@ function TopMetric({
     <div
       className={`relative overflow-hidden rounded-md border-2 border-white/45 bg-white/10 px-2.5 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
     >
-      <div>
-        <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/85 sm:text-[10px] sm:tracking-[0.14em]">
-          {label}
-        </p>
-        <p className={`mt-1 text-base font-semibold sm:text-lg ${magnitudeColorClass(tone)}`}>
-          {value}
-        </p>
-        {note ? <p className="mt-2 text-xs text-white/60">{note}</p> : null}
-      </div>
+      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/85 sm:text-[10px] sm:tracking-[0.14em]">
+        {label}
+      </p>
+      <p className={`mt-1 text-base font-semibold sm:text-lg ${magnitudeColorClass(tone)}`}>
+        {value}
+      </p>
+      {note ? <p className="mt-2 text-xs text-white/60">{note}</p> : null}
     </div>
   );
 }
@@ -539,7 +465,15 @@ function WeekStripCell({
   );
 }
 
-function FocusedDayHeader({ day }: { day: CalDay }) {
+function FocusedDayHeader({
+  day,
+  dayTotals,
+  targets,
+}: {
+  day: CalDay;
+  dayTotals: CalTotals;
+  targets: CalTargets;
+}) {
   const date = new Date(`${day.date}T00:00:00.000Z`);
   const label = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
@@ -547,6 +481,8 @@ function FocusedDayHeader({ day }: { day: CalDay }) {
     day: "numeric",
     timeZone: "UTC",
   }).format(date);
+  const remaining =
+    targets.tdeeCalories === null ? null : targets.tdeeCalories - dayTotals.calories;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -556,10 +492,37 @@ function FocusedDayHeader({ day }: { day: CalDay }) {
         </p>
         <h2 className="mt-1 text-xl font-semibold text-white">{label}</h2>
       </div>
-      <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-sm font-semibold text-white/80">
-        {day.entries.length} entries
-      </span>
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-sm font-semibold text-white/80">
+          {day.entries.length} entries
+        </span>
+        {remaining !== null ? <RemainingBadge remaining={remaining} /> : null}
+      </div>
     </div>
+  );
+}
+
+function RemainingBadge({ remaining }: { remaining: number }) {
+  if (remaining > 0) {
+    return (
+      <span className="rounded-full border border-emerald-300/50 bg-white/10 px-3 py-1 text-sm font-semibold text-emerald-300">
+        {remaining.toLocaleString()} cal left
+      </span>
+    );
+  }
+
+  if (remaining < 0) {
+    return (
+      <span className="rounded-full border border-red-300/50 bg-white/10 px-3 py-1 text-sm font-semibold text-red-300">
+        {Math.abs(remaining).toLocaleString()} cal over
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white">
+      Right on target
+    </span>
   );
 }
 
@@ -578,14 +541,7 @@ function MealEntryForm({
 }) {
   return (
     <form className="mt-4 rounded-md border border-white/15 bg-black/20 p-3" onSubmit={onSubmit}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-white">Add to {focusedDay.date}</p>
-        {mealForm.savedFoodId ? (
-          <span className="rounded-full border border-emerald-300/30 bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-200">
-            Saved food
-          </span>
-        ) : null}
-      </div>
+      <p className="text-sm font-semibold text-white">Add to {focusedDay.date}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <TextInput
           className="lg:col-span-2"
@@ -632,14 +588,6 @@ function MealEntryForm({
         >
           Log entry
         </button>
-        <button
-          className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-          disabled={disabled}
-          onClick={() => onMealFormChange(emptyMealForm)}
-          type="button"
-        >
-          Clear
-        </button>
       </div>
     </form>
   );
@@ -665,7 +613,7 @@ function FoodEntryRow({
         </span>
       </div>
       <div className="mt-1 flex items-center justify-between gap-3 text-xs opacity-85">
-        <span>{formatMacros(entry).replace(/^ · /, "") || categoryLabel(entry.category)}</span>
+        <span>{formatMacrosInline(entry) || categoryLabel(entry.category)}</span>
         <button
           className="rounded border border-white/30 bg-black/15 px-2 py-1 font-semibold text-white transition hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={disabled}
@@ -675,6 +623,83 @@ function FoodEntryRow({
           Delete
         </button>
       </div>
+    </div>
+  );
+}
+
+function DayTotalsPanel({
+  day,
+  targets,
+}: {
+  day: CalDay;
+  targets: CalTargets;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+        Day totals
+      </p>
+      <h2 className="mt-1 text-xl font-semibold text-white">
+        {day.totals.calories.toLocaleString()} calories
+      </h2>
+      {targets.tdeeCalories !== null ? (
+        <CalorieBudgetBar consumed={day.totals.calories} target={targets.tdeeCalories} />
+      ) : null}
+      <div className="mt-4 grid gap-2">
+        <DayTotalLine
+          label="Calories"
+          target={targets.tdeeCalories}
+          thresholds={DAILY_CALORIE_THRESHOLDS}
+          unit="cal"
+          value={day.totals.calories}
+        />
+        <DayTotalLine
+          label="Protein"
+          target={targets.proteinTargetG}
+          thresholds={DAILY_MACRO_THRESHOLDS}
+          unit="g"
+          value={day.totals.proteinG}
+        />
+        <DayTotalLine
+          label="Carbs"
+          target={targets.carbsTargetG}
+          thresholds={DAILY_MACRO_THRESHOLDS}
+          unit="g"
+          value={day.totals.carbsG}
+        />
+        <DayTotalLine
+          label="Fat"
+          target={targets.fatTargetG}
+          thresholds={DAILY_MACRO_THRESHOLDS}
+          unit="g"
+          value={day.totals.fatG}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CalorieBudgetBar({
+  consumed,
+  target,
+}: {
+  consumed: number;
+  target: number;
+}) {
+  const pct = Math.min(100, Math.round((consumed / target) * 100));
+  const fillClass =
+    consumed <= target
+      ? "bg-emerald-300"
+      : consumed <= target * 1.2
+        ? "bg-amber-300"
+        : "bg-red-300";
+
+  return (
+    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/10">
+      <div
+        className={`h-2 rounded-full transition-all ${fillClass}`}
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
@@ -764,79 +789,19 @@ function WeightPanel({
   );
 }
 
-function TargetsPanel({
-  disabled,
-  onSubmit,
-  setTargetForm,
-  targetForm,
-  targets,
-}: {
-  disabled: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  setTargetForm: (form: TargetFormState) => void;
-  targetForm: TargetFormState;
-  targets: CalTargets;
-}) {
-  return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-        Targets
-      </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">
-        {targets.tdeeCalories ? `${targets.tdeeCalories.toLocaleString()} calories` : "Set your TDEE"}
-      </h2>
-      <details className="mt-4 rounded-md border border-white/15 bg-black/20 p-3">
-        <summary className="cursor-pointer text-sm font-semibold text-white">
-          Edit targets
-        </summary>
-        <form className="mt-3 grid gap-3" onSubmit={onSubmit}>
-          <NumberInput
-            label="Daily calories"
-            onChange={(value) => setTargetForm({ ...targetForm, tdeeCalories: value })}
-            value={targetForm.tdeeCalories}
-          />
-          <div className="grid grid-cols-3 gap-2">
-            <NumberInput
-              label="Protein"
-              onChange={(value) => setTargetForm({ ...targetForm, proteinTargetG: value })}
-              suffix="g"
-              value={targetForm.proteinTargetG}
-            />
-            <NumberInput
-              label="Carbs"
-              onChange={(value) => setTargetForm({ ...targetForm, carbsTargetG: value })}
-              suffix="g"
-              value={targetForm.carbsTargetG}
-            />
-            <NumberInput
-              label="Fat"
-              onChange={(value) => setTargetForm({ ...targetForm, fatTargetG: value })}
-              suffix="g"
-              value={targetForm.fatTargetG}
-            />
-          </div>
-          <button
-            className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
-            disabled={disabled}
-            type="submit"
-          >
-            Save targets
-          </button>
-        </form>
-      </details>
-    </section>
-  );
-}
-
 function SavedFoodsList({
   disabled,
-  onArchive,
+  focusedDay,
+  loggedFoodId,
   onFill,
+  onInstantLog,
   savedFoods,
 }: {
   disabled: boolean;
-  onArchive: (id: string) => void;
+  focusedDay: CalDay;
+  loggedFoodId: string | null;
   onFill: (food: SavedFood) => void;
+  onInstantLog: (food: SavedFood) => void;
   savedFoods: SavedFood[];
 }) {
   return (
@@ -845,20 +810,22 @@ function SavedFoodsList({
         Saved foods
       </p>
       <h2 className="mt-1 text-xl font-semibold text-white">Quick log</h2>
-      <div className="mt-4 grid gap-2 md:grid-cols-2">
+      <p className="mt-1 text-xs text-white/60">Adds to {focusedDay.date}</p>
+      <div className="mt-4 grid gap-2">
         {savedFoods.length > 0 ? (
           savedFoods.map((food) => (
             <SavedFoodRow
               disabled={disabled}
               food={food}
+              isLogged={loggedFoodId === food.id}
               key={food.id}
-              onArchive={onArchive}
               onFill={onFill}
+              onInstantLog={onInstantLog}
             />
           ))
         ) : (
-          <p className="rounded-md border border-dashed border-white/20 bg-black/15 p-4 text-sm text-white/70 md:col-span-2">
-            Save foods you repeat often, then use them to prefill the log.
+          <p className="rounded-md border border-dashed border-white/20 bg-black/15 p-4 text-sm text-white/70">
+            Create saved foods from Trends.
           </p>
         )}
       </div>
@@ -869,13 +836,15 @@ function SavedFoodsList({
 function SavedFoodRow({
   disabled,
   food,
-  onArchive,
+  isLogged,
   onFill,
+  onInstantLog,
 }: {
   disabled: boolean;
   food: SavedFood;
-  onArchive: (id: string) => void;
+  isLogged: boolean;
   onFill: (food: SavedFood) => void;
+  onInstantLog: (food: SavedFood) => void;
 }) {
   return (
     <div className="rounded-md border border-white/15 bg-black/20 p-3 text-white backdrop-blur-md">
@@ -883,93 +852,28 @@ function SavedFoodRow({
         <div>
           <p className="font-semibold">{food.name}</p>
           <p className="text-sm text-white/70">
-            {categoryLabel(food.category)} ·{" "}
-            {food.calories.toLocaleString()} cal
+            {categoryLabel(food.category)} · {food.calories.toLocaleString()} cal
             {formatMacros(food)}
           </p>
         </div>
         <button
-          className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-zinc-950 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
           disabled={disabled}
-          onClick={() => onFill(food)}
+          onClick={() => onInstantLog(food)}
           type="button"
         >
-          Log this
+          {isLogged ? "Logged ✓" : "Log"}
         </button>
       </div>
       <button
-        className="mt-2 text-xs font-semibold text-white/60 transition hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-2 text-xs font-semibold text-white/60 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
-        onClick={() => onArchive(food.id)}
+        onClick={() => onFill(food)}
         type="button"
       >
-        Archive
+        Edit
       </button>
     </div>
-  );
-}
-
-function SavedFoodForm({
-  disabled,
-  form,
-  onChange,
-  onSubmit,
-}: {
-  disabled: boolean;
-  form: SavedFoodFormState;
-  onChange: (form: SavedFoodFormState) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <form className="rounded-md border border-white/15 bg-black/20 p-3" onSubmit={onSubmit}>
-      <p className="text-sm font-semibold text-white">Create saved food</p>
-      <div className="mt-3 grid gap-2">
-        <TextInput
-          label="Name"
-          onChange={(value) => onChange({ ...form, name: value })}
-          placeholder="Greek yogurt"
-          value={form.name}
-        />
-        <CategorySelect
-          label="Category"
-          onChange={(category) => onChange({ ...form, category })}
-          value={form.category}
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <NumberInput
-            label="Calories"
-            onChange={(value) => onChange({ ...form, calories: value })}
-            required
-            value={form.calories}
-          />
-          <NumberInput
-            label="Protein"
-            onChange={(value) => onChange({ ...form, proteinG: value })}
-            suffix="g"
-            value={form.proteinG}
-          />
-          <NumberInput
-            label="Carbs"
-            onChange={(value) => onChange({ ...form, carbsG: value })}
-            suffix="g"
-            value={form.carbsG}
-          />
-          <NumberInput
-            label="Fat"
-            onChange={(value) => onChange({ ...form, fatG: value })}
-            suffix="g"
-            value={form.fatG}
-          />
-        </div>
-        <button
-          className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={disabled || !form.name.trim() || !form.calories.trim()}
-          type="submit"
-        >
-          Save food
-        </button>
-      </div>
-    </form>
   );
 }
 
@@ -1075,13 +979,22 @@ function formatMacros(entry: {
   carbsG: number | null;
   fatG: number | null;
 }): string {
-  const parts = [
+  const inline = formatMacrosInline(entry);
+  return inline ? ` · ${inline}` : "";
+}
+
+function formatMacrosInline(entry: {
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+}): string {
+  return [
     entry.proteinG === null ? null : `${entry.proteinG}p`,
     entry.carbsG === null ? null : `${entry.carbsG}c`,
     entry.fatG === null ? null : `${entry.fatG}f`,
-  ].filter(Boolean);
-
-  return parts.length > 0 ? ` · ${parts.join(" / ")}` : "";
+  ]
+    .filter(Boolean)
+    .join(" / ");
 }
 
 function formatSignedCalories(value: number): string {
