@@ -1,5 +1,5 @@
 import type { MagnitudeTone } from "@/lib/cal/projection";
-import type { FoodCategory } from "@/lib/cal/types";
+import type { FoodCategory, FoodEntry } from "@/lib/cal/types";
 
 export type { FoodCategory };
 
@@ -30,6 +30,27 @@ export function categoryBarClass(category: FoodCategory): string {
       return `${base} border-[#7e22ce] bg-[#9333ea] text-white`;
     case "other":
       return `${base} border-zinc-600 bg-zinc-700 text-white`;
+  }
+}
+
+export function verdictBarClass(entry: Pick<FoodEntry, "verdict" | "verdictSource">): string {
+  const base = "rounded-md border p-3 text-sm shadow-[0_8px_18px_rgba(8,15,28,0.16)]";
+
+  if (entry.verdictSource === "pending") {
+    return `${base} animate-pulse border-dashed border-zinc-500 bg-zinc-700 text-white`;
+  }
+
+  if (entry.verdictSource === "unscored" || entry.verdict === null) {
+    return `${base} border-zinc-600 bg-zinc-700 text-white`;
+  }
+
+  switch (entry.verdict) {
+    case "good":
+      return `${base} border-emerald-700 bg-emerald-600 text-white`;
+    case "fine":
+      return `${base} border-amber-600 bg-amber-500 text-white`;
+    case "bad":
+      return `${base} border-rose-700 bg-rose-600 text-white`;
   }
 }
 

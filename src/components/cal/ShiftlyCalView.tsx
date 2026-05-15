@@ -10,12 +10,15 @@ import {
   createFoodEntryAction,
   deleteFoodEntryAction,
   logWeightAction,
+  overrideVerdictAction,
+  regenerateVerdictAction,
   updateFoodEntryAction,
 } from "@/app/(protected)/cal/actions";
 import {
   categoryBarClass,
   categoryLabel,
   magnitudeColorClass,
+  verdictBarClass,
 } from "@/lib/cal/color";
 import {
   colorToneFromMagnitude,
@@ -33,6 +36,7 @@ import type {
   CalTotals,
   FoodCategory,
   FoodEntry,
+  FoodVerdict,
   SavedFood,
   ShiftlyCalData,
 } from "@/lib/cal/types";
@@ -256,6 +260,34 @@ export function ShiftlyCalView({
     }
   }
 
+  async function regenerateVerdict(id: string): Promise<boolean> {
+    setError(null);
+    try {
+      await regenerateVerdictAction({ id });
+      router.refresh();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to regenerate verdict.");
+      return false;
+    }
+  }
+
+  async function overrideVerdict(
+    id: string,
+    verdict: FoodVerdict,
+    verdictReason: string,
+  ): Promise<boolean> {
+    setError(null);
+    try {
+      await overrideVerdictAction({ id, verdict, verdictReason });
+      router.refresh();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to override verdict.");
+      return false;
+    }
+  }
+
   function fillFromSavedFood(food: SavedFood) {
     setMealForm({
       mealName: food.name,
@@ -405,6 +437,8 @@ export function ShiftlyCalView({
                         entry={entry}
                         key={entry.id}
                         onDelete={deleteEntry}
+                        onOverrideVerdict={overrideVerdict}
+                        onRegenerateVerdict={regenerateVerdict}
                         onUpdate={updateEntry}
                       />
                     ))
@@ -726,16 +760,29 @@ function FoodEntryRow({
   disabled,
   entry,
   onDelete,
+  onOverrideVerdict,
+  onRegenerateVerdict,
   onUpdate,
 }: {
   disabled: boolean;
   entry: FoodEntry;
   onDelete: (id: string) => void;
+  onOverrideVerdict: (
+    id: string,
+    verdict: FoodVerdict,
+    verdictReason: string,
+  ) => Promise<boolean>;
+  onRegenerateVerdict: (id: string) => Promise<boolean>;
   onUpdate: (id: string, patch: UpdateFoodEntryPatch) => Promise<boolean>;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isVerdictSaving, setIsVerdictSaving] = useState(false);
+  const [overrideValue, setOverrideValue] = useState<FoodVerdict>(
+    entry.verdict ?? "fine",
+  );
+  const [overrideReason, setOverrideReason] = useState(entry.verdictReason ?? "");
   const [editForm, setEditForm] = useState({
     mealName: entry.mealName,
     category: entry.category,
@@ -755,9 +802,38 @@ function FoodEntryRow({
     if (ok) setIsEditing(false);
   }
 
+  async function submitOverride() {
+    setIsVerdictSaving(true);
+    const ok = await onOverrideVerdict(entry.id, overrideValue, overrideReason);
+    setIsVerdictSaving(false);
+    if (ok) setIsEditing(false);
+  }
+
+  async function regenerateVerdict() {
+    setIsVerdictSaving(true);
+    const ok = await onRegenerateVerdict(entry.id);
+    setIsVerdictSaving(false);
+    if (ok) setIsEditing(false);
+  }
+
+  const title = entry.mealName || categoryLabel(entry.category);
+  const verdictStatus = verdictStatusText(entry);
+
   if (isEditing) {
     return (
-      <form className={categoryBarClass(entry.category)} onSubmit={submitEdit}>
+      <form className={verdictBarClass(entry)} onSubmit={submitEdit}>
+        <div className="mb-3 rounded-md border border-white/20 bg-black/20 p-3">
+          <p className="text-sm italic text-white/85">
+            {entry.verdictReason
+              ? `${entry.verdictReason}${
+                  entry.verdictSource === "manual_override" ? " (your override)" : ""
+                }`
+              : verdictStatus}
+          </p>
+          <span className="mt-2 inline-flex rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-xs font-semibold text-white/65">
+            {categoryLabel(entry.category)}
+          </span>
+        </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <TextInput
             label="Meal"
@@ -822,6 +898,46 @@ function FoodEntryRow({
           >
             Cancel
           </button>
+          <button
+            className="rounded border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled || isSaving || isVerdictSaving}
+            onClick={regenerateVerdict}
+            type="button"
+          >
+            Regenerate verdict
+          </button>
+        </div>
+        <div className="mt-3 rounded-md border border-white/20 bg-black/20 p-3">
+          <p className="mb-2 text-xs font-semibold text-white/75">
+            Lock verdict override
+          </p>
+          <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
+            <select
+              className="rounded-md border border-white/20 bg-[#111827] px-3 py-2 text-sm font-semibold text-white focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
+              disabled={disabled || isVerdictSaving}
+              onChange={(event) => setOverrideValue(event.target.value as FoodVerdict)}
+              value={overrideValue}
+            >
+              <option value="good">Good</option>
+              <option value="fine">Fine</option>
+              <option value="bad">Bad</option>
+            </select>
+            <input
+              className="rounded-md border border-white/20 bg-black/25 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
+              disabled={disabled || isVerdictSaving}
+              onChange={(event) => setOverrideReason(event.target.value)}
+              placeholder="Reason"
+              value={overrideReason}
+            />
+            <button
+              className="rounded border border-white/30 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={disabled || isVerdictSaving}
+              onClick={submitOverride}
+              type="button"
+            >
+              Lock override
+            </button>
+          </div>
         </div>
         <div className="mt-3 rounded-md border border-white/20 bg-black/20 p-3">
           <p className="mb-2 text-xs font-semibold text-white/75">
@@ -840,28 +956,31 @@ function FoodEntryRow({
     );
   }
 
-  const title = entry.mealName || categoryLabel(entry.category);
-
   if (!isExpanded) {
     return (
       <button
-        className={`${categoryBarClass(entry.category)} flex w-full items-center justify-between gap-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
+        className={`${verdictBarClass(entry)} flex w-full items-center justify-between gap-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
         onClick={() => setIsExpanded(true)}
         type="button"
       >
         <span className="min-w-0 truncate font-semibold">{title}</span>
+        {entry.verdictSource === "manual_override" ? (
+          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+            Override
+          </span>
+        ) : null}
         <span className="ml-auto shrink-0 text-right font-semibold opacity-90">
           {entry.calories.toLocaleString()} cal
         </span>
         <span aria-hidden="true" className="shrink-0 text-xs opacity-70">
-          ▶
+          &gt;
         </span>
       </button>
     );
   }
 
   return (
-    <div className={`${categoryBarClass(entry.category)} transition-all`}>
+    <div className={`${verdictBarClass(entry)} transition-all`}>
       <button
         className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
         onClick={() => setIsExpanded(false)}
@@ -872,12 +991,35 @@ function FoodEntryRow({
           {entry.calories.toLocaleString()} cal
         </span>
         <span aria-hidden="true" className="shrink-0 text-xs opacity-70">
-          ▼
+          v
         </span>
       </button>
+      <div className="mt-2 rounded-md border border-white/20 bg-black/20 p-2 text-xs text-white/85">
+        <p className="line-clamp-2 italic">{entry.verdictReason ?? verdictStatus}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
+            {categoryLabel(entry.category)}
+          </span>
+          {entry.verdictSource === "manual_override" ? (
+            <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
+              Override
+            </span>
+          ) : null}
+        </div>
+      </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-all">
-        <span>{formatMacrosInline(entry) || categoryLabel(entry.category)}</span>
+        <span>{formatMacrosInline(entry) || "No macros logged"}</span>
         <div className="flex items-center gap-2">
+          {entry.verdictSource === "unscored" ? (
+            <button
+              className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={disabled || isVerdictSaving}
+              onClick={regenerateVerdict}
+              type="button"
+            >
+              Retry scoring
+            </button>
+          ) : null}
           <button
             className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
@@ -1298,6 +1440,14 @@ function formatMacrosInline(entry: {
   ]
     .filter(Boolean)
     .join(" / ");
+}
+
+function verdictStatusText(entry: FoodEntry): string {
+  if (entry.verdictSource === "pending") return "Scoring...";
+  if (entry.verdictSource === "unscored") return "Not scored yet.";
+  if (entry.verdictSource === "manual_override") return "Manual verdict override.";
+  if (entry.verdict === null) return "Scoring...";
+  return `${entry.verdict[0].toUpperCase()}${entry.verdict.slice(1)} verdict`;
 }
 
 function mergeEstimateIntoEntry(

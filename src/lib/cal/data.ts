@@ -13,10 +13,15 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   CalDay,
+  CalPhase,
+  CalSex,
   CalTargets,
   CalTotals,
   FoodCategory,
   FoodEntry,
+  FoodVerdict,
+  FoodVerdictContext,
+  FoodVerdictSource,
   SavedFood,
   ShiftlyCalData,
   WeightLog,
@@ -34,6 +39,10 @@ type FoodEntryRow = {
   fat_g: number | null;
   fiber_g: number | null;
   saved_food_id: string | null;
+  verdict: string | null;
+  verdict_reason: string | null;
+  verdict_source: string | null;
+  verdict_context: FoodVerdictContext | null;
   created_at: string;
   updated_at: string;
 };
@@ -67,6 +76,13 @@ type SettingsTargetsRow = {
   carbs_target_g: number | null;
   fat_target_g: number | null;
   fiber_target_g: number | null;
+  age: number | null;
+  sex: string | null;
+  height_cm: number | string | null;
+  activity_level: string | null;
+  current_phase: string | null;
+  goals_text: string | null;
+  health_flags: string[] | null;
 };
 
 type TrendFoodEntryRow = {
@@ -129,7 +145,7 @@ async function loadShiftlyCalData(
     supabase
       .from("food_entries")
       .select(
-        "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g,saved_food_id,created_at,updated_at",
+        "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g,saved_food_id,verdict,verdict_reason,verdict_source,verdict_context,created_at,updated_at",
       )
       .eq("user_id", userId)
       .gte("date", weekStartIso)
@@ -148,7 +164,7 @@ async function loadShiftlyCalData(
       .order("created_at", { ascending: true }),
     supabase
       .from("settings")
-      .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g")
+      .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g,age,sex,height_cm,activity_level,current_phase,goals_text,health_flags")
       .eq("user_id", userId)
       .maybeSingle(),
     supabase
@@ -176,6 +192,7 @@ async function loadShiftlyCalData(
   return {
     todayIso,
     targets,
+    dailyTargetBand: buildDailyTargetBand(targets.tdeeCalories),
     currentWeek,
     projection: {
       weeklyDeficitCalories,
@@ -380,6 +397,15 @@ function mapTargets(row: SettingsTargetsRow | null): CalTargets {
     carbsTargetG: row?.carbs_target_g ?? null,
     fatTargetG: row?.fat_target_g ?? null,
     fiberTargetG: row?.fiber_target_g ?? null,
+    age: row?.age ?? null,
+    sex: mapSex(row?.sex ?? null),
+    heightCm: row?.height_cm === null || row?.height_cm === undefined
+      ? null
+      : Number(row.height_cm),
+    activityLevel: row?.activity_level ?? null,
+    currentPhase: mapPhase(row?.current_phase ?? null),
+    goalsText: row?.goals_text ?? null,
+    healthFlags: Array.isArray(row?.health_flags) ? row.health_flags : [],
   };
 }
 
@@ -396,6 +422,10 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
     fatG: nullableNumber(row.fat_g),
     fiberG: nullableNumber(row.fiber_g),
     savedFoodId: row.saved_food_id,
+    verdict: mapVerdict(row.verdict),
+    verdictReason: row.verdict_reason,
+    verdictSource: mapVerdictSource(row.verdict_source),
+    verdictContext: row.verdict_context ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -432,6 +462,13 @@ function nullableNumber(value: number | null): number | null {
   return value === null ? null : Number(value);
 }
 
+function buildDailyTargetBand(tdeeCalories: number | null) {
+  return {
+    low: tdeeCalories === null ? null : Math.round(tdeeCalories * 0.85),
+    high: tdeeCalories === null ? null : Math.round(tdeeCalories * 1.15),
+  };
+}
+
 function mapCategory(value: string | null): FoodCategory {
   switch (value) {
     case "healthy_snack":
@@ -443,4 +480,40 @@ function mapCategory(value: string | null): FoodCategory {
     default:
       return "meal";
   }
+}
+
+function mapVerdict(value: string | null): FoodVerdict | null {
+  if (value === "good" || value === "fine" || value === "bad") return value;
+  return null;
+}
+
+function mapVerdictSource(value: string | null): FoodVerdictSource {
+  if (
+    value === "pending" ||
+    value === "ai" ||
+    value === "manual_override" ||
+    value === "unscored"
+  ) {
+    return value;
+  }
+
+  return "pending";
+}
+
+function mapSex(value: string | null): CalSex | null {
+  if (value === "male" || value === "female") return value;
+  return null;
+}
+
+function mapPhase(value: string | null): CalPhase | null {
+  if (
+    value === "cut" ||
+    value === "maintain" ||
+    value === "bulk" ||
+    value === "recomp"
+  ) {
+    return value;
+  }
+
+  return null;
 }

@@ -5,6 +5,25 @@ export type FoodCategory =
   | "drink"
   | "other";
 
+export type FoodVerdict = "good" | "fine" | "bad";
+export type FoodVerdictSource = "pending" | "ai" | "manual_override" | "unscored";
+export type CalPhase = "cut" | "maintain" | "bulk" | "recomp";
+export type CalSex = "male" | "female";
+
+export type FoodVerdictContext = {
+  estimated_facets?: {
+    sodium_mg?: number | null;
+    added_sugar_g?: number | null;
+    alcohol_servings?: number | null;
+    saturated_fat_g?: number | null;
+    high_sodium?: boolean;
+    high_added_sugar?: boolean;
+    source?: "official" | "ai_estimate" | "unknown";
+  };
+  rules_triggered?: string[];
+  week_pattern_summary?: string;
+};
+
 export type FoodEntry = {
   id: string;
   date: string;
@@ -17,6 +36,10 @@ export type FoodEntry = {
   fatG: number | null;
   fiberG: number | null;
   savedFoodId: string | null;
+  verdict: FoodVerdict | null;
+  verdictReason: string | null;
+  verdictSource: FoodVerdictSource;
+  verdictContext: FoodVerdictContext | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -50,6 +73,13 @@ export type CalTargets = {
   carbsTargetG: number | null;
   fatTargetG: number | null;
   fiberTargetG: number | null;
+  age: number | null;
+  sex: CalSex | null;
+  heightCm: number | null;
+  activityLevel: string | null;
+  currentPhase: CalPhase | null;
+  goalsText: string | null;
+  healthFlags: string[];
 };
 
 export type CalTotals = {
@@ -83,6 +113,7 @@ export type CalProjection = {
 export type ShiftlyCalData = {
   todayIso: string;
   targets: CalTargets;
+  dailyTargetBand: { low: number | null; high: number | null };
   currentWeek: CalWeek;
   projection: CalProjection;
   savedFoods: SavedFood[];
