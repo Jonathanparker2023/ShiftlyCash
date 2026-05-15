@@ -10,6 +10,7 @@ import {
   computeWeeklyDeficit,
   projectWeeklyWeightChangeLbs,
 } from "@/lib/cal/projection";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   CalDay,
   CalTargets,
@@ -72,6 +73,8 @@ type TrendFoodEntryRow = {
   date: string;
   calories: number;
   protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
   fiber_g: number | null;
 };
 
@@ -84,7 +87,10 @@ export type CalTrendDay = {
   date: string;
   calories: number;
   proteinG: number;
+  carbsG: number;
+  fatG: number;
   fiberG: number;
+  entryCount: number;
   weightLbs: number | null;
 };
 
@@ -100,6 +106,21 @@ export async function getShiftlyCalData(opts?: {
   weekStartIso?: string;
 }): Promise<ShiftlyCalData> {
   const { supabase, user } = await requireUser();
+  return loadShiftlyCalData(supabase, user.id, opts);
+}
+
+export async function getShiftlyCalDataForUser(
+  userId: string,
+  opts?: { weekStartIso?: string },
+): Promise<ShiftlyCalData> {
+  return loadShiftlyCalData(createAdminClient(), userId, opts);
+}
+
+async function loadShiftlyCalData(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+  opts?: { weekStartIso?: string },
+): Promise<ShiftlyCalData> {
   const todayIso = getTodayIso();
   const weekStartIso = normalizeWeekStartIso(opts?.weekStartIso);
   const weekEndIso = addDaysIso(weekStartIso, 6);
@@ -110,7 +131,7 @@ export async function getShiftlyCalData(opts?: {
       .select(
         "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g,saved_food_id,created_at,updated_at",
       )
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .gte("date", weekStartIso)
       .lte("date", weekEndIso)
       .order("date", { ascending: true })
@@ -121,19 +142,19 @@ export async function getShiftlyCalData(opts?: {
       .select(
         "id,name,category,calories,protein_g,carbs_g,fat_g,fiber_g,sort_order,archived_at,created_at,updated_at",
       )
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     supabase
       .from("settings")
       .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle(),
     supabase
       .from("weight_logs")
       .select("id,date,weight_lbs,created_at,updated_at")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .gte("date", weekStartIso)
       .lte("date", weekEndIso),
   ]);
@@ -169,20 +190,36 @@ export async function getShiftlyCalTrendsData(opts?: {
 }): Promise<ShiftlyCalTrendsData> {
   const weekData = await getShiftlyCalData(opts);
   const { supabase, user } = await requireUser();
+  return loadShiftlyCalTrendsData(supabase, user.id, weekData);
+}
+
+export async function getShiftlyCalTrendsDataForUser(
+  userId: string,
+  opts?: { weekStartIso?: string },
+): Promise<ShiftlyCalTrendsData> {
+  const weekData = await getShiftlyCalDataForUser(userId, opts);
+  return loadShiftlyCalTrendsData(createAdminClient(), userId, weekData);
+}
+
+async function loadShiftlyCalTrendsData(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+  weekData: ShiftlyCalData,
+): Promise<ShiftlyCalTrendsData> {
   const trendStartIso = addDaysIso(weekData.todayIso, -27);
 
   const [entriesRes, weightRes] = await Promise.all([
     supabase
       .from("food_entries")
-      .select("date,calories,protein_g,fiber_g")
-      .eq("user_id", user.id)
+      .select("date,calories,protein_g,carbs_g,fat_g,fiber_g")
+      .eq("user_id", userId)
       .gte("date", trendStartIso)
       .lte("date", weekData.todayIso)
       .order("date", { ascending: true }),
     supabase
       .from("weight_logs")
       .select("date,weight_lbs")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .gte("date", trendStartIso)
       .lte("date", weekData.todayIso)
       .order("date", { ascending: true }),
@@ -197,18 +234,31 @@ export async function getShiftlyCalTrendsData(opts?: {
 
   const caloriesByDate = new Map<
     string,
-    { calories: number; proteinG: number; fiberG: number }
+    {
+      calories: number;
+      proteinG: number;
+      carbsG: number;
+      fatG: number;
+      fiberG: number;
+      entryCount: number;
+    }
   >();
   for (const row of (entriesRes.data ?? []) as TrendFoodEntryRow[]) {
     const existing = caloriesByDate.get(row.date) ?? {
       calories: 0,
       proteinG: 0,
+      carbsG: 0,
+      fatG: 0,
       fiberG: 0,
+      entryCount: 0,
     };
     caloriesByDate.set(row.date, {
       calories: existing.calories + Number(row.calories),
       proteinG: existing.proteinG + Number(row.protein_g ?? 0),
+      carbsG: existing.carbsG + Number(row.carbs_g ?? 0),
+      fatG: existing.fatG + Number(row.fat_g ?? 0),
       fiberG: existing.fiberG + Number(row.fiber_g ?? 0),
+      entryCount: existing.entryCount + 1,
     });
   }
 
@@ -232,7 +282,10 @@ export async function getShiftlyCalTrendsData(opts?: {
         date,
         calories: sums?.calories ?? 0,
         proteinG: sums?.proteinG ?? 0,
+        carbsG: sums?.carbsG ?? 0,
+        fatG: sums?.fatG ?? 0,
         fiberG: sums?.fiberG ?? 0,
+        entryCount: sums?.entryCount ?? 0,
         weightLbs: weightByDate.get(date) ?? null,
       };
     }),
