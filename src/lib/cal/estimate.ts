@@ -62,20 +62,65 @@ Quick reference: 1 cup cooked beans = ~15g fiber, 1 medium apple = ~4g, 1 cup br
 - "medium" - composite homemade meal with reasonable portion assumptions, OR named item with modifications applied via first principles.
 - "low" - vague input ("some pasta", "snacks"), unusual items, or descriptions where portion is genuinely unclear.
 
+## Naming style
+
+The \`mealName\` field should be a SHORT, punchy, qualifier-style label - NOT a literal food description. Max 5 words. Aim for 2-4 words.
+
+Pattern: [qualifier] + [reference]
+
+Good qualifiers describe the meal's character:
+- Macro shape: "High Protein", "Low Carb", "High Fiber", "Low Protein"
+- Health: "Clean", "Dirty", "Unhealthy", "Lean", "Heavy"
+- Calorie load: "Light", "Hefty", "Calorie Bomb", "Quick Bite"
+- Sodium / sugar: "Salt Bomb", "Sugar Bomb"
+- Category: "Sweet Treat", "Greasy Hit", "Sneaky Snack"
+- Time/speed: "Drive-thru", "Quick"
+
+Good references hint at what it was:
+- Brand: "Dunkin", "Chipotle", "McD's", "Mickey D's", "Starbucks"
+- Type: "Bowl", "Sandwich", "Snack", "Plate", "Hit", "Bite"
+- Specific: "Burger", "Donut", "Salad", "Smoothie"
+
+Examples of GOOD names:
+- "Big Mac no fries"           -> "Unhealthy Mickey D's"
+- "Greek yogurt with berries"  -> "Clean Protein Snack"
+- "Chipotle chicken bowl"      -> "Heavy Chipotle Bowl"
+- "Apple"                      -> "Clean Apple Hit"
+- "Mountain Dew 20oz"          -> "Sugar Bomb Soda"
+- "Salmon and broccoli"        -> "Lean Protein Plate"
+- "Dunkin glazed donut"        -> "Unhealthy Dunkin Donut"
+- "Chicken Caesar salad"       -> "Salty Chicken Salad"
+- "Protein shake and banana"   -> "High Protein Quickie"
+- "Pizza two slices"           -> "Heavy Pizza Hit"
+- "Black coffee"               -> "Clean Coffee"
+- "Chick-fil-A spicy chicken"  -> "Greasy CFA Sandwich"
+
+Examples of BAD names (do NOT do):
+- "Grilled chicken breast with brown rice and steamed broccoli" (too long, too literal)
+- "Meal" (too vague)
+- "Lunch" (too vague)
+- "Food I ate at noon" (literal, boring)
+
+When the user gave a very specific named item with no modifications, you can keep the brand prominent ("Big Mac Special" is fine - short, punchy, identifiable). When the user gave a generic description, lean qualifier-heavy ("Heavy Carb Plate").
+
+Humor is allowed and encouraged when it fits ("Sneaky Late Night", "Regret Donut", "Diet Saver Salad"). Don't force it - natural beats forced.
+
+Keep it under 5 words. Two-to-three-word names usually feel best.
+
 ## Output format
 
 Output JSON ONLY. No prose before or after. No markdown fence. No code blocks. The entire response must be a single valid JSON object.
 
 Schema (all keys required; macro fields may be null only if truly unknowable):
 {
-  "mealName": string, short, max 40 chars (e.g. "Chipotle Steak Bowl (light rice)"),
+  "mealName": string, MAX 5 WORDS (~30 chars), qualifier-style punchy label as described above (e.g. "Heavy Chipotle Bowl", "Unhealthy Mickey D's", "Clean Apple Hit"),
   "category": "meal" | "healthy_snack" | "unhealthy_snack" | "drink" | "other",
   "calories": integer,
   "proteinG": integer | null,
   "carbsG": integer | null,
   "fatG": integer | null,
   "fiberG": integer | null,
-  "reasoning": string, max 300 chars. When the meal has 2+ components, START with a one-line component breakdown using bullets, then optionally add a short note. Example: "• Steak 240 cal • Rice (light) 105 cal • Beans 130 cal • Guac 230 cal". For single-item foods, just give a short sentence ("Standard medium banana per USDA").
+  "reasoning": string, max 300 chars. When the meal has 2+ components, START with a one-line component breakdown using bullets, then optionally add a short note. Example: "• Steak 240 cal • Rice (light) 105 cal • Beans 130 cal • Guac 230 cal". For single-item foods, just give a short sentence ("Standard medium banana per USDA"),
   "confidence": "high" | "medium" | "low"
 }
 

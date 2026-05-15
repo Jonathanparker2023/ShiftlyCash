@@ -733,6 +733,7 @@ function FoodEntryRow({
   onDelete: (id: string) => void;
   onUpdate: (id: string, patch: UpdateFoodEntryPatch) => Promise<boolean>;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -839,36 +840,62 @@ function FoodEntryRow({
     );
   }
 
+  const title = entry.mealName || categoryLabel(entry.category);
+
+  if (!isExpanded) {
+    return (
+      <button
+        className={`${categoryBarClass(entry.category)} flex w-full items-center justify-between gap-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
+        onClick={() => setIsExpanded(true)}
+        type="button"
+      >
+        <span className="min-w-0 truncate font-semibold">{title}</span>
+        <span className="ml-auto shrink-0 text-right font-semibold opacity-90">
+          {entry.calories.toLocaleString()} cal
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-xs opacity-70">
+          ▶
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <div className={categoryBarClass(entry.category)}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-semibold">
-          {entry.mealName || categoryLabel(entry.category)}
-        </span>
+    <div className={`${categoryBarClass(entry.category)} transition-all`}>
+      <button
+        className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
+        onClick={() => setIsExpanded(false)}
+        type="button"
+      >
+        <span className="min-w-0 truncate font-semibold">{title}</span>
         <span className="text-right font-semibold opacity-90">
-          <span className="block">{entry.calories.toLocaleString()} cal</span>
-          {entry.loggedTime ? (
-            <span className="text-xs font-medium opacity-75">
-              {formatLoggedTime(entry.loggedTime)}
-            </span>
-          ) : null}
+          {entry.calories.toLocaleString()} cal
         </span>
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-3 text-xs opacity-85">
+        <span aria-hidden="true" className="shrink-0 text-xs opacity-70">
+          ▼
+        </span>
+      </button>
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-all">
         <span>{formatMacrosInline(entry) || categoryLabel(entry.category)}</span>
         <div className="flex items-center gap-2">
           <button
-            className="rounded border border-white/30 bg-black/15 px-2 py-1 font-semibold text-white transition hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
-            onClick={() => setIsEditing(true)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsEditing(true);
+            }}
             type="button"
           >
             Edit
           </button>
           <button
-            className="rounded border border-white/30 bg-black/15 px-2 py-1 font-semibold text-white transition hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
-            onClick={() => onDelete(entry.id)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(entry.id);
+            }}
             type="button"
           >
             Delete
@@ -1236,19 +1263,6 @@ function currentTimeInput(): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(
     now.getMinutes(),
   ).padStart(2, "0")}`;
-}
-
-function formatLoggedTime(value: string): string {
-  const [hoursRaw, minutes = "00"] = value.split(":");
-  const hours = Number(hoursRaw);
-  if (!Number.isFinite(hours)) return value;
-
-  const date = new Date(Date.UTC(2026, 0, 1, hours, Number(minutes)));
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "UTC",
-  }).format(date);
 }
 
 function formatMacros(entry: {
