@@ -1092,13 +1092,14 @@ function FoodEntryRow({
         className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
         onClick={() => setIsExpanded(false)}
         type="button"
+        aria-label={`Collapse ${title}`}
       >
         <span className="min-w-0 truncate font-semibold">{title}</span>
         <span className="text-right font-semibold opacity-90">
           {entry.calories.toLocaleString()} cal
         </span>
         <span aria-hidden="true" className="shrink-0 text-xs opacity-70">
-          v
+          ^
         </span>
       </button>
       <div className="mt-2 rounded-md border border-white/20 bg-black/20 p-2 text-xs text-white/85">
@@ -1122,6 +1123,13 @@ function FoodEntryRow({
       <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-all">
         <span>{formatMacrosInline(entry) || "No macros logged"}</span>
         <div className="flex items-center gap-2">
+          <button
+            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white"
+            onClick={() => setIsExpanded(false)}
+            type="button"
+          >
+            Close
+          </button>
           {entry.verdictSource === "unscored" || isStuck ? (
             <button
               className="rounded border border-white/30 bg-black/20 px-2 py-1 font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
