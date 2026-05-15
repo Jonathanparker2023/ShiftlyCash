@@ -65,6 +65,64 @@ Estimate these whenever possible:
 
 Use 0 when the food genuinely contains none. Use null only when the description is too vague to estimate.
 
+## Hidden sodium watchlist — DO NOT miss these
+
+The most common estimation failure is under-counting sodium in foods that READ as healthy but pack heavy sodium. ALWAYS account for these when present:
+
+**Cheese (per oz, very high):**
+- Feta: 300-500mg
+- Parmesan: 300-450mg
+- Blue cheese: 350-450mg
+- Cottage cheese (1/2 cup): 400-500mg
+- Cheddar / mozzarella: 175-225mg (lower but not negligible)
+
+**Brined / cured foods:**
+- Kalamata olives: 50-100mg per olive (5 olives = 250-500mg)
+- Green olives: 80-120mg per olive
+- Capers (1 tsp): 200-250mg
+- Anchovies (1 fillet): 100-150mg
+- Pickles (1 medium): 700-900mg
+- Sauerkraut (1/4 cup): 300-400mg
+- Kimchi (1/4 cup): 300-500mg
+
+**Sauces / dressings / condiments (per tbsp unless noted):**
+- Regular soy sauce: 900-1100mg
+- Low-sodium soy sauce: 500-600mg
+- Teriyaki sauce: 700-900mg
+- Miso paste (1 tsp): 200-300mg
+- Hoisin sauce: 250-350mg
+- Worcestershire: 150-200mg
+- Bottled salad dressing: 250-400mg
+- Ranch dressing: 250-300mg
+- Hot sauce: 100-200mg
+- Ketchup: 150-200mg
+- BBQ sauce: 250-350mg
+
+**Deli / cured meats (per oz):**
+- Deli turkey/ham: 350-500mg
+- Salami / pepperoni: 400-550mg
+- Bacon: 200-300mg per slice
+- Hot dogs: 500-700mg each
+- Smoked salmon: 500-600mg
+
+**Bread / baked / canned:**
+- Bagel: 400-600mg
+- Pita: 250-350mg
+- Tortilla: 300-450mg
+- Canned beans (no salt added: ~10mg; regular: 300-500mg per 1/2 cup)
+- Canned tuna in water: 200-300mg per 3oz
+- Bread (1 slice): 150-200mg
+
+**Restaurant / takeout marinades (NOT visible to user but always present):**
+- Greek/Mediterranean grilled meat marinade: adds ~300-500mg per 6oz serving
+- Korean / Japanese marinated meat (bulgogi, teriyaki): adds 700-1000mg
+- BBQ / smoked meats: adds 400-700mg
+- Brined / cured / smoked: assume +400mg minimum on top of base meat
+
+**Decision rule:** when a food description suggests any item from the lists above is present even implicitly (e.g., "Greek salad" implies feta + olives + dressing; "Mediterranean plate" implies marinated meat; "deli sandwich" implies cured meat + cheese; "sushi" implies soy sauce), SUM each component's sodium. Do not estimate the whole dish as a single low number just because it "feels healthy."
+
+When in doubt, estimate sodium on the HIGH side. Under-counting sodium for a user with HBP risk is the worst failure mode.
+
 ## Confidence calibration
 
 - "high" - named published item with no modifications, OR simple whole food at standard portion.
