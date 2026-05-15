@@ -191,6 +191,10 @@ def summarize(data: dict) -> str:
     lines.append(f"  Carbs:    {fmt(targets.get('carbs_g'), 'g')}")
     lines.append(f"  Fat:      {fmt(targets.get('fat_g'), 'g')}")
     lines.append(f"  Fiber:    {fmt(targets.get('fiber_g'), 'g')}")
+    lines.append(f"  Sodium:   {fmt(targets.get('sodium_mg'), 'mg')}")
+    lines.append(f"  Sugar:    {fmt(targets.get('added_sugar_g'), 'g added')}")
+    lines.append(f"  Sat fat:  {fmt(targets.get('saturated_fat_g'), 'g')}")
+    lines.append(f"  Water:    {fmt(targets.get('water_oz'), 'oz')}")
 
     lines.append(f"\nTODAY — {today.get('date', '?')}")
     lines.append(
@@ -205,7 +209,11 @@ def summarize(data: dict) -> str:
         f"{fmt(today_totals.get('protein_g'), 'g')} protein / "
         f"{fmt(today_totals.get('carbs_g'), 'g')} carbs / "
         f"{fmt(today_totals.get('fat_g'), 'g')} fat / "
-        f"{fmt(today_totals.get('fiber_g'), 'g')} fiber"
+        f"{fmt(today_totals.get('fiber_g'), 'g')} fiber / "
+        f"{fmt(today_totals.get('sodium_mg'), 'mg')} sodium / "
+        f"{fmt(today_totals.get('added_sugar_g'), 'g')} added sugar / "
+        f"{fmt(today_totals.get('saturated_fat_g'), 'g')} sat fat / "
+        f"{fmt(today.get('water_oz'), 'oz')} water"
     )
     lines.append(
         f"  Entries:  {fmt(today.get('entry_count'))} "
@@ -218,7 +226,8 @@ def summarize(data: dict) -> str:
             f"{entry.get('name') or entry.get('category') or 'Food'} — "
             f"{fmt(entry.get('calories'), ' cal')}, "
             f"{fmt(entry.get('protein_g'), 'g')}p, "
-            f"{fmt(entry.get('fiber_g'), 'g')}fi"
+            f"{fmt(entry.get('fiber_g'), 'g')}fi, "
+            f"{fmt(entry.get('sodium_mg'), 'mg')} sodium"
         )
 
     lines.append("\nTODAY VERDICTS")

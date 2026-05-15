@@ -31,6 +31,9 @@ type SavedFoodFormState = {
   carbsG: string;
   fatG: string;
   fiberG: string;
+  sodiumMg: string;
+  addedSugarG: string;
+  saturatedFatG: string;
 };
 
 type TargetFormState = {
@@ -39,6 +42,10 @@ type TargetFormState = {
   carbsTargetG: string;
   fatTargetG: string;
   fiberTargetG: string;
+  sodiumTargetMg: string;
+  addedSugarTargetG: string;
+  saturatedFatTargetG: string;
+  waterTargetOz: string;
 };
 
 const emptySavedFoodForm: SavedFoodFormState = {
@@ -49,6 +56,9 @@ const emptySavedFoodForm: SavedFoodFormState = {
   carbsG: "",
   fatG: "",
   fiberG: "",
+  sodiumMg: "",
+  addedSugarG: "",
+  saturatedFatG: "",
 };
 
 const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
@@ -75,6 +85,10 @@ export function ShiftlyCalTrendsView({
     carbsTargetG: initialData.targets.carbsTargetG?.toString() ?? "",
     fatTargetG: initialData.targets.fatTargetG?.toString() ?? "",
     fiberTargetG: initialData.targets.fiberTargetG?.toString() ?? "",
+    sodiumTargetMg: initialData.targets.sodiumTargetMg?.toString() ?? "",
+    addedSugarTargetG: initialData.targets.addedSugarTargetG?.toString() ?? "",
+    saturatedFatTargetG: initialData.targets.saturatedFatTargetG?.toString() ?? "",
+    waterTargetOz: initialData.targets.waterTargetOz?.toString() ?? "",
   });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -225,6 +239,30 @@ function TargetsPanel({
           suffix="g"
           value={form.fiberTargetG}
         />
+        <NumberInput
+          label="Sodium target"
+          onChange={(value) => onChange({ ...form, sodiumTargetMg: value })}
+          suffix="mg"
+          value={form.sodiumTargetMg}
+        />
+        <NumberInput
+          label="Added sugar target"
+          onChange={(value) => onChange({ ...form, addedSugarTargetG: value })}
+          suffix="g"
+          value={form.addedSugarTargetG}
+        />
+        <NumberInput
+          label="Sat fat target"
+          onChange={(value) => onChange({ ...form, saturatedFatTargetG: value })}
+          suffix="g"
+          value={form.saturatedFatTargetG}
+        />
+        <NumberInput
+          label="Water target"
+          onChange={(value) => onChange({ ...form, waterTargetOz: value })}
+          suffix="oz"
+          value={form.waterTargetOz}
+        />
         <div className="sm:col-span-2">
           <button
             className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
@@ -302,6 +340,24 @@ function SavedFoodsManagement({
           onChange={(value) => onChange({ ...form, fiberG: value })}
           suffix="g"
           value={form.fiberG}
+        />
+        <NumberInput
+          label="Sodium"
+          onChange={(value) => onChange({ ...form, sodiumMg: value })}
+          suffix="mg"
+          value={form.sodiumMg}
+        />
+        <NumberInput
+          label="Added sugar"
+          onChange={(value) => onChange({ ...form, addedSugarG: value })}
+          suffix="g"
+          value={form.addedSugarG}
+        />
+        <NumberInput
+          label="Sat fat"
+          onChange={(value) => onChange({ ...form, saturatedFatG: value })}
+          suffix="g"
+          value={form.saturatedFatG}
         />
         <div className="sm:col-span-2 xl:col-span-3">
           <button
@@ -401,7 +457,7 @@ function TrendHistoryRow({
   const tone = colorToneFromMagnitude(deviation, DAILY_CALORIE_THRESHOLDS);
 
   return (
-    <div className="grid gap-2 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white sm:grid-cols-[minmax(150px,1fr)_repeat(4,minmax(80px,0.4fr))] sm:items-center">
+    <div className="grid gap-2 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white sm:grid-cols-[minmax(150px,1fr)_repeat(5,minmax(80px,0.4fr))] sm:items-center">
       <div>
         <p className="font-semibold">{formatDayLabel(day.date)}</p>
         <p className="text-xs text-white/60">{day.date}</p>
@@ -411,6 +467,7 @@ function TrendHistoryRow({
       </p>
       <p className="text-white/80">{day.proteinG.toLocaleString()}g protein</p>
       <p className="text-white/80">{day.fiberG.toLocaleString()}g fiber</p>
+      <p className="text-white/80">{day.waterOz.toLocaleString()} oz water</p>
       <p className="text-white/80">
         {day.weightLbs === null ? "No weight" : `${day.weightLbs.toFixed(1)} lbs`}
       </p>
@@ -546,12 +603,18 @@ function formatMacros(entry: {
   carbsG: number | null;
   fatG: number | null;
   fiberG: number | null;
+  sodiumMg: number | null;
+  addedSugarG: number | null;
+  saturatedFatG: number | null;
 }): string {
   const macros = [
     entry.proteinG === null ? null : `${entry.proteinG}p`,
     entry.carbsG === null ? null : `${entry.carbsG}c`,
     entry.fatG === null ? null : `${entry.fatG}f`,
     entry.fiberG === null ? null : `${entry.fiberG}fi`,
+    entry.sodiumMg === null ? null : `${entry.sodiumMg}mg sodium`,
+    entry.addedSugarG === null ? null : `${entry.addedSugarG}g sugar`,
+    entry.saturatedFatG === null ? null : `${entry.saturatedFatG}g sat fat`,
   ]
     .filter(Boolean)
     .join(" / ");

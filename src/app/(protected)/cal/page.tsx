@@ -1,6 +1,8 @@
 import { ShiftlyCalView } from "@/components/cal/ShiftlyCalView";
 import { getShiftlyCalData } from "@/lib/cal/data";
 
+export const maxDuration = 60;
+
 export default async function ShiftlyCalPage({
   searchParams,
 }: {

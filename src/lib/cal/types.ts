@@ -35,10 +35,14 @@ export type FoodEntry = {
   carbsG: number | null;
   fatG: number | null;
   fiberG: number | null;
+  sodiumMg: number | null;
+  addedSugarG: number | null;
+  saturatedFatG: number | null;
   savedFoodId: string | null;
   verdict: FoodVerdict | null;
   verdictReason: string | null;
   verdictSource: FoodVerdictSource;
+  verdictError: string | null;
   verdictContext: FoodVerdictContext | null;
   createdAt: string;
   updatedAt: string;
@@ -53,6 +57,9 @@ export type SavedFood = {
   carbsG: number | null;
   fatG: number | null;
   fiberG: number | null;
+  sodiumMg: number | null;
+  addedSugarG: number | null;
+  saturatedFatG: number | null;
   sortOrder: number;
   archivedAt: string | null;
   createdAt: string;
@@ -67,12 +74,24 @@ export type WeightLog = {
   updatedAt: string;
 };
 
+export type WaterLog = {
+  id: string;
+  date: string;
+  amountOz: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CalTargets = {
   tdeeCalories: number | null;
   proteinTargetG: number | null;
   carbsTargetG: number | null;
   fatTargetG: number | null;
   fiberTargetG: number | null;
+  sodiumTargetMg: number | null;
+  addedSugarTargetG: number | null;
+  saturatedFatTargetG: number | null;
+  waterTargetOz: number | null;
   age: number | null;
   sex: CalSex | null;
   heightCm: number | null;
@@ -88,6 +107,9 @@ export type CalTotals = {
   carbsG: number;
   fatG: number;
   fiberG: number;
+  sodiumMg: number;
+  addedSugarG: number;
+  saturatedFatG: number;
 };
 
 export type CalDay = {
@@ -96,6 +118,7 @@ export type CalDay = {
   entries: FoodEntry[];
   totals: CalTotals;
   weight: WeightLog | null;
+  waterOz: number;
 };
 
 export type CalWeek = {

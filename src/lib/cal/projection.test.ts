@@ -51,6 +51,9 @@ function makeWeek(calories: number): CalWeek {
       carbsG: 0,
       fatG: 0,
       fiberG: 0,
+      sodiumMg: 0,
+      addedSugarG: 0,
+      saturatedFatG: 0,
     },
   };
 }

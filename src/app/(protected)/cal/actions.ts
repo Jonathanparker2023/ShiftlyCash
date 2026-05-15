@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { waitUntil } from "@vercel/functions";
 
 import { requireUser } from "@/lib/auth";
 import { estimateFood, type FoodEstimate } from "@/lib/cal/estimate";
@@ -32,6 +33,9 @@ type VerdictEntryRow = {
   carbs_g: number | null;
   fat_g: number | null;
   fiber_g: number | null;
+  sodium_mg: number | null;
+  added_sugar_g: number | null;
+  saturated_fat_g: number | null;
 };
 
 type VerdictSettingsRow = {
@@ -45,6 +49,9 @@ type VerdictSettingsRow = {
   tdee_calories: number | null;
   protein_target_g: number | null;
   fiber_target_g: number | null;
+  sodium_target_mg: number | null;
+  added_sugar_target_g: number | null;
+  saturated_fat_target_g: number | null;
 };
 
 type VerdictWeekEntryRow = {
@@ -53,6 +60,9 @@ type VerdictWeekEntryRow = {
   calories: number;
   protein_g: number | null;
   fiber_g: number | null;
+  sodium_mg: number | null;
+  added_sugar_g: number | null;
+  saturated_fat_g: number | null;
 };
 
 export async function createFoodEntryAction(input: {
@@ -65,6 +75,9 @@ export async function createFoodEntryAction(input: {
   carbsG?: NullableMacroInput;
   fatG?: NullableMacroInput;
   fiberG?: NullableMacroInput;
+  sodiumMg?: NullableMacroInput;
+  addedSugarG?: NullableMacroInput;
+  saturatedFatG?: NullableMacroInput;
   savedFoodId?: string | null;
 }): Promise<{ ok: true; id: string }> {
   const { supabase, user } = await requireUser();
@@ -86,6 +99,9 @@ export async function createFoodEntryAction(input: {
       carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
       fat_g: optionalNonNegativeInteger(input.fatG, "Fat"),
       fiber_g: optionalNonNegativeInteger(input.fiberG, "Fiber"),
+      sodium_mg: optionalNonNegativeInteger(input.sodiumMg, "Sodium"),
+      added_sugar_g: optionalNonNegativeInteger(input.addedSugarG, "Added sugar"),
+      saturated_fat_g: optionalNonNegativeInteger(input.saturatedFatG, "Saturated fat"),
       saved_food_id: input.savedFoodId || null,
       verdict: null,
       verdict_source: "pending",
@@ -136,6 +152,9 @@ export async function updateFoodEntryAction(input: {
   carbsG?: NullableMacroInput;
   fatG?: NullableMacroInput;
   fiberG?: NullableMacroInput;
+  sodiumMg?: NullableMacroInput;
+  addedSugarG?: NullableMacroInput;
+  saturatedFatG?: NullableMacroInput;
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
   const calories = requireNonNegativeInteger(input.calories, "Calories");
@@ -160,6 +179,9 @@ export async function updateFoodEntryAction(input: {
       carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
       fat_g: optionalNonNegativeInteger(input.fatG, "Fat"),
       fiber_g: optionalNonNegativeInteger(input.fiberG, "Fiber"),
+      sodium_mg: optionalNonNegativeInteger(input.sodiumMg, "Sodium"),
+      added_sugar_g: optionalNonNegativeInteger(input.addedSugarG, "Added sugar"),
+      saturated_fat_g: optionalNonNegativeInteger(input.saturatedFatG, "Saturated fat"),
       ...(current?.verdict_source === "manual_override"
         ? {}
         : {
@@ -239,6 +261,9 @@ export async function createSavedFoodAction(input: {
   carbsG?: NullableMacroInput;
   fatG?: NullableMacroInput;
   fiberG?: NullableMacroInput;
+  sodiumMg?: NullableMacroInput;
+  addedSugarG?: NullableMacroInput;
+  saturatedFatG?: NullableMacroInput;
 }): Promise<{ ok: true; id: string }> {
   const { supabase, user } = await requireUser();
   const name = input.name.trim();
@@ -266,6 +291,9 @@ export async function createSavedFoodAction(input: {
       carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
       fat_g: optionalNonNegativeInteger(input.fatG, "Fat"),
       fiber_g: optionalNonNegativeInteger(input.fiberG, "Fiber"),
+      sodium_mg: optionalNonNegativeInteger(input.sodiumMg, "Sodium"),
+      added_sugar_g: optionalNonNegativeInteger(input.addedSugarG, "Added sugar"),
+      saturated_fat_g: optionalNonNegativeInteger(input.saturatedFatG, "Saturated fat"),
       sort_order: Number(maxRow?.sort_order ?? -1) + 1,
     })
     .select("id")
@@ -320,12 +348,36 @@ export async function logWeightAction(input: {
   return { ok: true };
 }
 
+export async function logWaterAction(input: {
+  date?: string;
+  amountOz: number | string;
+}): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const amountOz = requireNonNegativeInteger(input.amountOz, "Water");
+  if (amountOz <= 0) throw new Error("Water must be greater than zero.");
+
+  const { error } = await supabase.from("water_logs").insert({
+    user_id: user.id,
+    date: normalizeIsoDate(input.date),
+    amount_oz: amountOz,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/cal");
+  return { ok: true };
+}
+
 export async function saveCalTargetsAction(input: {
   tdeeCalories?: NullableMacroInput;
   proteinTargetG?: NullableMacroInput;
   carbsTargetG?: NullableMacroInput;
   fatTargetG?: NullableMacroInput;
   fiberTargetG?: NullableMacroInput;
+  sodiumTargetMg?: NullableMacroInput;
+  addedSugarTargetG?: NullableMacroInput;
+  saturatedFatTargetG?: NullableMacroInput;
+  waterTargetOz?: NullableMacroInput;
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
 
@@ -337,6 +389,10 @@ export async function saveCalTargetsAction(input: {
       carbs_target_g: optionalNonNegativeInteger(input.carbsTargetG, "Carbs target"),
       fat_target_g: optionalNonNegativeInteger(input.fatTargetG, "Fat target"),
       fiber_target_g: optionalPositiveInteger(input.fiberTargetG, "Fiber target"),
+      sodium_target_mg: optionalPositiveInteger(input.sodiumTargetMg, "Sodium target"),
+      added_sugar_target_g: optionalPositiveInteger(input.addedSugarTargetG, "Added sugar target"),
+      saturated_fat_target_g: optionalPositiveInteger(input.saturatedFatTargetG, "Saturated fat target"),
+      water_target_oz: optionalPositiveInteger(input.waterTargetOz, "Water target"),
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", user.id);
@@ -426,6 +482,12 @@ function parseInteger(value: NullableMacroInput): number | null {
 }
 
 function scheduleScoreFoodEntry(entryId: string, userId: string) {
+  console.info("[verdict] scoring scheduled", { entryId, userId, ts: Date.now() });
+  if (typeof waitUntil === "function") {
+    waitUntil(scoreEntryAndUpdate(entryId, userId));
+    return;
+  }
+
   after(async () => {
     await scoreEntryAndUpdate(entryId, userId);
   });
@@ -433,6 +495,8 @@ function scheduleScoreFoodEntry(entryId: string, userId: string) {
 
 async function scoreEntryAndUpdate(entryId: string, userId: string) {
   const supabase = createAdminClient();
+  const startedAt = Date.now();
+  console.info("[verdict] scoring start", { entryId, userId, ts: startedAt });
 
   try {
     const input = await buildVerdictInput(supabase, entryId, userId);
@@ -444,6 +508,7 @@ async function scoreEntryAndUpdate(entryId: string, userId: string) {
         verdict: result.verdict,
         verdict_reason: result.verdict_reason,
         verdict_source: "ai",
+        verdict_error: null,
         verdict_context: result.verdict_context,
         updated_at: new Date().toISOString(),
       })
@@ -451,17 +516,32 @@ async function scoreEntryAndUpdate(entryId: string, userId: string) {
       .eq("id", entryId);
 
     if (error) throw new Error(error.message);
-  } catch {
+    console.info("[verdict] scoring success", { entryId, userId, ts: Date.now() });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown verdict scoring error.";
+    console.info("[verdict] scoring failure", {
+      entryId,
+      userId,
+      ts: Date.now(),
+      error: message,
+    });
     await supabase
       .from("food_entries")
       .update({
         verdict: null,
         verdict_reason: null,
         verdict_source: "unscored",
+        verdict_error: message,
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", userId)
       .eq("id", entryId);
+  } finally {
+    console.info("[verdict] scoring duration ms", {
+      entryId,
+      userId,
+      durationMs: Date.now() - startedAt,
+    });
   }
 
   revalidatePath("/cal");
@@ -474,7 +554,7 @@ async function buildVerdictInput(
 ): Promise<VerdictInput> {
   const { data: entry, error: entryError } = await supabase
     .from("food_entries")
-    .select("id,user_id,date,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g")
+    .select("id,user_id,date,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g,sodium_mg,added_sugar_g,saturated_fat_g")
     .eq("user_id", userId)
     .eq("id", entryId)
     .single();
@@ -491,13 +571,13 @@ async function buildVerdictInput(
     supabase
       .from("settings")
       .select(
-        "age,sex,height_cm,activity_level,current_phase,goals_text,health_flags,tdee_calories,protein_target_g,fiber_target_g",
+        "age,sex,height_cm,activity_level,current_phase,goals_text,health_flags,tdee_calories,protein_target_g,fiber_target_g,sodium_target_mg,added_sugar_target_g,saturated_fat_target_g",
       )
       .eq("user_id", userId)
       .maybeSingle(),
     supabase
       .from("food_entries")
-      .select("date,category,calories,protein_g,fiber_g")
+      .select("date,category,calories,protein_g,fiber_g,sodium_mg,added_sugar_g,saturated_fat_g")
       .eq("user_id", userId)
       .gte("date", weekStartIso)
       .lte("date", weekEndIso),
@@ -546,6 +626,9 @@ async function buildVerdictInput(
       carbsG: row.carbs_g === null ? null : Number(row.carbs_g),
       fatG: row.fat_g === null ? null : Number(row.fat_g),
       fiberG: row.fiber_g === null ? null : Number(row.fiber_g),
+      sodiumMg: row.sodium_mg === null ? null : Number(row.sodium_mg),
+      addedSugarG: row.added_sugar_g === null ? null : Number(row.added_sugar_g),
+      saturatedFatG: row.saturated_fat_g === null ? null : Number(row.saturated_fat_g),
     },
     profile: {
       age: Number(settings.age ?? 28),
@@ -566,17 +649,26 @@ async function buildVerdictInput(
       tdee_cal: tdee,
       protein_g: proteinTarget,
       fiber_g: fiberTarget,
+      sodium_mg: Number(settings.sodium_target_mg ?? 2300),
+      added_sugar_g: Number(settings.added_sugar_target_g ?? 36),
+      saturated_fat_g: Number(settings.saturated_fat_target_g ?? 20),
     },
     today_so_far: {
       cal: dayTotals.calories,
       protein_g: dayTotals.proteinG,
       fiber_g: dayTotals.fiberG,
+      sodium_mg: dayTotals.sodiumMg,
+      added_sugar_g: dayTotals.addedSugarG,
+      saturated_fat_g: dayTotals.saturatedFatG,
       entry_count: todayRows.length,
     },
     week_so_far: {
       cal: weekTotals.calories,
       protein_g: weekTotals.proteinG,
       fiber_g: weekTotals.fiberG,
+      sodium_mg: weekTotals.sodiumMg,
+      added_sugar_g: weekTotals.addedSugarG,
+      saturated_fat_g: weekTotals.saturatedFatG,
       entry_count: weekRows.length,
       days_logged: dayCalories.length,
       counts_by_category: countsByCategory,
@@ -592,8 +684,11 @@ function totalRows(rows: VerdictWeekEntryRow[]) {
       calories: total.calories + Number(row.calories),
       proteinG: total.proteinG + Number(row.protein_g ?? 0),
       fiberG: total.fiberG + Number(row.fiber_g ?? 0),
+      sodiumMg: total.sodiumMg + Number(row.sodium_mg ?? 0),
+      addedSugarG: total.addedSugarG + Number(row.added_sugar_g ?? 0),
+      saturatedFatG: total.saturatedFatG + Number(row.saturated_fat_g ?? 0),
     }),
-    { calories: 0, proteinG: 0, fiberG: 0 },
+    { calories: 0, proteinG: 0, fiberG: 0, sodiumMg: 0, addedSugarG: 0, saturatedFatG: 0 },
   );
 }
 

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { AiFoodEstimator } from "@/components/cal/AiFoodEstimator";
 import {
   createFoodEntryAction,
   deleteFoodEntryAction,
+  logWaterAction,
   logWeightAction,
   overrideVerdictAction,
   regenerateVerdictAction,
@@ -24,7 +25,6 @@ import {
   colorToneFromMagnitude,
   dailyDeviation,
   DAILY_CALORIE_THRESHOLDS,
-  DAILY_MACRO_THRESHOLDS,
   WEEKLY_CALORIE_THRESHOLDS,
   WEEKLY_MACRO_THRESHOLDS,
   type MagnitudeTone,
@@ -50,6 +50,9 @@ type MealFormState = {
   carbsG: string;
   fatG: string;
   fiberG: string;
+  sodiumMg: string;
+  addedSugarG: string;
+  saturatedFatG: string;
   savedFoodId: string | null;
 };
 
@@ -62,6 +65,9 @@ type UpdateFoodEntryPatch = {
   carbsG?: number | string | null;
   fatG?: number | string | null;
   fiberG?: number | string | null;
+  sodiumMg?: number | string | null;
+  addedSugarG?: number | string | null;
+  saturatedFatG?: number | string | null;
 };
 
 function emptyMealForm(): MealFormState {
@@ -74,6 +80,9 @@ function emptyMealForm(): MealFormState {
     carbsG: "",
     fatG: "",
     fiberG: "",
+    sodiumMg: "",
+    addedSugarG: "",
+    saturatedFatG: "",
     savedFoodId: null,
   };
 }
@@ -108,6 +117,7 @@ export function ShiftlyCalView({
   );
   const [loggedFoodId, setLoggedFoodId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [isPending, startTransition] = useTransition();
   const focusedDay =
     initialData.currentWeek.days[focusedDayIndex] ?? initialData.currentWeek.days[0];
@@ -132,6 +142,28 @@ export function ShiftlyCalView({
       ? null
       : initialData.targets.proteinTargetG * 7,
   );
+  const hasRecentPendingVerdicts = useMemo(
+    () =>
+      focusedDay.entries.some(
+        (entry) =>
+          entry.verdictSource === "pending" &&
+          nowMs - new Date(entry.createdAt).getTime() < 60_000,
+      ),
+    [focusedDay.entries, nowMs],
+  );
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 5000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!hasRecentPendingVerdicts) return;
+    const id = window.setInterval(() => {
+      router.refresh();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [hasRecentPendingVerdicts, router]);
 
   function submitMeal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -149,6 +181,9 @@ export function ShiftlyCalView({
           carbsG: mealForm.carbsG,
           fatG: mealForm.fatG,
           fiberG: mealForm.fiberG,
+          sodiumMg: mealForm.sodiumMg,
+          addedSugarG: mealForm.addedSugarG,
+          saturatedFatG: mealForm.saturatedFatG,
           savedFoodId: mealForm.savedFoodId,
         });
         setMealForm(emptyMealForm());
@@ -174,6 +209,9 @@ export function ShiftlyCalView({
           carbsG: food.carbsG?.toString() ?? "",
           fatG: food.fatG?.toString() ?? "",
           fiberG: food.fiberG?.toString() ?? "",
+          sodiumMg: food.sodiumMg?.toString() ?? "",
+          addedSugarG: food.addedSugarG?.toString() ?? "",
+          saturatedFatG: food.saturatedFatG?.toString() ?? "",
           savedFoodId: food.id,
         });
         setLoggedFoodId(food.id);
@@ -194,6 +232,9 @@ export function ShiftlyCalView({
     carbsG: string;
     fatG: string;
     fiberG: string;
+    sodiumMg: string;
+    addedSugarG: string;
+    saturatedFatG: string;
   }) {
     setError(null);
     startTransition(async () => {
@@ -208,6 +249,9 @@ export function ShiftlyCalView({
           carbsG: input.carbsG,
           fatG: input.fatG,
           fiberG: input.fiberG,
+          sodiumMg: input.sodiumMg,
+          addedSugarG: input.addedSugarG,
+          saturatedFatG: input.saturatedFatG,
           savedFoodId: null,
         });
         router.refresh();
@@ -260,6 +304,18 @@ export function ShiftlyCalView({
     }
   }
 
+  function logWater(amountOz: number) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await logWaterAction({ date: focusedDay.date, amountOz });
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to log water.");
+      }
+    });
+  }
+
   async function regenerateVerdict(id: string): Promise<boolean> {
     setError(null);
     try {
@@ -298,6 +354,9 @@ export function ShiftlyCalView({
       carbsG: food.carbsG?.toString() ?? "",
       fatG: food.fatG?.toString() ?? "",
       fiberG: food.fiberG?.toString() ?? "",
+      sodiumMg: food.sodiumMg?.toString() ?? "",
+      addedSugarG: food.addedSugarG?.toString() ?? "",
+      saturatedFatG: food.saturatedFatG?.toString() ?? "",
       savedFoodId: food.id,
     });
     setIsMealFormOpen(true);
@@ -392,12 +451,10 @@ export function ShiftlyCalView({
             <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
               <SavedFoodsList
                 disabled={isPending}
-                focusedDay={focusedDay}
                 loggedFoodId={loggedFoodId}
                 onFill={fillFromSavedFood}
                 onInstantLog={instantLog}
                 savedFoods={initialData.savedFoods}
-                todayIso={initialData.todayIso}
               />
 
               <div>
@@ -411,22 +468,13 @@ export function ShiftlyCalView({
                     disabled={isPending}
                     onConfirm={logFromEstimate}
                   />
-                  <button
-                    className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-                    onClick={() => setIsMealFormOpen((current) => !current)}
-                    type="button"
-                  >
-                    {isMealFormOpen ? "Close form" : "+ Log food"}
-                  </button>
                 </div>
                 {isMealFormOpen ? (
                   <MealEntryForm
                     disabled={isPending}
-                    focusedDay={focusedDay}
                     mealForm={mealForm}
                     onMealFormChange={setMealForm}
                     onSubmit={submitMeal}
-                    todayIso={initialData.todayIso}
                   />
                 ) : null}
                 <div className="mt-4 space-y-2">
@@ -436,6 +484,7 @@ export function ShiftlyCalView({
                         disabled={isPending}
                         entry={entry}
                         key={entry.id}
+                        nowMs={nowMs}
                         onDelete={deleteEntry}
                         onOverrideVerdict={overrideVerdict}
                         onRegenerateVerdict={regenerateVerdict}
@@ -455,6 +504,14 @@ export function ShiftlyCalView({
                   day={focusedDay}
                   targets={initialData.targets}
                 />
+                <div className="mt-4">
+                  <WaterPanel
+                    day={focusedDay}
+                    disabled={isPending}
+                    onLog={logWater}
+                    targetOz={initialData.targets.waterTargetOz}
+                  />
+                </div>
                 <div className="mt-4">
                   <WeightPanel
                     day={focusedDay}
@@ -675,24 +732,17 @@ function RemainingBadge({ remaining }: { remaining: number }) {
 
 function MealEntryForm({
   disabled,
-  focusedDay,
   mealForm,
   onMealFormChange,
   onSubmit,
-  todayIso,
 }: {
   disabled: boolean;
-  focusedDay: CalDay;
   mealForm: MealFormState;
   onMealFormChange: (form: MealFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  todayIso: string;
 }) {
   return (
     <form className="mt-4 rounded-md border border-white/15 bg-black/20 p-3" onSubmit={onSubmit}>
-      <p className="text-sm font-semibold text-white">
-        Add to {focusedDayLabel(focusedDay.date, todayIso)}
-      </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
         <TextInput
           className="lg:col-span-2"
@@ -742,6 +792,24 @@ function MealEntryForm({
           suffix="g"
           value={mealForm.fiberG}
         />
+        <NumberInput
+          label="Sodium"
+          onChange={(value) => onMealFormChange({ ...mealForm, sodiumMg: value })}
+          suffix="mg"
+          value={mealForm.sodiumMg}
+        />
+        <NumberInput
+          label="Added sugar"
+          onChange={(value) => onMealFormChange({ ...mealForm, addedSugarG: value })}
+          suffix="g"
+          value={mealForm.addedSugarG}
+        />
+        <NumberInput
+          label="Sat fat"
+          onChange={(value) => onMealFormChange({ ...mealForm, saturatedFatG: value })}
+          suffix="g"
+          value={mealForm.saturatedFatG}
+        />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -759,6 +827,7 @@ function MealEntryForm({
 function FoodEntryRow({
   disabled,
   entry,
+  nowMs,
   onDelete,
   onOverrideVerdict,
   onRegenerateVerdict,
@@ -766,6 +835,7 @@ function FoodEntryRow({
 }: {
   disabled: boolean;
   entry: FoodEntry;
+  nowMs: number;
   onDelete: (id: string) => void;
   onOverrideVerdict: (
     id: string,
@@ -792,6 +862,9 @@ function FoodEntryRow({
     carbsG: entry.carbsG?.toString() ?? "",
     fatG: entry.fatG?.toString() ?? "",
     fiberG: entry.fiberG?.toString() ?? "",
+    sodiumMg: entry.sodiumMg?.toString() ?? "",
+    addedSugarG: entry.addedSugarG?.toString() ?? "",
+    saturatedFatG: entry.saturatedFatG?.toString() ?? "",
   });
 
   async function submitEdit(event: FormEvent<HTMLFormElement>) {
@@ -818,10 +891,16 @@ function FoodEntryRow({
 
   const title = entry.mealName || categoryLabel(entry.category);
   const verdictStatus = verdictStatusText(entry);
+  const isStuck =
+    entry.verdictSource === "pending" &&
+    nowMs - new Date(entry.createdAt).getTime() > 60_000;
+  const rowClass = isStuck
+    ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-white shadow-[0_8px_18px_rgba(8,15,28,0.16)]"
+    : verdictBarClass(entry);
 
   if (isEditing) {
     return (
-      <form className={verdictBarClass(entry)} onSubmit={submitEdit}>
+      <form className={rowClass} onSubmit={submitEdit}>
         <div className="mb-3 rounded-md border border-white/20 bg-black/20 p-3">
           <p className="text-sm italic text-white/85">
             {entry.verdictReason
@@ -830,6 +909,11 @@ function FoodEntryRow({
                 }`
               : verdictStatus}
           </p>
+          {entry.verdictSource === "unscored" && entry.verdictError ? (
+            <p className="mt-2 rounded-md border border-red-300/50 bg-red-500/15 px-2 py-1 text-xs font-semibold text-red-200">
+              Scoring failed: {entry.verdictError}
+            </p>
+          ) : null}
           <span className="mt-2 inline-flex rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-xs font-semibold text-white/65">
             {categoryLabel(entry.category)}
           </span>
@@ -880,6 +964,24 @@ function FoodEntryRow({
             onChange={(value) => setEditForm({ ...editForm, fiberG: value })}
             suffix="g"
             value={editForm.fiberG}
+          />
+          <NumberInput
+            label="Sodium"
+            onChange={(value) => setEditForm({ ...editForm, sodiumMg: value })}
+            suffix="mg"
+            value={editForm.sodiumMg}
+          />
+          <NumberInput
+            label="Added sugar"
+            onChange={(value) => setEditForm({ ...editForm, addedSugarG: value })}
+            suffix="g"
+            value={editForm.addedSugarG}
+          />
+          <NumberInput
+            label="Sat fat"
+            onChange={(value) => setEditForm({ ...editForm, saturatedFatG: value })}
+            suffix="g"
+            value={editForm.saturatedFatG}
           />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -959,7 +1061,7 @@ function FoodEntryRow({
   if (!isExpanded) {
     return (
       <button
-        className={`${verdictBarClass(entry)} flex w-full items-center justify-between gap-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
+        className={`${rowClass} flex w-full items-center justify-between gap-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
         onClick={() => setIsExpanded(true)}
         type="button"
       >
@@ -972,6 +1074,11 @@ function FoodEntryRow({
         <span className="ml-auto shrink-0 text-right font-semibold opacity-90">
           {entry.calories.toLocaleString()} cal
         </span>
+        {isStuck ? (
+          <span className="shrink-0 rounded border border-white/30 bg-black/20 px-2 py-1 text-xs font-semibold text-white">
+            Scoring stuck - retry
+          </span>
+        ) : null}
         <span aria-hidden="true" className="shrink-0 text-xs opacity-70">
           &gt;
         </span>
@@ -980,7 +1087,7 @@ function FoodEntryRow({
   }
 
   return (
-    <div className={`${verdictBarClass(entry)} transition-all`}>
+    <div className={`${rowClass} transition-all`}>
       <button
         className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
         onClick={() => setIsExpanded(false)}
@@ -996,6 +1103,11 @@ function FoodEntryRow({
       </button>
       <div className="mt-2 rounded-md border border-white/20 bg-black/20 p-2 text-xs text-white/85">
         <p className="line-clamp-2 italic">{entry.verdictReason ?? verdictStatus}</p>
+        {entry.verdictSource === "unscored" && entry.verdictError ? (
+          <p className="mt-2 rounded-md border border-red-300/50 bg-red-500/15 px-2 py-1 font-semibold text-red-200">
+            Scoring failed: {entry.verdictError}
+          </p>
+        ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
             {categoryLabel(entry.category)}
@@ -1010,14 +1122,14 @@ function FoodEntryRow({
       <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-all">
         <span>{formatMacrosInline(entry) || "No macros logged"}</span>
         <div className="flex items-center gap-2">
-          {entry.verdictSource === "unscored" ? (
+          {entry.verdictSource === "unscored" || isStuck ? (
             <button
-              className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded border border-white/30 bg-black/20 px-2 py-1 font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={disabled || isVerdictSaving}
               onClick={regenerateVerdict}
               type="button"
             >
-              Retry scoring
+              {isStuck ? "Scoring stuck - retry" : "Retry scoring"}
             </button>
           ) : null}
           <button
@@ -1060,108 +1172,143 @@ function DayTotalsPanel({
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
         Day totals
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">
-        {day.totals.calories.toLocaleString()} calories
-      </h2>
-      {targets.tdeeCalories !== null ? (
-        <CalorieBudgetBar consumed={day.totals.calories} target={targets.tdeeCalories} />
-      ) : null}
-      <div className="mt-4 grid gap-2">
-        <DayTotalLine
+      <div className="mt-3 grid gap-3">
+        <DayTotalMetric
           label="Calories"
           target={targets.tdeeCalories}
-          thresholds={DAILY_CALORIE_THRESHOLDS}
           unit="cal"
           value={day.totals.calories}
         />
-        <DayTotalLine
+        <DayTotalMetric
           label="Protein"
           target={targets.proteinTargetG}
-          thresholds={DAILY_MACRO_THRESHOLDS}
           unit="g"
           value={day.totals.proteinG}
         />
-        <DayTotalLine
+        <DayTotalMetric
           label="Carbs"
           target={targets.carbsTargetG}
-          thresholds={DAILY_MACRO_THRESHOLDS}
           unit="g"
           value={day.totals.carbsG}
         />
-        <DayTotalLine
+        <DayTotalMetric
           label="Fat"
           target={targets.fatTargetG}
-          thresholds={DAILY_MACRO_THRESHOLDS}
           unit="g"
           value={day.totals.fatG}
         />
-        <DayTotalLine
+        <DayTotalMetric
           label="Fiber"
           target={targets.fiberTargetG}
-          thresholds={DAILY_MACRO_THRESHOLDS}
           unit="g"
           value={day.totals.fiberG}
+        />
+        <DayTotalMetric
+          label="Sodium"
+          target={targets.sodiumTargetMg}
+          unit="mg"
+          value={day.totals.sodiumMg}
+        />
+        <DayTotalMetric
+          label="Added sugar"
+          target={targets.addedSugarTargetG}
+          unit="g"
+          value={day.totals.addedSugarG}
+        />
+        <DayTotalMetric
+          label="Sat fat"
+          target={targets.saturatedFatTargetG}
+          unit="g"
+          value={day.totals.saturatedFatG}
         />
       </div>
     </div>
   );
 }
 
-function CalorieBudgetBar({
-  consumed,
-  target,
-}: {
-  consumed: number;
-  target: number;
-}) {
-  const pct = Math.min(100, Math.round((consumed / target) * 100));
-  const fillClass =
-    consumed <= target
-      ? "bg-emerald-300"
-      : consumed <= target * 1.2
-        ? "bg-amber-300"
-        : "bg-red-300";
-
-  return (
-    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/10">
-      <div
-        className={`h-2 rounded-full transition-all ${fillClass}`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
-
-function DayTotalLine({
+function DayTotalMetric({
   label,
   target,
-  thresholds,
   unit,
   value,
 }: {
   label: string;
   target: number | null;
-  thresholds: { green: number; amber: number };
   unit: string;
   value: number;
 }) {
-  const deviation = dailyDeviation(value, target);
-  const tone = colorToneFromMagnitude(deviation, thresholds);
+  const tone = targetProgressTone(value, target);
+  const barPct = target === null ? 0 : Math.min(100, Math.round((value / target) * 100));
+  const fillClass = metricFillClass(tone);
+  const textClass = metricTextClass(tone);
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 p-3">
+    <div className="rounded-md border border-white/15 bg-black/20 p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-white/70">{label}</p>
-        <p className="font-bold text-white">
-          {value.toLocaleString()} {unit}
+        <p className={`text-lg font-bold ${textClass}`}>{label}</p>
+        <p className={`text-lg font-bold ${textClass}`}>
+          {formatTargetProgress(value, target, unit)}
         </p>
       </div>
-      {deviation === null ? null : (
-        <p className={`mt-1 text-xs font-semibold ${magnitudeColorClass(tone)}`}>
-          {formatSignedValue(deviation, unit)} from target
-        </p>
-      )}
+      {target !== null ? (
+        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className={`h-2 rounded-full transition-all ${fillClass}`}
+            style={{ width: `${barPct}%` }}
+          />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function WaterPanel({
+  day,
+  disabled,
+  onLog,
+  targetOz,
+}: {
+  day: CalDay;
+  disabled: boolean;
+  onLog: (amountOz: number) => void;
+  targetOz: number | null;
+}) {
+  const tone = targetProgressTone(day.waterOz, targetOz);
+  const textClass = metricTextClass(tone);
+  const fillClass = metricFillClass(tone);
+  const barPct =
+    targetOz === null ? 0 : Math.min(100, Math.round((day.waterOz / targetOz) * 100));
+
+  return (
+    <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+      <div className="flex items-center justify-between gap-3">
+        <p className={`text-lg font-bold ${textClass}`}>Water</p>
+        <p className={`text-lg font-bold ${textClass}`}>
+          {formatTargetProgress(day.waterOz, targetOz, "oz")}
+        </p>
+      </div>
+      {targetOz !== null ? (
+        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className={`h-2 rounded-full transition-all ${fillClass}`}
+            style={{ width: `${barPct}%` }}
+          />
+        </div>
+      ) : null}
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        {[8, 12, 16, 24].map((amount) => (
+          <button
+            className="rounded-md border border-white/20 bg-white/10 px-2 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
+            key={amount}
+            onClick={() => onLog(amount)}
+            type="button"
+          >
+            +{amount}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1211,20 +1358,16 @@ function WeightPanel({
 
 function SavedFoodsList({
   disabled,
-  focusedDay,
   loggedFoodId,
   onFill,
   onInstantLog,
   savedFoods,
-  todayIso,
 }: {
   disabled: boolean;
-  focusedDay: CalDay;
   loggedFoodId: string | null;
   onFill: (food: SavedFood) => void;
   onInstantLog: (food: SavedFood) => void;
   savedFoods: SavedFood[];
-  todayIso: string;
 }) {
   return (
     <div>
@@ -1232,9 +1375,6 @@ function SavedFoodsList({
         Saved foods
       </p>
       <h2 className="mt-1 text-xl font-semibold text-white">Quick log</h2>
-      <p className="mt-1 text-xs text-white/60">
-        Adds to {focusedDayLabel(focusedDay.date, todayIso)}
-      </p>
       <div className="mt-4 grid gap-2">
         {savedFoods.length > 0 ? (
           savedFoods.map((food) => (
@@ -1412,6 +1552,9 @@ function formatMacros(entry: {
   carbsG: number | null;
   fatG: number | null;
   fiberG: number | null;
+  sodiumMg: number | null;
+  addedSugarG: number | null;
+  saturatedFatG: number | null;
 }): string {
   const inline = formatMacrosInline(entry);
   return inline ? ` - ${inline}` : "";
@@ -1431,12 +1574,18 @@ function formatMacrosInline(entry: {
   carbsG: number | null;
   fatG: number | null;
   fiberG: number | null;
+  sodiumMg: number | null;
+  addedSugarG: number | null;
+  saturatedFatG: number | null;
 }): string {
   return [
     entry.proteinG === null ? null : `${entry.proteinG}p`,
     entry.carbsG === null ? null : `${entry.carbsG}c`,
     entry.fatG === null ? null : `${entry.fatG}f`,
     entry.fiberG === null ? null : `${entry.fiberG}fi`,
+    entry.sodiumMg === null ? null : `${entry.sodiumMg}mg sodium`,
+    entry.addedSugarG === null ? null : `${entry.addedSugarG}g sugar`,
+    entry.saturatedFatG === null ? null : `${entry.saturatedFatG}g sat fat`,
   ]
     .filter(Boolean)
     .join(" / ");
@@ -1460,6 +1609,9 @@ function mergeEstimateIntoEntry(
     carbsG: string;
     fatG: string;
     fiberG: string;
+    sodiumMg: string;
+    addedSugarG: string;
+    saturatedFatG: string;
   },
   addition: {
     mealName: string;
@@ -1469,6 +1621,9 @@ function mergeEstimateIntoEntry(
     carbsG: string;
     fatG: string;
     fiberG: string;
+    sodiumMg: string;
+    addedSugarG: string;
+    saturatedFatG: string;
   },
 ) {
   return {
@@ -1480,6 +1635,12 @@ function mergeEstimateIntoEntry(
     carbsG: addOptionalNumberStrings(current.carbsG, addition.carbsG),
     fatG: addOptionalNumberStrings(current.fatG, addition.fatG),
     fiberG: addOptionalNumberStrings(current.fiberG, addition.fiberG),
+    sodiumMg: addOptionalNumberStrings(current.sodiumMg, addition.sodiumMg),
+    addedSugarG: addOptionalNumberStrings(current.addedSugarG, addition.addedSugarG),
+    saturatedFatG: addOptionalNumberStrings(
+      current.saturatedFatG,
+      addition.saturatedFatG,
+    ),
   };
 }
 
@@ -1509,8 +1670,50 @@ function formatSignedCalories(value: number): string {
   return `${formatSignedNumber(value, 0)} cal`;
 }
 
-function formatSignedValue(value: number, unit: string): string {
-  return `${formatSignedNumber(value, 0)} ${unit}`;
+function targetProgressTone(
+  value: number,
+  target: number | null,
+): "green" | "amber" | "red" | "neutral" {
+  if (target === null || target <= 0) return "neutral";
+  if (value <= target) return "green";
+  if (value <= target * 1.1) return "amber";
+  return "red";
+}
+
+function metricTextClass(tone: "green" | "amber" | "red" | "neutral"): string {
+  switch (tone) {
+    case "green":
+      return "text-emerald-300";
+    case "amber":
+      return "text-amber-300";
+    case "red":
+      return "text-red-300";
+    case "neutral":
+      return "text-white";
+  }
+}
+
+function metricFillClass(tone: "green" | "amber" | "red" | "neutral"): string {
+  switch (tone) {
+    case "green":
+      return "bg-emerald-300";
+    case "amber":
+      return "bg-amber-300";
+    case "red":
+      return "bg-red-300";
+    case "neutral":
+      return "bg-white/40";
+  }
+}
+
+function formatTargetProgress(
+  value: number,
+  target: number | null,
+  unit: string,
+): string {
+  const formattedValue = value.toLocaleString();
+  if (target === null) return `${formattedValue} ${unit}`;
+  return `${formattedValue}/${target.toLocaleString()} ${unit}`;
 }
 
 function formatSignedNumber(value: number, digits: number): string {

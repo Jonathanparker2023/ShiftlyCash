@@ -15,6 +15,9 @@ type EstimateForm = {
   carbsG: string;
   fatG: string;
   fiberG: string;
+  sodiumMg: string;
+  addedSugarG: string;
+  saturatedFatG: string;
   reasoning: string;
   confidence: "high" | "medium" | "low";
 };
@@ -32,6 +35,9 @@ type Props = {
     carbsG: string;
     fatG: string;
     fiberG: string;
+    sodiumMg: string;
+    addedSugarG: string;
+    saturatedFatG: string;
   }) => void;
 };
 
@@ -67,8 +73,8 @@ const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
 ];
 
 export function AiFoodEstimator({
-  buttonLabel = "AI estimate",
-  confirmLabel = "Log it",
+  buttonLabel = "Log food",
+  confirmLabel = "Log food",
   disabled,
   onConfirm,
 }: Props) {
@@ -144,6 +150,9 @@ export function AiFoodEstimator({
       carbsG: estimate.carbsG,
       fatG: estimate.fatG,
       fiberG: estimate.fiberG,
+      sodiumMg: estimate.sodiumMg,
+      addedSugarG: estimate.addedSugarG,
+      saturatedFatG: estimate.saturatedFatG,
     });
     reset();
     setIsOpen(false);
@@ -152,7 +161,7 @@ export function AiFoodEstimator({
   return (
     <div>
       <button
-        className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
@@ -162,7 +171,6 @@ export function AiFoodEstimator({
 
       {isOpen ? (
         <div className="mt-3 rounded-md border border-white/15 bg-black/20 p-3 text-white">
-          <p className="text-sm font-semibold">AI food estimate</p>
           {estimate ? (
             <EstimateResult
               confirmLabel={confirmLabel}
@@ -310,15 +318,28 @@ function EstimateResult({
           suffix="g"
           value={estimate.fiberG}
         />
+        <NumberInput
+          label="Sodium"
+          onChange={(value) => onChange({ ...estimate, sodiumMg: value })}
+          suffix="mg"
+          value={estimate.sodiumMg}
+        />
+        <NumberInput
+          label="Added sugar"
+          onChange={(value) => onChange({ ...estimate, addedSugarG: value })}
+          suffix="g"
+          value={estimate.addedSugarG}
+        />
+        <NumberInput
+          label="Sat fat"
+          onChange={(value) => onChange({ ...estimate, saturatedFatG: value })}
+          suffix="g"
+          value={estimate.saturatedFatG}
+        />
       </div>
-      {estimate.reasoning ? (
-        <p className="mt-3 max-h-24 overflow-auto whitespace-pre-wrap text-xs italic text-white/60">
-          {estimate.reasoning}
-        </p>
-      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+          className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
           disabled={disabled || !estimate.calories.trim()}
           onClick={onConfirm}
           type="button"
@@ -444,6 +465,9 @@ function toEstimateForm(estimate: FoodEstimate): EstimateForm {
     carbsG: estimate.carbsG?.toString() ?? "",
     fatG: estimate.fatG?.toString() ?? "",
     fiberG: estimate.fiberG?.toString() ?? "",
+    sodiumMg: estimate.sodiumMg?.toString() ?? "",
+    addedSugarG: estimate.addedSugarG?.toString() ?? "",
+    saturatedFatG: estimate.saturatedFatG?.toString() ?? "",
     reasoning: estimate.reasoning,
     confidence: estimate.confidence,
   };

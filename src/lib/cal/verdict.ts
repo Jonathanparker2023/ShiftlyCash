@@ -11,9 +11,11 @@ const VERDICT_SYSTEM_PROMPT = `You are a nutrition coach scoring a single logged
 ## Inputs you receive
 - entry: the single logged food + macros
 - profile: age, sex, height_cm, weight_lbs, activity_level, current_phase, goals_text, health_flags
-- targets: TDEE, protein, fiber
+- targets: TDEE, protein, fiber, sodium, added sugar, saturated fat
 - today_so_far: cumulative totals today before AND after this entry
 - week_so_far: cumulative totals this week, clean/indulgence day counts, counts by category
+
+Use entry.sodiumMg, entry.addedSugarG, and entry.saturatedFatG when present. Only estimate missing values. Do not overwrite real row values with fresh guesses.
 
 ## Verdict enum
 - "good" — aligns with phase goals AND clean week pattern OR a course-correction after a bad streak
@@ -118,6 +120,9 @@ export type VerdictInput = {
     carbsG: number | null;
     fatG: number | null;
     fiberG: number | null;
+    sodiumMg: number | null;
+    addedSugarG: number | null;
+    saturatedFatG: number | null;
   };
   profile: {
     age: number;
@@ -133,17 +138,26 @@ export type VerdictInput = {
     tdee_cal: number;
     protein_g: number;
     fiber_g: number;
+    sodium_mg: number;
+    added_sugar_g: number;
+    saturated_fat_g: number;
   };
   today_so_far: {
     cal: number;
     protein_g: number;
     fiber_g: number;
+    sodium_mg: number;
+    added_sugar_g: number;
+    saturated_fat_g: number;
     entry_count: number;
   };
   week_so_far: {
     cal: number;
     protein_g: number;
     fiber_g: number;
+    sodium_mg: number;
+    added_sugar_g: number;
+    saturated_fat_g: number;
     entry_count: number;
     days_logged: number;
     counts_by_category: Record<FoodCategory, number>;

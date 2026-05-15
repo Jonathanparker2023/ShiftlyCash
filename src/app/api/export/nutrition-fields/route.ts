@@ -156,6 +156,10 @@ function mapTargets(targets: CalTargets) {
     carbs_g: targets.carbsTargetG,
     fat_g: targets.fatTargetG,
     fiber_g: targets.fiberTargetG,
+    sodium_mg: targets.sodiumTargetMg,
+    added_sugar_g: targets.addedSugarTargetG,
+    saturated_fat_g: targets.saturatedFatTargetG,
+    water_oz: targets.waterTargetOz,
   };
 }
 
@@ -181,9 +185,26 @@ function mapToday(day: CalDay, targets: CalTargets) {
         targets.fiberTargetG === null
           ? null
           : roundInteger(day.totals.fiberG - targets.fiberTargetG),
+      sodium_mg:
+        targets.sodiumTargetMg === null
+          ? null
+          : roundInteger(day.totals.sodiumMg - targets.sodiumTargetMg),
+      added_sugar_g:
+        targets.addedSugarTargetG === null
+          ? null
+          : roundInteger(day.totals.addedSugarG - targets.addedSugarTargetG),
+      saturated_fat_g:
+        targets.saturatedFatTargetG === null
+          ? null
+          : roundInteger(day.totals.saturatedFatG - targets.saturatedFatTargetG),
+      water_oz:
+        targets.waterTargetOz === null
+          ? null
+          : roundInteger(day.waterOz - targets.waterTargetOz),
     },
     entry_count: day.entries.length,
     entries: day.entries.map(mapEntry),
+    water_oz: day.waterOz,
     weight_lbs: day.weight === null ? null : roundWeight(day.weight.weightLbs),
   };
 }
@@ -193,6 +214,7 @@ function mapWeekDay(day: CalDay) {
     date: day.date,
     totals: mapTotals(day.totals),
     weight_lbs: day.weight === null ? null : roundWeight(day.weight.weightLbs),
+    water_oz: day.waterOz,
     entry_count: day.entries.length,
   };
 }
@@ -207,6 +229,9 @@ function mapEntry(entry: FoodEntry) {
     carbs_g: nullableInteger(entry.carbsG),
     fat_g: nullableInteger(entry.fatG),
     fiber_g: nullableInteger(entry.fiberG),
+    sodium_mg: nullableInteger(entry.sodiumMg),
+    added_sugar_g: nullableInteger(entry.addedSugarG),
+    saturated_fat_g: nullableInteger(entry.saturatedFatG),
     logged_time: normalizeLoggedTime(entry.loggedTime),
     saved_food_id: entry.savedFoodId,
     created_at: entry.createdAt,
@@ -226,6 +251,9 @@ function mapSavedFood(food: SavedFood) {
     carbs_g: nullableInteger(food.carbsG),
     fat_g: nullableInteger(food.fatG),
     fiber_g: nullableInteger(food.fiberG),
+    sodium_mg: nullableInteger(food.sodiumMg),
+    added_sugar_g: nullableInteger(food.addedSugarG),
+    saturated_fat_g: nullableInteger(food.saturatedFatG),
     sort_order: roundInteger(food.sortOrder),
     archived_at: food.archivedAt,
   };
@@ -239,6 +267,10 @@ function mapTrendDay(day: CalTrendDay) {
     carbs_g: roundInteger(day.carbsG),
     fat_g: roundInteger(day.fatG),
     fiber_g: roundInteger(day.fiberG),
+    sodium_mg: roundInteger(day.sodiumMg),
+    added_sugar_g: roundInteger(day.addedSugarG),
+    saturated_fat_g: roundInteger(day.saturatedFatG),
+    water_oz: roundInteger(day.waterOz),
     weight_lbs: day.weightLbs === null ? null : roundWeight(day.weightLbs),
     verdict_counts: {
       good: day.verdictCounts.good,
@@ -256,6 +288,9 @@ function mapTotals(totals: CalTotals) {
     carbs_g: roundInteger(totals.carbsG),
     fat_g: roundInteger(totals.fatG),
     fiber_g: roundInteger(totals.fiberG),
+    sodium_mg: roundInteger(totals.sodiumMg),
+    added_sugar_g: roundInteger(totals.addedSugarG),
+    saturated_fat_g: roundInteger(totals.saturatedFatG),
   };
 }
 
@@ -285,8 +320,20 @@ function buildRollingWindow(
       carbsG: sum.carbsG + day.carbsG,
       fatG: sum.fatG + day.fatG,
       fiberG: sum.fiberG + day.fiberG,
+      sodiumMg: sum.sodiumMg + day.sodiumMg,
+      addedSugarG: sum.addedSugarG + day.addedSugarG,
+      saturatedFatG: sum.saturatedFatG + day.saturatedFatG,
     }),
-    { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 },
+    {
+      calories: 0,
+      proteinG: 0,
+      carbsG: 0,
+      fatG: 0,
+      fiberG: 0,
+      sodiumMg: 0,
+      addedSugarG: 0,
+      saturatedFatG: 0,
+    },
   );
   const denominator = loggedDays.length || 1;
   const weightTrend = weightDelta(days);
@@ -304,6 +351,12 @@ function buildRollingWindow(
     avg_carbs_g: roundInteger(totals.carbsG / denominator),
     avg_fat_g: roundInteger(totals.fatG / denominator),
     avg_fiber_g: roundInteger(totals.fiberG / denominator),
+    avg_sodium_mg: roundInteger(totals.sodiumMg / denominator),
+    avg_added_sugar_g: roundInteger(totals.addedSugarG / denominator),
+    avg_saturated_fat_g: roundInteger(totals.saturatedFatG / denominator),
+    avg_water_oz: roundInteger(
+      loggedDays.reduce((sum, day) => sum + day.waterOz, 0) / denominator,
+    ),
     days_under_tdee: daysUnderTdee,
     days_over_tdee: daysOverTdee,
     days_logged: loggedDays.length,

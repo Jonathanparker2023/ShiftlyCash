@@ -6,7 +6,7 @@ import type { FoodCategory } from "@/lib/cal/types";
 
 const ESTIMATOR_MODEL = "claude-sonnet-4-5";
 const MAX_DESCRIPTION_LENGTH = 500;
-const SYSTEM_PROMPT = `You are a precise nutrition estimator. Your job is to estimate calories and macros for food a user has eaten.
+const SYSTEM_PROMPT = `You are a precise nutrition estimator. Your job is to estimate calories, macros, sodium, added sugar, and saturated fat for food a user has eaten.
 
 ## Tool use - web search
 
@@ -55,6 +55,15 @@ Be willing to estimate component values yourself if not in published data - firs
 Estimate fiber whenever the food contains plant matter (vegetables, fruit, beans, whole grains, nuts). Set fiberG to 0 (not null) for foods that genuinely contain none - pure meat, dairy, oil, candy without nuts/fruit. Use null only when you genuinely cannot estimate (very vague input).
 
 Quick reference: 1 cup cooked beans = ~15g fiber, 1 medium apple = ~4g, 1 cup brown rice = ~3g, 1 cup white rice = ~0.5g, leafy greens ~2g/cup, nuts ~3-4g/oz.
+
+## Cut-risk fields
+
+Estimate these whenever possible:
+- sodiumMg: milligrams of sodium. Restaurant, processed, deli, fried, canned, sauce-heavy, and fast-food meals are often high.
+- addedSugarG: grams of added sugar only. Soda, juice drinks, candy, pastries, sweet coffee, desserts, and sweet sauces count. Whole fruit natural sugar does not.
+- saturatedFatG: grams of saturated fat. Cheese, butter, cream, fatty meats, fried fast food, pastries, and coconut-heavy foods count.
+
+Use 0 when the food genuinely contains none. Use null only when the description is too vague to estimate.
 
 ## Confidence calibration
 
@@ -120,6 +129,9 @@ Schema (all keys required; macro fields may be null only if truly unknowable):
   "carbsG": integer | null,
   "fatG": integer | null,
   "fiberG": integer | null,
+  "sodiumMg": integer | null,
+  "addedSugarG": integer | null,
+  "saturatedFatG": integer | null,
   "reasoning": string, max 300 chars. When the meal has 2+ components, START with a one-line component breakdown using bullets, then optionally add a short note. Example: "• Steak 240 cal • Rice (light) 105 cal • Beans 130 cal • Guac 230 cal". For single-item foods, just give a short sentence ("Standard medium banana per USDA"),
   "confidence": "high" | "medium" | "low"
 }
@@ -139,6 +151,9 @@ export type FoodEstimate = {
   carbsG: number | null;
   fatG: number | null;
   fiberG: number | null;
+  sodiumMg: number | null;
+  addedSugarG: number | null;
+  saturatedFatG: number | null;
   reasoning: string;
   confidence: "high" | "medium" | "low";
 };
@@ -214,6 +229,9 @@ function parseEstimate(raw: string): FoodEstimate {
     carbsG: toOptionalInteger(obj.carbsG),
     fatG: toOptionalInteger(obj.fatG),
     fiberG: toOptionalInteger(obj.fiberG),
+    sodiumMg: toOptionalInteger(obj.sodiumMg),
+    addedSugarG: toOptionalInteger(obj.addedSugarG),
+    saturatedFatG: toOptionalInteger(obj.saturatedFatG),
     reasoning: String(obj.reasoning ?? "").slice(0, 300),
     confidence: parseConfidence(obj.confidence),
   };
