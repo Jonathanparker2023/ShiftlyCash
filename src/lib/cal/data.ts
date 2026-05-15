@@ -102,6 +102,31 @@ export type ShiftlyCalTrendsData = {
   currentWeek: ShiftlyCalData["currentWeek"];
 };
 
+export type CalHistoryWeek = {
+  weekStartIso: string;
+  weekEndIso: string;
+  totals: CalTotals;
+  avgDailyLogged: CalTotals;
+  daysLogged: number;
+  entryCount: number;
+  weightStartLbs: number | null;
+  weightEndLbs: number | null;
+  weightDeltaLbs: number | null;
+};
+
+export type ShiftlyCalHistoryData = {
+  todayIso: string;
+  targets: CalTargets;
+  weeks: CalHistoryWeek[];
+  summary: {
+    weekCount: number;
+    avgWeeklyCalories: number;
+    avgWeeklyProteinG: number;
+    avgWeeklyFiberG: number;
+    avgWeeklyWeightDeltaLbs: number | null;
+  };
+};
+
 export async function getShiftlyCalData(opts?: {
   weekStartIso?: string;
 }): Promise<ShiftlyCalData> {
@@ -199,6 +224,76 @@ export async function getShiftlyCalTrendsDataForUser(
 ): Promise<ShiftlyCalTrendsData> {
   const weekData = await getShiftlyCalDataForUser(userId, opts);
   return loadShiftlyCalTrendsData(createAdminClient(), userId, weekData);
+}
+
+export async function getShiftlyCalHistoryData(): Promise<ShiftlyCalHistoryData> {
+  const { supabase, user } = await requireUser();
+  const todayIso = getTodayIso();
+  const currentWeekStartIso = getSundayOnOrBeforeTodayIso();
+  const firstWeekStartIso = addDaysIso(currentWeekStartIso, -77);
+  const currentWeekEndIso = addDaysIso(currentWeekStartIso, 6);
+
+  const [entriesRes, settingsRes, weightRes] = await Promise.all([
+    supabase
+      .from("food_entries")
+      .select(
+        "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g,saved_food_id,created_at,updated_at",
+      )
+      .eq("user_id", user.id)
+      .gte("date", firstWeekStartIso)
+      .lte("date", currentWeekEndIso)
+      .order("date", { ascending: true })
+      .order("logged_time", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("settings")
+      .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("weight_logs")
+      .select("id,date,weight_lbs,created_at,updated_at")
+      .eq("user_id", user.id)
+      .gte("date", firstWeekStartIso)
+      .lte("date", currentWeekEndIso)
+      .order("date", { ascending: true }),
+  ]);
+
+  if (entriesRes.error) throw new Error(`Food entries: ${entriesRes.error.message}`);
+  if (settingsRes.error) throw new Error(`Cal targets: ${settingsRes.error.message}`);
+  if (weightRes.error) throw new Error(`Weight log: ${weightRes.error.message}`);
+
+  const entries = ((entriesRes.data ?? []) as FoodEntryRow[]).map(mapFoodEntry);
+  const weights = ((weightRes.data ?? []) as WeightLogRow[]).map(mapWeightLog);
+  const targets = mapTargets((settingsRes.data ?? null) as SettingsTargetsRow | null);
+  const weeks = Array.from({ length: 12 }, (_, index) => {
+    const weekStartIso = addDaysIso(currentWeekStartIso, index * -7);
+    return buildHistoryWeek(weekStartIso, entries, weights);
+  });
+  const loggedWeeks = weeks.filter((week) => week.daysLogged > 0);
+  const weightDeltas = weeks
+    .map((week) => week.weightDeltaLbs)
+    .filter((value): value is number => value !== null);
+
+  return {
+    todayIso,
+    targets,
+    weeks,
+    summary: {
+      weekCount: loggedWeeks.length,
+      avgWeeklyCalories: Math.round(
+        average(loggedWeeks.map((week) => week.totals.calories)),
+      ),
+      avgWeeklyProteinG: Math.round(
+        average(loggedWeeks.map((week) => week.totals.proteinG)),
+      ),
+      avgWeeklyFiberG: Math.round(
+        average(loggedWeeks.map((week) => week.totals.fiberG)),
+      ),
+      avgWeeklyWeightDeltaLbs:
+        weightDeltas.length === 0 ? null : round1(average(weightDeltas)),
+    },
+  };
 }
 
 async function loadShiftlyCalTrendsData(
@@ -443,4 +538,58 @@ function mapCategory(value: string | null): FoodCategory {
     default:
       return "meal";
   }
+}
+
+function buildHistoryWeek(
+  weekStartIso: string,
+  entries: FoodEntry[],
+  weights: WeightLog[],
+): CalHistoryWeek {
+  const weekEndIso = addDaysIso(weekStartIso, 6);
+  const weekEntries = entries.filter(
+    (entry) => entry.date >= weekStartIso && entry.date <= weekEndIso,
+  );
+  const weekWeights = weights.filter(
+    (weight) => weight.date >= weekStartIso && weight.date <= weekEndIso,
+  );
+  const totals = sumTotals(weekEntries);
+  const daysLogged = new Set(weekEntries.map((entry) => entry.date)).size;
+  const weightStartLbs = weekWeights[0]?.weightLbs ?? null;
+  const weightEndLbs = weekWeights.at(-1)?.weightLbs ?? null;
+
+  return {
+    weekStartIso,
+    weekEndIso,
+    totals,
+    avgDailyLogged: averageTotals(totals, daysLogged),
+    daysLogged,
+    entryCount: weekEntries.length,
+    weightStartLbs,
+    weightEndLbs,
+    weightDeltaLbs:
+      weightStartLbs === null || weightEndLbs === null
+        ? null
+        : round1(weightEndLbs - weightStartLbs),
+  };
+}
+
+function averageTotals(totals: CalTotals, daysLogged: number): CalTotals {
+  const divisor = daysLogged || 1;
+
+  return {
+    calories: Math.round(totals.calories / divisor),
+    proteinG: Math.round(totals.proteinG / divisor),
+    carbsG: Math.round(totals.carbsG / divisor),
+    fatG: Math.round(totals.fatG / divisor),
+    fiberG: Math.round(totals.fiberG / divisor),
+  };
+}
+
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
 }

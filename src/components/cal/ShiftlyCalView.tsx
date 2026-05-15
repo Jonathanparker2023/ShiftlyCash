@@ -320,9 +320,9 @@ export function ShiftlyCalView({
                 </p>
                 <Link
                   className="inline-flex rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
-                  href={`/cal/trends?week=${weekStartIso}`}
+                  href="/cal/history"
                 >
-                  Trends
+                  History
                 </Link>
               </div>
             </div>
@@ -375,7 +375,7 @@ export function ShiftlyCalView({
                   targets={initialData.targets}
                 />
                 <div className="mt-4 space-y-3">
-        <AiFoodEstimator
+                  <AiFoodEstimator
                     disabled={isPending}
                     onConfirm={logFromEstimate}
                   />
@@ -434,6 +434,27 @@ export function ShiftlyCalView({
               </div>
             </div>
           </section>
+        </div>
+      </section>
+      <section className="rounded-xl border border-white/15 bg-black/20 p-4 text-white shadow-[0_18px_50px_rgba(8,15,28,0.22)] backdrop-blur-md">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+              Library
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-white">
+              Saved foods & targets
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-white/70">
+              Manage quick-log foods, calorie targets, and macro targets in one place.
+            </p>
+          </div>
+          <Link
+            className="inline-flex w-full items-center justify-center rounded-md border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20 sm:w-auto"
+            href="/cal/library"
+          >
+            Open library
+          </Link>
         </div>
       </section>
     </div>
@@ -1080,7 +1101,7 @@ function SavedFoodsList({
           ))
         ) : (
           <p className="rounded-md border border-dashed border-white/20 bg-black/15 p-4 text-sm text-white/70">
-            Create saved foods from Trends.
+            Create saved foods from the library.
           </p>
         )}
       </div>
