@@ -24,6 +24,7 @@ import type {
 type FoodEntryRow = {
   id: string;
   date: string;
+  logged_time: string | null;
   meal_name: string;
   category: string | null;
   calories: number;
@@ -102,12 +103,14 @@ export async function getShiftlyCalData(opts?: {
     supabase
       .from("food_entries")
       .select(
-        "id,date,meal_name,category,calories,protein_g,carbs_g,fat_g,saved_food_id,created_at,updated_at",
+        "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,saved_food_id,created_at,updated_at",
       )
       .eq("user_id", user.id)
       .gte("date", weekStartIso)
       .lte("date", weekEndIso)
-      .order("created_at", { ascending: false }),
+      .order("date", { ascending: true })
+      .order("logged_time", { ascending: true })
+      .order("created_at", { ascending: true }),
     supabase
       .from("saved_foods")
       .select(
@@ -314,6 +317,7 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
   return {
     id: row.id,
     date: row.date,
+    loggedTime: row.logged_time,
     mealName: row.meal_name,
     category: mapCategory(row.category),
     calories: Number(row.calories),

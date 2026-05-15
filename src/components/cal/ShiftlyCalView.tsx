@@ -40,6 +40,7 @@ import type {
 type MealFormState = {
   mealName: string;
   category: FoodCategory;
+  loggedTime: string;
   calories: string;
   proteinG: string;
   carbsG: string;
@@ -50,21 +51,25 @@ type MealFormState = {
 type UpdateFoodEntryPatch = {
   mealName?: string | null;
   category?: FoodCategory | string | null;
+  loggedTime?: string | null;
   calories: number | string;
   proteinG?: number | string | null;
   carbsG?: number | string | null;
   fatG?: number | string | null;
 };
 
-const emptyMealForm: MealFormState = {
-  mealName: "",
-  category: "meal",
-  calories: "",
-  proteinG: "",
-  carbsG: "",
-  fatG: "",
-  savedFoodId: null,
-};
+function emptyMealForm(): MealFormState {
+  return {
+    mealName: "",
+    category: "meal",
+    loggedTime: currentTimeInput(),
+    calories: "",
+    proteinG: "",
+    carbsG: "",
+    fatG: "",
+    savedFoodId: null,
+  };
+}
 
 const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
   { value: "meal", label: "Meal" },
@@ -89,7 +94,7 @@ export function ShiftlyCalView({
     ),
   );
   const [focusedDayIndex, setFocusedDayIndex] = useState(todayIndex);
-  const [mealForm, setMealForm] = useState<MealFormState>(emptyMealForm);
+  const [mealForm, setMealForm] = useState<MealFormState>(() => emptyMealForm());
   const [isMealFormOpen, setIsMealFormOpen] = useState(false);
   const [weightValue, setWeightValue] = useState(
     initialData.currentWeek.days[todayIndex]?.weight?.weightLbs.toString() ?? "",
@@ -129,6 +134,7 @@ export function ShiftlyCalView({
       try {
         await createFoodEntryAction({
           date: focusedDay.date,
+          loggedTime: mealForm.loggedTime,
           mealName: mealForm.mealName,
           category: mealForm.category,
           calories: mealForm.calories,
@@ -137,7 +143,7 @@ export function ShiftlyCalView({
           fatG: mealForm.fatG,
           savedFoodId: mealForm.savedFoodId,
         });
-        setMealForm(emptyMealForm);
+        setMealForm(emptyMealForm());
         setIsMealFormOpen(false);
         router.refresh();
       } catch (err) {
@@ -152,6 +158,7 @@ export function ShiftlyCalView({
       try {
         await createFoodEntryAction({
           date: focusedDay.date,
+          loggedTime: currentTimeInput(),
           mealName: food.name,
           category: food.category,
           calories: food.calories.toString(),
@@ -172,6 +179,7 @@ export function ShiftlyCalView({
   function logFromEstimate(input: {
     mealName: string;
     category: FoodCategory;
+    loggedTime: string;
     calories: string;
     proteinG: string;
     carbsG: string;
@@ -182,6 +190,7 @@ export function ShiftlyCalView({
       try {
         await createFoodEntryAction({
           date: focusedDay.date,
+          loggedTime: input.loggedTime,
           mealName: input.mealName,
           category: input.category,
           calories: input.calories,
@@ -244,6 +253,7 @@ export function ShiftlyCalView({
     setMealForm({
       mealName: food.name,
       category: food.category,
+      loggedTime: currentTimeInput(),
       calories: food.calories.toString(),
       proteinG: food.proteinG?.toString() ?? "",
       carbsG: food.carbsG?.toString() ?? "",
@@ -357,7 +367,7 @@ export function ShiftlyCalView({
                   targets={initialData.targets}
                 />
                 <div className="mt-4 space-y-3">
-                  <AiFoodEstimator
+        <AiFoodEstimator
                     disabled={isPending}
                     onConfirm={logFromEstimate}
                   />
@@ -644,10 +654,16 @@ function MealEntryForm({
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <TextInput
           className="lg:col-span-2"
-          label="Meal"
+        label="Meal"
           onChange={(value) => onMealFormChange({ ...mealForm, mealName: value })}
           placeholder="Chicken bowl"
           value={mealForm.mealName}
+        />
+        <TextInput
+          label="Time"
+          onChange={(value) => onMealFormChange({ ...mealForm, loggedTime: value })}
+          type="time"
+          value={mealForm.loggedTime}
         />
         <CategorySelect
           label="Category"
@@ -708,6 +724,7 @@ function FoodEntryRow({
   const [editForm, setEditForm] = useState({
     mealName: entry.mealName,
     category: entry.category,
+    loggedTime: entry.loggedTime ?? currentTimeInput(),
     calories: entry.calories.toString(),
     proteinG: entry.proteinG?.toString() ?? "",
     carbsG: entry.carbsG?.toString() ?? "",
@@ -735,6 +752,12 @@ function FoodEntryRow({
             label="Category"
             onChange={(category) => setEditForm({ ...editForm, category })}
             value={editForm.category}
+          />
+          <TextInput
+            label="Time"
+            onChange={(value) => setEditForm({ ...editForm, loggedTime: value })}
+            type="time"
+            value={editForm.loggedTime}
           />
           <NumberInput
             label="Calories"
@@ -788,8 +811,13 @@ function FoodEntryRow({
         <span className="font-semibold">
           {entry.mealName || categoryLabel(entry.category)}
         </span>
-        <span className="font-semibold opacity-90">
-          {entry.calories.toLocaleString()} cal
+        <span className="text-right font-semibold opacity-90">
+          <span className="block">{entry.calories.toLocaleString()} cal</span>
+          {entry.loggedTime ? (
+            <span className="text-xs font-medium opacity-75">
+              {formatLoggedTime(entry.loggedTime)}
+            </span>
+          ) : null}
         </span>
       </div>
       <div className="mt-1 flex items-center justify-between gap-3 text-xs opacity-85">
@@ -1095,12 +1123,14 @@ function TextInput({
   label,
   onChange,
   placeholder,
+  type = "text",
   value,
 }: {
   className?: string;
   label: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  type?: string;
   value: string;
 }) {
   return (
@@ -1110,7 +1140,7 @@ function TextInput({
         className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        type="text"
+        type={type}
         value={value}
       />
     </label>
@@ -1158,6 +1188,26 @@ function getMostRecentWeight(days: CalDay[]) {
     .reverse()
     .map((day) => day.weight)
     .find((weight) => weight !== null) ?? null;
+}
+
+function currentTimeInput(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(
+    now.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function formatLoggedTime(value: string): string {
+  const [hoursRaw, minutes = "00"] = value.split(":");
+  const hours = Number(hoursRaw);
+  if (!Number.isFinite(hours)) return value;
+
+  const date = new Date(Date.UTC(2026, 0, 1, hours, Number(minutes)));
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function formatMacros(entry: {

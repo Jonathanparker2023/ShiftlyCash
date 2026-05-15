@@ -8,6 +8,7 @@ export type FoodCategory =
 export type FoodEntry = {
   id: string;
   date: string;
+  loggedTime: string | null;
   mealName: string;
   category: FoodCategory;
   calories: number;

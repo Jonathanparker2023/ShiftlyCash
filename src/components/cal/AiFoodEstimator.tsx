@@ -24,6 +24,7 @@ type Props = {
   onConfirm: (input: {
     mealName: string;
     category: FoodCategory;
+    loggedTime: string;
     calories: string;
     proteinG: string;
     carbsG: string;
@@ -133,6 +134,7 @@ export function AiFoodEstimator({
     onConfirm({
       mealName: estimate.mealName,
       category: estimate.category,
+      loggedTime: currentTimeInput(),
       calories: estimate.calories,
       proteinG: estimate.proteinG,
       carbsG: estimate.carbsG,
@@ -223,6 +225,13 @@ export function AiFoodEstimator({
       ) : null}
     </div>
   );
+}
+
+function currentTimeInput(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(
+    now.getMinutes(),
+  ).padStart(2, "0")}`;
 }
 
 function EstimateResult({

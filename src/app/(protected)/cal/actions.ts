@@ -18,6 +18,7 @@ const FOOD_CATEGORIES = new Set<FoodCategory>([
 
 export async function createFoodEntryAction(input: {
   date?: string;
+  loggedTime?: string | null;
   mealName?: string | null;
   category?: FoodCategory | string | null;
   calories: number | string;
@@ -37,6 +38,7 @@ export async function createFoodEntryAction(input: {
     .insert({
       user_id: user.id,
       date,
+      logged_time: normalizeTimeInput(input.loggedTime) ?? getCurrentLocalTimeHm(),
       meal_name: mealName,
       category,
       calories,
@@ -80,6 +82,7 @@ export async function deleteFoodEntryAction(input: {
 
 export async function updateFoodEntryAction(input: {
   id: string;
+  loggedTime?: string | null;
   mealName?: string | null;
   category?: FoodCategory | string | null;
   calories: number | string;
@@ -94,6 +97,7 @@ export async function updateFoodEntryAction(input: {
     .from("food_entries")
     .update({
       meal_name: input.mealName?.trim() ?? "",
+      logged_time: normalizeTimeInput(input.loggedTime),
       category: parseCategory(input.category),
       calories,
       protein_g: optionalNonNegativeInteger(input.proteinG, "Protein"),
@@ -232,6 +236,32 @@ function normalizeIsoDate(value: string | null | undefined): string {
   }
 
   return value;
+}
+
+function normalizeTimeInput(value: string | null | undefined): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (!/^\d{2}:\d{2}$/.test(value)) {
+    throw new Error("Time must be HH:mm.");
+  }
+
+  const [hours, minutes] = value.split(":").map(Number);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    throw new Error("Time must be HH:mm.");
+  }
+
+  return value;
+}
+
+function getCurrentLocalTimeHm(): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    timeZone: process.env.SHIFTLYCASH_TIME_ZONE ?? "America/New_York",
+  }).formatToParts(new Date());
+  const part = (type: string) =>
+    parts.find((item) => item.type === type)?.value ?? "00";
+  return `${part("hour")}:${part("minute")}`;
 }
 
 function requireNonNegativeInteger(value: number | string, label: string): number {
