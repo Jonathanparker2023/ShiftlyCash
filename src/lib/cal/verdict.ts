@@ -38,7 +38,17 @@ Use entry.sodiumMg, entry.addedSugarG, and entry.saturatedFatG when present. Onl
 
 ## Health flag mappings (apply only if flag is present in profile.health_flags)
 
-- "high_blood_pressure": estimate sodium for this entry. If estimated single-entry sodium >600mg, flag in rules_triggered. If estimated weekly sodium would exceed 10500mg (DASH 1500/day × 7), reason notes "DASH ceiling reached." Append "tracking cue, not medical advice" to reason.
+- "high_blood_pressure": apply DASH eating pattern guidance.
+  Sodium (negative signal):
+  - Estimate sodium for this entry. If single-entry sodium >600mg, add "bp_sodium_single_entry" to rules_triggered.
+  - If estimated weekly sodium would exceed 10500mg (DASH 1500/day x 7), reason notes "approaching DASH sodium ceiling."
+  Potassium (positive signal - actively lowers BP per DASH):
+  - High-potassium foods include: banana, sweet potato, spinach, beans, lentils, avocado, yogurt, tomato, orange, watermelon. Estimate potassium when these are present.
+  - If entry contains meaningful potassium (>300mg estimated) AND sodium is moderate (<400mg), this leans toward "good" verdict. Reason can note "potassium-rich, BP-supportive."
+  - If the week's been sodium-heavy and this entry is potassium-rich + low-sodium, this is a course-correction -> leans "good" with reason "DASH-friendly course correction."
+  Caffeine (transient BP spike - informational only):
+  - If entry is a caffeinated drink (coffee, espresso, energy drink, strong tea), include "caffeine_present" in rules_triggered. Don't penalize - just surface it.
+  Append "tracking cue, not medical advice" to any reason text that references sodium, potassium, or DASH.
 - "pre_diabetic": estimate added sugar for this entry. If >25g flag rules_triggered. Track glycemic-impact pattern across the week. Append "tracking cue, not medical advice" to reason.
 - "fatty_liver": estimate added sugar AND alcohol servings. Append "tracking cue, not medical advice" to reason.
 - "high_cholesterol": estimate saturated fat. Flag if single entry exceeds 7g sat fat. Append "tracking cue, not medical advice" to reason.
@@ -66,6 +76,8 @@ The verdict enum CAN be "bad" — that is a structured label. But the reason tex
       "added_sugar_g": integer | null,
       "alcohol_servings": number | null,
       "saturated_fat_g": integer | null,
+      "potassium_mg_estimated": integer | null,
+      "caffeine_mg_estimated": integer | null,
       "high_sodium": boolean,
       "high_added_sugar": boolean,
       "source": "official" | "ai_estimate" | "unknown"
@@ -102,6 +114,8 @@ export type VerdictResult = {
       added_sugar_g?: number | null;
       alcohol_servings?: number | null;
       saturated_fat_g?: number | null;
+      potassium_mg_estimated?: number | null;
+      caffeine_mg_estimated?: number | null;
       high_sodium?: boolean;
       high_added_sugar?: boolean;
       source: "official" | "ai_estimate" | "unknown";
@@ -267,6 +281,8 @@ function parseFacets(value: unknown): VerdictResult["verdict_context"]["estimate
     added_sugar_g: optionalNumber(obj.added_sugar_g),
     alcohol_servings: optionalNumber(obj.alcohol_servings),
     saturated_fat_g: optionalNumber(obj.saturated_fat_g),
+    potassium_mg_estimated: optionalNumber(obj.potassium_mg_estimated),
+    caffeine_mg_estimated: optionalNumber(obj.caffeine_mg_estimated),
     high_sodium: Boolean(obj.high_sodium),
     high_added_sugar: Boolean(obj.high_added_sugar),
     source:
