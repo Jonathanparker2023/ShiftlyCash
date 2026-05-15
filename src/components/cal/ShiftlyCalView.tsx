@@ -801,6 +801,19 @@ function FoodEntryRow({
             Cancel
           </button>
         </div>
+        <div className="mt-3 rounded-md border border-white/20 bg-black/20 p-3">
+          <p className="mb-2 text-xs font-semibold text-white/75">
+            Forgot something?
+          </p>
+          <AiFoodEstimator
+            buttonLabel="AI add food"
+            confirmLabel="Add to entry"
+            disabled={disabled || isSaving}
+            onConfirm={(addition) =>
+              setEditForm((current) => mergeEstimateIntoEntry(current, addition))
+            }
+          />
+        </div>
       </form>
     );
   }
@@ -1240,6 +1253,58 @@ function formatMacrosInline(entry: {
   ]
     .filter(Boolean)
     .join(" / ");
+}
+
+function mergeEstimateIntoEntry(
+  current: {
+    mealName: string;
+    category: FoodCategory;
+    loggedTime: string;
+    calories: string;
+    proteinG: string;
+    carbsG: string;
+    fatG: string;
+  },
+  addition: {
+    mealName: string;
+    category: FoodCategory;
+    calories: string;
+    proteinG: string;
+    carbsG: string;
+    fatG: string;
+  },
+) {
+  return {
+    ...current,
+    mealName: appendMealName(current.mealName, addition.mealName),
+    category: current.category || addition.category,
+    calories: addNumberStrings(current.calories, addition.calories),
+    proteinG: addOptionalNumberStrings(current.proteinG, addition.proteinG),
+    carbsG: addOptionalNumberStrings(current.carbsG, addition.carbsG),
+    fatG: addOptionalNumberStrings(current.fatG, addition.fatG),
+  };
+}
+
+function appendMealName(current: string, addition: string): string {
+  const cleanCurrent = current.trim();
+  const cleanAddition = addition.trim();
+  if (!cleanCurrent) return cleanAddition;
+  if (!cleanAddition) return cleanCurrent;
+  return `${cleanCurrent} + ${cleanAddition}`;
+}
+
+function addNumberStrings(left: string, right: string): string {
+  return String(toFormNumber(left) + toFormNumber(right));
+}
+
+function addOptionalNumberStrings(left: string, right: string): string {
+  const sum = toFormNumber(left) + toFormNumber(right);
+  return sum === 0 ? "" : String(sum);
+}
+
+function toFormNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatSignedCalories(value: number): string {

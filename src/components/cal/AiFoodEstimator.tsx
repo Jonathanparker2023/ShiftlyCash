@@ -20,6 +20,8 @@ type EstimateForm = {
 };
 
 type Props = {
+  buttonLabel?: string;
+  confirmLabel?: string;
   disabled: boolean;
   onConfirm: (input: {
     mealName: string;
@@ -64,6 +66,8 @@ const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
 ];
 
 export function AiFoodEstimator({
+  buttonLabel = "AI estimate",
+  confirmLabel = "Log it",
   disabled,
   onConfirm,
 }: Props) {
@@ -152,7 +156,7 @@ export function AiFoodEstimator({
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
-        AI estimate
+        {buttonLabel}
       </button>
 
       {isOpen ? (
@@ -160,6 +164,7 @@ export function AiFoodEstimator({
           <p className="text-sm font-semibold">AI food estimate</p>
           {estimate ? (
             <EstimateResult
+              confirmLabel={confirmLabel}
               disabled={disabled}
               estimate={estimate}
               onChange={setEstimate}
@@ -235,12 +240,14 @@ function currentTimeInput(): string {
 }
 
 function EstimateResult({
+  confirmLabel,
   disabled,
   estimate,
   onChange,
   onConfirm,
   onDiscard,
 }: {
+  confirmLabel: string;
   disabled: boolean;
   estimate: EstimateForm;
   onChange: (estimate: EstimateForm) => void;
@@ -306,7 +313,7 @@ function EstimateResult({
           onClick={onConfirm}
           type="button"
         >
-          Log it
+          {confirmLabel}
         </button>
         <button
           className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
