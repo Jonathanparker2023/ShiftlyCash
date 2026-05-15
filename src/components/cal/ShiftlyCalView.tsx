@@ -1348,11 +1348,6 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
       ? ""
       : (window.localStorage.getItem("shiftlycal-order-zip") ?? ""),
   );
-  const [budget, setBudget] = useState(() =>
-    typeof window === "undefined"
-      ? "25"
-      : (window.localStorage.getItem("shiftlycal-order-budget") ?? "25"),
-  );
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -1362,11 +1357,8 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
     setIsGenerating(true);
     try {
       window.localStorage.setItem("shiftlycal-order-zip", zipCode);
-      window.localStorage.setItem("shiftlycal-order-budget", budget);
-      const budgetUsd = Number(budget);
       const result = await generateMealOrderPromptAction({
         locationHint: zipCode,
-        budgetUsd: Number.isFinite(budgetUsd) ? budgetUsd : 25,
       });
       setPrompt(result.prompt);
       setIsOpen(true);
@@ -1406,27 +1398,15 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
 
       {isOpen ? (
         <div className="mt-3 space-y-3">
-          <div className="grid gap-2 sm:grid-cols-[1fr_120px]">
-            <label className="block text-xs font-semibold text-white/75">
-              Zip code
-              <input
-                className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
-                onChange={(event) => setZipCode(event.target.value)}
-                placeholder="10001"
-                value={zipCode}
-              />
-            </label>
-            <label className="block text-xs font-semibold text-white/75">
-              Budget $
-              <input
-                className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
-                min="1"
-                onChange={(event) => setBudget(event.target.value)}
-                type="number"
-                value={budget}
-              />
-            </label>
-          </div>
+          <label className="block text-xs font-semibold text-white/75">
+            Zip code
+            <input
+              className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+              onChange={(event) => setZipCode(event.target.value)}
+              placeholder="10001"
+              value={zipCode}
+            />
+          </label>
           <textarea
             className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
             onChange={(event) => setPrompt(event.target.value)}

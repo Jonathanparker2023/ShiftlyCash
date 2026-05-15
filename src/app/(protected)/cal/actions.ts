@@ -129,21 +129,16 @@ export async function estimateFoodAction(input: {
 
 export async function generateMealOrderPromptAction(input?: {
   locationHint?: string;
-  budgetUsd?: number;
 }): Promise<{ ok: true; prompt: string }> {
   const data = await getShiftlyCalData();
   const today =
     data.currentWeek.days.find((day) => day.date === data.todayIso) ??
     data.currentWeek.days[0];
-  const budgetUsd =
-    typeof input?.budgetUsd === "number" && Number.isFinite(input.budgetUsd)
-      ? Math.max(1, Math.round(input.budgetUsd))
-      : 25;
   const locationHint = input?.locationHint?.trim() || "[your zip code]";
   const hasHbp = data.targets.healthFlags.includes("high_blood_pressure");
 
   const lines = [
-    "I'm ordering my final meal of the day on DoorDash. Help me pick something that fits my remaining macro budget.",
+    "You are Perplexity Comet, an agentic browser. I'm ordering my final meal of the day on DoorDash. Browse DoorDash directly, find real options that fit my remaining macro budget, and report back.",
     "",
     "## My current state (today, after meals logged so far)",
     "",
@@ -210,17 +205,17 @@ export async function generateMealOrderPromptAction(input?: {
     "",
     "## Your task",
     "",
-    `1. Search DoorDash for 3 meal options near ${locationHint} under $${budgetUsd} that best fit the gaps above.`,
+    `1. Browse DoorDash near ${locationHint} and find 4 real meal options that best fit the gaps above. Use the actual DoorDash UI — don't make up restaurants or items.`,
     "2. For each option list: restaurant, dish name, approximate cal / protein / sodium / fiber, and price.",
-    "3. **Important - portioning instructions**: if a meal exceeds one of my limits (e.g., 1200mg sodium when I only have 400mg headroom, or 800 cal when I only have 500 left), DON'T rule it out - tell me how to portion it. Examples:",
+    "3. **Portioning instructions are required**: if a meal exceeds one of my limits (e.g., 1200mg sodium when I only have 400mg headroom, or 800 cal when I only have 500 left), DON'T rule it out - tell me exactly how to portion it. Examples:",
     '   - "Eat 60% of the bowl, save the rest for tomorrow\'s breakfast"',
     '   - "Skip the side of rice"',
     '   - "Get the half-portion / kid\'s size if available"',
     '   - "Eat the protein and veg, skip the bread/dressing/sauce"',
-    `4. Rank the 3 options by best-fit for my remaining budget${hasHbp ? " AND BP-friendliness" : ""}.`,
+    `4. Rank the 4 options by best-fit for my remaining macros${hasHbp ? " AND BP-friendliness" : ""}.`,
     "5. Note which one is your top pick and why in one sentence.",
     "",
-    "Search now and return the 3 options.",
+    "Browse now and return the 4 options with their DoorDash links.",
   ];
 
   return { ok: true, prompt: lines.filter(Boolean).join("\n") };
