@@ -147,7 +147,7 @@ export function ShiftlyCalView({
       focusedDay.entries.some(
         (entry) =>
           entry.verdictSource === "pending" &&
-          nowMs - new Date(entry.createdAt).getTime() < 60_000,
+          nowMs - new Date(entry.updatedAt).getTime() < 60_000,
       ),
     [focusedDay.entries, nowMs],
   );
@@ -893,7 +893,7 @@ function FoodEntryRow({
   const verdictStatus = verdictStatusText(entry);
   const isStuck =
     entry.verdictSource === "pending" &&
-    nowMs - new Date(entry.createdAt).getTime() > 60_000;
+    nowMs - new Date(entry.updatedAt).getTime() > 60_000;
   const rowClass = isStuck
     ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-white shadow-[0_8px_18px_rgba(8,15,28,0.16)]"
     : verdictBarClass(entry);

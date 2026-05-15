@@ -21,6 +21,7 @@ const FOOD_CATEGORIES = new Set<FoodCategory>([
 ]);
 const FOOD_VERDICTS = new Set<FoodVerdict>(["good", "fine", "bad"]);
 const JON_FALLBACK_WEIGHT_LBS = 201.9;
+const VERDICT_SCORING_TIMEOUT_MS = 45_000;
 
 type VerdictEntryRow = {
   id: string;
@@ -224,7 +225,7 @@ export async function regenerateVerdictAction(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/cal");
-  scheduleScoreFoodEntry(input.id, user.id);
+  await scoreEntryAndUpdate(input.id, user.id);
   return { ok: true };
 }
 
@@ -500,7 +501,11 @@ async function scoreEntryAndUpdate(entryId: string, userId: string) {
 
   try {
     const input = await buildVerdictInput(supabase, entryId, userId);
-    const result = await scoreEntry(input);
+    const result = await withTimeout(
+      scoreEntry(input),
+      VERDICT_SCORING_TIMEOUT_MS,
+      "Verdict scorer timed out.",
+    );
 
     const { error } = await supabase
       .from("food_entries")
@@ -545,6 +550,26 @@ async function scoreEntryAndUpdate(entryId: string, userId: string) {
   }
 
   revalidatePath("/cal");
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
 }
 
 async function buildVerdictInput(
