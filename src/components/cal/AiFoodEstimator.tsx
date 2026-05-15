@@ -1,6 +1,5 @@
 "use client";
 
-import type { FormEvent } from "react";
 import { useRef, useState, useTransition } from "react";
 
 import { estimateFoodAction } from "@/app/(protected)/cal/actions";
@@ -84,8 +83,7 @@ export function AiFoodEstimator({
     typeof window !== "undefined" &&
     Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
 
-  function submitEstimate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function runEstimate() {
     setError(null);
 
     startTransition(async () => {
@@ -175,7 +173,7 @@ export function AiFoodEstimator({
               onDiscard={reset}
             />
           ) : (
-            <form className="mt-3 space-y-3" onSubmit={submitEstimate}>
+            <div className="mt-3 space-y-3">
               <label className="block text-sm font-semibold text-white/80">
                 What did you eat?
                 <textarea
@@ -212,7 +210,8 @@ export function AiFoodEstimator({
                 <button
                   className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
                   disabled={disabled || isPending || !description.trim()}
-                  type="submit"
+                  onClick={runEstimate}
+                  type="button"
                 >
                   {isPending ? "Looking up nutrition data..." : "Estimate"}
                 </button>
@@ -227,7 +226,7 @@ export function AiFoodEstimator({
                   Cancel
                 </button>
               </div>
-            </form>
+            </div>
           )}
         </div>
       ) : null}

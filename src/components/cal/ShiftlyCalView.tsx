@@ -757,6 +757,18 @@ function FoodEntryRow({
   if (isEditing) {
     return (
       <form className={categoryBarClass(entry.category)} onSubmit={submitEdit}>
+        <button
+          className="-m-1 mb-2 flex w-[calc(100%+0.5rem)] flex-col items-start gap-0.5 rounded p-1 text-left transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60"
+          onClick={() => setIsEditing(false)}
+          type="button"
+        >
+          <span className="w-full truncate font-semibold leading-tight">
+            {entry.mealName || categoryLabel(entry.category)}
+          </span>
+          <span className="text-xs font-semibold opacity-85">
+            {entry.calories.toLocaleString()} cal — tap to close
+          </span>
+        </button>
         <div className="grid gap-2 sm:grid-cols-2">
           <TextInput
             label="Meal"
