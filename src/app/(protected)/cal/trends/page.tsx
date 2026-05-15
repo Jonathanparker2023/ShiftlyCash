@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { ShiftlyCalTrendsView } from "@/components/cal/ShiftlyCalTrendsView";
-import { getShiftlyCalData } from "@/lib/cal/data";
+import { getShiftlyCalTrendsData } from "@/lib/cal/data";
 
 export default async function ShiftlyCalTrendsPage({
   searchParams,
@@ -9,7 +9,7 @@ export default async function ShiftlyCalTrendsPage({
   searchParams: Promise<{ week?: string }>;
 }) {
   const { week } = await searchParams;
-  const data = await getShiftlyCalData({ weekStartIso: week });
+  const data = await getShiftlyCalTrendsData({ weekStartIso: week });
 
   return (
     <main className="min-h-screen px-3 py-4 text-white sm:px-4 lg:px-6">

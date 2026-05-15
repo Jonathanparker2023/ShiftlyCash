@@ -175,7 +175,7 @@ export function ShiftlyCalView({
     startTransition(async () => {
       try {
         await logWeightAction({
-          date: initialData.todayIso,
+          date: focusedDay.date,
           weightLbs: weightValue,
         });
         router.refresh();
@@ -907,39 +907,31 @@ function WeightPanel({
   todayIso: string;
   weightValue: string;
 }) {
-  const isToday = day.date === todayIso;
-
   return (
     <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
         Weight
       </p>
-      {isToday ? (
-        <form className="mt-3 flex gap-2" onSubmit={onSubmit}>
-          <label className="min-w-0 flex-1 text-sm font-semibold text-white/80">
-            Today
-            <input
-              className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
-              min={1}
-              onChange={(event) => setWeightValue(event.target.value)}
-              step="0.1"
-              type="number"
-              value={weightValue}
-            />
-          </label>
-          <button
-            className="mt-6 rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
-            disabled={disabled || !weightValue.trim()}
-            type="submit"
-          >
-            Save
-          </button>
-        </form>
-      ) : (
-        <p className="mt-3 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white/75">
-          {day.weight ? `${day.weight.weightLbs.toFixed(1)} lbs` : "No weight logged"}
-        </p>
-      )}
+      <form className="mt-3 flex gap-2" onSubmit={onSubmit}>
+        <label className="min-w-0 flex-1 text-sm font-semibold text-white/80">
+          {focusedDayLabel(day.date, todayIso)}
+          <input
+            className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            min={1}
+            onChange={(event) => setWeightValue(event.target.value)}
+            step="0.1"
+            type="number"
+            value={weightValue}
+          />
+        </label>
+        <button
+          className="mt-6 rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+          disabled={disabled || !weightValue.trim()}
+          type="submit"
+        >
+          Save
+        </button>
+      </form>
     </section>
   );
 }
@@ -1006,7 +998,7 @@ function SavedFoodRow({
   onInstantLog: (food: SavedFood) => void;
 }) {
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 p-3 text-white backdrop-blur-md">
+    <div className={categoryBarClass(food.category)}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold">{food.name}</p>

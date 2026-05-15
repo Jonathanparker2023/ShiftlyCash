@@ -9,7 +9,8 @@ import {
   createSavedFoodAction,
   saveCalTargetsAction,
 } from "@/app/(protected)/cal/actions";
-import { categoryLabel, magnitudeColorClass } from "@/lib/cal/color";
+import { categoryBarClass, categoryLabel, magnitudeColorClass } from "@/lib/cal/color";
+import type { CalTrendDay, ShiftlyCalTrendsData } from "@/lib/cal/data";
 import {
   colorToneFromMagnitude,
   dailyDeviation,
@@ -20,7 +21,6 @@ import type {
   CalTargets,
   FoodCategory,
   SavedFood,
-  ShiftlyCalData,
 } from "@/lib/cal/types";
 
 type SavedFoodFormState = {
@@ -60,7 +60,7 @@ export function ShiftlyCalTrendsView({
   initialData,
   weekStartIso,
 }: {
-  initialData: ShiftlyCalData;
+  initialData: ShiftlyCalTrendsData;
   weekStartIso: string;
 }) {
   const router = useRouter();
@@ -155,8 +155,8 @@ export function ShiftlyCalTrendsView({
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.75fr)]">
-          <WeeklyHistoryStrip
-            days={initialData.currentWeek.days}
+          <TrendHistoryStrip
+            trendDays={initialData.trendDays}
             targets={initialData.targets}
           />
           <WeightLogWeek days={initialData.currentWeek.days} />
@@ -328,7 +328,7 @@ function SavedFoodManageRow({
   onArchive: (id: string) => void;
 }) {
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 p-3 text-white">
+    <div className={categoryBarClass(food.category)}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold">{food.name}</p>
@@ -350,36 +350,38 @@ function SavedFoodManageRow({
   );
 }
 
-function WeeklyHistoryStrip({
-  days,
+function TrendHistoryStrip({
+  trendDays,
   targets,
 }: {
-  days: CalDay[];
+  trendDays: CalTrendDay[];
   targets: CalTargets;
 }) {
   return (
     <section className="rounded-lg border border-white/15 bg-black/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-        Weekly history
+        28-day history
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">Daily summary</h2>
-      <div className="mt-4 grid gap-2">
-        {days.map((day) => (
-          <WeeklyHistoryRow day={day} key={day.date} targets={targets} />
+      <h2 className="mt-1 text-xl font-semibold text-white">Daily trend rows</h2>
+      <div className="mt-4 max-h-[34rem] overflow-y-auto pr-1">
+        <div className="grid gap-2">
+        {[...trendDays].reverse().map((day) => (
+          <TrendHistoryRow day={day} key={day.date} targets={targets} />
         ))}
+        </div>
       </div>
     </section>
   );
 }
 
-function WeeklyHistoryRow({
+function TrendHistoryRow({
   day,
   targets,
 }: {
-  day: CalDay;
+  day: CalTrendDay;
   targets: CalTargets;
 }) {
-  const deviation = dailyDeviation(day.totals.calories, targets.tdeeCalories);
+  const deviation = dailyDeviation(day.calories, targets.tdeeCalories);
   const tone = colorToneFromMagnitude(deviation, DAILY_CALORIE_THRESHOLDS);
 
   return (
@@ -389,11 +391,11 @@ function WeeklyHistoryRow({
         <p className="text-xs text-white/60">{day.date}</p>
       </div>
       <p className={`font-semibold ${magnitudeColorClass(tone)}`}>
-        {day.totals.calories.toLocaleString()} cal
+        {day.calories.toLocaleString()} cal
       </p>
-      <p className="text-white/80">{day.totals.proteinG.toLocaleString()}g protein</p>
+      <p className="text-white/80">{day.proteinG.toLocaleString()}g protein</p>
       <p className="text-white/80">
-        {day.weight ? `${day.weight.weightLbs.toFixed(1)} lbs` : "No weight"}
+        {day.weightLbs === null ? "No weight" : `${day.weightLbs.toFixed(1)} lbs`}
       </p>
     </div>
   );

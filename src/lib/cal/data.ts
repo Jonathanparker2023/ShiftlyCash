@@ -64,6 +64,32 @@ type SettingsTargetsRow = {
   fat_target_g: number | null;
 };
 
+type TrendFoodEntryRow = {
+  date: string;
+  calories: number;
+  protein_g: number | null;
+};
+
+type TrendWeightLogRow = {
+  date: string;
+  weight_lbs: number | string;
+};
+
+export type CalTrendDay = {
+  date: string;
+  calories: number;
+  proteinG: number;
+  weightLbs: number | null;
+};
+
+export type ShiftlyCalTrendsData = {
+  todayIso: string;
+  targets: CalTargets;
+  savedFoods: SavedFood[];
+  trendDays: CalTrendDay[];
+  currentWeek: ShiftlyCalData["currentWeek"];
+};
+
 export async function getShiftlyCalData(opts?: {
   weekStartIso?: string;
 }): Promise<ShiftlyCalData> {
@@ -127,6 +153,72 @@ export async function getShiftlyCalData(opts?: {
       projectedWeightDeltaLbs: projectWeeklyWeightChangeLbs(weeklyDeficitCalories),
     },
     savedFoods: ((savedFoodsRes.data ?? []) as SavedFoodRow[]).map(mapSavedFood),
+  };
+}
+
+export async function getShiftlyCalTrendsData(opts?: {
+  weekStartIso?: string;
+}): Promise<ShiftlyCalTrendsData> {
+  const weekData = await getShiftlyCalData(opts);
+  const { supabase, user } = await requireUser();
+  const trendStartIso = addDaysIso(weekData.todayIso, -27);
+
+  const [entriesRes, weightRes] = await Promise.all([
+    supabase
+      .from("food_entries")
+      .select("date,calories,protein_g")
+      .eq("user_id", user.id)
+      .gte("date", trendStartIso)
+      .lte("date", weekData.todayIso)
+      .order("date", { ascending: true }),
+    supabase
+      .from("weight_logs")
+      .select("date,weight_lbs")
+      .eq("user_id", user.id)
+      .gte("date", trendStartIso)
+      .lte("date", weekData.todayIso)
+      .order("date", { ascending: true }),
+  ]);
+
+  if (entriesRes.error) {
+    throw new Error(`Food entries: ${entriesRes.error.message}`);
+  }
+  if (weightRes.error) {
+    throw new Error(`Weight: ${weightRes.error.message}`);
+  }
+
+  const caloriesByDate = new Map<string, { calories: number; proteinG: number }>();
+  for (const row of (entriesRes.data ?? []) as TrendFoodEntryRow[]) {
+    const existing = caloriesByDate.get(row.date) ?? { calories: 0, proteinG: 0 };
+    caloriesByDate.set(row.date, {
+      calories: existing.calories + Number(row.calories),
+      proteinG: existing.proteinG + Number(row.protein_g ?? 0),
+    });
+  }
+
+  const weightByDate = new Map<string, number>(
+    ((weightRes.data ?? []) as TrendWeightLogRow[]).map((row) => [
+      row.date,
+      Number(row.weight_lbs),
+    ]),
+  );
+
+  return {
+    todayIso: weekData.todayIso,
+    targets: weekData.targets,
+    savedFoods: weekData.savedFoods,
+    currentWeek: weekData.currentWeek,
+    trendDays: Array.from({ length: 28 }, (_, index) => {
+      const date = addDaysIso(trendStartIso, index);
+      const sums = caloriesByDate.get(date);
+
+      return {
+        date,
+        calories: sums?.calories ?? 0,
+        proteinG: sums?.proteinG ?? 0,
+        weightLbs: weightByDate.get(date) ?? null,
+      };
+    }),
   };
 }
 
