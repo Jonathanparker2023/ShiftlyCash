@@ -36,6 +36,8 @@ import {
   cashflowColorFromTone,
   cashflowDailyColor,
   cashflowDailyTone,
+  cashflowWeeklyTone,
+  spendWeeklyTone,
 } from "@/lib/domain/legacyRules";
 const JOB_OPTIONS: JobType[] = [
   "none",
@@ -659,7 +661,8 @@ function MetricStrip({
   medians: DashboardData["metricMedians"];
 }) {
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
-  const cashflowTone = cashflowDailyTone(displayCashflowCents);
+  const cashflowTone = cashflowWeeklyTone(displayCashflowCents);
+  const spendTone = spendWeeklyTone(spendCents, medians.spendCents);
 
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -670,9 +673,9 @@ function MetricStrip({
         value={formatMoney(earningsCents)}
       />
       <TopMetric
-        accent="negative"
+        accent={spendTone}
         label="Spend"
-        tone="negative"
+        tone={spendTone}
         trend={buildMedianTrend(spendCents, medians.spendCents, "lower")}
         value={formatMoney(spendCents)}
       />
