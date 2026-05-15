@@ -248,6 +248,121 @@ export async function generateMealOrderPromptAction(input?: {
   return { ok: true, prompt: lines.filter(Boolean).join("\n") };
 }
 
+export async function generateHomeRecipePromptAction(): Promise<{
+  ok: true;
+  prompt: string;
+}> {
+  const data = await getShiftlyCalData();
+  const today =
+    data.currentWeek.days.find((day) => day.date === data.todayIso) ??
+    data.currentWeek.days[0];
+  const hasHbp = data.targets.healthFlags.includes("high_blood_pressure");
+
+  const lines = [
+    "You are Perplexity Comet, an agentic browser. I'm cooking my final meal of the day at home. Browse real recipe sites (NYT Cooking, Serious Eats, Bon Appétit, Cooking Light, food blogs, etc.), find recipes that fit my remaining macro budget, and report back with PRECISE ingredient measurements.",
+    "",
+    "## My current state (today, after meals logged so far)",
+    "",
+    renderBudgetLine(
+      "Calories",
+      data.targets.tdeeCalories,
+      today.totals.calories,
+      "cal",
+      "left",
+    ),
+    renderNeedLine(
+      "Protein needed",
+      data.targets.proteinTargetG,
+      today.totals.proteinG,
+      "g",
+      "daily floor",
+    ),
+    renderNeedLine(
+      "Fiber needed",
+      data.targets.fiberTargetG,
+      today.totals.fiberG,
+      "g",
+      "daily floor",
+    ),
+    renderBudgetLine(
+      "Sodium HEADROOM",
+      data.targets.sodiumTargetMg,
+      today.totals.sodiumMg,
+      "mg",
+      hasHbp ? "left (DASH ceiling, hard cap)" : "left",
+    ),
+    renderSimpleBudgetLine(
+      "Added sugar budget",
+      data.targets.addedSugarTargetG,
+      today.totals.addedSugarG,
+      "g",
+      "remaining",
+    ),
+    renderSimpleBudgetLine(
+      "Saturated fat budget",
+      data.targets.saturatedFatTargetG,
+      today.totals.saturatedFatG,
+      "g",
+      "remaining",
+    ),
+    "",
+    "## Context",
+    "",
+    `- I'm ${data.targets.age ?? 28}, ${data.targets.sex ?? "male"}, 5'9\", 202 lb, sedentary${hasHbp ? " with mild HBP" : ""}`,
+    `- On a cut targeting ~1.2 lb/wk loss (TDEE target ${data.targets.tdeeCalories ?? 1650} cal/day)`,
+    "- This is my final meal — cooking lets ME control sodium and added sugar, so I want recipes that LEAN INTO that advantage",
+    "- Prefer recipes with whole-food protein (chicken, fish, lean beef, eggs, beans) + a fiber source (veg, legumes, whole grains)",
+    "- Skip dessert / baked-good recipes for this round",
+    "",
+    "## Your task",
+    "",
+    "1. Find 4 recipes from real sources that fit my remaining macros for 1 serving.",
+    "",
+    "   **Mix requirement:**",
+    "   - **Recipe 1 MUST be from a mainstream high-quality source** (NYT Cooking, Serious Eats, Bon Appétit, America's Test Kitchen, Cooking Light, etc.) — predictable, well-tested.",
+    "   - **Recipes 2, 3, 4 should be lesser-known food blogs or chef sites** — hidden gems. Skip the obvious mainstream sources for these.",
+    "",
+    "2. **CRITICAL — precise measurements.** Because I'm cooking, I control the salt and sugar exactly. For EACH recipe, give me:",
+    "",
+    "   ```",
+    "   **Recipe N: <Recipe name>** by <author/site> ([link])",
+    "   Prep: <min> | Cook: <min> | Serves: <N>",
+    "",
+    "   Ingredients (per single serving I'll eat):",
+    "   - <amount> <ingredient> — <sodium_mg>mg sodium, <added_sugar_g>g added sugar, <protein_g>g protein, <fiber_g>g fiber, <calories>cal",
+    "   - ...",
+    "",
+    "   Per-serving totals:",
+    "   - Calories: <consumed_today + this serving>/<tdee_target>",
+    "   - Protein: <consumed + this serving>/<protein_target>g",
+    "   - Fiber: <consumed + this serving>/<fiber_target>g",
+    "   - Sodium: <consumed + this serving>/<sodium_target>mg",
+    "   - Added sugar: <consumed + this serving>/<sugar_target>g",
+    "   - Saturated fat: <consumed + this serving>/<sat_fat_target>g",
+    "",
+    "   What you need to BUY vs PANTRY:",
+    "   - Buy: <items not in a typical pantry>",
+    "   - Pantry assumed: <items I likely already have (salt, olive oil, garlic, lemon, etc.)>",
+    "",
+    "   Modifications applied for my targets:",
+    "   - <e.g. \"Halved the salt to 1/2 tsp (saves 1160mg sodium)\">",
+    "   - <e.g. \"Skipped the brown sugar glaze (saves 12g added sugar)\">",
+    "   - <e.g. \"Used boneless skinless thigh instead of skin-on (saves 4g saturated fat)\">",
+    "   ```",
+    "",
+    "3. **Sodium and added sugar amounts must be exact, not rounded.** Use 1/8 tsp / 1/4 tsp / 1/2 tsp / 1 tsp granularity for salt. Use grams for added sugar. Convert teaspoons to mg using: 1 tsp table salt = ~2300mg sodium; 1/2 tsp = 1160mg; 1/4 tsp = 580mg; 1/8 tsp = 290mg. Cite your ingredient sodium values from USDA FoodData Central or the recipe author when possible.",
+    "",
+    "4. **If a recipe as published exceeds my sodium or sugar headroom, MODIFY THE RECIPE with exact reduction**. Don't just say 'use less salt' — say 'reduce salt from 1 tsp to 1/2 tsp.' Replace high-sodium ingredients with low-sodium alternatives where natural (e.g., low-sodium soy sauce + rice vinegar instead of regular soy sauce; fresh garlic + lemon instead of garlic salt). Account for the modifications in the per-serving totals.",
+    "",
+    `5. Rank the 4 recipes by best-fit for my remaining macros${hasHbp ? " AND BP-friendliness (low sodium, herbs/acid for flavor instead of salt)" : ""}.`,
+    "6. Note which is your top pick and why in one sentence — especially if one stands out for flavor-per-sodium ratio.",
+    "",
+    "Browse now and return the 4 recipes with precise measurements and real source links.",
+  ];
+
+  return { ok: true, prompt: lines.filter(Boolean).join("\n") };
+}
+
 export async function deleteFoodEntryAction(input: {
   id: string;
 }): Promise<{ ok: true }> {

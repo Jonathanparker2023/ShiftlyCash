@@ -9,6 +9,7 @@ import { AiFoodEstimator } from "@/components/cal/AiFoodEstimator";
 import {
   createFoodEntryAction,
   deleteFoodEntryAction,
+  generateHomeRecipePromptAction,
   generateMealOrderPromptAction,
   logWaterAction,
   logWeightAction,
@@ -459,6 +460,7 @@ export function ShiftlyCalView({
                   savedFoods={initialData.savedFoods}
                 />
                 <MealOrderPromptBox disabled={isPending} />
+                <HomeRecipePromptBox disabled={isPending} />
                 <WeightPanel
                   day={focusedDay}
                   disabled={isPending}
@@ -1429,6 +1431,94 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
               value={zipCode}
             />
           </label>
+          <textarea
+            className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            onChange={(event) => setPrompt(event.target.value)}
+            value={prompt}
+          />
+        </div>
+      ) : status ? (
+        <p className="mt-2 text-xs font-semibold text-red-200">{status}</p>
+      ) : null}
+    </section>
+  );
+}
+
+function HomeRecipePromptBox({ disabled }: { disabled: boolean }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  async function generatePrompt() {
+    setStatus(null);
+    setIsGenerating(true);
+    try {
+      const result = await generateHomeRecipePromptAction();
+      setPrompt(result.prompt);
+      setIsOpen(true);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Unable to generate prompt.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function copyPrompt() {
+    if (!prompt) return;
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setStatus("Copied to clipboard.");
+    } catch {
+      setStatus("Copy failed. Select the text and copy it manually.");
+    }
+  }
+
+  return (
+    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+      <button
+        className="w-full rounded-md border border-amber-300/50 bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled || isGenerating}
+        onClick={() => {
+          if (!isOpen || !prompt) {
+            void generatePrompt();
+            return;
+          }
+          setIsOpen((current) => !current);
+        }}
+        type="button"
+      >
+        {isGenerating ? "Building recipe prompt..." : "🍳 Cook at home"}
+      </button>
+
+      {isOpen ? (
+        <div className="mt-3 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="rounded-md border border-amber-300/50 bg-amber-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!prompt}
+              onClick={copyPrompt}
+              type="button"
+            >
+              📋 Copy to clipboard
+            </button>
+            <button
+              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={disabled || isGenerating}
+              onClick={generatePrompt}
+              type="button"
+            >
+              Regenerate
+            </button>
+            <button
+              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              onClick={() => setIsOpen(false)}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
+          {status ? <p className="text-xs font-semibold text-white/70">{status}</p> : null}
           <textarea
             className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
             onChange={(event) => setPrompt(event.target.value)}
