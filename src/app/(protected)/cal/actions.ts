@@ -6,6 +6,7 @@ import { waitUntil } from "@vercel/functions";
 
 import { requireUser } from "@/lib/auth";
 import { estimateFood, type FoodEstimate } from "@/lib/cal/estimate";
+import { getShiftlyCalData } from "@/lib/cal/data";
 import type { FoodCategory, FoodVerdict } from "@/lib/cal/types";
 import { scoreEntry, type VerdictInput } from "@/lib/cal/verdict";
 import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
@@ -124,6 +125,105 @@ export async function estimateFoodAction(input: {
 }): Promise<FoodEstimate> {
   await requireUser();
   return estimateFood(input.description);
+}
+
+export async function generateMealOrderPromptAction(input?: {
+  locationHint?: string;
+  budgetUsd?: number;
+}): Promise<{ ok: true; prompt: string }> {
+  const data = await getShiftlyCalData();
+  const today =
+    data.currentWeek.days.find((day) => day.date === data.todayIso) ??
+    data.currentWeek.days[0];
+  const budgetUsd =
+    typeof input?.budgetUsd === "number" && Number.isFinite(input.budgetUsd)
+      ? Math.max(1, Math.round(input.budgetUsd))
+      : 25;
+  const locationHint = input?.locationHint?.trim() || "[your zip code]";
+  const hasHbp = data.targets.healthFlags.includes("high_blood_pressure");
+
+  const lines = [
+    "I'm ordering my final meal of the day on DoorDash. Help me pick something that fits my remaining macro budget.",
+    "",
+    "## My current state (today, after meals logged so far)",
+    "",
+    renderBudgetLine(
+      "Calories",
+      data.targets.tdeeCalories,
+      today.totals.calories,
+      "cal",
+      "left",
+    ),
+    renderNeedLine(
+      "Protein needed",
+      data.targets.proteinTargetG,
+      today.totals.proteinG,
+      "g",
+      "daily floor",
+    ),
+    renderNeedLine(
+      "Fiber needed",
+      data.targets.fiberTargetG,
+      today.totals.fiberG,
+      "g",
+      "daily floor",
+    ),
+    renderBudgetLine(
+      "Sodium HEADROOM",
+      data.targets.sodiumTargetMg,
+      today.totals.sodiumMg,
+      "mg",
+      hasHbp ? "left (DASH ceiling)" : "left",
+      hasHbp
+        ? "I have mild high blood pressure, so this is a hard cap"
+        : undefined,
+    ),
+    renderSimpleBudgetLine(
+      "Added sugar budget",
+      data.targets.addedSugarTargetG,
+      today.totals.addedSugarG,
+      "g",
+      "remaining",
+    ),
+    renderSimpleBudgetLine(
+      "Saturated fat budget",
+      data.targets.saturatedFatTargetG,
+      today.totals.saturatedFatG,
+      "g",
+      "remaining",
+    ),
+    hasHbp &&
+    data.targets.sodiumTargetMg !== null &&
+    today.totals.sodiumMg >= data.targets.sodiumTargetMg
+      ? "- **WARNING: I've already hit my sodium ceiling today.** Find the lowest-sodium option available and tell me to skip salt-heavy components."
+      : null,
+    "",
+    "## Context",
+    "",
+    `- I'm ${data.targets.age ?? 28}, ${data.targets.sex ?? "male"}, 5'9", 202 lb, sedentary${hasHbp ? " with mild HBP" : ""}`,
+    `- On a cut targeting ~1.2 lb/wk loss (TDEE target ${data.targets.tdeeCalories ?? 1650} cal/day)`,
+    "- This is my final meal - eat for satiety + macro closure",
+    hasHbp
+      ? "- Avoid liquid sugars (juice, soda, sweetened coffee drinks) - they spike BP"
+      : "- Avoid liquid sugars (juice, soda, sweetened coffee drinks)",
+    "- Prefer whole-food meals with real protein and fiber over processed/refined",
+    "",
+    "## Your task",
+    "",
+    `1. Search DoorDash for 3 meal options near ${locationHint} under $${budgetUsd} that best fit the gaps above.`,
+    "2. For each option list: restaurant, dish name, approximate cal / protein / sodium / fiber, and price.",
+    "3. **Important - portioning instructions**: if a meal exceeds one of my limits (e.g., 1200mg sodium when I only have 400mg headroom, or 800 cal when I only have 500 left), DON'T rule it out - tell me how to portion it. Examples:",
+    '   - "Eat 60% of the bowl, save the rest for tomorrow\'s breakfast"',
+    '   - "Skip the side of rice"',
+    '   - "Get the half-portion / kid\'s size if available"',
+    '   - "Eat the protein and veg, skip the bread/dressing/sauce"',
+    `4. Rank the 3 options by best-fit for my remaining budget${hasHbp ? " AND BP-friendliness" : ""}.`,
+    "5. Note which one is your top pick and why in one sentence.",
+    "",
+    "Search now and return the 3 options.",
+  ];
+
+  return { ok: true, prompt: lines.filter(Boolean).join("\n") };
 }
 
 export async function deleteFoodEntryAction(input: {
@@ -402,6 +502,52 @@ export async function saveCalTargetsAction(input: {
 
   revalidatePath("/cal");
   return { ok: true };
+}
+
+function renderBudgetLine(
+  label: string,
+  target: number | null,
+  consumed: number,
+  unit: string,
+  leftLabel: string,
+  extra?: string,
+): string | null {
+  if (target === null) return null;
+  const remaining = Math.round(target - consumed);
+  const remainingText =
+    remaining < 0
+      ? `over by ${Math.abs(remaining)}${unit}`
+      : `${remaining}${unit} ${leftLabel}`;
+  const suffix = extra ? ` - ${extra}` : "";
+  return `- **${label}**: ${remainingText} (target ${Math.round(target)}, consumed ${Math.round(consumed)})${suffix}`;
+}
+
+function renderNeedLine(
+  label: string,
+  target: number | null,
+  consumed: number,
+  unit: string,
+  targetLabel: string,
+): string | null {
+  if (target === null) return null;
+  const need = Math.round(target - consumed);
+  const needText =
+    need < 0 ? `over by ${Math.abs(need)}${unit}` : `${need}${unit} more`;
+  return `- **${label}**: ${needText} to hit my ${Math.round(target)}${unit} ${targetLabel} (currently at ${Math.round(consumed)}${unit})`;
+}
+
+function renderSimpleBudgetLine(
+  label: string,
+  target: number | null,
+  consumed: number,
+  unit: string,
+  suffix: string,
+): string | null {
+  if (target === null) return null;
+  const remaining = Math.round(target - consumed);
+  const remainingText =
+    remaining < 0 ? `over by ${Math.abs(remaining)}${unit}` : `${remaining}${unit} ${suffix}`;
+  return `- **${label}**: ${remainingText}`;
 }
 
 function normalizeIsoDate(value: string | null | undefined): string {

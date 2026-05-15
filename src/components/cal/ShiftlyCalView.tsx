@@ -9,6 +9,7 @@ import { AiFoodEstimator } from "@/components/cal/AiFoodEstimator";
 import {
   createFoodEntryAction,
   deleteFoodEntryAction,
+  generateMealOrderPromptAction,
   logWaterAction,
   logWeightAction,
   overrideVerdictAction,
@@ -504,6 +505,9 @@ export function ShiftlyCalView({
                   day={focusedDay}
                   targets={initialData.targets}
                 />
+                <div className="mt-4">
+                  <MealOrderPromptBox disabled={isPending} />
+                </div>
                 <div className="mt-4">
                   <WaterPanel
                     day={focusedDay}
@@ -1334,6 +1338,131 @@ function DayTotalMetric({
       ) : null}
       <p className={`mt-1 text-xs font-semibold ${textClass}`}>{state.note}</p>
     </div>
+  );
+}
+
+function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [zipCode, setZipCode] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : (window.localStorage.getItem("shiftlycal-order-zip") ?? ""),
+  );
+  const [budget, setBudget] = useState(() =>
+    typeof window === "undefined"
+      ? "25"
+      : (window.localStorage.getItem("shiftlycal-order-budget") ?? "25"),
+  );
+  const [prompt, setPrompt] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  async function generatePrompt() {
+    setStatus(null);
+    setIsGenerating(true);
+    try {
+      window.localStorage.setItem("shiftlycal-order-zip", zipCode);
+      window.localStorage.setItem("shiftlycal-order-budget", budget);
+      const budgetUsd = Number(budget);
+      const result = await generateMealOrderPromptAction({
+        locationHint: zipCode,
+        budgetUsd: Number.isFinite(budgetUsd) ? budgetUsd : 25,
+      });
+      setPrompt(result.prompt);
+      setIsOpen(true);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Unable to generate prompt.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function copyPrompt() {
+    if (!prompt) return;
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setStatus("Copied to clipboard.");
+    } catch {
+      setStatus("Copy failed. Select the text and copy it manually.");
+    }
+  }
+
+  return (
+    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+      <button
+        className="w-full rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled || isGenerating}
+        onClick={() => {
+          if (!isOpen || !prompt) {
+            void generatePrompt();
+            return;
+          }
+          setIsOpen((current) => !current);
+        }}
+        type="button"
+      >
+        {isGenerating ? "Building DoorDash prompt..." : "🛵 Order final meal"}
+      </button>
+
+      {isOpen ? (
+        <div className="mt-3 space-y-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_120px]">
+            <label className="block text-xs font-semibold text-white/75">
+              Zip code
+              <input
+                className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+                onChange={(event) => setZipCode(event.target.value)}
+                placeholder="10001"
+                value={zipCode}
+              />
+            </label>
+            <label className="block text-xs font-semibold text-white/75">
+              Budget $
+              <input
+                className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+                min="1"
+                onChange={(event) => setBudget(event.target.value)}
+                type="number"
+                value={budget}
+              />
+            </label>
+          </div>
+          <textarea
+            className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            onChange={(event) => setPrompt(event.target.value)}
+            value={prompt}
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={disabled || isGenerating}
+              onClick={generatePrompt}
+              type="button"
+            >
+              Regenerate
+            </button>
+            <button
+              className="rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!prompt}
+              onClick={copyPrompt}
+              type="button"
+            >
+              📋 Copy to clipboard
+            </button>
+            <button
+              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              onClick={() => setIsOpen(false)}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
+          {status ? <p className="text-xs font-semibold text-white/70">{status}</p> : null}
+        </div>
+      ) : status ? (
+        <p className="mt-2 text-xs font-semibold text-red-200">{status}</p>
+      ) : null}
+    </section>
   );
 }
 
