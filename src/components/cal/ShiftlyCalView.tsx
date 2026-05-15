@@ -1167,97 +1167,155 @@ function DayTotalsPanel({
   day: CalDay;
   targets: CalTargets;
 }) {
+  const secondaryMetrics: DayMetricConfig[] = [
+    {
+      kind: "goal",
+      label: "Protein",
+      target: targets.proteinTargetG,
+      unit: "g",
+      value: day.totals.proteinG,
+    },
+    {
+      kind: "limit",
+      label: "Carbs",
+      target: targets.carbsTargetG,
+      unit: "g",
+      value: day.totals.carbsG,
+    },
+    {
+      kind: "limit",
+      label: "Fat",
+      target: targets.fatTargetG,
+      unit: "g",
+      value: day.totals.fatG,
+    },
+    {
+      kind: "goal",
+      label: "Fiber",
+      target: targets.fiberTargetG,
+      unit: "g",
+      value: day.totals.fiberG,
+    },
+    {
+      kind: "limit",
+      label: "Sodium",
+      target: targets.sodiumTargetMg,
+      unit: "mg",
+      value: day.totals.sodiumMg,
+    },
+    {
+      kind: "limit",
+      label: "Added sugar",
+      target: targets.addedSugarTargetG,
+      unit: "g",
+      value: day.totals.addedSugarG,
+    },
+    {
+      kind: "limit",
+      label: "Sat fat",
+      target: targets.saturatedFatTargetG,
+      unit: "g",
+      value: day.totals.saturatedFatG,
+    },
+  ];
+
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
         Day totals
       </p>
-      <div className="mt-3 grid gap-3">
-        <DayTotalMetric
+      <div className="mt-3 space-y-3">
+        <DayTotalHero
+          kind="limit"
           label="Calories"
           target={targets.tdeeCalories}
           unit="cal"
           value={day.totals.calories}
         />
-        <DayTotalMetric
-          label="Protein"
-          target={targets.proteinTargetG}
-          unit="g"
-          value={day.totals.proteinG}
-        />
-        <DayTotalMetric
-          label="Carbs"
-          target={targets.carbsTargetG}
-          unit="g"
-          value={day.totals.carbsG}
-        />
-        <DayTotalMetric
-          label="Fat"
-          target={targets.fatTargetG}
-          unit="g"
-          value={day.totals.fatG}
-        />
-        <DayTotalMetric
-          label="Fiber"
-          target={targets.fiberTargetG}
-          unit="g"
-          value={day.totals.fiberG}
-        />
-        <DayTotalMetric
-          label="Sodium"
-          target={targets.sodiumTargetMg}
-          unit="mg"
-          value={day.totals.sodiumMg}
-        />
-        <DayTotalMetric
-          label="Added sugar"
-          target={targets.addedSugarTargetG}
-          unit="g"
-          value={day.totals.addedSugarG}
-        />
-        <DayTotalMetric
-          label="Sat fat"
-          target={targets.saturatedFatTargetG}
-          unit="g"
-          value={day.totals.saturatedFatG}
-        />
+        <div className="grid grid-cols-2 gap-2">
+          {secondaryMetrics.map((metric) => (
+            <DayTotalMetric key={metric.label} {...metric} />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function DayTotalMetric({
-  label,
-  target,
-  unit,
-  value,
-}: {
+type MetricKind = "limit" | "goal";
+
+type DayMetricConfig = {
+  kind: MetricKind;
   label: string;
   target: number | null;
   unit: string;
   value: number;
-}) {
-  const tone = targetProgressTone(value, target);
-  const barPct = target === null ? 0 : Math.min(100, Math.round((value / target) * 100));
-  const fillClass = metricFillClass(tone);
-  const textClass = metricTextClass(tone);
+};
+
+function DayTotalHero({
+  kind,
+  label,
+  target,
+  unit,
+  value,
+}: DayMetricConfig) {
+  const state = metricState(value, target, kind, unit);
+  const fillClass = metricFillClass(state.tone);
+  const textClass = metricTextClass(state.tone);
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 p-4">
+    <div className="rounded-md border border-white/15 bg-black/20 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
       <div className="flex items-center justify-between gap-3">
-        <p className={`text-lg font-bold ${textClass}`}>{label}</p>
-        <p className={`text-lg font-bold ${textClass}`}>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+          {label}
+        </p>
+        <p className={`text-xl font-bold ${textClass}`}>
           {formatTargetProgress(value, target, unit)}
         </p>
       </div>
       {target !== null ? (
-        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
           <div
-            className={`h-2 rounded-full transition-all ${fillClass}`}
-            style={{ width: `${barPct}%` }}
+            className={`h-2.5 rounded-full transition-all ${fillClass}`}
+            style={{ width: `${state.barPct}%` }}
           />
         </div>
       ) : null}
+      <p className={`mt-2 text-sm font-semibold ${textClass}`}>
+        {state.note}
+      </p>
+    </div>
+  );
+}
+
+function DayTotalMetric({
+  kind,
+  label,
+  target,
+  unit,
+  value,
+}: DayMetricConfig) {
+  const state = metricState(value, target, kind, unit);
+  const fillClass = metricFillClass(state.tone);
+  const textClass = metricTextClass(state.tone);
+
+  return (
+    <div className="rounded-md border border-white/10 bg-black/15 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className={`text-sm font-bold ${textClass}`}>{label}</p>
+        <p className={`text-sm font-bold ${textClass}`}>
+          {formatTargetProgress(value, target, unit)}
+        </p>
+      </div>
+      {target !== null ? (
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className={`h-1.5 rounded-full transition-all ${fillClass}`}
+            style={{ width: `${state.barPct}%` }}
+          />
+        </div>
+      ) : null}
+      <p className={`mt-1 text-xs font-semibold ${textClass}`}>{state.note}</p>
     </div>
   );
 }
@@ -1273,32 +1331,30 @@ function WaterPanel({
   onLog: (amountOz: number) => void;
   targetOz: number | null;
 }) {
-  const tone = targetProgressTone(day.waterOz, targetOz);
-  const textClass = metricTextClass(tone);
-  const fillClass = metricFillClass(tone);
-  const barPct =
-    targetOz === null ? 0 : Math.min(100, Math.round((day.waterOz / targetOz) * 100));
+  const state = metricState(day.waterOz, targetOz, "goal", "oz");
+  const textClass = metricTextClass(state.tone);
+  const fillClass = metricFillClass(state.tone);
 
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
       <div className="flex items-center justify-between gap-3">
-        <p className={`text-lg font-bold ${textClass}`}>Water</p>
-        <p className={`text-lg font-bold ${textClass}`}>
+        <p className={`text-sm font-bold ${textClass}`}>Water</p>
+        <p className={`text-sm font-bold ${textClass}`}>
           {formatTargetProgress(day.waterOz, targetOz, "oz")}
         </p>
       </div>
       {targetOz !== null ? (
-        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
           <div
-            className={`h-2 rounded-full transition-all ${fillClass}`}
-            style={{ width: `${barPct}%` }}
+            className={`h-1.5 rounded-full transition-all ${fillClass}`}
+            style={{ width: `${state.barPct}%` }}
           />
         </div>
       ) : null}
-      <div className="mt-3 grid grid-cols-4 gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         {[8, 12, 16, 24].map((amount) => (
           <button
-            className="rounded-md border border-white/20 bg-white/10 px-2 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             key={amount}
             onClick={() => onLog(amount)}
@@ -1670,14 +1726,66 @@ function formatSignedCalories(value: number): string {
   return `${formatSignedNumber(value, 0)} cal`;
 }
 
-function targetProgressTone(
+function metricState(
   value: number,
   target: number | null,
-): "green" | "amber" | "red" | "neutral" {
-  if (target === null || target <= 0) return "neutral";
-  if (value <= target) return "green";
-  if (value <= target * 1.1) return "amber";
-  return "red";
+  kind: MetricKind,
+  unit: string,
+) {
+  if (target === null || target <= 0) {
+    return {
+      barPct: 0,
+      note: "No target set",
+      tone: "neutral" as const,
+    };
+  }
+
+  const ratio = value / target;
+  const barPct = Math.min(100, Math.round(ratio * 100));
+
+  if (kind === "goal") {
+    const remaining = Math.max(0, target - value);
+    if (value >= target) {
+      return {
+        barPct,
+        note:
+          value > target ? `${formatAmount(value - target, unit)} over goal` : "Goal hit",
+        tone: "green" as const,
+      };
+    }
+    if (ratio >= 0.9) {
+      return {
+        barPct,
+        note: `${formatAmount(remaining, unit)} to goal`,
+        tone: "amber" as const,
+      };
+    }
+    return {
+      barPct,
+      note: `${formatAmount(remaining, unit)} to goal`,
+      tone: "red" as const,
+    };
+  }
+
+  if (value <= target) {
+    return {
+      barPct,
+      note: `${formatAmount(target - value, unit)} left`,
+      tone: "green" as const,
+    };
+  }
+  if (value <= target * 1.1) {
+    return {
+      barPct,
+      note: `${formatAmount(value - target, unit)} over`,
+      tone: "amber" as const,
+    };
+  }
+  return {
+    barPct,
+    note: `${formatAmount(value - target, unit)} over`,
+    tone: "red" as const,
+  };
 }
 
 function metricTextClass(tone: "green" | "amber" | "red" | "neutral"): string {
@@ -1691,6 +1799,10 @@ function metricTextClass(tone: "green" | "amber" | "red" | "neutral"): string {
     case "neutral":
       return "text-white";
   }
+}
+
+function formatAmount(value: number, unit: string): string {
+  return `${Math.round(value).toLocaleString()} ${unit}`;
 }
 
 function metricFillClass(tone: "green" | "amber" | "red" | "neutral"): string {

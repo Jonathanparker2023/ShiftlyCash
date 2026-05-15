@@ -9,13 +9,8 @@ import {
   createSavedFoodAction,
   saveCalTargetsAction,
 } from "@/app/(protected)/cal/actions";
-import { categoryBarClass, categoryLabel, magnitudeColorClass } from "@/lib/cal/color";
+import { categoryBarClass, categoryLabel } from "@/lib/cal/color";
 import type { CalTrendDay, ShiftlyCalTrendsData } from "@/lib/cal/data";
-import {
-  colorToneFromMagnitude,
-  dailyDeviation,
-  DAILY_CALORIE_THRESHOLDS,
-} from "@/lib/cal/projection";
 import type {
   CalDay,
   CalTargets,
@@ -453,24 +448,86 @@ function TrendHistoryRow({
   day: CalTrendDay;
   targets: CalTargets;
 }) {
-  const deviation = dailyDeviation(day.calories, targets.tdeeCalories);
-  const tone = colorToneFromMagnitude(deviation, DAILY_CALORIE_THRESHOLDS);
-
   return (
-    <div className="grid gap-2 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white sm:grid-cols-[minmax(150px,1fr)_repeat(5,minmax(80px,0.4fr))] sm:items-center">
+    <div className="grid gap-3 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white">
       <div>
         <p className="font-semibold">{formatDayLabel(day.date)}</p>
         <p className="text-xs text-white/60">{day.date}</p>
       </div>
-      <p className={`font-semibold ${magnitudeColorClass(tone)}`}>
-        {day.calories.toLocaleString()} cal
-      </p>
-      <p className="text-white/80">{day.proteinG.toLocaleString()}g protein</p>
-      <p className="text-white/80">{day.fiberG.toLocaleString()}g fiber</p>
-      <p className="text-white/80">{day.waterOz.toLocaleString()} oz water</p>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <TrendMetric
+          kind="limit"
+          label="Cal"
+          target={targets.tdeeCalories}
+          unit="cal"
+          value={day.calories}
+        />
+        <TrendMetric
+          kind="goal"
+          label="Protein"
+          target={targets.proteinTargetG}
+          unit="g"
+          value={day.proteinG}
+        />
+        <TrendMetric
+          kind="goal"
+          label="Fiber"
+          target={targets.fiberTargetG}
+          unit="g"
+          value={day.fiberG}
+        />
+        <TrendMetric
+          kind="goal"
+          label="Water"
+          target={targets.waterTargetOz}
+          unit="oz"
+          value={day.waterOz}
+        />
+      </div>
       <p className="text-white/80">
         {day.weightLbs === null ? "No weight" : `${day.weightLbs.toFixed(1)} lbs`}
       </p>
+    </div>
+  );
+}
+
+type TrendMetricKind = "limit" | "goal";
+
+function TrendMetric({
+  kind,
+  label,
+  target,
+  unit,
+  value,
+}: {
+  kind: TrendMetricKind;
+  label: string;
+  target: number | null;
+  unit: string;
+  value: number;
+}) {
+  const state = trendMetricState(value, target, kind);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xs font-bold ${trendTextClass(state.tone)}`}>
+          {label}
+        </span>
+        <span className={`text-xs font-bold ${trendTextClass(state.tone)}`}>
+          {target === null
+            ? `${value.toLocaleString()} ${unit}`
+            : `${value.toLocaleString()}/${target.toLocaleString()}`}
+        </span>
+      </div>
+      {target !== null ? (
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div
+            className={`h-1.5 rounded-full ${trendFillClass(state.tone)}`}
+            style={{ width: `${state.barPct}%` }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -620,4 +677,53 @@ function formatMacros(entry: {
     .join(" / ");
 
   return macros ? ` - ${macros}` : "";
+}
+
+function trendMetricState(
+  value: number,
+  target: number | null,
+  kind: TrendMetricKind,
+) {
+  if (target === null || target <= 0) {
+    return { barPct: 0, tone: "neutral" as const };
+  }
+
+  const ratio = value / target;
+  const barPct = Math.min(100, Math.round(ratio * 100));
+
+  if (kind === "goal") {
+    if (value >= target) return { barPct, tone: "green" as const };
+    if (ratio >= 0.9) return { barPct, tone: "amber" as const };
+    return { barPct, tone: "red" as const };
+  }
+
+  if (value <= target) return { barPct, tone: "green" as const };
+  if (value <= target * 1.1) return { barPct, tone: "amber" as const };
+  return { barPct, tone: "red" as const };
+}
+
+function trendTextClass(tone: "green" | "amber" | "red" | "neutral"): string {
+  switch (tone) {
+    case "green":
+      return "text-emerald-300";
+    case "amber":
+      return "text-amber-300";
+    case "red":
+      return "text-red-300";
+    case "neutral":
+      return "text-white/70";
+  }
+}
+
+function trendFillClass(tone: "green" | "amber" | "red" | "neutral"): string {
+  switch (tone) {
+    case "green":
+      return "bg-emerald-300";
+    case "amber":
+      return "bg-amber-300";
+    case "red":
+      return "bg-red-300";
+    case "neutral":
+      return "bg-white/40";
+  }
 }
