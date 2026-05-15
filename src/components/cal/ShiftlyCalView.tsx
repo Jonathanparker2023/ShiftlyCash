@@ -733,6 +733,7 @@ function FoodEntryRow({
   onDelete: (id: string) => void;
   onUpdate: (id: string, patch: UpdateFoodEntryPatch) => Promise<boolean>;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -757,18 +758,6 @@ function FoodEntryRow({
   if (isEditing) {
     return (
       <form className={categoryBarClass(entry.category)} onSubmit={submitEdit}>
-        <button
-          className="-m-1 mb-2 flex w-[calc(100%+0.5rem)] flex-col items-start gap-0.5 rounded p-1 text-left transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60"
-          onClick={() => setIsEditing(false)}
-          type="button"
-        >
-          <span className="w-full truncate font-semibold leading-tight">
-            {entry.mealName || categoryLabel(entry.category)}
-          </span>
-          <span className="text-xs font-semibold opacity-85">
-            {entry.calories.toLocaleString()} cal — tap to close
-          </span>
-        </button>
         <div className="grid gap-2 sm:grid-cols-2">
           <TextInput
             label="Meal"
@@ -833,14 +822,6 @@ function FoodEntryRow({
           >
             Cancel
           </button>
-          <button
-            className="ml-auto rounded border border-red-300/40 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={disabled || isSaving}
-            onClick={() => onDelete(entry.id)}
-            type="button"
-          >
-            Delete
-          </button>
         </div>
         <div className="mt-3 rounded-md border border-white/20 bg-black/20 p-3">
           <p className="mb-2 text-xs font-semibold text-white/75">
@@ -861,17 +842,67 @@ function FoodEntryRow({
 
   const title = entry.mealName || categoryLabel(entry.category);
 
+  if (!isExpanded) {
+    return (
+      <button
+        className={`${categoryBarClass(entry.category)} flex w-full items-center justify-between gap-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
+        onClick={() => setIsExpanded(true)}
+        type="button"
+      >
+        <span className="min-w-0 truncate font-semibold">{title}</span>
+        <span className="ml-auto shrink-0 text-right font-semibold opacity-90">
+          {entry.calories.toLocaleString()} cal
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-xs opacity-70">
+          ▶
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <button
-      className={`${categoryBarClass(entry.category)} flex w-full flex-col items-start gap-0.5 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
-      onClick={() => setIsEditing(true)}
-      type="button"
-    >
-      <span className="w-full truncate font-semibold leading-tight">{title}</span>
-      <span className="text-xs font-semibold opacity-85">
-        {entry.calories.toLocaleString()} cal
-      </span>
-    </button>
+    <div className={`${categoryBarClass(entry.category)} transition-all`}>
+      <button
+        className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
+        onClick={() => setIsExpanded(false)}
+        type="button"
+      >
+        <span className="min-w-0 truncate font-semibold">{title}</span>
+        <span className="text-right font-semibold opacity-90">
+          {entry.calories.toLocaleString()} cal
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-xs opacity-70">
+          ▼
+        </span>
+      </button>
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-all">
+        <span>{formatMacrosInline(entry) || categoryLabel(entry.category)}</span>
+        <div className="flex items-center gap-2">
+          <button
+            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsEditing(true);
+            }}
+            type="button"
+          >
+            Edit
+          </button>
+          <button
+            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(entry.id);
+            }}
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
