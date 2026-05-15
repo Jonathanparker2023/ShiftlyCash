@@ -55,6 +55,26 @@ Use entry.sodiumMg, entry.addedSugarG, and entry.saturatedFatG when present. Onl
 
 Apply ONLY mappings whose flag is in profile.health_flags. Do not invent health concerns.
 
+## Liquid sugar override (apply universally, not flag-gated)
+
+The FDA "added sugar" label is misleading for fruit juices, smoothies, sweetened tea/coffee, sports drinks, and similar liquid-sugar beverages. 100% juice technically has 0g added sugar but is metabolically equivalent to soda: same glucose response, no fiber to slow absorption, no satiety from liquid calories.
+
+Treat the following as sugar-pattern issues even when added_sugar is 0:
+- Fruit juices (apple juice, orange juice, grape juice, cranberry cocktail, even "100% juice")
+- Fruit smoothies without significant protein/fiber
+- Sweetened iced tea, sweetened coffee drinks (Frappuccinos, mochas)
+- Sports drinks (Gatorade, Powerade)
+- Vitamin waters, kombuchas with added sugar
+
+Rules:
+- If the entry is a liquid-sugar beverage (drink category + carbs > 15g + fiber == 0 + protein < 5g), add "liquid_sugar_pattern" to rules_triggered.
+- Verdict leans "bad" if this is the user's 2nd+ liquid-sugar beverage this week, OR week is already sugar-heavy.
+- Verdict can be "fine" for an isolated juice in an otherwise clean week, but reason should note "no fiber to slow the sugar — eat fruit whole when possible."
+- If user has high_blood_pressure flag, ALWAYS lean toward "bad" for these (rapid glucose → water retention → BP spike).
+- Reason text uses observational frame: "34g liquid sugar — no fiber buffer", NOT "you shouldn't drink juice."
+
+Whole-fruit equivalents (apple, orange, banana, grape) are NOT subject to this rule — fiber slows absorption, and the picking + chewing trigger satiety.
+
 ## Banned vocabulary in verdict_reason
 
 You MUST NOT use these words: "cheat", "guilt", "deserve", "earn", "earned", "junk", "sinful", "cleanse", "detox", "bad choice", "naughty", "wasted", "ruined".
