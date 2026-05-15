@@ -271,9 +271,23 @@ export function cashflowWeeklyColor(cents: number): string {
 }
 
 export function cashflowWeeklyTone(cents: number): CashflowTone {
-  if (cents < 0) return "negative";
-  if (cents < 90000) return "amber";
-  return "positive";
+  if (cents < 50000) return "negative";  // < $500 → red
+  if (cents < 90000) return "amber";     // $500–$899 → amber
+  return "positive";                     // ≥ $900 → green
+}
+
+/**
+ * Weekly spend tone relative to median:
+ *   ≤ 85% of median → green  (spending well under)
+ *   ≤ 115% of median → amber (near median)
+ *   > 115% of median → red   (running hot)
+ *   no median → amber (neutral fallback)
+ */
+export function spendWeeklyTone(cents: number, medianCents: number | null): CashflowTone {
+  if (!medianCents) return "amber";
+  if (cents <= medianCents * 0.85) return "positive";
+  if (cents <= medianCents * 1.15) return "amber";
+  return "negative";
 }
 
 export function cashflowColorFromTone(tone: CashflowTone): string {
