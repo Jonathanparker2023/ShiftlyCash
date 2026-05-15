@@ -163,6 +163,13 @@ export async function generateMealOrderPromptAction(input?: {
       "g",
       "daily floor",
     ),
+    renderSimpleBudgetLine(
+      "Carbs budget",
+      data.targets.carbsTargetG,
+      today.totals.carbsG,
+      "g",
+      "remaining (daily ceiling, not floor)",
+    ),
     renderBudgetLine(
       "Sodium HEADROOM",
       data.targets.sodiumTargetMg,
@@ -302,6 +309,13 @@ export async function generateHomeRecipePromptAction(): Promise<{
       today.totals.fiberG,
       "g",
       "daily floor",
+    ),
+    renderSimpleBudgetLine(
+      "Carbs budget",
+      data.targets.carbsTargetG,
+      today.totals.carbsG,
+      "g",
+      "remaining (daily ceiling, not floor)",
     ),
     renderBudgetLine(
       "Sodium HEADROOM",
