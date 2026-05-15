@@ -632,7 +632,7 @@ function mapTargets(row: SettingsTargetsRow | null): CalTargets {
   return {
     tdeeCalories: row?.tdee_calories ?? null,
     proteinTargetG: row?.protein_target_g ?? null,
-    carbsTargetG: row?.carbs_target_g ?? null,
+    carbsTargetG: row?.carbs_target_g ?? 120,
     fatTargetG: row?.fat_target_g ?? null,
     fiberTargetG: row?.fiber_target_g ?? null,
     sodiumTargetMg: row?.sodium_target_mg ?? 2300,
