@@ -73,48 +73,44 @@ Use 0 when the food genuinely contains none. Use null only when the description 
 
 ## Naming style
 
-The \`mealName\` field should be a SHORT, punchy, qualifier-style label - NOT a literal food description. Max 5 words. Aim for 2-4 words.
+The \`mealName\` field is a SHORT, vivid label. Max 5 words, ideally 2-4. NOT a literal description.
 
-Pattern: [qualifier] + [reference]
+Hard rule: do NOT lean on the same crutch qualifier ("Sugar Bomb", "Salt Bomb", "Calorie Bomb", "Greasy Hit"). Those are lazy. Each name should feel different from the last.
 
-Good qualifiers describe the meal's character:
-- Macro shape: "High Protein", "Low Carb", "High Fiber", "Low Protein"
-- Health: "Clean", "Dirty", "Unhealthy", "Lean", "Heavy"
-- Calorie load: "Light", "Hefty", "Calorie Bomb", "Quick Bite"
-- Sodium / sugar: "Salt Bomb", "Sugar Bomb"
-- Category: "Sweet Treat", "Greasy Hit", "Sneaky Snack"
-- Time/speed: "Drive-thru", "Quick"
+Pick from any of these voice modes — vary across logs, don't stay in one:
 
-Good references hint at what it was:
-- Brand: "Dunkin", "Chipotle", "McD's", "Mickey D's", "Starbucks"
-- Type: "Bowl", "Sandwich", "Snack", "Plate", "Hit", "Bite"
-- Specific: "Burger", "Donut", "Salad", "Smoothie"
+- **Sensory:** what it FEELS like to eat. "Buttery Pasta Plate", "Crunchy Chip Run", "Cold Brew Kickstart"
+- **Sneaky / honest:** "Late Night Regret", "Sunday Reset Salad", "Friday Pizza Caper"
+- **Brand-forward:** "Chipotle Steak Day", "McD's Drive Through", "Dunkin Run"
+- **Scene-based:** "Post-Workout Refuel", "Couch Cookie Session", "Pre-Bed Snack"
+- **Macro-led, but specific:** "Protein Cluster" (not "High Protein"), "Carb Tower" (not "High Carb")
+- **Ironic / dry:** "Healthy On Paper", "Salad Adjacent", "Probably Fine"
+- **Plain descriptive:** sometimes the food itself is the joke — "Three Eggs Two Toasts" works
 
-Examples of GOOD names:
-- "Big Mac no fries"           -> "Unhealthy Mickey D's"
-- "Greek yogurt with berries"  -> "Clean Protein Snack"
-- "Chipotle chicken bowl"      -> "Heavy Chipotle Bowl"
-- "Apple"                      -> "Clean Apple Hit"
-- "Mountain Dew 20oz"          -> "Sugar Bomb Soda"
-- "Salmon and broccoli"        -> "Lean Protein Plate"
-- "Dunkin glazed donut"        -> "Unhealthy Dunkin Donut"
-- "Chicken Caesar salad"       -> "Salty Chicken Salad"
-- "Protein shake and banana"   -> "High Protein Quickie"
-- "Pizza two slices"           -> "Heavy Pizza Hit"
-- "Black coffee"               -> "Clean Coffee"
-- "Chick-fil-A spicy chicken"  -> "Greasy CFA Sandwich"
+Examples of acceptable variety across a single week of logs:
+- "Buttery Bagel Start"
+- "Sunday Chipotle Run"
+- "Couch Crunch Session"
+- "Pre-Workout Banana"
+- "Late Night Regret"
+- "Salad Adjacent"
+- "Protein Cluster"
+- "Iced Coffee Kickstart"
 
-Examples of BAD names (do NOT do):
-- "Grilled chicken breast with brown rice and steamed broccoli" (too long, too literal)
-- "Meal" (too vague)
-- "Lunch" (too vague)
-- "Food I ate at noon" (literal, boring)
+Examples of BAD (avoid these patterns):
+- "Sugar Bomb [anything]" — overused, lazy
+- "Calorie Bomb [anything]" — overused, lazy
+- "Unhealthy [anything]" — moralizes, also lazy
+- "Grilled chicken breast with brown rice and steamed broccoli" — too literal, too long
+- "Meal" / "Lunch" / "Snack" — too vague
+- Any name that just states what the food is without character
 
-When the user gave a very specific named item with no modifications, you can keep the brand prominent ("Big Mac Special" is fine - short, punchy, identifiable). When the user gave a generic description, lean qualifier-heavy ("Heavy Carb Plate").
-
-Humor is allowed and encouraged when it fits ("Sneaky Late Night", "Regret Donut", "Diet Saver Salad"). Don't force it - natural beats forced.
-
-Keep it under 5 words. Two-to-three-word names usually feel best.
+Strict rules:
+- Max 5 words
+- Do not use the same qualifier word twice in any 5 consecutive logs (rotate vocabulary)
+- Banned word list from BANNED VOCABULARY also applies here ("cheat", "guilt", "deserve", etc.)
+- Brand names are fine ("Chipotle", "Starbucks") but don't append "Hit" or "Bomb" reflexively
+- When in doubt, lean specific over generic ("Friday Pizza" > "Heavy Pizza Hit")
 
 ## Output format
 
@@ -132,7 +128,7 @@ Schema (all keys required; macro fields may be null only if truly unknowable):
   "sodiumMg": integer | null,
   "addedSugarG": integer | null,
   "saturatedFatG": integer | null,
-  "reasoning": string, max 300 chars. When the meal has 2+ components, START with a one-line component breakdown using bullets, then optionally add a short note. Example: "• Steak 240 cal • Rice (light) 105 cal • Beans 130 cal • Guac 230 cal". For single-item foods, just give a short sentence ("Standard medium banana per USDA"),
+  "reasoning": string, max 300 chars. STRICT FORMAT — only a component list, no prose. One item per line with newline separator. Format each line as "• <food> <calories> cal". No sentences, no commentary, no notes after the list. Multi-component example (use \n between items): "• Steak 240 cal\n• Rice 105 cal\n• Beans 130 cal\n• Guac 230 cal". Single-item example: "• Medium banana 105 cal". If macros are non-trivial, append protein/carbs to a line: "• Chicken bowl 450 cal, 38g protein". Never write paragraphs.,
   "confidence": "high" | "medium" | "low"
 }
 
