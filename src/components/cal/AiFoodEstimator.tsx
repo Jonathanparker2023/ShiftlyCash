@@ -216,7 +216,7 @@ export function AiFoodEstimator({
                   </button>
                 ) : null}
                 <button
-                  className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+                  className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={disabled || isPending || !description.trim()}
                   onClick={runEstimate}
                   type="button"
