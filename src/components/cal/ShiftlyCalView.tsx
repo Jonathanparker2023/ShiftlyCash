@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useMemo, useState, useTransition } from "react";
 
+import { AiFoodEstimator } from "@/components/cal/AiFoodEstimator";
 import {
   createFoodEntryAction,
   deleteFoodEntryAction,
@@ -168,6 +169,36 @@ export function ShiftlyCalView({
     });
   }
 
+  function logFromEstimate(input: {
+    mealName: string;
+    category: FoodCategory;
+    calories: string;
+    proteinG: string;
+    carbsG: string;
+    fatG: string;
+  }) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await createFoodEntryAction({
+          date: focusedDay.date,
+          mealName: input.mealName,
+          category: input.category,
+          calories: input.calories,
+          proteinG: input.proteinG,
+          carbsG: input.carbsG,
+          fatG: input.fatG,
+          savedFoodId: null,
+        });
+        router.refresh();
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Unable to log estimated food.",
+        );
+      }
+    });
+  }
+
   function submitWeight(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -325,7 +356,13 @@ export function ShiftlyCalView({
                   dayTotals={focusedDay.totals}
                   targets={initialData.targets}
                 />
-                <div className="mt-4">
+                <div className="mt-4 space-y-3">
+                  <AiFoodEstimator
+                    disabled={isPending}
+                    focusedDayDate={focusedDay.date}
+                    onConfirm={logFromEstimate}
+                    todayIso={initialData.todayIso}
+                  />
                   <button
                     className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
                     onClick={() => setIsMealFormOpen((current) => !current)}

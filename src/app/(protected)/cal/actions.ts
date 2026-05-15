@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
+import { estimateFood, type FoodEstimate } from "@/lib/cal/estimate";
 import type { FoodCategory } from "@/lib/cal/types";
 import { getTodayIso } from "@/lib/dashboard/dates";
 
@@ -51,6 +52,13 @@ export async function createFoodEntryAction(input: {
 
   revalidatePath("/cal");
   return { ok: true, id: data.id };
+}
+
+export async function estimateFoodAction(input: {
+  description: string;
+}): Promise<FoodEstimate> {
+  await requireUser();
+  return estimateFood(input.description);
 }
 
 export async function deleteFoodEntryAction(input: {
