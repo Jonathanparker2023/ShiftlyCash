@@ -21,8 +21,6 @@ type EstimateForm = {
 
 type Props = {
   disabled: boolean;
-  focusedDayDate: string;
-  todayIso: string;
   onConfirm: (input: {
     mealName: string;
     category: FoodCategory;
@@ -66,9 +64,7 @@ const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
 
 export function AiFoodEstimator({
   disabled,
-  focusedDayDate,
   onConfirm,
-  todayIso,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [description, setDescription] = useState("");
@@ -159,9 +155,7 @@ export function AiFoodEstimator({
 
       {isOpen ? (
         <div className="mt-3 rounded-md border border-white/15 bg-black/20 p-3 text-white">
-          <p className="text-sm font-semibold">
-            Estimate for {focusedDayLabel(focusedDayDate, todayIso)}
-          </p>
+          <p className="text-sm font-semibold">AI food estimate</p>
           {estimate ? (
             <EstimateResult
               disabled={disabled}
@@ -178,7 +172,7 @@ export function AiFoodEstimator({
                   className="mt-1 min-h-24 w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
                   maxLength={500}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Two scrambled eggs, toast, and coffee"
+                  placeholder="What did you eat? Be as specific or as casual as you want."
                   value={description}
                 />
               </label>
@@ -210,7 +204,7 @@ export function AiFoodEstimator({
                   disabled={disabled || isPending || !description.trim()}
                   type="submit"
                 >
-                  {isPending ? "Estimating..." : "Estimate"}
+                  {isPending ? "Looking up nutrition data..." : "Estimate"}
                 </button>
                 <button
                   className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
@@ -294,7 +288,7 @@ function EstimateResult({
         />
       </div>
       {estimate.reasoning ? (
-        <p className="mt-3 text-sm italic text-white/60">{estimate.reasoning}</p>
+        <p className="mt-3 text-xs italic text-white/60">{estimate.reasoning}</p>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -426,13 +420,4 @@ function toEstimateForm(estimate: FoodEstimate): EstimateForm {
     reasoning: estimate.reasoning,
     confidence: estimate.confidence,
   };
-}
-
-function focusedDayLabel(dateIso: string, todayIso: string): string {
-  if (dateIso === todayIso) return "Today";
-
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    weekday: "long",
-  }).format(new Date(`${dateIso}T00:00:00.000Z`));
 }

@@ -359,9 +359,7 @@ export function ShiftlyCalView({
                 <div className="mt-4 space-y-3">
                   <AiFoodEstimator
                     disabled={isPending}
-                    focusedDayDate={focusedDay.date}
                     onConfirm={logFromEstimate}
-                    todayIso={initialData.todayIso}
                   />
                   <button
                     className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
