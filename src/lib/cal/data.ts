@@ -92,6 +92,9 @@ type TrendFoodEntryRow = {
   carbs_g: number | null;
   fat_g: number | null;
   fiber_g: number | null;
+  verdict: string | null;
+  verdict_source: string | null;
+  verdict_context: FoodVerdictContext | null;
 };
 
 type TrendWeightLogRow = {
@@ -107,7 +110,35 @@ export type CalTrendDay = {
   fatG: number;
   fiberG: number;
   entryCount: number;
+  verdictCounts: CalVerdictCounts;
+  estimatedFacets: CalTrendEstimatedFacets;
   weightLbs: number | null;
+};
+
+export type CalVerdictCounts = {
+  good: number;
+  fine: number;
+  bad: number;
+  unscored: number;
+  manualOverride: number;
+};
+
+export type CalTrendEstimatedFacets = {
+  sodiumMgEstimated: number | null;
+  addedSugarGEstimated: number | null;
+  alcoholServingsEstimated: number | null;
+  highSodium: boolean;
+  highAddedSugar: boolean;
+};
+
+export type VerdictSummary = CalVerdictCounts & {
+  estimatedFacetsWeek: {
+    sodiumMgEstimated: number | null;
+    addedSugarGEstimated: number | null;
+    alcoholServingsEstimated: number | null;
+    highSodiumDays: number;
+    highAddedSugarDays: number;
+  };
 };
 
 export type ShiftlyCalTrendsData = {
@@ -228,7 +259,7 @@ async function loadShiftlyCalTrendsData(
   const [entriesRes, weightRes] = await Promise.all([
     supabase
       .from("food_entries")
-      .select("date,calories,protein_g,carbs_g,fat_g,fiber_g")
+      .select("date,calories,protein_g,carbs_g,fat_g,fiber_g,verdict,verdict_source,verdict_context")
       .eq("user_id", userId)
       .gte("date", trendStartIso)
       .lte("date", weekData.todayIso)
@@ -258,6 +289,8 @@ async function loadShiftlyCalTrendsData(
       fatG: number;
       fiberG: number;
       entryCount: number;
+      verdictCounts: CalVerdictCounts;
+      estimatedFacets: CalTrendEstimatedFacets;
     }
   >();
   for (const row of (entriesRes.data ?? []) as TrendFoodEntryRow[]) {
@@ -268,7 +301,15 @@ async function loadShiftlyCalTrendsData(
       fatG: 0,
       fiberG: 0,
       entryCount: 0,
+      verdictCounts: emptyVerdictCounts(),
+      estimatedFacets: emptyTrendEstimatedFacets(),
     };
+    const verdictCounts = { ...existing.verdictCounts };
+    addVerdictToCounts(verdictCounts, mapVerdict(row.verdict), mapVerdictSource(row.verdict_source));
+    const estimatedFacets = addTrendEstimatedFacets(
+      existing.estimatedFacets,
+      row.verdict_context ?? null,
+    );
     caloriesByDate.set(row.date, {
       calories: existing.calories + Number(row.calories),
       proteinG: existing.proteinG + Number(row.protein_g ?? 0),
@@ -276,6 +317,8 @@ async function loadShiftlyCalTrendsData(
       fatG: existing.fatG + Number(row.fat_g ?? 0),
       fiberG: existing.fiberG + Number(row.fiber_g ?? 0),
       entryCount: existing.entryCount + 1,
+      verdictCounts,
+      estimatedFacets,
     });
   }
 
@@ -303,9 +346,52 @@ async function loadShiftlyCalTrendsData(
         fatG: sums?.fatG ?? 0,
         fiberG: sums?.fiberG ?? 0,
         entryCount: sums?.entryCount ?? 0,
+        verdictCounts: sums?.verdictCounts ?? emptyVerdictCounts(),
+        estimatedFacets: sums?.estimatedFacets ?? emptyTrendEstimatedFacets(),
         weightLbs: weightByDate.get(date) ?? null,
       };
     }),
+  };
+}
+
+export function summarizeVerdicts(entries: FoodEntry[]): VerdictSummary {
+  const counts = emptyVerdictCounts();
+  const facetSums = {
+    sodiumMgEstimated: null as number | null,
+    addedSugarGEstimated: null as number | null,
+    alcoholServingsEstimated: null as number | null,
+  };
+  const highSodiumDays = new Set<string>();
+  const highAddedSugarDays = new Set<string>();
+
+  for (const entry of entries) {
+    addVerdictToCounts(counts, entry.verdict, entry.verdictSource);
+    const facets = entry.verdictContext?.estimated_facets;
+    if (!facets) continue;
+
+    facetSums.sodiumMgEstimated = addNullableNumber(
+      facetSums.sodiumMgEstimated,
+      facets.sodium_mg,
+    );
+    facetSums.addedSugarGEstimated = addNullableNumber(
+      facetSums.addedSugarGEstimated,
+      facets.added_sugar_g,
+    );
+    facetSums.alcoholServingsEstimated = addNullableNumber(
+      facetSums.alcoholServingsEstimated,
+      facets.alcohol_servings,
+    );
+    if (facets.high_sodium === true) highSodiumDays.add(entry.date);
+    if (facets.high_added_sugar === true) highAddedSugarDays.add(entry.date);
+  }
+
+  return {
+    ...counts,
+    estimatedFacetsWeek: {
+      ...facetSums,
+      highSodiumDays: highSodiumDays.size,
+      highAddedSugarDays: highAddedSugarDays.size,
+    },
   };
 }
 
@@ -388,6 +474,71 @@ function addTotals(left: CalTotals, right: CalTotals): CalTotals {
 
 function emptyTotals(): CalTotals {
   return { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 };
+}
+
+function emptyVerdictCounts(): CalVerdictCounts {
+  return { good: 0, fine: 0, bad: 0, unscored: 0, manualOverride: 0 };
+}
+
+function emptyTrendEstimatedFacets(): CalTrendEstimatedFacets {
+  return {
+    sodiumMgEstimated: null,
+    addedSugarGEstimated: null,
+    alcoholServingsEstimated: null,
+    highSodium: false,
+    highAddedSugar: false,
+  };
+}
+
+function addVerdictToCounts(
+  counts: CalVerdictCounts,
+  verdict: FoodVerdict | null,
+  verdictSource: FoodVerdictSource,
+) {
+  if (verdictSource === "manual_override") counts.manualOverride += 1;
+
+  if (verdict === "good" || verdict === "fine" || verdict === "bad") {
+    counts[verdict] += 1;
+    return;
+  }
+
+  if (verdictSource === "pending" || verdictSource === "unscored") {
+    counts.unscored += 1;
+  }
+}
+
+function addTrendEstimatedFacets(
+  existing: CalTrendEstimatedFacets,
+  verdictContext: FoodVerdictContext | null,
+): CalTrendEstimatedFacets {
+  const facets = verdictContext?.estimated_facets;
+  if (!facets) return existing;
+
+  return {
+    sodiumMgEstimated: addNullableNumber(
+      existing.sodiumMgEstimated,
+      facets.sodium_mg,
+    ),
+    addedSugarGEstimated: addNullableNumber(
+      existing.addedSugarGEstimated,
+      facets.added_sugar_g,
+    ),
+    alcoholServingsEstimated: addNullableNumber(
+      existing.alcoholServingsEstimated,
+      facets.alcohol_servings,
+    ),
+    highSodium: existing.highSodium || facets.high_sodium === true,
+    highAddedSugar:
+      existing.highAddedSugar || facets.high_added_sugar === true,
+  };
+}
+
+function addNullableNumber(
+  current: number | null,
+  value: number | null | undefined,
+): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return current;
+  return (current ?? 0) + value;
 }
 
 function mapTargets(row: SettingsTargetsRow | null): CalTargets {

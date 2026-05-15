@@ -118,6 +118,50 @@ def pct(value) -> str:
     return "—" if value is None else f"{value}%"
 
 
+def verdict_counts_from_entries(entries: list[dict]) -> dict[str, int]:
+    counts = {"good": 0, "fine": 0, "bad": 0, "unscored": 0}
+    for entry in entries:
+        verdict = entry.get("verdict")
+        source = entry.get("verdict_source")
+        if verdict in ("good", "fine", "bad"):
+            counts[verdict] += 1
+        elif source in ("pending", "unscored") or verdict is None:
+            counts["unscored"] += 1
+    return counts
+
+
+def verdict_summary_counts(summary: dict) -> dict[str, int]:
+    return {
+        "good": int(summary.get("good") or 0),
+        "fine": int(summary.get("fine") or 0),
+        "bad": int(summary.get("bad") or 0),
+        "unscored": int(summary.get("unscored") or 0),
+        "manual_override": int(summary.get("manual_override") or 0),
+    }
+
+
+def fmt_verdict_counts(counts: dict[str, int], include_manual: bool = False) -> str:
+    text = (
+        f"Good: {counts.get('good', 0)} • "
+        f"Fine: {counts.get('fine', 0)} • "
+        f"Bad: {counts.get('bad', 0)} • "
+        f"Unscored: {counts.get('unscored', 0)}"
+    )
+    if include_manual:
+        text += f" • Manual overrides: {counts.get('manual_override', 0)}"
+    return text
+
+
+def fmt_facet(value, suffix: str = "") -> str:
+    if value is None:
+        return "--"
+    if isinstance(value, float):
+        text = f"{value:,.1f}" if value % 1 else f"{value:,.0f}"
+    else:
+        text = f"{value:,}" if isinstance(value, int) else str(value)
+    return f"{text}{suffix}"
+
+
 def summarize(data: dict) -> str:
     fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     targets = data.get("targets") or {}
@@ -177,6 +221,14 @@ def summarize(data: dict) -> str:
             f"{fmt(entry.get('fiber_g'), 'g')}fi"
         )
 
+    lines.append("\nTODAY VERDICTS")
+    lines.append(
+        "  "
+        + fmt_verdict_counts(
+            verdict_counts_from_entries(today.get("entries") or [])
+        )
+    )
+
     lines.append(
         f"\nCURRENT WEEK — {current_week.get('start', '?')} to {current_week.get('end', '?')}"
     )
@@ -210,6 +262,22 @@ def summarize(data: dict) -> str:
             f"weight {fmt(day.get('weight_lbs'), ' lbs')}"
         )
 
+    week_verdict = current_week.get("verdict_summary") or {}
+    week_counts = verdict_summary_counts(week_verdict)
+    week_facets = week_verdict.get("estimated_facets_week") or {}
+    lines.append("\nWEEK VERDICTS")
+    lines.append("  " + fmt_verdict_counts(week_counts, include_manual=True))
+    lines.append(
+        "  Estimated facets (week): "
+        f"sodium ~{fmt_facet(week_facets.get('sodium_mg_estimated'), 'mg')} "
+        f"• added sugar ~{fmt_facet(week_facets.get('added_sugar_g_estimated'), 'g')}"
+    )
+    lines.append(
+        "  High-sodium days: "
+        f"{fmt(week_facets.get('high_sodium_days'))} • "
+        f"High-sugar days: {fmt(week_facets.get('high_added_sugar_days'))}"
+    )
+
     lines.append("\nROLLING 7d")
     lines.append(
         f"  Avg cal: {fmt(rolling_7d.get('avg_cal'), ' cal')} "
@@ -220,6 +288,10 @@ def summarize(data: dict) -> str:
     lines.append(
         f"  Weight trend: {fmt(rolling_7d.get('weight_trend_lbs'), ' lbs')}"
     )
+    rolling_7d_counts = verdict_summary_counts(
+        rolling_7d.get("verdict_summary") or {}
+    )
+    lines.append("  Verdicts: " + fmt_verdict_counts(rolling_7d_counts))
 
     lines.append("\nROLLING 28d")
     lines.append(
@@ -230,6 +302,11 @@ def summarize(data: dict) -> str:
     lines.append(
         f"  Weight change: {fmt(rolling_28d.get('weight_change_lbs'), ' lbs')}"
     )
+    rolling_28d_counts = verdict_summary_counts(
+        rolling_28d.get("verdict_summary") or {}
+    )
+    lines.append("\nROLLING 28d VERDICTS")
+    lines.append("  " + fmt_verdict_counts(rolling_28d_counts))
 
     lines.append(f"\nSAVED FOODS — {len(saved_foods)} active")
     for food in saved_foods[:5]:

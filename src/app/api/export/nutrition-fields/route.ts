@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import {
   getShiftlyCalDataForUser,
   getShiftlyCalTrendsDataForUser,
+  summarizeVerdicts,
   type CalTrendDay,
+  type VerdictSummary,
 } from "@/lib/cal/data";
 import type {
   CalDay,
@@ -39,6 +41,7 @@ export async function GET(request: Request) {
     const rolling7Days = trends.trendDays.filter(
       (day) => day.date >= rolling7Start && day.date <= data.todayIso,
     );
+    const weekEntries = data.currentWeek.days.flatMap((day) => day.entries);
 
     return NextResponse.json({
       as_of: new Date().toISOString(),
@@ -59,6 +62,7 @@ export async function GET(request: Request) {
         projected_weight_change_lbs: roundWeight(
           data.projection.projectedWeightDeltaLbs,
         ),
+        verdict_summary: mapVerdictSummary(summarizeVerdicts(weekEntries)),
         days: data.currentWeek.days.map(mapWeekDay),
       },
       rolling_7d: buildRollingWindow(rolling7Days, data.targets, rolling7Start),
@@ -206,6 +210,9 @@ function mapEntry(entry: FoodEntry) {
     logged_time: normalizeLoggedTime(entry.loggedTime),
     saved_food_id: entry.savedFoodId,
     created_at: entry.createdAt,
+    verdict: entry.verdict,
+    verdict_reason: entry.verdictReason,
+    verdict_source: entry.verdictSource,
   };
 }
 
@@ -233,6 +240,12 @@ function mapTrendDay(day: CalTrendDay) {
     fat_g: roundInteger(day.fatG),
     fiber_g: roundInteger(day.fiberG),
     weight_lbs: day.weightLbs === null ? null : roundWeight(day.weightLbs),
+    verdict_counts: {
+      good: day.verdictCounts.good,
+      fine: day.verdictCounts.fine,
+      bad: day.verdictCounts.bad,
+      unscored: day.verdictCounts.unscored,
+    },
   };
 }
 
@@ -296,6 +309,7 @@ function buildRollingWindow(
     days_logged: loggedDays.length,
     weight_start_lbs: weightTrend.start,
     weight_end_lbs: weightTrend.end,
+    verdict_summary: mapTrendVerdictSummary(days),
   };
 
   if (includeCompliance) {
@@ -314,6 +328,86 @@ function buildRollingWindow(
   }
 
   return result;
+}
+
+function mapVerdictSummary(summary: VerdictSummary) {
+  return {
+    good: summary.good,
+    fine: summary.fine,
+    bad: summary.bad,
+    unscored: summary.unscored,
+    manual_override: summary.manualOverride,
+    estimated_facets_week: {
+      sodium_mg_estimated: nullableInteger(
+        summary.estimatedFacetsWeek.sodiumMgEstimated,
+      ),
+      added_sugar_g_estimated: nullableInteger(
+        summary.estimatedFacetsWeek.addedSugarGEstimated,
+      ),
+      alcohol_servings_estimated:
+        summary.estimatedFacetsWeek.alcoholServingsEstimated === null
+          ? null
+          : roundWeight(summary.estimatedFacetsWeek.alcoholServingsEstimated),
+      high_sodium_days: summary.estimatedFacetsWeek.highSodiumDays,
+      high_added_sugar_days: summary.estimatedFacetsWeek.highAddedSugarDays,
+    },
+  };
+}
+
+function mapTrendVerdictSummary(days: CalTrendDay[]) {
+  const summary = days.reduce(
+    (acc, day) => ({
+      good: acc.good + day.verdictCounts.good,
+      fine: acc.fine + day.verdictCounts.fine,
+      bad: acc.bad + day.verdictCounts.bad,
+      unscored: acc.unscored + day.verdictCounts.unscored,
+      manualOverride: acc.manualOverride + day.verdictCounts.manualOverride,
+      estimatedFacetsWeek: {
+        sodiumMgEstimated: addNullableNumber(
+          acc.estimatedFacetsWeek.sodiumMgEstimated,
+          day.estimatedFacets.sodiumMgEstimated,
+        ),
+        addedSugarGEstimated: addNullableNumber(
+          acc.estimatedFacetsWeek.addedSugarGEstimated,
+          day.estimatedFacets.addedSugarGEstimated,
+        ),
+        alcoholServingsEstimated: addNullableNumber(
+          acc.estimatedFacetsWeek.alcoholServingsEstimated,
+          day.estimatedFacets.alcoholServingsEstimated,
+        ),
+        highSodiumDays:
+          acc.estimatedFacetsWeek.highSodiumDays +
+          (day.estimatedFacets.highSodium ? 1 : 0),
+        highAddedSugarDays:
+          acc.estimatedFacetsWeek.highAddedSugarDays +
+          (day.estimatedFacets.highAddedSugar ? 1 : 0),
+      },
+    }),
+    {
+      good: 0,
+      fine: 0,
+      bad: 0,
+      unscored: 0,
+      manualOverride: 0,
+      estimatedFacetsWeek: {
+        sodiumMgEstimated: null as number | null,
+        addedSugarGEstimated: null as number | null,
+        alcoholServingsEstimated: null as number | null,
+        highSodiumDays: 0,
+        highAddedSugarDays: 0,
+      },
+    },
+  );
+
+  return mapVerdictSummary(summary);
+}
+
+function addNullableNumber(
+  current: number | null,
+  value: number | null,
+): number | null {
+  if (value === null) return current;
+  return (current ?? 0) + value;
 }
 
 function countLoggedCalDays(days: CalDay[]): number {
