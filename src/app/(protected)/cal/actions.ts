@@ -70,6 +70,38 @@ export async function deleteFoodEntryAction(input: {
   return { ok: true };
 }
 
+export async function updateFoodEntryAction(input: {
+  id: string;
+  mealName?: string | null;
+  category?: FoodCategory | string | null;
+  calories: number | string;
+  proteinG?: NullableMacroInput;
+  carbsG?: NullableMacroInput;
+  fatG?: NullableMacroInput;
+}): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const calories = requireNonNegativeInteger(input.calories, "Calories");
+
+  const { error } = await supabase
+    .from("food_entries")
+    .update({
+      meal_name: input.mealName?.trim() ?? "",
+      category: parseCategory(input.category),
+      calories,
+      protein_g: optionalNonNegativeInteger(input.proteinG, "Protein"),
+      carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
+      fat_g: optionalNonNegativeInteger(input.fatG, "Fat"),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", user.id)
+    .eq("id", input.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/cal");
+  return { ok: true };
+}
+
 export async function createSavedFoodAction(input: {
   name: string;
   category?: FoodCategory | string | null;

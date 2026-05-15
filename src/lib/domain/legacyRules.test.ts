@@ -7,6 +7,7 @@ import {
   cashflowWeeklyColor,
   cashflowWeeklyTone,
   normalizeTxName,
+  spendWeeklyTone,
 } from "./legacyRules";
 
 describe("legacy cashflow color tiers", () => {
@@ -50,21 +51,35 @@ describe("legacy cashflow color tiers", () => {
     });
   });
 
-  describe("weekly history tier — < $0 red, $0–$899 amber, ≥ $900 green", () => {
-    it("classifies negative weekly cashflow as red", () => {
+  describe("weekly history tier - < $500 red, $500-$899 amber, >= $900 green", () => {
+    it("classifies cashflow below $500 as red", () => {
       expect(cashflowWeeklyTone(-1)).toBe("negative");
       expect(cashflowWeeklyColor(-1)).toBe("text-red-600");
+      expect(cashflowWeeklyTone(0)).toBe("negative");
+      expect(cashflowWeeklyColor(49_999)).toBe("text-red-600");
     });
 
-    it("classifies zero through $899 weekly cashflow as amber", () => {
-      expect(cashflowWeeklyTone(0)).toBe("amber");
-      expect(cashflowWeeklyColor(0)).toBe("text-amber-500");
+    it("classifies $500 through $899 weekly cashflow as amber", () => {
+      expect(cashflowWeeklyTone(50_000)).toBe("amber");
+      expect(cashflowWeeklyColor(50_000)).toBe("text-amber-500");
       expect(cashflowWeeklyTone(89_999)).toBe("amber");
     });
 
     it("classifies $900+ weekly cashflow as green", () => {
       expect(cashflowWeeklyTone(90_000)).toBe("positive");
       expect(cashflowWeeklyColor(90_000)).toBe("text-green-600");
+    });
+  });
+
+  describe("weekly spend tone - relative to median", () => {
+    it("classifies low spend as green, near median as amber, and hot spend as red", () => {
+      expect(spendWeeklyTone(84_999, 100_000)).toBe("positive");
+      expect(spendWeeklyTone(100_000, 100_000)).toBe("amber");
+      expect(spendWeeklyTone(115_001, 100_000)).toBe("negative");
+    });
+
+    it("uses amber when no median is available", () => {
+      expect(spendWeeklyTone(10_000, null)).toBe("amber");
     });
   });
 

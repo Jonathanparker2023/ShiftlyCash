@@ -1,7 +1,11 @@
 import "server-only";
 
 import { requireUser } from "@/lib/auth";
-import { addDaysIso, getSundayOnOrBeforeTodayIso, getTodayIso } from "@/lib/dashboard/dates";
+import {
+  addDaysIso,
+  getSundayOnOrBeforeTodayIso,
+  getTodayIso,
+} from "@/lib/dashboard/dates";
 import {
   computeWeeklyDeficit,
   projectWeeklyWeightChangeLbs,
@@ -60,10 +64,12 @@ type SettingsTargetsRow = {
   fat_target_g: number | null;
 };
 
-export async function getShiftlyCalData(): Promise<ShiftlyCalData> {
+export async function getShiftlyCalData(opts?: {
+  weekStartIso?: string;
+}): Promise<ShiftlyCalData> {
   const { supabase, user } = await requireUser();
   const todayIso = getTodayIso();
-  const weekStartIso = getSundayOnOrBeforeTodayIso();
+  const weekStartIso = normalizeWeekStartIso(opts?.weekStartIso);
   const weekEndIso = addDaysIso(weekStartIso, 6);
 
   const [entriesRes, savedFoodsRes, settingsRes, weightRes] = await Promise.all([
@@ -122,6 +128,16 @@ export async function getShiftlyCalData(): Promise<ShiftlyCalData> {
     },
     savedFoods: ((savedFoodsRes.data ?? []) as SavedFoodRow[]).map(mapSavedFood),
   };
+}
+
+function normalizeWeekStartIso(value: string | undefined): string {
+  if (!value) return getSundayOnOrBeforeTodayIso();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return getSundayOnOrBeforeTodayIso();
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return getSundayOnOrBeforeTodayIso();
+
+  return value;
 }
 
 function buildCalWeek(

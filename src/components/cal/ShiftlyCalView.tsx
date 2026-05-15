@@ -9,6 +9,7 @@ import {
   createFoodEntryAction,
   deleteFoodEntryAction,
   logWeightAction,
+  updateFoodEntryAction,
 } from "@/app/(protected)/cal/actions";
 import {
   categoryBarClass,
@@ -24,6 +25,7 @@ import {
   WEEKLY_MACRO_THRESHOLDS,
   type MagnitudeTone,
 } from "@/lib/cal/projection";
+import { addDaysIso } from "@/lib/dashboard/dates";
 import type {
   CalDay,
   CalTargets,
@@ -42,6 +44,15 @@ type MealFormState = {
   carbsG: string;
   fatG: string;
   savedFoodId: string | null;
+};
+
+type UpdateFoodEntryPatch = {
+  mealName?: string | null;
+  category?: FoodCategory | string | null;
+  calories: number | string;
+  proteinG?: number | string | null;
+  carbsG?: number | string | null;
+  fatG?: number | string | null;
 };
 
 const emptyMealForm: MealFormState = {
@@ -64,8 +75,10 @@ const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
 
 export function ShiftlyCalView({
   initialData,
+  weekStartIso,
 }: {
   initialData: ShiftlyCalData;
+  weekStartIso: string;
 }) {
   const router = useRouter();
   const todayIndex = Math.max(
@@ -85,6 +98,11 @@ export function ShiftlyCalView({
   const [isPending, startTransition] = useTransition();
   const focusedDay =
     initialData.currentWeek.days[focusedDayIndex] ?? initialData.currentWeek.days[0];
+  const prevWeekIso = addDaysIso(weekStartIso, -7);
+  const nextWeekIso = addDaysIso(weekStartIso, 7);
+  const isCurrentWeek = initialData.currentWeek.days.some(
+    (day) => day.date === initialData.todayIso,
+  );
   const currentWeight = useMemo(
     () => getMostRecentWeight(initialData.currentWeek.days),
     [initialData.currentWeek.days],
@@ -179,6 +197,18 @@ export function ShiftlyCalView({
     });
   }
 
+  async function updateEntry(id: string, patch: UpdateFoodEntryPatch): Promise<boolean> {
+    setError(null);
+    try {
+      await updateFoodEntryAction({ id, ...patch });
+      router.refresh();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to update entry.");
+      return false;
+    }
+  }
+
   function fillFromSavedFood(food: SavedFood) {
     setMealForm({
       mealName: food.name,
@@ -192,6 +222,13 @@ export function ShiftlyCalView({
     setIsMealFormOpen(true);
   }
 
+  function focusDay(index: number) {
+    setFocusedDayIndex(index);
+    setWeightValue(
+      initialData.currentWeek.days[index]?.weight?.weightLbs.toString() ?? "",
+    );
+  }
+
   return (
     <div className="space-y-4">
       <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
@@ -202,21 +239,41 @@ export function ShiftlyCalView({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
                 ShiftlyCal
               </p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
-                {formatWeekRange(
-                  initialData.currentWeek.weekStartIso,
-                  initialData.currentWeek.weekEndIso,
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <Link
+                  className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                  href={`/cal?week=${prevWeekIso}`}
+                >
+                  Prev
+                </Link>
+                <h2 className="text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+                  {formatWeekRange(
+                    initialData.currentWeek.weekStartIso,
+                    initialData.currentWeek.weekEndIso,
+                  )}
+                </h2>
+                {isCurrentWeek ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-white/40">
+                    Next
+                  </span>
+                ) : (
+                  <Link
+                    className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                    href={`/cal?week=${nextWeekIso}`}
+                  >
+                    Next
+                  </Link>
                 )}
-              </h2>
+              </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <p className="inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
                   Energy balance tracker
                 </p>
                 <Link
                   className="inline-flex rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
-                  href="/cal/trends"
+                  href={`/cal/trends?week=${weekStartIso}`}
                 >
-                  Trends →
+                  Trends
                 </Link>
               </div>
             </div>
@@ -237,7 +294,7 @@ export function ShiftlyCalView({
                   day={day}
                   isFocused={index === focusedDayIndex}
                   key={day.date}
-                  onClick={() => setFocusedDayIndex(index)}
+                  onClick={() => focusDay(index)}
                   targets={initialData.targets}
                 />
               ))}
@@ -259,6 +316,7 @@ export function ShiftlyCalView({
                 onFill={fillFromSavedFood}
                 onInstantLog={instantLog}
                 savedFoods={initialData.savedFoods}
+                todayIso={initialData.todayIso}
               />
 
               <div>
@@ -283,6 +341,7 @@ export function ShiftlyCalView({
                     mealForm={mealForm}
                     onMealFormChange={setMealForm}
                     onSubmit={submitMeal}
+                    todayIso={initialData.todayIso}
                   />
                 ) : null}
                 <div className="mt-4 space-y-2">
@@ -293,6 +352,7 @@ export function ShiftlyCalView({
                         entry={entry}
                         key={entry.id}
                         onDelete={deleteEntry}
+                        onUpdate={updateEntry}
                       />
                     ))
                   ) : (
@@ -532,16 +592,20 @@ function MealEntryForm({
   mealForm,
   onMealFormChange,
   onSubmit,
+  todayIso,
 }: {
   disabled: boolean;
   focusedDay: CalDay;
   mealForm: MealFormState;
   onMealFormChange: (form: MealFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  todayIso: string;
 }) {
   return (
     <form className="mt-4 rounded-md border border-white/15 bg-black/20 p-3" onSubmit={onSubmit}>
-      <p className="text-sm font-semibold text-white">Add to {focusedDay.date}</p>
+      <p className="text-sm font-semibold text-white">
+        Add to {focusedDayLabel(focusedDay.date, todayIso)}
+      </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <TextInput
           className="lg:col-span-2"
@@ -597,11 +661,92 @@ function FoodEntryRow({
   disabled,
   entry,
   onDelete,
+  onUpdate,
 }: {
   disabled: boolean;
   entry: FoodEntry;
   onDelete: (id: string) => void;
+  onUpdate: (id: string, patch: UpdateFoodEntryPatch) => Promise<boolean>;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    mealName: entry.mealName,
+    category: entry.category,
+    calories: entry.calories.toString(),
+    proteinG: entry.proteinG?.toString() ?? "",
+    carbsG: entry.carbsG?.toString() ?? "",
+    fatG: entry.fatG?.toString() ?? "",
+  });
+
+  async function submitEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    const ok = await onUpdate(entry.id, editForm);
+    setIsSaving(false);
+    if (ok) setIsEditing(false);
+  }
+
+  if (isEditing) {
+    return (
+      <form className={categoryBarClass(entry.category)} onSubmit={submitEdit}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <TextInput
+            label="Meal"
+            onChange={(value) => setEditForm({ ...editForm, mealName: value })}
+            value={editForm.mealName}
+          />
+          <CategorySelect
+            label="Category"
+            onChange={(category) => setEditForm({ ...editForm, category })}
+            value={editForm.category}
+          />
+          <NumberInput
+            label="Calories"
+            onChange={(value) => setEditForm({ ...editForm, calories: value })}
+            required
+            value={editForm.calories}
+          />
+          <NumberInput
+            label="Protein"
+            onChange={(value) => setEditForm({ ...editForm, proteinG: value })}
+            suffix="g"
+            value={editForm.proteinG}
+          />
+          <NumberInput
+            label="Carbs"
+            onChange={(value) => setEditForm({ ...editForm, carbsG: value })}
+            suffix="g"
+            value={editForm.carbsG}
+          />
+          <NumberInput
+            label="Fat"
+            onChange={(value) => setEditForm({ ...editForm, fatG: value })}
+            suffix="g"
+            value={editForm.fatG}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            className="rounded border border-white/30 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled || isSaving || !editForm.calories.trim()}
+            type="submit"
+          >
+            Save
+          </button>
+          <button
+            className="rounded border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled || isSaving}
+            onClick={() => setIsEditing(false)}
+            type="button"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   return (
     <div className={categoryBarClass(entry.category)}>
       <div className="flex items-center justify-between gap-3">
@@ -614,14 +759,24 @@ function FoodEntryRow({
       </div>
       <div className="mt-1 flex items-center justify-between gap-3 text-xs opacity-85">
         <span>{formatMacrosInline(entry) || categoryLabel(entry.category)}</span>
-        <button
-          className="rounded border border-white/30 bg-black/15 px-2 py-1 font-semibold text-white transition hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={disabled}
-          onClick={() => onDelete(entry.id)}
-          type="button"
-        >
-          Delete
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="rounded border border-white/30 bg-black/15 px-2 py-1 font-semibold text-white transition hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
+            onClick={() => setIsEditing(true)}
+            type="button"
+          >
+            Edit
+          </button>
+          <button
+            className="rounded border border-white/30 bg-black/15 px-2 py-1 font-semibold text-white transition hover:bg-black/25 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
+            onClick={() => onDelete(entry.id)}
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -796,6 +951,7 @@ function SavedFoodsList({
   onFill,
   onInstantLog,
   savedFoods,
+  todayIso,
 }: {
   disabled: boolean;
   focusedDay: CalDay;
@@ -803,6 +959,7 @@ function SavedFoodsList({
   onFill: (food: SavedFood) => void;
   onInstantLog: (food: SavedFood) => void;
   savedFoods: SavedFood[];
+  todayIso: string;
 }) {
   return (
     <div>
@@ -810,7 +967,9 @@ function SavedFoodsList({
         Saved foods
       </p>
       <h2 className="mt-1 text-xl font-semibold text-white">Quick log</h2>
-      <p className="mt-1 text-xs text-white/60">Adds to {focusedDay.date}</p>
+      <p className="mt-1 text-xs text-white/60">
+        Adds to {focusedDayLabel(focusedDay.date, todayIso)}
+      </p>
       <div className="mt-4 grid gap-2">
         {savedFoods.length > 0 ? (
           savedFoods.map((food) => (
@@ -852,7 +1011,7 @@ function SavedFoodRow({
         <div>
           <p className="font-semibold">{food.name}</p>
           <p className="text-sm text-white/70">
-            {categoryLabel(food.category)} · {food.calories.toLocaleString()} cal
+            {categoryLabel(food.category)} - {food.calories.toLocaleString()} cal
             {formatMacros(food)}
           </p>
         </div>
@@ -862,7 +1021,7 @@ function SavedFoodRow({
           onClick={() => onInstantLog(food)}
           type="button"
         >
-          {isLogged ? "Logged ✓" : "Log"}
+          {isLogged ? "Logged" : "Log"}
         </button>
       </div>
       <button
@@ -980,7 +1139,16 @@ function formatMacros(entry: {
   fatG: number | null;
 }): string {
   const inline = formatMacrosInline(entry);
-  return inline ? ` · ${inline}` : "";
+  return inline ? ` - ${inline}` : "";
+}
+
+function focusedDayLabel(dateIso: string, todayIso: string): string {
+  if (dateIso === todayIso) return "Today";
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+  }).format(new Date(`${dateIso}T00:00:00.000Z`));
 }
 
 function formatMacrosInline(entry: {

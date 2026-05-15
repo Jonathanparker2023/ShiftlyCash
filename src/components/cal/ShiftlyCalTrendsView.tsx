@@ -58,8 +58,10 @@ const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
 
 export function ShiftlyCalTrendsView({
   initialData,
+  weekStartIso,
 }: {
   initialData: ShiftlyCalData;
+  weekStartIso: string;
 }) {
   const router = useRouter();
   const [savedFoodForm, setSavedFoodForm] =
@@ -119,6 +121,15 @@ export function ShiftlyCalTrendsView({
     <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
       <div className="h-2 bg-white/10" />
       <div className="space-y-4 p-3 sm:p-4">
+        <div className="rounded-lg border border-white/15 bg-black/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+            Week
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-white">
+            {formatDayLabel(weekStartIso)} - {formatDayLabel(initialData.currentWeek.weekEndIso)}
+          </h2>
+        </div>
+
         {error ? (
           <p className="rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-200">
             {error}
@@ -322,7 +333,7 @@ function SavedFoodManageRow({
         <div>
           <p className="font-semibold">{food.name}</p>
           <p className="text-sm text-white/70">
-            {categoryLabel(food.category)} · {food.calories.toLocaleString()} cal
+            {categoryLabel(food.category)} - {food.calories.toLocaleString()} cal
             {formatMacros(food)}
           </p>
         </div>
@@ -524,5 +535,5 @@ function formatMacros(entry: {
     .filter(Boolean)
     .join(" / ");
 
-  return macros ? ` · ${macros}` : "";
+  return macros ? ` - ${macros}` : "";
 }
