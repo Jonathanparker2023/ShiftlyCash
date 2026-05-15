@@ -50,6 +50,12 @@ Be willing to estimate component values yourself if not in published data - firs
 - When genuinely uncertain, pick the middle of the plausible range, never the extreme.
 - Perfection is not required - close estimates beat refusing to estimate.
 
+## Fiber estimation
+
+Estimate fiber whenever the food contains plant matter (vegetables, fruit, beans, whole grains, nuts). Set fiberG to 0 (not null) for foods that genuinely contain none - pure meat, dairy, oil, candy without nuts/fruit. Use null only when you genuinely cannot estimate (very vague input).
+
+Quick reference: 1 cup cooked beans = ~15g fiber, 1 medium apple = ~4g, 1 cup brown rice = ~3g, 1 cup white rice = ~0.5g, leafy greens ~2g/cup, nuts ~3-4g/oz.
+
 ## Confidence calibration
 
 - "high" - named published item with no modifications, OR simple whole food at standard portion.
@@ -68,7 +74,8 @@ Schema (all keys required; macro fields may be null only if truly unknowable):
   "proteinG": integer | null,
   "carbsG": integer | null,
   "fatG": integer | null,
-  "reasoning": string, 1-3 short sentences showing your decomposition and any search findings (max 300 chars),
+  "fiberG": integer | null,
+  "reasoning": string, max 300 chars. When the meal has 2+ components, START with a one-line component breakdown using bullets, then optionally add a short note. Example: "• Steak 240 cal • Rice (light) 105 cal • Beans 130 cal • Guac 230 cal". For single-item foods, just give a short sentence ("Standard medium banana per USDA").
   "confidence": "high" | "medium" | "low"
 }
 
@@ -86,6 +93,7 @@ export type FoodEstimate = {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  fiberG: number | null;
   reasoning: string;
   confidence: "high" | "medium" | "low";
 };
@@ -160,6 +168,7 @@ function parseEstimate(raw: string): FoodEstimate {
     proteinG: toOptionalInteger(obj.proteinG),
     carbsG: toOptionalInteger(obj.carbsG),
     fatG: toOptionalInteger(obj.fatG),
+    fiberG: toOptionalInteger(obj.fiberG),
     reasoning: String(obj.reasoning ?? "").slice(0, 300),
     confidence: parseConfidence(obj.confidence),
   };

@@ -25,6 +25,7 @@ export async function createFoodEntryAction(input: {
   proteinG?: NullableMacroInput;
   carbsG?: NullableMacroInput;
   fatG?: NullableMacroInput;
+  fiberG?: NullableMacroInput;
   savedFoodId?: string | null;
 }): Promise<{ ok: true; id: string }> {
   const { supabase, user } = await requireUser();
@@ -45,6 +46,7 @@ export async function createFoodEntryAction(input: {
       protein_g: optionalNonNegativeInteger(input.proteinG, "Protein"),
       carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
       fat_g: optionalNonNegativeInteger(input.fatG, "Fat"),
+      fiber_g: optionalNonNegativeInteger(input.fiberG, "Fiber"),
       saved_food_id: input.savedFoodId || null,
     })
     .select("id")
@@ -89,6 +91,7 @@ export async function updateFoodEntryAction(input: {
   proteinG?: NullableMacroInput;
   carbsG?: NullableMacroInput;
   fatG?: NullableMacroInput;
+  fiberG?: NullableMacroInput;
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
   const calories = requireNonNegativeInteger(input.calories, "Calories");
@@ -103,6 +106,7 @@ export async function updateFoodEntryAction(input: {
       protein_g: optionalNonNegativeInteger(input.proteinG, "Protein"),
       carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
       fat_g: optionalNonNegativeInteger(input.fatG, "Fat"),
+      fiber_g: optionalNonNegativeInteger(input.fiberG, "Fiber"),
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", user.id)
@@ -121,6 +125,7 @@ export async function createSavedFoodAction(input: {
   proteinG?: NullableMacroInput;
   carbsG?: NullableMacroInput;
   fatG?: NullableMacroInput;
+  fiberG?: NullableMacroInput;
 }): Promise<{ ok: true; id: string }> {
   const { supabase, user } = await requireUser();
   const name = input.name.trim();
@@ -147,6 +152,7 @@ export async function createSavedFoodAction(input: {
       protein_g: optionalNonNegativeInteger(input.proteinG, "Protein"),
       carbs_g: optionalNonNegativeInteger(input.carbsG, "Carbs"),
       fat_g: optionalNonNegativeInteger(input.fatG, "Fat"),
+      fiber_g: optionalNonNegativeInteger(input.fiberG, "Fiber"),
       sort_order: Number(maxRow?.sort_order ?? -1) + 1,
     })
     .select("id")
@@ -206,6 +212,7 @@ export async function saveCalTargetsAction(input: {
   proteinTargetG?: NullableMacroInput;
   carbsTargetG?: NullableMacroInput;
   fatTargetG?: NullableMacroInput;
+  fiberTargetG?: NullableMacroInput;
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
 
@@ -216,6 +223,7 @@ export async function saveCalTargetsAction(input: {
       protein_target_g: optionalNonNegativeInteger(input.proteinTargetG, "Protein target"),
       carbs_target_g: optionalNonNegativeInteger(input.carbsTargetG, "Carbs target"),
       fat_target_g: optionalNonNegativeInteger(input.fatTargetG, "Fat target"),
+      fiber_target_g: optionalPositiveInteger(input.fiberTargetG, "Fiber target"),
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", user.id);

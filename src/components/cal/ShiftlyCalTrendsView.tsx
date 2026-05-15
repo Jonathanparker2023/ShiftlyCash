@@ -30,6 +30,7 @@ type SavedFoodFormState = {
   proteinG: string;
   carbsG: string;
   fatG: string;
+  fiberG: string;
 };
 
 type TargetFormState = {
@@ -37,6 +38,7 @@ type TargetFormState = {
   proteinTargetG: string;
   carbsTargetG: string;
   fatTargetG: string;
+  fiberTargetG: string;
 };
 
 const emptySavedFoodForm: SavedFoodFormState = {
@@ -46,6 +48,7 @@ const emptySavedFoodForm: SavedFoodFormState = {
   proteinG: "",
   carbsG: "",
   fatG: "",
+  fiberG: "",
 };
 
 const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
@@ -71,6 +74,7 @@ export function ShiftlyCalTrendsView({
     proteinTargetG: initialData.targets.proteinTargetG?.toString() ?? "",
     carbsTargetG: initialData.targets.carbsTargetG?.toString() ?? "",
     fatTargetG: initialData.targets.fatTargetG?.toString() ?? "",
+    fiberTargetG: initialData.targets.fiberTargetG?.toString() ?? "",
   });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -215,6 +219,12 @@ function TargetsPanel({
           suffix="g"
           value={form.fatTargetG}
         />
+        <NumberInput
+          label="Fiber target"
+          onChange={(value) => onChange({ ...form, fiberTargetG: value })}
+          suffix="g"
+          value={form.fiberTargetG}
+        />
         <div className="sm:col-span-2">
           <button
             className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
@@ -286,6 +296,12 @@ function SavedFoodsManagement({
           onChange={(value) => onChange({ ...form, fatG: value })}
           suffix="g"
           value={form.fatG}
+        />
+        <NumberInput
+          label="Fiber"
+          onChange={(value) => onChange({ ...form, fiberG: value })}
+          suffix="g"
+          value={form.fiberG}
         />
         <div className="sm:col-span-2 xl:col-span-3">
           <button
@@ -385,7 +401,7 @@ function TrendHistoryRow({
   const tone = colorToneFromMagnitude(deviation, DAILY_CALORIE_THRESHOLDS);
 
   return (
-    <div className="grid gap-2 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white sm:grid-cols-[minmax(150px,1fr)_repeat(3,minmax(90px,0.45fr))] sm:items-center">
+    <div className="grid gap-2 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white sm:grid-cols-[minmax(150px,1fr)_repeat(4,minmax(80px,0.4fr))] sm:items-center">
       <div>
         <p className="font-semibold">{formatDayLabel(day.date)}</p>
         <p className="text-xs text-white/60">{day.date}</p>
@@ -394,6 +410,7 @@ function TrendHistoryRow({
         {day.calories.toLocaleString()} cal
       </p>
       <p className="text-white/80">{day.proteinG.toLocaleString()}g protein</p>
+      <p className="text-white/80">{day.fiberG.toLocaleString()}g fiber</p>
       <p className="text-white/80">
         {day.weightLbs === null ? "No weight" : `${day.weightLbs.toFixed(1)} lbs`}
       </p>
@@ -528,11 +545,13 @@ function formatMacros(entry: {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  fiberG: number | null;
 }): string {
   const macros = [
     entry.proteinG === null ? null : `${entry.proteinG}p`,
     entry.carbsG === null ? null : `${entry.carbsG}c`,
     entry.fatG === null ? null : `${entry.fatG}f`,
+    entry.fiberG === null ? null : `${entry.fiberG}fi`,
   ]
     .filter(Boolean)
     .join(" / ");

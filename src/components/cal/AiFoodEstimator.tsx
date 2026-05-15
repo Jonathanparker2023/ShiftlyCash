@@ -15,6 +15,7 @@ type EstimateForm = {
   proteinG: string;
   carbsG: string;
   fatG: string;
+  fiberG: string;
   reasoning: string;
   confidence: "high" | "medium" | "low";
 };
@@ -31,6 +32,7 @@ type Props = {
     proteinG: string;
     carbsG: string;
     fatG: string;
+    fiberG: string;
   }) => void;
 };
 
@@ -143,6 +145,7 @@ export function AiFoodEstimator({
       proteinG: estimate.proteinG,
       carbsG: estimate.carbsG,
       fatG: estimate.fatG,
+      fiberG: estimate.fiberG,
     });
     reset();
     setIsOpen(false);
@@ -302,9 +305,17 @@ function EstimateResult({
           suffix="g"
           value={estimate.fatG}
         />
+        <NumberInput
+          label="Fiber"
+          onChange={(value) => onChange({ ...estimate, fiberG: value })}
+          suffix="g"
+          value={estimate.fiberG}
+        />
       </div>
       {estimate.reasoning ? (
-        <p className="mt-3 text-xs italic text-white/60">{estimate.reasoning}</p>
+        <p className="mt-3 max-h-24 overflow-auto whitespace-pre-wrap text-xs italic text-white/60">
+          {estimate.reasoning}
+        </p>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -433,6 +444,7 @@ function toEstimateForm(estimate: FoodEstimate): EstimateForm {
     proteinG: estimate.proteinG?.toString() ?? "",
     carbsG: estimate.carbsG?.toString() ?? "",
     fatG: estimate.fatG?.toString() ?? "",
+    fiberG: estimate.fiberG?.toString() ?? "",
     reasoning: estimate.reasoning,
     confidence: estimate.confidence,
   };

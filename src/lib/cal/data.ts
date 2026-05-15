@@ -31,6 +31,7 @@ type FoodEntryRow = {
   protein_g: number | null;
   carbs_g: number | null;
   fat_g: number | null;
+  fiber_g: number | null;
   saved_food_id: string | null;
   created_at: string;
   updated_at: string;
@@ -44,6 +45,7 @@ type SavedFoodRow = {
   protein_g: number | null;
   carbs_g: number | null;
   fat_g: number | null;
+  fiber_g: number | null;
   sort_order: number | null;
   archived_at: string | null;
   created_at: string;
@@ -63,12 +65,14 @@ type SettingsTargetsRow = {
   protein_target_g: number | null;
   carbs_target_g: number | null;
   fat_target_g: number | null;
+  fiber_target_g: number | null;
 };
 
 type TrendFoodEntryRow = {
   date: string;
   calories: number;
   protein_g: number | null;
+  fiber_g: number | null;
 };
 
 type TrendWeightLogRow = {
@@ -80,6 +84,7 @@ export type CalTrendDay = {
   date: string;
   calories: number;
   proteinG: number;
+  fiberG: number;
   weightLbs: number | null;
 };
 
@@ -103,7 +108,7 @@ export async function getShiftlyCalData(opts?: {
     supabase
       .from("food_entries")
       .select(
-        "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,saved_food_id,created_at,updated_at",
+        "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g,saved_food_id,created_at,updated_at",
       )
       .eq("user_id", user.id)
       .gte("date", weekStartIso)
@@ -114,7 +119,7 @@ export async function getShiftlyCalData(opts?: {
     supabase
       .from("saved_foods")
       .select(
-        "id,name,category,calories,protein_g,carbs_g,fat_g,sort_order,archived_at,created_at,updated_at",
+        "id,name,category,calories,protein_g,carbs_g,fat_g,fiber_g,sort_order,archived_at,created_at,updated_at",
       )
       .eq("user_id", user.id)
       .is("archived_at", null)
@@ -122,7 +127,7 @@ export async function getShiftlyCalData(opts?: {
       .order("created_at", { ascending: true }),
     supabase
       .from("settings")
-      .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g")
+      .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g")
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase
@@ -169,7 +174,7 @@ export async function getShiftlyCalTrendsData(opts?: {
   const [entriesRes, weightRes] = await Promise.all([
     supabase
       .from("food_entries")
-      .select("date,calories,protein_g")
+      .select("date,calories,protein_g,fiber_g")
       .eq("user_id", user.id)
       .gte("date", trendStartIso)
       .lte("date", weekData.todayIso)
@@ -190,12 +195,20 @@ export async function getShiftlyCalTrendsData(opts?: {
     throw new Error(`Weight: ${weightRes.error.message}`);
   }
 
-  const caloriesByDate = new Map<string, { calories: number; proteinG: number }>();
+  const caloriesByDate = new Map<
+    string,
+    { calories: number; proteinG: number; fiberG: number }
+  >();
   for (const row of (entriesRes.data ?? []) as TrendFoodEntryRow[]) {
-    const existing = caloriesByDate.get(row.date) ?? { calories: 0, proteinG: 0 };
+    const existing = caloriesByDate.get(row.date) ?? {
+      calories: 0,
+      proteinG: 0,
+      fiberG: 0,
+    };
     caloriesByDate.set(row.date, {
       calories: existing.calories + Number(row.calories),
       proteinG: existing.proteinG + Number(row.protein_g ?? 0),
+      fiberG: existing.fiberG + Number(row.fiber_g ?? 0),
     });
   }
 
@@ -219,6 +232,7 @@ export async function getShiftlyCalTrendsData(opts?: {
         date,
         calories: sums?.calories ?? 0,
         proteinG: sums?.proteinG ?? 0,
+        fiberG: sums?.fiberG ?? 0,
         weightLbs: weightByDate.get(date) ?? null,
       };
     }),
@@ -286,6 +300,7 @@ function sumTotals(entries: FoodEntry[]): CalTotals {
       proteinG: totals.proteinG + (entry.proteinG ?? 0),
       carbsG: totals.carbsG + (entry.carbsG ?? 0),
       fatG: totals.fatG + (entry.fatG ?? 0),
+      fiberG: totals.fiberG + (entry.fiberG ?? 0),
     }),
     emptyTotals(),
   );
@@ -297,11 +312,12 @@ function addTotals(left: CalTotals, right: CalTotals): CalTotals {
     proteinG: left.proteinG + right.proteinG,
     carbsG: left.carbsG + right.carbsG,
     fatG: left.fatG + right.fatG,
+    fiberG: left.fiberG + right.fiberG,
   };
 }
 
 function emptyTotals(): CalTotals {
-  return { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
+  return { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 };
 }
 
 function mapTargets(row: SettingsTargetsRow | null): CalTargets {
@@ -310,6 +326,7 @@ function mapTargets(row: SettingsTargetsRow | null): CalTargets {
     proteinTargetG: row?.protein_target_g ?? null,
     carbsTargetG: row?.carbs_target_g ?? null,
     fatTargetG: row?.fat_target_g ?? null,
+    fiberTargetG: row?.fiber_target_g ?? null,
   };
 }
 
@@ -324,6 +341,7 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
     proteinG: nullableNumber(row.protein_g),
     carbsG: nullableNumber(row.carbs_g),
     fatG: nullableNumber(row.fat_g),
+    fiberG: nullableNumber(row.fiber_g),
     savedFoodId: row.saved_food_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -339,6 +357,7 @@ function mapSavedFood(row: SavedFoodRow): SavedFood {
     proteinG: nullableNumber(row.protein_g),
     carbsG: nullableNumber(row.carbs_g),
     fatG: nullableNumber(row.fat_g),
+    fiberG: nullableNumber(row.fiber_g),
     sortOrder: Number(row.sort_order ?? 0),
     archivedAt: row.archived_at,
     createdAt: row.created_at,

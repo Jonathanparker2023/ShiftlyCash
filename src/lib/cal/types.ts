@@ -15,6 +15,7 @@ export type FoodEntry = {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  fiberG: number | null;
   savedFoodId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +29,7 @@ export type SavedFood = {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  fiberG: number | null;
   sortOrder: number;
   archivedAt: string | null;
   createdAt: string;
@@ -47,6 +49,7 @@ export type CalTargets = {
   proteinTargetG: number | null;
   carbsTargetG: number | null;
   fatTargetG: number | null;
+  fiberTargetG: number | null;
 };
 
 export type CalTotals = {
@@ -54,6 +57,7 @@ export type CalTotals = {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  fiberG: number;
 };
 
 export type CalDay = {

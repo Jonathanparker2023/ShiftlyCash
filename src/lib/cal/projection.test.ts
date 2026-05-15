@@ -50,6 +50,7 @@ function makeWeek(calories: number): CalWeek {
       proteinG: 0,
       carbsG: 0,
       fatG: 0,
+      fiberG: 0,
     },
   };
 }

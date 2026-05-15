@@ -45,6 +45,7 @@ type MealFormState = {
   proteinG: string;
   carbsG: string;
   fatG: string;
+  fiberG: string;
   savedFoodId: string | null;
 };
 
@@ -56,6 +57,7 @@ type UpdateFoodEntryPatch = {
   proteinG?: number | string | null;
   carbsG?: number | string | null;
   fatG?: number | string | null;
+  fiberG?: number | string | null;
 };
 
 function emptyMealForm(): MealFormState {
@@ -67,6 +69,7 @@ function emptyMealForm(): MealFormState {
     proteinG: "",
     carbsG: "",
     fatG: "",
+    fiberG: "",
     savedFoodId: null,
   };
 }
@@ -141,6 +144,7 @@ export function ShiftlyCalView({
           proteinG: mealForm.proteinG,
           carbsG: mealForm.carbsG,
           fatG: mealForm.fatG,
+          fiberG: mealForm.fiberG,
           savedFoodId: mealForm.savedFoodId,
         });
         setMealForm(emptyMealForm());
@@ -165,6 +169,7 @@ export function ShiftlyCalView({
           proteinG: food.proteinG?.toString() ?? "",
           carbsG: food.carbsG?.toString() ?? "",
           fatG: food.fatG?.toString() ?? "",
+          fiberG: food.fiberG?.toString() ?? "",
           savedFoodId: food.id,
         });
         setLoggedFoodId(food.id);
@@ -184,6 +189,7 @@ export function ShiftlyCalView({
     proteinG: string;
     carbsG: string;
     fatG: string;
+    fiberG: string;
   }) {
     setError(null);
     startTransition(async () => {
@@ -197,6 +203,7 @@ export function ShiftlyCalView({
           proteinG: input.proteinG,
           carbsG: input.carbsG,
           fatG: input.fatG,
+          fiberG: input.fiberG,
           savedFoodId: null,
         });
         router.refresh();
@@ -258,6 +265,7 @@ export function ShiftlyCalView({
       proteinG: food.proteinG?.toString() ?? "",
       carbsG: food.carbsG?.toString() ?? "",
       fatG: food.fatG?.toString() ?? "",
+      fiberG: food.fiberG?.toString() ?? "",
       savedFoodId: food.id,
     });
     setIsMealFormOpen(true);
@@ -651,7 +659,7 @@ function MealEntryForm({
       <p className="text-sm font-semibold text-white">
         Add to {focusedDayLabel(focusedDay.date, todayIso)}
       </p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
         <TextInput
           className="lg:col-span-2"
         label="Meal"
@@ -694,6 +702,12 @@ function MealEntryForm({
           suffix="g"
           value={mealForm.fatG}
         />
+        <NumberInput
+          label="Fiber"
+          onChange={(value) => onMealFormChange({ ...mealForm, fiberG: value })}
+          suffix="g"
+          value={mealForm.fiberG}
+        />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -729,6 +743,7 @@ function FoodEntryRow({
     proteinG: entry.proteinG?.toString() ?? "",
     carbsG: entry.carbsG?.toString() ?? "",
     fatG: entry.fatG?.toString() ?? "",
+    fiberG: entry.fiberG?.toString() ?? "",
   });
 
   async function submitEdit(event: FormEvent<HTMLFormElement>) {
@@ -782,6 +797,12 @@ function FoodEntryRow({
             onChange={(value) => setEditForm({ ...editForm, fatG: value })}
             suffix="g"
             value={editForm.fatG}
+          />
+          <NumberInput
+            label="Fiber"
+            onChange={(value) => setEditForm({ ...editForm, fiberG: value })}
+            suffix="g"
+            value={editForm.fiberG}
           />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -904,6 +925,13 @@ function DayTotalsPanel({
           thresholds={DAILY_MACRO_THRESHOLDS}
           unit="g"
           value={day.totals.fatG}
+        />
+        <DayTotalLine
+          label="Fiber"
+          target={targets.fiberTargetG}
+          thresholds={DAILY_MACRO_THRESHOLDS}
+          unit="g"
+          value={day.totals.fiberG}
         />
       </div>
     </div>
@@ -1227,6 +1255,7 @@ function formatMacros(entry: {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  fiberG: number | null;
 }): string {
   const inline = formatMacrosInline(entry);
   return inline ? ` - ${inline}` : "";
@@ -1245,11 +1274,13 @@ function formatMacrosInline(entry: {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  fiberG: number | null;
 }): string {
   return [
     entry.proteinG === null ? null : `${entry.proteinG}p`,
     entry.carbsG === null ? null : `${entry.carbsG}c`,
     entry.fatG === null ? null : `${entry.fatG}f`,
+    entry.fiberG === null ? null : `${entry.fiberG}fi`,
   ]
     .filter(Boolean)
     .join(" / ");
@@ -1264,6 +1295,7 @@ function mergeEstimateIntoEntry(
     proteinG: string;
     carbsG: string;
     fatG: string;
+    fiberG: string;
   },
   addition: {
     mealName: string;
@@ -1272,6 +1304,7 @@ function mergeEstimateIntoEntry(
     proteinG: string;
     carbsG: string;
     fatG: string;
+    fiberG: string;
   },
 ) {
   return {
@@ -1282,6 +1315,7 @@ function mergeEstimateIntoEntry(
     proteinG: addOptionalNumberStrings(current.proteinG, addition.proteinG),
     carbsG: addOptionalNumberStrings(current.carbsG, addition.carbsG),
     fatG: addOptionalNumberStrings(current.fatG, addition.fatG),
+    fiberG: addOptionalNumberStrings(current.fiberG, addition.fiberG),
   };
 }
 
