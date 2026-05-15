@@ -901,14 +901,23 @@ function FoodEntryRow({
   if (isEditing) {
     return (
       <form className={rowClass} onSubmit={submitEdit}>
-        <div className="mb-3 rounded-md border border-white/20 bg-black/20 p-3">
-          <p className="text-sm italic text-white/85">
-            {entry.verdictReason
-              ? `${entry.verdictReason}${
-                  entry.verdictSource === "manual_override" ? " (your override)" : ""
-                }`
-              : verdictStatus}
-          </p>
+        <button
+          className="mb-3 w-full rounded-md border border-white/20 bg-black/20 p-3 text-left transition hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-white/60"
+          onClick={() => setIsEditing(false)}
+          type="button"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm italic text-white/85">
+              {entry.verdictReason
+                ? `${entry.verdictReason}${
+                    entry.verdictSource === "manual_override" ? " (your override)" : ""
+                  }`
+                : verdictStatus}
+            </p>
+            <span aria-hidden="true" className="shrink-0 text-xs text-white/60">
+              tap to close
+            </span>
+          </div>
           {entry.verdictSource === "unscored" && entry.verdictError ? (
             <p className="mt-2 rounded-md border border-red-300/50 bg-red-500/15 px-2 py-1 text-xs font-semibold text-red-200">
               Scoring failed: {entry.verdictError}
@@ -917,7 +926,7 @@ function FoodEntryRow({
           <span className="mt-2 inline-flex rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-xs font-semibold text-white/65">
             {categoryLabel(entry.category)}
           </span>
-        </div>
+        </button>
         <div className="grid gap-2 sm:grid-cols-2">
           <TextInput
             label="Meal"
