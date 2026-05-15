@@ -137,6 +137,59 @@ html {
   background-color: #1e293b !important;
 }
 
+/*
+  Dark-glass legibility pass.
+  The penthouse background is bright enough in places that the earlier
+  translucent panels let numbers wash out. These app-wide overrides keep the
+  frosted look, but give widgets and controls a darker backing everywhere.
+*/
+.bg-black\/5 {
+  background-color: rgb(0 0 0 / 0.22) !important;
+}
+
+.hover\:bg-black\/10:hover,
+.bg-black\/10 {
+  background-color: rgb(0 0 0 / 0.28) !important;
+}
+
+.hover\:bg-black\/15:hover,
+.bg-black\/15 {
+  background-color: rgb(0 0 0 / 0.34) !important;
+}
+
+.bg-black\/20 {
+  background-color: rgb(0 0 0 / 0.4) !important;
+}
+
+.hover\:bg-black\/25:hover,
+.bg-black\/25 {
+  background-color: rgb(0 0 0 / 0.46) !important;
+}
+
+.bg-white\/5 {
+  background-color: rgb(0 0 0 / 0.18) !important;
+}
+
+.hover\:bg-white\/10:hover,
+.bg-white\/10 {
+  background-color: rgb(0 0 0 / 0.28) !important;
+}
+
+.hover\:bg-white\/14:hover,
+.bg-white\/14 {
+  background-color: rgb(0 0 0 / 0.36) !important;
+}
+
+.hover\:bg-white\/15:hover,
+.bg-white\/15 {
+  background-color: rgb(0 0 0 / 0.34) !important;
+}
+
+.hover\:bg-white\/20:hover,
+.bg-white\/20 {
+  background-color: rgb(0 0 0 / 0.44) !important;
+}
+
 .border-zinc-100 {
   border-color: #e2e8f0 !important;
 }
