@@ -450,13 +450,24 @@ export function ShiftlyCalView({
 
           <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
             <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
-              <SavedFoodsList
-                disabled={isPending}
-                loggedFoodId={loggedFoodId}
-                onFill={fillFromSavedFood}
-                onInstantLog={instantLog}
-                savedFoods={initialData.savedFoods}
-              />
+              <div className="space-y-4">
+                <SavedFoodsList
+                  disabled={isPending}
+                  loggedFoodId={loggedFoodId}
+                  onFill={fillFromSavedFood}
+                  onInstantLog={instantLog}
+                  savedFoods={initialData.savedFoods}
+                />
+                <MealOrderPromptBox disabled={isPending} />
+                <WeightPanel
+                  day={focusedDay}
+                  disabled={isPending}
+                  onSubmit={submitWeight}
+                  setWeightValue={setWeightValue}
+                  todayIso={initialData.todayIso}
+                  weightValue={weightValue}
+                />
+              </div>
 
               <div>
                 <FocusedDayHeader
@@ -500,32 +511,17 @@ export function ShiftlyCalView({
                 </div>
               </div>
 
-              <div>
+              <div className="space-y-4">
                 <DayTotalsPanel
                   day={focusedDay}
                   targets={initialData.targets}
                 />
-                <div className="mt-4">
-                  <MealOrderPromptBox disabled={isPending} />
-                </div>
-                <div className="mt-4">
-                  <WaterPanel
-                    day={focusedDay}
-                    disabled={isPending}
-                    onLog={logWater}
-                    targetOz={initialData.targets.waterTargetOz}
-                  />
-                </div>
-                <div className="mt-4">
-                  <WeightPanel
-                    day={focusedDay}
-                    disabled={isPending}
-                    onSubmit={submitWeight}
-                    setWeightValue={setWeightValue}
-                    todayIso={initialData.todayIso}
-                    weightValue={weightValue}
-                  />
-                </div>
+                <WaterPanel
+                  day={focusedDay}
+                  disabled={isPending}
+                  onLog={logWater}
+                  targetOz={initialData.targets.waterTargetOz}
+                />
               </div>
             </div>
           </section>
