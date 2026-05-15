@@ -248,7 +248,15 @@ export async function generateMealOrderPromptAction(input?: {
     `4. Rank the 4 options by best-fit for my remaining macros${hasHbp ? " AND BP-friendliness" : ""}.`,
     "5. Note which one is your top pick and why in one sentence.",
     "",
-    "Browse now and return the 4 options with their DoorDash links.",
+    "6. **At the very end, under a `## For logging` section, give a plain one-line macro summary for EACH of the 4 options in this exact format (no x/total, no rankings, just clean numbers I can paste into my food-logging AI):**",
+    "",
+    "   ```",
+    "   <Option name>: <cal> cal, <protein>g protein, <carbs>g carbs, <fat>g fat, <fiber>g fiber, <sodium>mg sodium, <added_sugar>g added sugar, <saturated_fat>g sat fat",
+    "   ```",
+    "",
+    "   Use the PORTIONED numbers (what I'll actually eat), not the full-meal numbers. Example: `GRECA Chicken Kalamakia (no pita): 640 cal, 73g protein, 8g carbs, 28g fat, 2g fiber, 640mg sodium, 0g added sugar, 3.5g sat fat`",
+    "",
+    "Browse now and return the 4 options with their DoorDash links, the ranking, and the For logging block at the end.",
   ];
 
   return { ok: true, prompt: lines.filter(Boolean).join("\n") };
@@ -388,7 +396,15 @@ export async function generateHomeRecipePromptAction(): Promise<{
     `5. Rank the 4 recipes by best-fit for my remaining macros${hasHbp ? " AND BP-friendliness (low sodium, herbs/acid for flavor instead of salt)" : ""}.`,
     "6. Note which is your top pick and why in one sentence — especially if one stands out for flavor-per-sodium ratio.",
     "",
-    "Browse now and return the 4 recipes with precise measurements and real source links.",
+    "7. **At the very end, under a `## For logging` section, give a plain one-line macro summary for EACH recipe in this exact format (1 serving, AFTER your modifications, no x/total, just clean numbers I can paste into my food-logging AI):**",
+    "",
+    "   ```",
+    "   <Recipe name> (1 serving, with modifications): <cal> cal, <protein>g protein, <carbs>g carbs, <fat>g fat, <fiber>g fiber, <sodium>mg sodium, <added_sugar>g added sugar, <saturated_fat>g sat fat",
+    "   ```",
+    "",
+    "   Example: `Lemon-Herb Chicken Thighs with Roasted Broccoli (1 serving, salt halved): 480 cal, 45g protein, 12g carbs, 24g fat, 6g fiber, 720mg sodium, 0g added sugar, 5g sat fat`",
+    "",
+    "Browse now and return the 4 recipes with precise measurements, real source links, ranking, and the For logging block at the end.",
   ];
 
   return { ok: true, prompt: lines.filter(Boolean).join("\n") };
