@@ -48,6 +48,7 @@ const JOB_OPTIONS: JobType[] = [
   "other",
 ];
 const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "split", "unit"];
+const AUTO_SYNC_STORAGE_KEY = "shiftly:lastAutoSyncAt";
 
 type DashboardEditorProps = {
   initialData: DashboardData;
@@ -71,6 +72,8 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     new Set(),
   );
   const [transactionError, setTransactionError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [focusedDayIndex, setFocusedDayIndex] = useState(() =>
     Math.max(
       0,
@@ -128,11 +131,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   // Throttled by sessionStorage so it only runs once per browser session per
   // 5-minute window, avoiding API spam during navigation.
   useEffect(() => {
-    const STORAGE_KEY = "shiftly:lastAutoSyncAt";
     const THROTTLE_MS = 5 * 60 * 1000;
-    const last = Number(sessionStorage.getItem(STORAGE_KEY) ?? "0");
+    const last = Number(sessionStorage.getItem(AUTO_SYNC_STORAGE_KEY) ?? "0");
     if (Date.now() - last < THROTTLE_MS) return;
-    sessionStorage.setItem(STORAGE_KEY, String(Date.now()));
+    sessionStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
 
     let cancelled = false;
     (async () => {
@@ -170,6 +172,23 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   );
   const focusedDay = days[focusedDayIndex] ?? days[0];
   const focusedDayTotals = focusedDay ? dayTotals.get(focusedDay.id) : undefined;
+
+  async function handleManualSync() {
+    setSyncStatus(null);
+    setIsSyncing(true);
+
+    try {
+      const result = await syncTransactionsAction();
+      window.sessionStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
+      setSyncStatus(`Pulled ${result.added} new, ${result.modified} updated`);
+      router.refresh();
+      window.setTimeout(() => setSyncStatus(null), 4000);
+    } catch (error) {
+      setSyncStatus(error instanceof Error ? error.message : "Sync failed");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
 
   function updateSlot(
     dayId: string,
@@ -566,10 +585,23 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             </div>
 
             <div>
-              <div className="mb-3 flex justify-start lg:justify-end">
+              <div className="mb-3 flex flex-wrap items-center justify-start gap-2 lg:justify-end">
                 <span className="inline-flex rounded-full border border-white/25 bg-white/15 px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
                   Active week
                 </span>
+                <button
+                  className="inline-flex rounded-full border border-emerald-200/60 bg-emerald-400/90 px-3 py-1 text-xs font-bold text-[#052e16] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isSyncing}
+                  onClick={handleManualSync}
+                  type="button"
+                >
+                  {isSyncing ? "Syncing..." : "Sync now"}
+                </button>
+                {syncStatus ? (
+                  <span className="inline-flex rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                    {syncStatus}
+                  </span>
+                ) : null}
               </div>
               <MetricStrip
                 cashflowCents={weekTotals.cashflowCents}

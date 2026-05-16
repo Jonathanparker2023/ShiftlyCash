@@ -213,6 +213,20 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
       requireString(item.access_token_encrypted, "encrypted access token"),
       encryptionKey,
     );
+
+    try {
+      await client.transactionsRefresh({ access_token: accessToken });
+    } catch (refreshError) {
+      if (isPlaidLoginRequiredError(refreshError)) {
+        throw refreshError;
+      }
+
+      console.warn(
+        `[plaid/refresh] failed for item ${item.id}:`,
+        refreshError instanceof Error ? refreshError.message : refreshError,
+      );
+    }
+
     let cursor = item.cursor ?? undefined;
     let hasMore = true;
     let addedCount = 0;
