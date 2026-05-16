@@ -663,12 +663,12 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
           <div className="mt-4 flex flex-col gap-3 border-t border-white/20 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-white">
-              <span>Total: {weekTotals.wageHours.toFixed(2)}h</span>
-              <span>Ability: {formatHoursFromSlots(days, "ability")}h</span>
               <span>
                 Prestige:{" "}
                 {formatHoursFromSlots(days, ["prestige", "prestige_ilst"])}h
               </span>
+              <span>Ability: {formatHoursFromSlots(days, "ability")}h</span>
+              <span>Total: {weekTotals.wageHours.toFixed(2)}h</span>
             </div>
             <WeekNetSummary
               abilityNetCents={weekNetTotals.abilityNetCents}
