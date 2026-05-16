@@ -867,15 +867,28 @@ function WeekStripCell({
   const displayCashflowCents = roundCashflowToNearestFiveDollars(
     projectedCashflowCents ?? cashflowCents,
   );
+  const dayTone = cashflowDailyTone(displayCashflowCents);
+  const toneBorder =
+    dayTone === "positive"
+      ? "border-emerald-400/80"
+      : dayTone === "amber"
+        ? "border-amber-400/80"
+        : "border-rose-400/80";
+  const toneGlow =
+    dayTone === "positive"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
+      : dayTone === "amber"
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(245,158,11,0.45)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]";
 
   return (
     <button
         className={
           isFocused
-          ? "min-w-0 rounded-md border-2 border-white/90 bg-white/14 px-1.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+          ? `min-w-0 rounded-md border-2 border-white/90 bg-white/14 px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3`
           : day.spendLocked
-            ? "min-w-0 rounded-md border-2 border-white/35 bg-white/8 px-1.5 py-2 text-left opacity-75 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] backdrop-blur-lg transition hover:border-white/45 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
-            : "min-w-0 rounded-md border-2 border-white/45 bg-white/10 px-1.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-xl transition hover:border-white/60 hover:bg-white/14 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-white/8 px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-white/14 focus:outline-none focus:ring-2 focus:ring-white sm:p-3`
+            : `min-w-0 rounded-md border-2 ${toneBorder} bg-white/10 px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-white/14 focus:outline-none focus:ring-2 focus:ring-white sm:p-3`
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
