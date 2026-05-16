@@ -14,10 +14,10 @@ export async function POST(request: Request) {
   }
 
   const fixture = {
-    text: "Spent $12.34 at TEST MERCHANT",
+    title: "You spent $5.05",
+    text: "Your new Chime account balance is $233.76 after your purchase at TEST MERCHANT.",
     receivedAt: new Date().toISOString(),
-    notificationTitle: "Chime",
-    shortcutVersion: "test-fixture",
+    shortcutVersion: "curl-fixture",
   };
 
   const url = new URL("/api/chime/ingest", request.url).toString();
