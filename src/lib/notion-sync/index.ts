@@ -1,7 +1,7 @@
 import "server-only";
 
-const FOUNDATION_LEDGER_DB = "450e01ea-a414-486d-9a1a-b2fa5a42d1e9";
-const NUTRITION_LEDGER_DB = "42d5a9ec-ea4d-4f28-b8e6-cc91a6efdbed";
+const FOUNDATION_LEDGER_DB = "95845470-73b6-4b8f-b13e-0106ca7d5737";
+const NUTRITION_LEDGER_DB = "807eb9f8-ae1a-4a53-9357-8a250c75dc48";
 const BASE_URL = "https://shiftlycash.vercel.app";
 const NOTION_VERSION = "2022-06-28";
 
