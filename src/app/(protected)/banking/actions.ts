@@ -90,6 +90,7 @@ export async function createLinkTokenAction(): Promise<CreateLinkTokenResult> {
     user: {
       client_user_id: user.id,
     },
+    webhook: process.env.PLAID_WEBHOOK_URL || undefined,
   });
 
   return {
@@ -149,28 +150,27 @@ export async function syncTransactionsAction(
     ? createAdminClient()
     : supabase;
   const config = getPlaidServerEnv();
-  const [
-    { data, error },
-    { data: activeWeekData, error: activeWeekError },
-  ] = await Promise.all([
+  const [{ data, error }, activeWeek] = await Promise.all([
     supabase.rpc("plaid_items_for_server_sync"),
-    supabase
-      .from("weeks")
-      .select("start_date,end_date")
-      .eq("status", "active")
-      .maybeSingle(),
+    loadActiveWeekForUser(supabase, user.id),
   ]);
 
   if (error) {
     throw new Error(`Unable to load Plaid sync items: ${error.message}`);
   }
-  if (activeWeekError) {
-    throw new Error(`Unable to load active week: ${activeWeekError.message}`);
-  }
 
   const items = (data ?? []) as ServerPlaidItem[];
-  const activeWeek = activeWeekData as ActiveWeekRange | null;
   const activeWeekStartDate = activeWeek?.start_date ?? null;
+  const syncContext: PlaidSyncContext = {
+    supabase,
+    merchantCacheClient,
+    userId: user.id,
+    activeWeekStartDate,
+    encryptionKey: config.tokenEncryptionKey,
+    forceRefresh,
+    updateItemSyncState: (itemId, cursor, status) =>
+      updatePlaidItemSyncStateViaRpc(supabase, itemId, cursor, status),
+  };
   let added = 0;
   let modified = 0;
   let removed = 0;
@@ -181,17 +181,17 @@ export async function syncTransactionsAction(
     }
 
     try {
-      const result = await syncPlaidItem(item, config.tokenEncryptionKey);
+      const result = await syncPlaidItem(item, syncContext);
       added += result.added;
       modified += result.modified;
       removed += result.removed;
     } catch (caughtError) {
       if (isPlaidLoginRequiredError(caughtError)) {
-        await supabase.rpc("update_plaid_item_sync_state", {
-          p_item_id: item.id,
-          p_cursor: item.cursor,
-          p_status: "login_required",
-        });
+        await syncContext.updateItemSyncState(
+          item.id,
+          item.cursor,
+          "login_required",
+        );
         continue;
       }
 
@@ -199,8 +199,10 @@ export async function syncTransactionsAction(
     }
   }
 
-  await excludeOldNoMatchingTransactions(activeWeekStartDate);
+  await excludeOldNoMatchingTransactions(supabase, user.id, activeWeekStartDate);
   const normalized = await normalizeCurrentWeekMerchantNames(
+    supabase,
+    user.id,
     activeWeek,
     merchantCacheClient,
   );
@@ -209,295 +211,486 @@ export async function syncTransactionsAction(
   revalidatePath("/banking");
 
   return { ok: true, added, modified, removed, normalized };
+}
 
-  async function syncPlaidItem(item: ServerPlaidItem, encryptionKey: string) {
-    const client = getPlaidClient();
-    const accessToken = decryptAccessToken(
-      requireString(item.access_token_encrypted, "encrypted access token"),
-      encryptionKey,
-    );
+export async function syncTransactionsActionForItem(
+  plaidItemId: string,
+): Promise<SyncTransactionsResult> {
+  const normalizedPlaidItemId = plaidItemId.trim();
 
-    if (forceRefresh) {
-      try {
-        await client.transactionsRefresh({ access_token: accessToken });
-      } catch (refreshError) {
-        if (isPlaidLoginRequiredError(refreshError)) {
-          throw refreshError;
-        }
-        console.warn(
-          `[plaid/refresh] failed for item ${item.id}:`,
-          refreshError instanceof Error ? refreshError.message : refreshError,
-        );
-      }
-    }
-
-    let cursor = item.cursor ?? undefined;
-    let hasMore = true;
-    let addedCount = 0;
-    let modifiedCount = 0;
-    let removedCount = 0;
-
-    while (hasMore) {
-      const response = await client.transactionsSync({
-        access_token: accessToken,
-        cursor,
-        count: 500,
-        options: {
-          include_original_description: true,
-        },
-      });
-
-      for (const transaction of response.data.added) {
-        await upsertPlaidTransaction(item.id, transaction);
-      }
-
-      for (const transaction of response.data.modified) {
-        await upsertPlaidTransaction(item.id, transaction);
-      }
-
-      for (const removedTransaction of response.data.removed) {
-        await markPlaidTransactionRemoved(removedTransaction.transaction_id);
-      }
-
-      addedCount += response.data.added.length;
-      modifiedCount += response.data.modified.length;
-      removedCount += response.data.removed.length;
-      cursor = response.data.next_cursor;
-      hasMore = response.data.has_more;
-    }
-
-    await supabase.rpc("update_plaid_item_sync_state", {
-      p_item_id: item.id,
-      p_cursor: cursor ?? null,
-      p_status: "active",
-    });
-
-    return {
-      added: addedCount,
-      modified: modifiedCount,
-      removed: removedCount,
-    };
+  if (!normalizedPlaidItemId) {
+    throw new Error("Missing Plaid item id.");
   }
 
-  async function upsertPlaidTransaction(plaidItemId: string, transaction: Transaction) {
-    const day = await findDayForTransaction(transaction.date);
-    const isBeforeActiveWeek =
-      Boolean(activeWeekStartDate) && transaction.date < activeWeekStartDate!;
-    const rawName = transaction.original_description ?? transaction.name;
-    const existingTransaction = await findExistingPlaidTransaction(
-      transaction.transaction_id,
-    );
+  const supabase = createAdminClient();
+  const merchantCacheClient = supabase;
+  const config = getPlaidServerEnv();
+  const { data: itemData, error: itemError } = await supabase
+    .from("plaid_items")
+    .select(
+      "id,user_id,plaid_item_id,access_token_encrypted,cursor,institution_name,status",
+    )
+    .eq("plaid_item_id", normalizedPlaidItemId)
+    .maybeSingle();
 
-    if (existingTransaction?.status === "excluded") {
-      return;
+  if (itemError) {
+    throw new Error(`Unable to load Plaid item: ${itemError.message}`);
+  }
+  if (!itemData) {
+    throw new Error(`Item not found: ${normalizedPlaidItemId}`);
+  }
+
+  const item = itemData as ServerPlaidItem & { user_id: string | null };
+  const userId = requireString(item.user_id, "Plaid item user");
+
+  if (!item.access_token_encrypted || item.status === "login_required") {
+    return { ok: true, added: 0, modified: 0, removed: 0, normalized: 0 };
+  }
+
+  const activeWeek = await loadActiveWeekForUser(supabase, userId);
+  const syncContext: PlaidSyncContext = {
+    supabase,
+    merchantCacheClient,
+    userId,
+    activeWeekStartDate: activeWeek?.start_date ?? null,
+    encryptionKey: config.tokenEncryptionKey,
+    forceRefresh: false,
+    updateItemSyncState: (itemId, cursor, status) =>
+      updatePlaidItemSyncStateDirect(supabase, userId, itemId, cursor, status),
+  };
+
+  let added = 0;
+  let modified = 0;
+  let removed = 0;
+
+  try {
+    const result = await syncPlaidItem(item, syncContext);
+    added = result.added;
+    modified = result.modified;
+    removed = result.removed;
+  } catch (caughtError) {
+    if (isPlaidLoginRequiredError(caughtError)) {
+      await syncContext.updateItemSyncState(
+        item.id,
+        item.cursor,
+        "login_required",
+      );
+      return { ok: true, added: 0, modified: 0, removed: 0, normalized: 0 };
     }
 
-    const merchantName = await resolveMerchantName(
-      rawName ?? transaction.merchant_name ?? transaction.name,
-      merchantCacheClient,
-    );
-    const category = formatCategory(transaction);
-    const isIncome = transaction.amount <= 0;
-    const matchesLegacyRule = isLegacyExempt({
-      merchantName,
-      rawName,
-      category,
-    });
-    const autoExclude = isIncome || matchesLegacyRule;
-    const baseStatus =
-      day && !day.spend_locked
-        ? "applied"
-        : isBeforeActiveWeek
-          ? "excluded"
-          : "pending_review";
-    const status = autoExclude ? "excluded" : baseStatus;
-    const reviewReason =
-      status === "pending_review"
-        ? day
-          ? "day_locked"
-          : "no_matching_day"
-        : null;
-    const autoExcludeNote = isIncome
-      ? "Auto-excluded as income (negative amount)."
-      : matchesLegacyRule
-        ? "Auto-excluded by legacy rule (subscription/recurring/insurance/etc.)."
-        : null;
-    const row = {
-      plaid_item_id: plaidItemId,
-      source: "plaid",
-      status: existingTransaction?.status === "applied" ? "applied" : status,
-      review_reason:
-        existingTransaction?.status === "applied"
-          ? null
-          : reviewReason,
-      plaid_transaction_id: transaction.transaction_id,
-      date: transaction.date,
-      authorized_date: transaction.authorized_date ?? null,
-      datetime: transaction.datetime ?? null,
-      merchant_name: merchantName,
-      raw_name: rawName,
-      amount: transaction.amount,
-      category,
-      pending: transaction.pending,
-      excluded_at: status === "excluded" ? new Date().toISOString() : null,
-      notes:
-        autoExcludeNote ??
-        (status === "excluded"
-          ? "Auto-excluded because the transaction date is before the active week."
-          : null),
-    };
+    throw caughtError;
+  }
 
-    if (existingTransaction) {
-      const nextStatus = row.status;
-      const { error: updateError } = await supabase
-        .from("transactions")
-        .update({
-          ...row,
-          day_id:
-            nextStatus === "applied"
-              ? existingTransaction.day_id ?? day?.id ?? null
-              : day?.id ?? null,
-        })
-        .eq("id", existingTransaction.id);
+  await excludeOldNoMatchingTransactions(
+    supabase,
+    userId,
+    activeWeek?.start_date ?? null,
+  );
+  const normalized = await normalizeCurrentWeekMerchantNames(
+    supabase,
+    userId,
+    activeWeek,
+    merchantCacheClient,
+  );
 
-      if (updateError) {
-        throw new Error(`Unable to update transaction: ${updateError.message}`);
+  return { ok: true, added, modified, removed, normalized };
+}
+
+type PlaidItemStatus = ServerPlaidItem["status"];
+
+type PlaidSyncCounters = Pick<
+  SyncTransactionsResult,
+  "added" | "modified" | "removed"
+>;
+
+type PlaidSyncContext = {
+  supabase: SupabaseClient;
+  merchantCacheClient: SupabaseClient;
+  userId: string;
+  activeWeekStartDate: string | null;
+  encryptionKey: string;
+  forceRefresh: boolean;
+  updateItemSyncState: (
+    itemId: string,
+    cursor: string | null,
+    status: PlaidItemStatus,
+  ) => Promise<void>;
+};
+
+async function syncPlaidItem(
+  item: ServerPlaidItem,
+  context: PlaidSyncContext,
+): Promise<PlaidSyncCounters> {
+  const client = getPlaidClient();
+  const accessToken = decryptAccessToken(
+    requireString(item.access_token_encrypted, "encrypted access token"),
+    context.encryptionKey,
+  );
+
+  if (context.forceRefresh) {
+    try {
+      await client.transactionsRefresh({ access_token: accessToken });
+    } catch (refreshError) {
+      if (isPlaidLoginRequiredError(refreshError)) {
+        throw refreshError;
       }
+      console.warn(
+        `[plaid/refresh] failed for item ${item.id}:`,
+        refreshError instanceof Error ? refreshError.message : refreshError,
+      );
+    }
+  }
 
-      return;
+  let cursor = item.cursor ?? undefined;
+  let hasMore = true;
+  let addedCount = 0;
+  let modifiedCount = 0;
+  let removedCount = 0;
+
+  while (hasMore) {
+    const response = await client.transactionsSync({
+      access_token: accessToken,
+      cursor,
+      count: 500,
+      options: {
+        include_original_description: true,
+      },
+    });
+
+    for (const transaction of response.data.added) {
+      await upsertPlaidTransaction(context, item.id, transaction);
     }
 
-    const { error: insertError } = await supabase.from("transactions").insert({
+    for (const transaction of response.data.modified) {
+      await upsertPlaidTransaction(context, item.id, transaction);
+    }
+
+    for (const removedTransaction of response.data.removed) {
+      await markPlaidTransactionRemoved(
+        context,
+        removedTransaction.transaction_id,
+      );
+    }
+
+    addedCount += response.data.added.length;
+    modifiedCount += response.data.modified.length;
+    removedCount += response.data.removed.length;
+    cursor = response.data.next_cursor;
+    hasMore = response.data.has_more;
+  }
+
+  await context.updateItemSyncState(item.id, cursor ?? null, "active");
+
+  return {
+    added: addedCount,
+    modified: modifiedCount,
+    removed: removedCount,
+  };
+}
+
+async function upsertPlaidTransaction(
+  context: PlaidSyncContext,
+  plaidItemId: string,
+  transaction: Transaction,
+) {
+  const day = await findDayForTransaction(context, transaction.date);
+  const isBeforeActiveWeek =
+    Boolean(context.activeWeekStartDate) &&
+    transaction.date < context.activeWeekStartDate!;
+  const rawName = transaction.original_description ?? transaction.name;
+  const existingTransaction = await findExistingPlaidTransaction(
+    context,
+    transaction.transaction_id,
+  );
+
+  if (existingTransaction?.status === "excluded") {
+    return;
+  }
+
+  const merchantName = await resolveMerchantName(
+    rawName ?? transaction.merchant_name ?? transaction.name,
+    context.merchantCacheClient,
+  );
+  const category = formatCategory(transaction);
+  const isIncome = transaction.amount <= 0;
+  const matchesLegacyRule = isLegacyExempt({
+    merchantName,
+    rawName,
+    category,
+  });
+  const autoExclude = isIncome || matchesLegacyRule;
+  const baseStatus =
+    day && !day.spend_locked
+      ? "applied"
+      : isBeforeActiveWeek
+        ? "excluded"
+        : "pending_review";
+  const status = autoExclude ? "excluded" : baseStatus;
+  const reviewReason =
+    status === "pending_review"
+      ? day
+        ? "day_locked"
+        : "no_matching_day"
+      : null;
+  const autoExcludeNote = isIncome
+    ? "Auto-excluded as income (negative amount)."
+    : matchesLegacyRule
+      ? "Auto-excluded by legacy rule (subscription/recurring/insurance/etc.)."
+      : null;
+  const row = {
+    plaid_item_id: plaidItemId,
+    source: "plaid",
+    status: existingTransaction?.status === "applied" ? "applied" : status,
+    review_reason:
+      existingTransaction?.status === "applied" ? null : reviewReason,
+    plaid_transaction_id: transaction.transaction_id,
+    date: transaction.date,
+    authorized_date: transaction.authorized_date ?? null,
+    datetime: transaction.datetime ?? null,
+    merchant_name: merchantName,
+    raw_name: rawName,
+    amount: transaction.amount,
+    category,
+    pending: transaction.pending,
+    excluded_at: status === "excluded" ? new Date().toISOString() : null,
+    notes:
+      autoExcludeNote ??
+      (status === "excluded"
+        ? "Auto-excluded because the transaction date is before the active week."
+        : null),
+  };
+
+  if (existingTransaction) {
+    const nextStatus = row.status;
+    const { error: updateError } = await context.supabase
+      .from("transactions")
+      .update({
+        ...row,
+        day_id:
+          nextStatus === "applied"
+            ? existingTransaction.day_id ?? day?.id ?? null
+            : day?.id ?? null,
+      })
+      .eq("id", existingTransaction.id)
+      .eq("user_id", context.userId);
+
+    if (updateError) {
+      throw new Error(`Unable to update transaction: ${updateError.message}`);
+    }
+
+    return;
+  }
+
+  const { error: insertError } = await context.supabase
+    .from("transactions")
+    .insert({
       ...row,
-      user_id: user.id,
+      user_id: context.userId,
       day_id: day?.id ?? null,
     });
 
-    if (insertError) {
-      throw new Error(`Unable to insert transaction: ${insertError.message}`);
-    }
+  if (insertError) {
+    throw new Error(`Unable to insert transaction: ${insertError.message}`);
+  }
+}
+
+async function findExistingPlaidTransaction(
+  context: PlaidSyncContext,
+  plaidTransactionId: string,
+) {
+  const { data: existingTransaction, error: existingError } = await context.supabase
+    .from("transactions")
+    .select("id,day_id,status")
+    .eq("user_id", context.userId)
+    .eq("plaid_transaction_id", plaidTransactionId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(
+      `Unable to check existing transaction: ${existingError.message}`,
+    );
   }
 
-  async function findExistingPlaidTransaction(plaidTransactionId: string) {
-    const { data: existingTransaction, error: existingError } = await supabase
-      .from("transactions")
-      .select("id,day_id,status")
-      .eq("plaid_transaction_id", plaidTransactionId)
-      .maybeSingle();
+  return existingTransaction as {
+    id: string;
+    day_id: string | null;
+    status: "applied" | "pending_review" | "excluded";
+  } | null;
+}
 
-    if (existingError) {
-      throw new Error(
-        `Unable to check existing transaction: ${existingError.message}`,
-      );
-    }
+async function markPlaidTransactionRemoved(
+  context: PlaidSyncContext,
+  plaidTransactionId: string,
+) {
+  const { error: updateError } = await context.supabase
+    .from("transactions")
+    .update({
+      status: "excluded",
+      excluded_at: new Date().toISOString(),
+      notes: "Removed by Plaid transaction sync.",
+    })
+    .eq("user_id", context.userId)
+    .eq("plaid_transaction_id", plaidTransactionId);
 
-    return existingTransaction as {
-      id: string;
-      day_id: string | null;
-      status: "applied" | "pending_review" | "excluded";
-    } | null;
+  if (updateError) {
+    throw new Error(`Unable to mark removed transaction: ${updateError.message}`);
+  }
+}
+
+async function findDayForTransaction(
+  context: PlaidSyncContext,
+  date: string,
+): Promise<DayMatch | null> {
+  const { data: day, error: dayError } = await context.supabase
+    .from("days")
+    .select("id,spend_locked")
+    .eq("user_id", context.userId)
+    .eq("date", date)
+    .maybeSingle();
+
+  if (dayError) {
+    throw new Error(`Unable to match transaction day: ${dayError.message}`);
   }
 
-  async function markPlaidTransactionRemoved(plaidTransactionId: string) {
+  return day as DayMatch | null;
+}
+
+async function loadActiveWeekForUser(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ActiveWeekRange | null> {
+  const { data: activeWeek, error: activeWeekError } = await supabase
+    .from("weeks")
+    .select("start_date,end_date")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (activeWeekError) {
+    throw new Error(`Unable to load active week: ${activeWeekError.message}`);
+  }
+
+  return activeWeek as ActiveWeekRange | null;
+}
+
+async function updatePlaidItemSyncStateViaRpc(
+  supabase: SupabaseClient,
+  itemId: string,
+  cursor: string | null,
+  status: PlaidItemStatus,
+) {
+  const { error } = await supabase.rpc("update_plaid_item_sync_state", {
+    p_item_id: itemId,
+    p_cursor: cursor,
+    p_status: status,
+  });
+
+  if (error) {
+    throw new Error(`Unable to update Plaid item sync state: ${error.message}`);
+  }
+}
+
+async function updatePlaidItemSyncStateDirect(
+  supabase: SupabaseClient,
+  userId: string,
+  itemId: string,
+  cursor: string | null,
+  status: PlaidItemStatus,
+) {
+  const { error } = await supabase
+    .from("plaid_items")
+    .update({
+      cursor,
+      status,
+      last_synced_at: new Date().toISOString(),
+    })
+    .eq("id", itemId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to update Plaid item sync state: ${error.message}`);
+  }
+}
+
+async function excludeOldNoMatchingTransactions(
+  supabase: SupabaseClient,
+  userId: string,
+  activeWeekStartDate: string | null,
+) {
+  if (!activeWeekStartDate) {
+    return;
+  }
+
+  const { error: updateError } = await supabase
+    .from("transactions")
+    .update({
+      status: "excluded",
+      excluded_at: new Date().toISOString(),
+      notes: "Auto-excluded because the transaction date is before the active week.",
+    })
+    .eq("user_id", userId)
+    .eq("status", "pending_review")
+    .eq("review_reason", "no_matching_day")
+    .lt("date", activeWeekStartDate);
+
+  if (updateError) {
+    throw new Error(
+      `Unable to auto-exclude old transactions: ${updateError.message}`,
+    );
+  }
+}
+
+async function normalizeCurrentWeekMerchantNames(
+  supabase: SupabaseClient,
+  userId: string,
+  week: ActiveWeekRange | null,
+  cacheClient: SupabaseClient,
+): Promise<number> {
+  if (!week) {
+    return 0;
+  }
+
+  const { data: transactions, error: transactionsError } = await supabase
+    .from("transactions")
+    .select("id,merchant_name,raw_name")
+    .eq("user_id", userId)
+    .gte("date", week.start_date)
+    .lte("date", week.end_date);
+
+  if (transactionsError) {
+    throw new Error(
+      `Unable to load current-week transactions for normalization: ${transactionsError.message}`,
+    );
+  }
+
+  let normalizedCount = 0;
+
+  for (const transaction of (transactions ?? []) as CurrentWeekTransaction[]) {
+    const rawName = transaction.raw_name ?? transaction.merchant_name;
+    const merchantName = await resolveMerchantName(rawName, cacheClient, {
+      refreshUglyCache: true,
+    });
+
+    if (!merchantName || merchantName === transaction.merchant_name) {
+      continue;
+    }
+
     const { error: updateError } = await supabase
       .from("transactions")
-      .update({
-        status: "excluded",
-        excluded_at: new Date().toISOString(),
-        notes: "Removed by Plaid transaction sync.",
-      })
-      .eq("plaid_transaction_id", plaidTransactionId);
-
-    if (updateError) {
-      throw new Error(`Unable to mark removed transaction: ${updateError.message}`);
-    }
-  }
-
-  async function findDayForTransaction(date: string): Promise<DayMatch | null> {
-    const { data: day, error: dayError } = await supabase
-      .from("days")
-      .select("id,spend_locked")
-      .eq("date", date)
-      .maybeSingle();
-
-    if (dayError) {
-      throw new Error(`Unable to match transaction day: ${dayError.message}`);
-    }
-
-    return day as DayMatch | null;
-  }
-
-  async function excludeOldNoMatchingTransactions(activeWeekStartDate: string | null) {
-    if (!activeWeekStartDate) {
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from("transactions")
-      .update({
-        status: "excluded",
-        excluded_at: new Date().toISOString(),
-        notes: "Auto-excluded because the transaction date is before the active week.",
-      })
-      .eq("status", "pending_review")
-      .eq("review_reason", "no_matching_day")
-      .lt("date", activeWeekStartDate);
+      .update({ merchant_name: merchantName })
+      .eq("id", transaction.id)
+      .eq("user_id", userId);
 
     if (updateError) {
       throw new Error(
-        `Unable to auto-exclude old transactions: ${updateError.message}`,
-      );
-    }
-  }
-
-  async function normalizeCurrentWeekMerchantNames(
-    week: ActiveWeekRange | null,
-    cacheClient: SupabaseClient,
-  ): Promise<number> {
-    if (!week) {
-      return 0;
-    }
-
-    const { data: transactions, error: transactionsError } = await supabase
-      .from("transactions")
-      .select("id,merchant_name,raw_name")
-      .gte("date", week.start_date)
-      .lte("date", week.end_date);
-
-    if (transactionsError) {
-      throw new Error(
-        `Unable to load current-week transactions for normalization: ${transactionsError.message}`,
+        `Unable to update normalized merchant name: ${updateError.message}`,
       );
     }
 
-    let normalizedCount = 0;
-
-    for (const transaction of (transactions ?? []) as CurrentWeekTransaction[]) {
-      const rawName = transaction.raw_name ?? transaction.merchant_name;
-      const merchantName = await resolveMerchantName(rawName, cacheClient, {
-        refreshUglyCache: true,
-      });
-
-      if (!merchantName || merchantName === transaction.merchant_name) {
-        continue;
-      }
-
-      const { error: updateError } = await supabase
-        .from("transactions")
-        .update({ merchant_name: merchantName })
-        .eq("id", transaction.id);
-
-      if (updateError) {
-        throw new Error(
-          `Unable to update normalized merchant name: ${updateError.message}`,
-        );
-      }
-
-      normalizedCount++;
-    }
-
-    return normalizedCount;
+    normalizedCount++;
   }
+
+  return normalizedCount;
 }
 
 export async function applyPendingTransactionAction(
