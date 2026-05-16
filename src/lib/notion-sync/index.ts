@@ -62,6 +62,13 @@ async function syncFoundationLedger(
     "plan_metrics",
     "debt_free_date_iso",
   );
+  const topCategory = firstRecord(
+    readArray(snapshot, "spending", "top_categories_rolling_30d"),
+  );
+  const historyExclusions = readPath(
+    snapshot,
+    ["history", "current_week", "exclusions"],
+  );
 
   const autoFillProps = cleanProperties({
     Week: titleProperty(`Week of ${weekStart}`),
@@ -78,6 +85,102 @@ async function syncFoundationLedger(
         readNumber(snapshot, "debt_totals", "total_active_dollars"),
     ),
     "Projected debt-free date": dateProperty(debtFreeDate),
+    "Income this week ($)": numberProperty(
+      readNumber(snapshot, "income", "this_week_net"),
+    ),
+    "Spending this week ($)": numberProperty(
+      readNumber(snapshot, "spending", "this_week_total"),
+    ),
+    "Baseline this week ($)": numberProperty(
+      readNumber(snapshot, "baseline", "this_week_total"),
+    ),
+    "Current pay-period cashflow ($)": numberProperty(
+      readNumber(snapshot, "cashflow", "current_pay_period_total"),
+    ),
+    "YTD deployable ($)": numberProperty(
+      readNumber(snapshot, "cashflow", "ytd_deployable_actual"),
+    ),
+    "Weekly tax due ($)": numberProperty(
+      readNumber(snapshot, "plan_metrics", "weekly_tax_due"),
+    ),
+    "Investable weekly cashflow ($)": numberProperty(
+      readNumber(snapshot, "plan_metrics", "investable_weekly_cashflow"),
+    ),
+    "Minimum payments weekly ($)": numberProperty(
+      readNumber(snapshot, "debt_totals", "total_min_pay_weekly"),
+    ),
+    "Active debt count": numberProperty(
+      readNumber(snapshot, "debt_totals", "active_debt_count"),
+    ),
+    "Projection WPC ($)": numberProperty(readNumber(snapshot, "projection", "wpc")),
+    "Projection avg earnings ($)": numberProperty(
+      readNumber(snapshot, "projection", "avg_earnings"),
+    ),
+    "YTD earnings ($)": numberProperty(
+      readNumber(snapshot, "projection", "ytd_earnings"),
+    ),
+    "YPGC ($)": numberProperty(readNumber(snapshot, "projection", "ypgc")),
+    "YPNC ($)": numberProperty(readNumber(snapshot, "projection", "ypnc")),
+    "Projected millionaire date": dateProperty(
+      readString(snapshot, "plan_metrics", "millionaire_date_iso"),
+    ),
+    "Age at millionaire": numberProperty(
+      readNumber(snapshot, "plan_metrics", "age_at_millionaire"),
+    ),
+    "Millionaire duration": richTextProperty(
+      readString(snapshot, "plan_metrics", "millionaire_duration_label"),
+    ),
+    "Top spending category": richTextProperty(readString(topCategory, "category")),
+    "Top spending category ($)": numberProperty(readNumber(topCategory, "amount")),
+    "History week #": numberProperty(
+      readNumber(snapshot, "history", "current_week", "display_week_number"),
+    ),
+    "History earnings ($)": numberProperty(
+      readNumber(snapshot, "history", "current_week", "earnings"),
+    ),
+    "History spend ($)": numberProperty(
+      readNumber(snapshot, "history", "current_week", "spend"),
+    ),
+    "History base ($)": numberProperty(
+      readNumber(snapshot, "history", "current_week", "base"),
+    ),
+    "History running balance ($)": numberProperty(
+      readNumber(snapshot, "history", "current_week", "running_balance"),
+    ),
+    "History earnings excluded": checkboxProperty(
+      readBoolean(historyExclusions, "earnings"),
+    ),
+    "History spend excluded": checkboxProperty(readBoolean(historyExclusions, "spend")),
+    "History cashflow excluded": checkboxProperty(
+      readBoolean(historyExclusions, "cashflow"),
+    ),
+    "Closed weeks count": numberProperty(
+      readNumber(snapshot, "history", "closed_week_count"),
+    ),
+    "History total earnings ($)": numberProperty(
+      readNumber(snapshot, "history", "summary", "total_earnings"),
+    ),
+    "History total spend ($)": numberProperty(
+      readNumber(snapshot, "history", "summary", "total_spend"),
+    ),
+    "History avg earnings ($)": numberProperty(
+      readNumber(snapshot, "history", "summary", "avg_earnings"),
+    ),
+    "History avg spend ($)": numberProperty(
+      readNumber(snapshot, "history", "summary", "avg_spend"),
+    ),
+    "History avg cashflow ($)": numberProperty(
+      readNumber(snapshot, "history", "summary", "avg_cashflow"),
+    ),
+    "History median earnings ($)": numberProperty(
+      readNumber(snapshot, "history", "summary", "median_earnings"),
+    ),
+    "History median spend ($)": numberProperty(
+      readNumber(snapshot, "history", "summary", "median_spend"),
+    ),
+    "History median cashflow ($)": numberProperty(
+      readNumber(snapshot, "history", "summary", "median_cashflow"),
+    ),
   });
 
   return upsertWeekRow(
@@ -140,6 +243,11 @@ async function syncNutritionLedger(
     targetFiber !== null && targetFiber > 0 && avgFiber !== null
       ? roundPercent(avgFiber / targetFiber)
       : null;
+  const daysLogged = readNumber(snapshot, "current_week", "days_logged");
+  const avgSodium = averageLoggedDayTotal(days, "sodium_mg");
+  const avgAddedSugar = averageLoggedDayTotal(days, "added_sugar_g");
+  const avgSaturatedFat = averageLoggedDayTotal(days, "saturated_fat_g");
+  const avgWater = averageLoggedDayValue(days, "water_oz");
 
   const autoFillProps = cleanProperties({
     Week: titleProperty(`Week of ${weekStart}`),
@@ -150,6 +258,116 @@ async function syncNutritionLedger(
     "Weight start (lbs)": numberProperty(weightStart),
     "Weight end (lbs)": numberProperty(weightEnd),
     "Weight delta (lbs)": numberProperty(weightDelta),
+    "Days logged": numberProperty(daysLogged),
+    "Weekly deficit (cal)": numberProperty(
+      readNumber(snapshot, "current_week", "deficit_cal"),
+    ),
+    "Projected weight change (lbs)": numberProperty(
+      readNumber(snapshot, "current_week", "projected_weight_change_lbs"),
+    ),
+    "Avg calories": numberProperty(avgCal),
+    "Avg protein (g)": numberProperty(avgProtein),
+    "Avg carbs (g)": numberProperty(
+      readNumber(snapshot, "current_week", "avg_daily_logged", "carbs_g"),
+    ),
+    "Avg fat (g)": numberProperty(
+      readNumber(snapshot, "current_week", "avg_daily_logged", "fat_g"),
+    ),
+    "Avg fiber (g)": numberProperty(avgFiber),
+    "Avg sodium (mg)": numberProperty(avgSodium),
+    "Avg added sugar (g)": numberProperty(avgAddedSugar),
+    "Avg saturated fat (g)": numberProperty(avgSaturatedFat),
+    "Avg water (oz)": numberProperty(avgWater),
+    "Good verdicts": numberProperty(
+      readNumber(snapshot, "current_week", "verdict_summary", "good"),
+    ),
+    "Fine verdicts": numberProperty(
+      readNumber(snapshot, "current_week", "verdict_summary", "fine"),
+    ),
+    "Bad verdicts": numberProperty(
+      readNumber(snapshot, "current_week", "verdict_summary", "bad"),
+    ),
+    "Unscored verdicts": numberProperty(
+      readNumber(snapshot, "current_week", "verdict_summary", "unscored"),
+    ),
+    "Manual overrides": numberProperty(
+      readNumber(snapshot, "current_week", "verdict_summary", "manual_override"),
+    ),
+    "High sodium days": numberProperty(
+      readNumber(
+        snapshot,
+        "current_week",
+        "verdict_summary",
+        "estimated_facets_week",
+        "high_sodium_days",
+      ),
+    ),
+    "High added sugar days": numberProperty(
+      readNumber(
+        snapshot,
+        "current_week",
+        "verdict_summary",
+        "estimated_facets_week",
+        "high_added_sugar_days",
+      ),
+    ),
+    "Est alcohol servings": numberProperty(
+      readNumber(
+        snapshot,
+        "current_week",
+        "verdict_summary",
+        "estimated_facets_week",
+        "alcohol_servings_estimated",
+      ),
+    ),
+    "7d avg calories": numberProperty(readNumber(snapshot, "rolling_7d", "avg_cal")),
+    "7d avg protein (g)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "avg_protein_g"),
+    ),
+    "7d avg fiber (g)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "avg_fiber_g"),
+    ),
+    "7d avg water (oz)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "avg_water_oz"),
+    ),
+    "7d days under TDEE": numberProperty(
+      readNumber(snapshot, "rolling_7d", "days_under_tdee"),
+    ),
+    "7d days over TDEE": numberProperty(
+      readNumber(snapshot, "rolling_7d", "days_over_tdee"),
+    ),
+    "7d weight trend (lbs)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "weight_trend_lbs"),
+    ),
+    "28d avg calories": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_cal"),
+    ),
+    "28d avg protein (g)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_protein_g"),
+    ),
+    "28d avg fiber (g)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_fiber_g"),
+    ),
+    "28d avg water (oz)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_water_oz"),
+    ),
+    "28d days logged": numberProperty(
+      readNumber(snapshot, "rolling_28d", "days_logged"),
+    ),
+    "28d days under TDEE": numberProperty(
+      readNumber(snapshot, "rolling_28d", "days_under_tdee"),
+    ),
+    "28d days over TDEE": numberProperty(
+      readNumber(snapshot, "rolling_28d", "days_over_tdee"),
+    ),
+    "28d compliance %": numberProperty(
+      wholePercentToNotionPercent(
+        readNumber(snapshot, "rolling_28d", "compliance_pct"),
+      ),
+    ),
+    "28d weight change (lbs)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "weight_change_lbs"),
+    ),
   });
 
   return upsertWeekRow(
@@ -274,6 +492,14 @@ function numberProperty(value: number | null): JsonRecord {
   return { number: value };
 }
 
+function checkboxProperty(value: boolean | null): JsonRecord {
+  return { checkbox: value ?? false };
+}
+
+function richTextProperty(content: string | null): JsonRecord {
+  return { rich_text: content ? [{ text: { content } }] : [] };
+}
+
 function selectProperty(name: string): JsonRecord {
   return { select: { name } };
 }
@@ -310,6 +536,11 @@ function readArray(value: unknown, ...path: string[]): unknown[] {
   return Array.isArray(found) ? found : [];
 }
 
+function readBoolean(value: unknown, ...path: string[]): boolean | null {
+  const found = readPath(value, path);
+  return typeof found === "boolean" ? found : null;
+}
+
 function readPath(value: unknown, path: string[]): unknown {
   return path.reduce<unknown>((current, key) => {
     if (!isRecord(current)) {
@@ -337,10 +568,42 @@ function roundPercent(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+function wholePercentToNotionPercent(value: number | null): number | null {
+  return value === null ? null : roundPercent(value / 100);
+}
+
 function roundWeight(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
 function roundInteger(value: number): number {
   return Math.round(value);
+}
+
+function averageLoggedDayTotal(days: unknown[], field: string): number | null {
+  return averageLoggedDays(days, (day) => readNumber(day, "totals", field));
+}
+
+function averageLoggedDayValue(days: unknown[], field: string): number | null {
+  return averageLoggedDays(days, (day) => readNumber(day, field));
+}
+
+function averageLoggedDays(
+  days: unknown[],
+  readValue: (day: unknown) => number | null,
+): number | null {
+  const loggedDays = days.filter(
+    (day) => (readNumber(day, "entry_count") ?? 0) > 0,
+  );
+
+  if (loggedDays.length === 0) {
+    return null;
+  }
+
+  const total = loggedDays.reduce<number>(
+    (sum, day) => sum + (readValue(day) ?? 0),
+    0,
+  );
+
+  return roundInteger(total / loggedDays.length);
 }

@@ -65,6 +65,7 @@ describe("/api/export/ledger-fields", () => {
               spend_total: 600,
               base_total: 200,
               cashflow_total: 600,
+              running_balance: 600,
             },
             {
               week_id: "week-2",
@@ -80,6 +81,7 @@ describe("/api/export/ledger-fields", () => {
               spend_total: 180,
               base_total: 60,
               cashflow_total: 360,
+              running_balance: 960,
             },
           ],
           error: null,
@@ -185,6 +187,17 @@ describe("/api/export/ledger-fields", () => {
           ],
           error: null,
         },
+        week_projection_exclusions: {
+          data: [
+            {
+              week_id: "week-1",
+              exclude_earnings: false,
+              exclude_spend: false,
+              exclude_cashflow: false,
+            },
+          ],
+          error: null,
+        },
       }),
     );
 
@@ -255,6 +268,48 @@ describe("/api/export/ledger-fields", () => {
       current_daily_base: expect.any(Number),
       monthly_total: expect.any(Number),
     });
+    expect(payload.history).toMatchObject({
+      current_week: {
+        week_id: "week-2",
+        start_date: "2026-05-04",
+        end_date: "2026-05-10",
+        display_week_number: 18,
+        status: "active",
+        pay_period_role: "week_1",
+        earnings: 600,
+        spend: 180,
+        base: 60,
+        cashflow: 360,
+        running_balance: 960,
+        exclusions: {
+          earnings: false,
+          spend: false,
+          cashflow: false,
+        },
+      },
+      closed_week_count: 1,
+      summary: {
+        total_earnings: 1400,
+        total_spend: 600,
+        avg_earnings: 1400,
+        avg_spend: 600,
+        avg_cashflow: 600,
+        median_earnings: 1400,
+        median_spend: 600,
+        median_cashflow: 600,
+      },
+      recent_closed_weeks: [
+        {
+          week_id: "week-1",
+          display_week_number: 17,
+          earnings: 1400,
+          spend: 600,
+          base: 200,
+          cashflow: 600,
+          running_balance: 600,
+        },
+      ],
+    });
     expect(payload.debt_totals).toMatchObject({
       total_active_debt: 14823.45,
       active_debt_count: 1,
@@ -314,6 +369,19 @@ describe("/api/export/ledger-fields", () => {
       payload.baseline.ytd_total,
       payload.baseline.current_daily_base,
       payload.baseline.monthly_total,
+      payload.history.current_week.earnings,
+      payload.history.current_week.spend,
+      payload.history.current_week.base,
+      payload.history.current_week.cashflow,
+      payload.history.current_week.running_balance,
+      payload.history.summary.total_earnings,
+      payload.history.summary.total_spend,
+      payload.history.summary.avg_earnings,
+      payload.history.summary.avg_spend,
+      payload.history.summary.avg_cashflow,
+      payload.history.summary.median_earnings,
+      payload.history.summary.median_spend,
+      payload.history.summary.median_cashflow,
       payload.debt_totals.total_active_debt,
       payload.debt_totals.total_min_pay_monthly,
       payload.debt_totals.total_min_pay_weekly,

@@ -45,6 +45,7 @@ type WeekTotalRow = {
   spend_total: NumericValue;
   base_total: NumericValue;
   cashflow_total: NumericValue;
+  running_balance: NumericValue;
 };
 
 type DayTotalRow = {
@@ -96,6 +97,13 @@ type TransactionRow = {
   amount: NumericValue;
   category: string | null;
   status: string;
+};
+
+type ProjectionExclusionRow = {
+  week_id: string;
+  exclude_earnings: boolean;
+  exclude_spend: boolean;
+  exclude_cashflow: boolean;
 };
 
 const LEDGER_TOKEN_ENV = "SHIFTLYCASH_LEDGER_TOKEN";
@@ -156,7 +164,7 @@ export async function GET(request: Request) {
       supabase
         .from("v_week_totals")
         .select(
-          "week_id,start_date,end_date,display_week_number,status,pay_period_role,paycheck_due_date,earnings_total,ability_paycheck_earnings,prestige_paycheck_earnings,spend_total,base_total,cashflow_total",
+          "week_id,start_date,end_date,display_week_number,status,pay_period_role,paycheck_due_date,earnings_total,ability_paycheck_earnings,prestige_paycheck_earnings,spend_total,base_total,cashflow_total,running_balance",
         )
         .eq("user_id", userId)
         .order("start_date", { ascending: true }),
@@ -212,6 +220,7 @@ export async function GET(request: Request) {
     const dayTotals = (dayTotalsRes.data ?? []) as DayTotalRow[];
     const days = (daysRes.data ?? []) as DayRow[];
     const dayIds = days.map((day) => day.id);
+    const weekIds = weeks.map((week) => week.week_id);
     const slotsRes =
       dayIds.length > 0
         ? await supabase
@@ -219,10 +228,25 @@ export async function GET(request: Request) {
             .select("day_id,job_type,pay_type,hours_or_units,regular_hours,overtime_hours")
             .in("day_id", dayIds)
         : { data: [], error: null };
+    const projectionExclusionsRes =
+      weekIds.length > 0
+        ? await supabase
+            .from("week_projection_exclusions")
+            .select("week_id,exclude_earnings,exclude_spend,exclude_cashflow")
+            .eq("user_id", userId)
+            .in("week_id", weekIds)
+        : { data: [], error: null };
 
     if (slotsRes.error) throw new Error(`Earn slots: ${slotsRes.error.message}`);
+    if (projectionExclusionsRes.error) {
+      throw new Error(
+        `Projection exclusions: ${projectionExclusionsRes.error.message}`,
+      );
+    }
 
     const slots = (slotsRes.data ?? []) as EarnSlotRow[];
+    const projectionExclusions =
+      (projectionExclusionsRes.data ?? []) as ProjectionExclusionRow[];
     const settings = settingsRes.data as SettingsRow;
     const baselineTotals = baselineTotalsRes.data as BaselineTotalRow | null;
     const debts = ((debtsRes.data ?? []) as DebtRow[]).map(mapDebt);
@@ -319,6 +343,11 @@ export async function GET(request: Request) {
       income,
       spending,
       baseline,
+      history: buildHistory({
+        weeks,
+        activeWeek,
+        projectionExclusions,
+      }),
       debt_totals: projectionContext.debtTotals,
       projection: projectionContext.projection,
       plan_metrics: projectionContext.planMetrics,
@@ -608,6 +637,171 @@ function buildProjectionContext({
           : formatWeekDuration(millionaireSim.weeksToTarget),
     },
   };
+}
+
+function buildHistory({
+  weeks,
+  activeWeek,
+  projectionExclusions,
+}: {
+  weeks: WeekTotalRow[];
+  activeWeek: WeekTotalRow | null;
+  projectionExclusions: ProjectionExclusionRow[];
+}) {
+  const exclusionsByWeek = new Map(
+    projectionExclusions.map((row) => [row.week_id, row]),
+  );
+  const closedWeeks = weeks.filter((week) => week.status === "closed");
+  const currentWeek = activeWeek ?? weeks.at(-1) ?? null;
+
+  return {
+    current_week:
+      currentWeek === null
+        ? null
+        : mapHistoryWeek(currentWeek, exclusionsByWeek.get(currentWeek.week_id)),
+    closed_week_count: closedWeeks.length,
+    summary: {
+      total_earnings: money(
+        sumIncludedHistory(closedWeeks, exclusionsByWeek, "earnings"),
+      ),
+      total_spend: money(
+        sumIncludedHistory(closedWeeks, exclusionsByWeek, "spend"),
+      ),
+      avg_earnings: nullableMoney(
+        averageIncludedHistory(closedWeeks, exclusionsByWeek, "earnings"),
+      ),
+      avg_spend: nullableMoney(
+        averageIncludedHistory(closedWeeks, exclusionsByWeek, "spend"),
+      ),
+      avg_cashflow: nullableMoney(
+        averageIncludedHistory(closedWeeks, exclusionsByWeek, "cashflow"),
+      ),
+      median_earnings: nullableMoney(
+        medianIncludedHistory(closedWeeks, exclusionsByWeek, "earnings"),
+      ),
+      median_spend: nullableMoney(
+        medianIncludedHistory(closedWeeks, exclusionsByWeek, "spend"),
+      ),
+      median_cashflow: nullableMoney(
+        medianIncludedHistory(closedWeeks, exclusionsByWeek, "cashflow"),
+      ),
+    },
+    recent_closed_weeks: closedWeeks
+      .slice(-8)
+      .map((week) => mapHistoryWeek(week, exclusionsByWeek.get(week.week_id))),
+  };
+}
+
+type HistoryProjectionField = "earnings" | "spend" | "cashflow";
+
+function mapHistoryWeek(
+  week: WeekTotalRow,
+  exclusions: ProjectionExclusionRow | undefined,
+) {
+  return {
+    week_id: week.week_id,
+    start_date: week.start_date,
+    end_date: week.end_date,
+    display_week_number: Math.round(toNumber(week.display_week_number)),
+    status: week.status,
+    pay_period_role: week.pay_period_role,
+    earnings: money(dollarsToCents(toNumber(week.earnings_total))),
+    spend: money(dollarsToCents(toNumber(week.spend_total))),
+    base: money(dollarsToCents(toNumber(week.base_total))),
+    cashflow: money(dollarsToCents(toNumber(week.cashflow_total))),
+    running_balance: money(dollarsToCents(toNumber(week.running_balance))),
+    exclusions: {
+      earnings: exclusions?.exclude_earnings ?? false,
+      spend: exclusions?.exclude_spend ?? false,
+      cashflow: exclusions?.exclude_cashflow ?? false,
+    },
+  };
+}
+
+function sumIncludedHistory(
+  weeks: WeekTotalRow[],
+  exclusionsByWeek: Map<string, ProjectionExclusionRow>,
+  field: HistoryProjectionField,
+) {
+  return weeks.reduce((sum, week) => {
+    if (isHistoryFieldExcluded(exclusionsByWeek.get(week.week_id), field)) {
+      return sum;
+    }
+
+    return sum + historyFieldCents(week, field);
+  }, 0);
+}
+
+function averageIncludedHistory(
+  weeks: WeekTotalRow[],
+  exclusionsByWeek: Map<string, ProjectionExclusionRow>,
+  field: HistoryProjectionField,
+) {
+  const included = weeks.filter(
+    (week) => !isHistoryFieldExcluded(exclusionsByWeek.get(week.week_id), field),
+  );
+
+  if (included.length === 0) {
+    return null;
+  }
+
+  return Math.round(
+    sumIncludedHistory(included, exclusionsByWeek, field) / included.length,
+  );
+}
+
+function medianIncludedHistory(
+  weeks: WeekTotalRow[],
+  exclusionsByWeek: Map<string, ProjectionExclusionRow>,
+  field: HistoryProjectionField,
+) {
+  const values = weeks
+    .filter(
+      (week) => !isHistoryFieldExcluded(exclusionsByWeek.get(week.week_id), field),
+    )
+    .map((week) => historyFieldCents(week, field))
+    .sort((left, right) => left - right);
+
+  if (values.length === 0) {
+    return null;
+  }
+
+  const middle = Math.floor(values.length / 2);
+  if (values.length % 2 === 1) {
+    return values[middle];
+  }
+
+  return Math.round((values[middle - 1] + values[middle]) / 2);
+}
+
+function historyFieldCents(
+  week: WeekTotalRow,
+  field: HistoryProjectionField,
+) {
+  if (field === "earnings") {
+    return dollarsToCents(toNumber(week.earnings_total));
+  }
+
+  if (field === "spend") {
+    return dollarsToCents(toNumber(week.spend_total));
+  }
+
+  return dollarsToCents(toNumber(week.cashflow_total));
+}
+
+function isHistoryFieldExcluded(
+  exclusions: ProjectionExclusionRow | undefined,
+  field: HistoryProjectionField,
+) {
+  if (field === "earnings") {
+    return exclusions?.exclude_earnings ?? false;
+  }
+
+  if (field === "spend") {
+    return exclusions?.exclude_spend ?? false;
+  }
+
+  return exclusions?.exclude_cashflow ?? false;
 }
 
 function buildSpending({
@@ -958,6 +1152,10 @@ function calculateAgeOnDate(iso: string): number {
 
 function money(cents: number): number {
   return round2(centsToDollars(cents));
+}
+
+function nullableMoney(cents: number | null): number | null {
+  return cents === null ? null : money(cents);
 }
 
 function round2(value: number): number {
