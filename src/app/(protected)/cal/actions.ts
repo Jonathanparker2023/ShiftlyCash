@@ -296,6 +296,107 @@ export async function generateMealOrderPromptAction(input?: {
   return { ok: true, prompt: lines.filter(Boolean).join("\n") };
 }
 
+export async function generateFindMealPromptAction(input?: {
+  locationHint?: string;
+}): Promise<{ ok: true; prompt: string }> {
+  const data = await getShiftlyCalData();
+  const today =
+    data.currentWeek.days.find((day) => day.date === data.todayIso) ??
+    data.currentWeek.days[0];
+  const locationHint = input?.locationHint?.trim() || "[your zip code or area]";
+  const hasHbp = data.targets.healthFlags.includes("high_blood_pressure");
+
+  const lines = [
+    `I want to grab a quick meal from somewhere near ${locationHint}. Suggest 1-3 specific places (real restaurants, supermarket prepared food, or fast-casual spots) where I can walk in, drive through, or quick-pickup something that fits my remaining macros. No DoorDash, no delivery analysis — just tell me where to go and what to order.`,
+    "",
+    "## My current state (today, after meals logged so far)",
+    "",
+    renderBudgetLine(
+      "Calories",
+      data.targets.tdeeCalories,
+      today.totals.calories,
+      "cal",
+      "left",
+    ),
+    renderNeedLine(
+      "Protein needed",
+      data.targets.proteinTargetG,
+      today.totals.proteinG,
+      "g",
+      "daily floor",
+    ),
+    renderNeedLine(
+      "Fiber needed",
+      data.targets.fiberTargetG,
+      today.totals.fiberG,
+      "g",
+      "daily floor",
+    ),
+    renderSimpleBudgetLine(
+      "Carbs budget",
+      data.targets.carbsTargetG,
+      today.totals.carbsG,
+      "g",
+      "remaining (daily ceiling)",
+    ),
+    renderBudgetLine(
+      "Sodium HEADROOM",
+      data.targets.sodiumTargetMg,
+      today.totals.sodiumMg,
+      "mg",
+      hasHbp ? "left (DASH ceiling, hard cap)" : "left",
+    ),
+    renderSimpleBudgetLine(
+      "Added sugar budget",
+      data.targets.addedSugarTargetG,
+      today.totals.addedSugarG,
+      "g",
+      "remaining",
+    ),
+    "",
+    "## Context",
+    "",
+    `- I'm ${data.targets.age ?? 28}, ${data.targets.sex ?? "male"}, 5'9", 202 lb, sedentary${hasHbp ? " with mild HBP" : ""}`,
+    `- On a cut targeting ~1.2 lb/wk loss (TDEE target ${data.targets.tdeeCalories ?? 1650} cal/day)`,
+    "- Quick stop, not delivery. Think drive-through, grocery store hot bar, fast-casual, gas-station-quality-OK-if-real-food.",
+    hasHbp
+      ? "- Avoid liquid sugars (juice, soda, sweetened drinks) and salt bombs (Greek/feta-heavy, deli meat, soy-marinated)"
+      : "- Avoid liquid sugars and salt bombs",
+    "- Prefer real-food protein (grilled chicken, eggs, plain yogurt, fish, beans) over processed",
+    "",
+    "## Your task",
+    "",
+    "1. Suggest 1-3 real places near my location. Mix types: one obvious (fast-casual chain), one less obvious (grocery hot bar, deli, mom-and-pop). No need to be exhaustive — just smart picks.",
+    "",
+    "2. For each, name the SPECIFIC item to order (no 'something from their menu' — be exact) and approximate macros in this format:",
+    "",
+    "   ```",
+    "   **<Place>**: <specific item to order>",
+    "   Approx macros: <cal> cal, <protein>g protein, <sodium>mg sodium, <fiber>g fiber",
+    "   Why it fits: <1 short sentence>",
+    "   ```",
+    "",
+    "3. **Pick your top recommendation and explain why in one sentence.**",
+    "",
+    "4. **Gap-fill tips (required).** For your top pick, what gaps remain after eating it? Recommend specific cheap home additions to close them:",
+    "   - Protein gap >30g → egg whites, cottage cheese, whey shake, Greek yogurt, tuna",
+    "   - Protein gap 10-30g → one of the above, lowest-sodium choice",
+    "   - Fiber gap >10g → salad, apple, raspberries, beans, chia",
+    "   - Water gap → drink X more oz before bed",
+    "   - Sodium/sugar headroom unused → no action, that's a win",
+    "",
+    "5. **For logging.** At the very end, under `## For logging`, give a one-line plain-numbers macro summary I can paste into my food logger for the top pick:",
+    "",
+    "   ```",
+    "   <Place> <item>: <cal> cal, <protein>g protein, <carbs>g carbs, <fat>g fat, <fiber>g fiber, <sodium>mg sodium, <added_sugar>g added sugar, <saturated_fat>g sat fat",
+    "   ```",
+    "",
+    "Keep it short. No long browse, no rejected-options list, no portioning. Just the picks, why, gap-fill tips, and the log line.",
+  ];
+
+  return { ok: true, prompt: lines.filter(Boolean).join("\n") };
+}
+
 export async function generateHomeRecipePromptAction(): Promise<{
   ok: true;
   prompt: string;
