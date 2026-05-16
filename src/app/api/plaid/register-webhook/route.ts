@@ -56,7 +56,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+  const results: Array<{
+    id: string;
+    ok: boolean;
+    registeredWebhook?: string | null;
+    matchesExpected?: boolean;
+    error?: string;
+  }> = [];
   for (const item of items ?? []) {
     try {
       if (!item.access_token_encrypted) continue;
@@ -68,7 +74,14 @@ export async function POST(request: Request) {
         access_token: accessToken,
         webhook: webhookUrl,
       });
-      results.push({ id: item.id as string, ok: true });
+      const itemGet = await plaid.itemGet({ access_token: accessToken });
+      const registeredWebhook = itemGet.data.item.webhook;
+      results.push({
+        id: item.id as string,
+        ok: registeredWebhook === webhookUrl,
+        registeredWebhook,
+        matchesExpected: registeredWebhook === webhookUrl,
+      });
     } catch (err) {
       results.push({
         id: item.id as string,

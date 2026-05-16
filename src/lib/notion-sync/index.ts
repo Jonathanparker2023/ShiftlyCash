@@ -134,11 +134,11 @@ async function syncNutritionLedger(
     targetTdee !== null && avgCal !== null ? roundInteger(avgCal - targetTdee) : null;
   const proteinHitPct =
     targetProtein !== null && targetProtein > 0 && avgProtein !== null
-      ? roundPercent((avgProtein / targetProtein) * 100)
+      ? roundPercent(avgProtein / targetProtein)
       : null;
   const fiberHitPct =
     targetFiber !== null && targetFiber > 0 && avgFiber !== null
-      ? roundPercent((avgFiber / targetFiber) * 100)
+      ? roundPercent(avgFiber / targetFiber)
       : null;
 
   const autoFillProps = cleanProperties({
