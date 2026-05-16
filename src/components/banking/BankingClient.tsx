@@ -77,7 +77,7 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
     setMessage("Syncing transactions...");
 
     try {
-      const result = await syncTransactionsAction();
+      const result = await syncTransactionsAction({ forceRefresh: true });
       setStatus("success");
       setMessage(
         `Synced ${result.added} added, ${result.modified} modified, ${result.removed} removed, ${result.normalized} cleaned transactions.`,

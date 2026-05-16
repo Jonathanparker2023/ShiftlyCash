@@ -140,7 +140,10 @@ export async function exchangePublicTokenAction(
   };
 }
 
-export async function syncTransactionsAction(): Promise<SyncTransactionsResult> {
+export async function syncTransactionsAction(
+  opts?: { forceRefresh?: boolean },
+): Promise<SyncTransactionsResult> {
+  const forceRefresh = opts?.forceRefresh === true;
   const { supabase, user } = await requireUser();
   const merchantCacheClient = getOptionalSupabaseServiceRoleKey()
     ? createAdminClient()
@@ -214,17 +217,18 @@ export async function syncTransactionsAction(): Promise<SyncTransactionsResult> 
       encryptionKey,
     );
 
-    try {
-      await client.transactionsRefresh({ access_token: accessToken });
-    } catch (refreshError) {
-      if (isPlaidLoginRequiredError(refreshError)) {
-        throw refreshError;
+    if (forceRefresh) {
+      try {
+        await client.transactionsRefresh({ access_token: accessToken });
+      } catch (refreshError) {
+        if (isPlaidLoginRequiredError(refreshError)) {
+          throw refreshError;
+        }
+        console.warn(
+          `[plaid/refresh] failed for item ${item.id}:`,
+          refreshError instanceof Error ? refreshError.message : refreshError,
+        );
       }
-
-      console.warn(
-        `[plaid/refresh] failed for item ${item.id}:`,
-        refreshError instanceof Error ? refreshError.message : refreshError,
-      );
     }
 
     let cursor = item.cursor ?? undefined;

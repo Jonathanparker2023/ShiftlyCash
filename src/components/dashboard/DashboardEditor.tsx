@@ -178,7 +178,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     setIsSyncing(true);
 
     try {
-      const result = await syncTransactionsAction();
+      const result = await syncTransactionsAction({ forceRefresh: true });
       window.sessionStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
       setSyncStatus(`Pulled ${result.added} new, ${result.modified} updated`);
       router.refresh();
