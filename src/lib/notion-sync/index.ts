@@ -334,7 +334,7 @@ function roundCurrency(value: number): number {
 }
 
 function roundPercent(value: number): number {
-  return Math.round(value * 10) / 10;
+  return Math.round(value * 1000) / 1000;
 }
 
 function roundWeight(value: number): number {
