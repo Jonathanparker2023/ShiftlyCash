@@ -1,7 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { parseChimeNotification } from "@/lib/domain/chime-parser";
+import {
+  parseChimeNotification,
+  type ChimeParseKind,
+  type ChimeParseResult,
+} from "@/lib/domain/chime-parser";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const SECRET_ENV = "CHIME_INGEST_SECRET";
@@ -62,14 +66,16 @@ export async function POST(request: Request) {
     sourceMeta.appBundle = obj.appBundle;
   }
 
-  const parsed = parseChimeNotification({ title, body: text });
+  const parsed = await parseChimeNotification({ title, body: text });
   let parsedTransactionId: string | null = null;
   let parseFailureReason: string | null = null;
   let parsedAt: string | null = null;
 
-  if (parsed.ok && parsed.kind === "purchase") {
+  if (parsed.ok && isMoneyMovementKind(parsed.kind)) {
     const todayDate = receivedAt.slice(0, 10);
     const importKey = `${receivedAt}|${title ?? ""}|${text}`.slice(0, 240);
+    const amount = transactionAmount(parsed);
+    const merchantName = parsed.merchantOrSource || `Chime ${parsed.kind}`;
 
     const { data: txInserted, error: txError } = await supabase
       .from("transactions")
@@ -77,18 +83,16 @@ export async function POST(request: Request) {
         user_id: userId,
         source: "chime",
         status: "pending_review",
-        review_reason: "Imported from Chime push notification",
-        merchant_name: parsed.merchant,
-        raw_name: parsed.merchant,
-        amount: parsed.amountDollars,
+        review_reason: `Imported from Chime push: ${parsed.kind}, confidence=${parsed.confidence}`,
+        merchant_name: merchantName,
+        raw_name: merchantName,
+        amount,
         date: todayDate,
         datetime: receivedAt,
         import_key: importKey,
-        pending: false,
-        notes:
-          parsed.newBalanceDollars !== null
-            ? `Chime balance after: $${parsed.newBalanceDollars.toFixed(2)}`
-            : null,
+        category: categoryForKind(parsed.kind),
+        pending: parsed.kind === "pending_charge",
+        notes: chimeNotes(parsed),
       })
       .select("id")
       .single();
@@ -104,6 +108,8 @@ export async function POST(request: Request) {
     }
   } else if (!parsed.ok) {
     parseFailureReason = parsed.reason;
+  } else {
+    parseFailureReason = `No transaction created for ${parsed.kind}: ${parsed.reasoning}`;
   }
 
   const { data: capInserted, error: capError } = await supabase
@@ -142,6 +148,53 @@ export async function POST(request: Request) {
     parsed: parsed.ok,
     parse_failure_reason: parseFailureReason,
   });
+}
+
+function isMoneyMovementKind(kind: ChimeParseKind): boolean {
+  return [
+    "purchase",
+    "pending_charge",
+    "transfer_out",
+    "deposit",
+    "transfer_in",
+    "refund",
+  ].includes(kind);
+}
+
+function transactionAmount(parsed: Extract<ChimeParseResult, { ok: true }>): number {
+  const amount = parsed.amountDollars ?? 0;
+  return parsed.direction === "credit" ? -amount : amount;
+}
+
+function categoryForKind(kind: ChimeParseKind): string {
+  switch (kind) {
+    case "deposit":
+      return "deposit";
+    case "transfer_in":
+    case "transfer_out":
+      return "transfer";
+    case "refund":
+      return "refund";
+    case "pending_charge":
+      return "pending_charge";
+    case "purchase":
+      return "purchase";
+    case "balance_alert":
+    case "card_event":
+    case "unknown_known_chime":
+      return "chime";
+  }
+}
+
+function chimeNotes(parsed: Extract<ChimeParseResult, { ok: true }>): string {
+  const parts: string[] = [];
+  if (parsed.newBalanceDollars !== null) {
+    parts.push(`Chime balance after: $${parsed.newBalanceDollars.toFixed(2)}`);
+  }
+  if (parsed.reasoning) {
+    parts.push(`AI parser: ${parsed.reasoning}`);
+  }
+  return parts.join(" | ");
 }
 
 export async function GET() {
