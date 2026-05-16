@@ -2,6 +2,12 @@ import { requireUserWithBootstrapStatus } from "@/lib/auth";
 import { formatDayLabel } from "@/lib/dashboard/dates";
 import { sortChronologicalTransactions } from "@/lib/dashboard/transactions";
 import { dollarsToCents } from "@/lib/domain/money";
+import {
+  calculateEarnSlot,
+  type JobType,
+  type PaySettings,
+  type PayType,
+} from "@/lib/domain/pay";
 import type {
   HistoryData,
   HistoryDetailData,
@@ -13,6 +19,16 @@ import type {
 } from "@/lib/history/types";
 
 type NumericValue = number | string | null;
+
+type SettingsRow = {
+  ability_regular_net_rate: NumericValue;
+  ability_ot_net_rate: NumericValue;
+  prestige_regular_net_rate: NumericValue;
+  prestige_ot_net_rate: NumericValue;
+  prestige_ilst_net_rate: NumericValue;
+  prestige_ilst_ot_net_rate: NumericValue;
+  ability_withholding_rate: NumericValue;
+};
 
 type WeekTotalRow = {
   week_id: string;
@@ -57,9 +73,11 @@ type EarnSlotRow = {
   id: string;
   day_id: string;
   slot_index: number;
-  job_type: string;
-  pay_type: string;
+  job_type: JobType;
+  pay_type: PayType;
   hours_or_units: NumericValue;
+  regular_hours: NumericValue;
+  overtime_hours: NumericValue;
   label: string | null;
   source: string;
 };
@@ -142,12 +160,20 @@ export async function getHistoryDetailData(
 ): Promise<HistoryDetailData | null> {
   const { supabase, user } = await requireUserWithBootstrapStatus();
   const [
+    { data: settingsData, error: settingsError },
     { data: weekData, error: weekError },
     { data: exclusionData, error: exclusionError },
     { data: dayData, error: dayError },
     { data: dayTotalData, error: dayTotalError },
     { data: snapshotData, error: snapshotError },
   ] = await Promise.all([
+    supabase
+      .from("settings")
+      .select(
+        "ability_regular_net_rate, ability_ot_net_rate, prestige_regular_net_rate, prestige_ot_net_rate, prestige_ilst_net_rate, prestige_ilst_ot_net_rate, ability_withholding_rate",
+      )
+      .eq("user_id", user.id)
+      .single(),
     supabase
       .from("v_week_totals")
       .select(
@@ -185,6 +211,9 @@ export async function getHistoryDetailData(
       .order("created_at", { ascending: false }),
   ]);
 
+  if (settingsError) {
+    throw new Error(`Unable to load pay settings: ${settingsError.message}`);
+  }
   if (weekError) {
     throw new Error(`Unable to load history week: ${weekError.message}`);
   }
@@ -207,6 +236,7 @@ export async function getHistoryDetailData(
 
   const days = (dayData ?? []) as DayRow[];
   const dayIds = days.map((day) => day.id);
+  const settings = mapPaySettings(settingsData as SettingsRow);
   const [slotRows, transactionRows] = await Promise.all([
     loadEarnSlots(dayIds),
     loadTransactions(dayIds),
@@ -226,6 +256,7 @@ export async function getHistoryDetailData(
         totalsByDay.get(day.id),
         slotRows.filter((slot) => slot.day_id === day.id),
         transactionRows.filter((transaction) => transaction.day_id === day.id),
+        settings,
       ),
     ),
     snapshots: ((snapshotData ?? []) as SnapshotRow[]).map(mapSnapshotSummary),
@@ -238,7 +269,9 @@ export async function getHistoryDetailData(
 
     const { data, error } = await supabase
       .from("earn_slots")
-      .select("id,day_id,slot_index,job_type,pay_type,hours_or_units,label,source")
+      .select(
+        "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,label,source",
+      )
       .eq("user_id", user.id)
       .in("day_id", dayIdsToLoad)
       .order("slot_index", { ascending: true });
@@ -313,6 +346,7 @@ function mapHistoryDetailDay(
   totals: DayTotalRow | undefined,
   slots: EarnSlotRow[],
   transactions: TransactionRow[],
+  settings: PaySettings,
 ): HistoryDetailDay {
   return {
     id: day.id,
@@ -328,22 +362,54 @@ function mapHistoryDetailDay(
     earningsCents: dollarsToCents(toNumber(totals?.earnings_total ?? 0)),
     spendCents: dollarsToCents(toNumber(totals?.spend_total ?? 0)),
     cashflowCents: dollarsToCents(toNumber(totals?.cashflow_total ?? 0)),
-    slots: slots.map(mapHistoryDetailSlot),
+    slots: slots.map((slot) => mapHistoryDetailSlot(slot, settings)),
     transactions: sortChronologicalTransactions(
       transactions.map(mapHistoryDetailTransaction),
     ),
   };
 }
 
-function mapHistoryDetailSlot(row: EarnSlotRow): HistoryDetailSlot {
-  return {
-    id: row.id,
-    slotIndex: row.slot_index,
+function mapHistoryDetailSlot(
+  row: EarnSlotRow,
+  settings: PaySettings,
+): HistoryDetailSlot {
+  const slot = {
     jobType: row.job_type,
     payType: row.pay_type,
     hoursOrUnits: toNumber(row.hours_or_units),
+    regularHours: toNumber(row.regular_hours),
+    overtimeHours: toNumber(row.overtime_hours),
     label: row.label ?? "",
+  };
+
+  return {
+    id: row.id,
+    slotIndex: row.slot_index,
+    ...slot,
+    computedEarningsCents: calculateEarnSlot(slot, settings).earningsCents,
     source: row.source,
+  };
+}
+
+function mapPaySettings(row: SettingsRow): PaySettings {
+  return {
+    abilityRegularNetRateCents: dollarsToCents(
+      toNumber(row.ability_regular_net_rate),
+    ),
+    abilityOvertimeNetRateCents: dollarsToCents(toNumber(row.ability_ot_net_rate)),
+    prestigeRegularNetRateCents: dollarsToCents(
+      toNumber(row.prestige_regular_net_rate),
+    ),
+    prestigeOvertimeNetRateCents: dollarsToCents(
+      toNumber(row.prestige_ot_net_rate),
+    ),
+    prestigeIlstRegularNetRateCents: dollarsToCents(
+      toNumber(row.prestige_ilst_net_rate),
+    ),
+    prestigeIlstOvertimeNetRateCents: dollarsToCents(
+      toNumber(row.prestige_ilst_ot_net_rate),
+    ),
+    abilityNetMultiplier: 1 - toNumber(row.ability_withholding_rate),
   };
 }
 

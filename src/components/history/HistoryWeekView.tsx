@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
 import {
   cashflowColorFromTone,
   cashflowDailyTone,
@@ -9,6 +10,7 @@ import {
   type CashflowTone,
 } from "@/lib/domain/legacyRules";
 import { centsToDollars } from "@/lib/domain/money";
+import { netEarningsByBucket } from "@/lib/domain/pay";
 import type {
   HistoryDetailData,
   HistoryDetailDay,
@@ -22,6 +24,10 @@ export function HistoryWeekView({ data }: { data: HistoryDetailData }) {
     Math.max(0, data.days.findIndex((day) => day.dayIndex === 6)),
   );
   const focusedDay = data.days[focusedDayIndex] ?? data.days[0];
+  const weekNetTotals = useMemo(
+    () => netEarningsByBucket(data.days.flatMap((day) => day.slots)),
+    [data.days],
+  );
 
   const metrics = useMemo(
     () => [
@@ -85,6 +91,11 @@ export function HistoryWeekView({ data }: { data: HistoryDetailData }) {
       </section>
 
       {focusedDay ? <FocusedDayPanel day={focusedDay} /> : null}
+
+      <WeekNetSummary
+        abilityNetCents={weekNetTotals.abilityNetCents}
+        prestigeNetCents={weekNetTotals.prestigeNetCents}
+      />
 
       <SnapshotSection snapshots={data.snapshots} />
     </main>
@@ -241,6 +252,11 @@ function ShiftRow({ slot }: { slot: HistoryDetailSlot }) {
         <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
           {slot.label || ""}
         </span>
+        {slot.computedEarningsCents > 0 ? (
+          <span className="ml-auto shrink-0 text-sm font-medium tabular-nums">
+            {formatMoney(slot.computedEarningsCents)}
+          </span>
+        ) : null}
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import {
   type SaveEarnSlotInput,
 } from "@/app/(protected)/actions";
 import { syncTransactionsAction } from "@/app/(protected)/banking/actions";
+import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
 import { addDaysIso, formatDayLabel } from "@/lib/dashboard/dates";
 import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
 import type {
@@ -28,9 +29,10 @@ import {
   calculateDayTotals,
   calculateWeekTotals,
   getPayPeriodInfo,
+  netEarningsByBucket,
   type JobType,
-  type PayType,
   type PaySettings,
+  type PayType,
 } from "@/lib/domain/pay";
 import {
   cashflowColorFromTone,
@@ -168,6 +170,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   );
   const weekTotals = useMemo(
     () => calculateWeekTotals({ days: days.map(toDayInput) }, initialData.settings),
+    [days, initialData.settings],
+  );
+  const weekNetTotals = useMemo(
+    () => netEarningsByBucket(toComputedEarningSlots(days, initialData.settings)),
     [days, initialData.settings],
   );
   const focusedDay = days[focusedDayIndex] ?? days[0];
@@ -664,6 +670,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                 {formatHoursFromSlots(days, ["prestige", "prestige_ilst"])}h
               </span>
             </div>
+            <WeekNetSummary
+              abilityNetCents={weekNetTotals.abilityNetCents}
+              prestigeNetCents={weekNetTotals.prestigeNetCents}
+            />
             <button
               className="h-10 w-full rounded-md bg-[#0b1220] px-5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(16,16,15,0.18)] transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#d7dee8] disabled:text-[#64748b] disabled:shadow-none sm:w-auto"
               disabled={!canCloseWeek || isClosing}
@@ -1754,6 +1764,15 @@ function toDayInput(day: DashboardDay) {
     spendCents: day.spendCents + day.transactionSpendCents,
     baseCents: day.baseCents,
   };
+}
+
+function toComputedEarningSlots(days: DashboardDay[], settings: PaySettings) {
+  return days.flatMap((day) =>
+    day.slots.map((slot) => ({
+      jobType: slot.jobType,
+      computedEarningsCents: calculateEarnSlot(slot, settings).earningsCents,
+    })),
+  );
 }
 
 function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {

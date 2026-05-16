@@ -4,9 +4,10 @@ import {
   calculateDayTotals,
   calculateEarnSlot,
   calculateWeekTotals,
-  type PaySettings,
   getPayPeriodInfo,
   getShiftlyDisplayWeekNumber,
+  netEarningsByBucket,
+  type PaySettings,
 } from "@/lib/domain/pay";
 import { dollarsToCents } from "@/lib/domain/money";
 
@@ -247,6 +248,22 @@ describe("pay calculations", () => {
     expect(totals.abilityPaycheckCents).toBe(4_500);
     expect(totals.prestigePaycheckCents).toBe(4_500);
     expect(totals.cashflowCents).toBe(1_800);
+  });
+
+  it("groups net earnings into Prestige and Ability buckets", () => {
+    expect(
+      netEarningsByBucket([
+        { jobType: "prestige", computedEarningsCents: 1_200 },
+        { jobType: "prestige_ilst", computedEarningsCents: 800 },
+        { jobType: "ability", computedEarningsCents: 1_500 },
+        { jobType: "incentive", computedEarningsCents: 250 },
+        { jobType: "other", computedEarningsCents: 9_999 },
+        { jobType: "none", computedEarningsCents: 999 },
+      ]),
+    ).toEqual({
+      prestigeNetCents: 2_000,
+      abilityNetCents: 1_750,
+    });
   });
 });
 

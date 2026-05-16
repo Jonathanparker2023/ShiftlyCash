@@ -36,6 +36,10 @@ export type EarnSlotInput = {
   label?: string;
 };
 
+export type NetEarningsBucketSlot = Pick<EarnSlotInput, "jobType"> & {
+  computedEarningsCents?: MoneyCents | null;
+};
+
 export type EarnSlotTotals = {
   earningsCents: MoneyCents;
   abilityPaycheckCents: MoneyCents;
@@ -234,6 +238,26 @@ export function calculateWeekTotals(
       totals.legacyRoundedCashflowCents,
     ),
   };
+}
+
+export function netEarningsByBucket(slots: NetEarningsBucketSlot[]): {
+  prestigeNetCents: MoneyCents;
+  abilityNetCents: MoneyCents;
+} {
+  let prestigeNetCents = 0;
+  let abilityNetCents = 0;
+
+  for (const slot of slots) {
+    const cents = slot.computedEarningsCents ?? 0;
+
+    if (slot.jobType === "prestige" || slot.jobType === "prestige_ilst") {
+      prestigeNetCents += cents;
+    } else if (slot.jobType === "ability" || slot.jobType === "incentive") {
+      abilityNetCents += cents;
+    }
+  }
+
+  return { prestigeNetCents, abilityNetCents };
 }
 
 export function getFirstSundayOfYear(year: number): Date {

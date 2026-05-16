@@ -1,3 +1,5 @@
+import type { JobType, PayType } from "@/lib/domain/pay";
+
 export type ProjectionExclusionField = "earnings" | "spend" | "cashflow";
 
 export type HistoryWeek = {
@@ -26,9 +28,12 @@ export type HistoryData = {
 export type HistoryDetailSlot = {
   id: string;
   slotIndex: number;
-  jobType: string;
-  payType: string;
+  jobType: JobType;
+  payType: PayType;
   hoursOrUnits: number;
+  regularHours: number;
+  overtimeHours: number;
+  computedEarningsCents: number;
   label: string;
   source: string;
 };
