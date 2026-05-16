@@ -290,7 +290,7 @@ async function syncNutritionLedger(
     "Unscored verdicts": numberProperty(
       readNumber(snapshot, "current_week", "verdict_summary", "unscored"),
     ),
-    "Manual overrides": numberProperty(
+    "Verdict manual overrides": numberProperty(
       readNumber(snapshot, "current_week", "verdict_summary", "manual_override"),
     ),
     "High sodium days": numberProperty(
@@ -360,7 +360,7 @@ async function syncNutritionLedger(
     "28d days over TDEE": numberProperty(
       readNumber(snapshot, "rolling_28d", "days_over_tdee"),
     ),
-    "28d compliance %": numberProperty(
+    "28d calorie compliance %": numberProperty(
       wholePercentToNotionPercent(
         readNumber(snapshot, "rolling_28d", "compliance_pct"),
       ),
