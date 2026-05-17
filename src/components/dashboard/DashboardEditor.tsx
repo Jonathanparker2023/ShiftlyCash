@@ -915,28 +915,25 @@ function WeekStripCell({
       onClick={() => onFocus(dayIndex)}
       type="button"
     >
-      <div className="flex min-w-0 items-center justify-between gap-1 sm:gap-2">
-        <span className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.14em]">
-          {shortDayName(day.date)}
+      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-white/65 sm:text-[10px] sm:tracking-[0.14em]">
+        <span className="truncate">
+          {shortDayName(day.date)} {formatDayOnly(day.date)}
         </span>
-        {day.spendLocked ? (
-          <span className="hidden rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
-            Locked
-          </span>
-        ) : null}
-      </div>
-      <div className="mt-1 flex min-w-0 items-center justify-between gap-1 sm:gap-2">
-        <span className="text-base font-semibold text-white sm:text-lg">
-          {formatDayOnly(day.date)}
+        <span className="flex shrink-0 items-center gap-1">
+          {isToday ? (
+            <span className="hidden rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white/85 sm:inline-flex">
+              Today
+            </span>
+          ) : null}
+          {day.spendLocked ? (
+            <span className="hidden rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white/85 sm:inline-flex">
+              Locked
+            </span>
+          ) : null}
         </span>
-        {isToday ? (
-          <span className="hidden rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
-            Today
-          </span>
-        ) : null}
       </div>
       <p
-        className={`mt-3 truncate text-xs font-semibold sm:mt-6 sm:text-sm ${cashflowDailyColor(
+        className={`mt-2 truncate text-lg font-bold tracking-tight sm:mt-3 sm:text-2xl ${cashflowDailyColor(
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >
