@@ -1,4 +1,4 @@
-import type { JobType, PayType } from "@/lib/domain/pay";
+import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 
 export type ProjectionExclusionField = "earnings" | "spend" | "cashflow";
 
@@ -33,6 +33,9 @@ export type HistoryDetailSlot = {
   hoursOrUnits: number;
   regularHours: number;
   overtimeHours: number;
+  incentiveMode: IncentiveMode;
+  incentiveRate: number;
+  incentiveAmount: number;
   computedEarningsCents: number;
   label: string;
   source: string;

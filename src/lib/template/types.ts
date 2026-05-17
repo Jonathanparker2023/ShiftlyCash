@@ -1,4 +1,4 @@
-import type { JobType, PayType } from "@/lib/domain/pay";
+import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 
 export type TemplateSlotDraft = {
   dayIndex: number;
@@ -8,6 +8,9 @@ export type TemplateSlotDraft = {
   hoursOrUnits: number;
   regularHours: number;
   overtimeHours: number;
+  incentiveMode: IncentiveMode;
+  incentiveRate: number;
+  incentiveAmount: number;
 };
 
 export type TemplateDayDraft = {

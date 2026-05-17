@@ -21,7 +21,12 @@ import {
   dollarsToCents,
   roundCentsToNearestTenDollars,
 } from "@/lib/domain/money";
-import type { JobType, PaySettings, PayType } from "@/lib/domain/pay";
+import type {
+  IncentiveMode,
+  JobType,
+  PaySettings,
+  PayType,
+} from "@/lib/domain/pay";
 
 type NumericValue = number | string | null;
 
@@ -60,6 +65,9 @@ type EarnSlotRow = {
   hours_or_units: NumericValue;
   regular_hours: NumericValue;
   overtime_hours: NumericValue;
+  incentive_mode: IncentiveMode | null;
+  incentive_rate: NumericValue;
+  incentive_amount: NumericValue;
   label: string | null;
   source: EarnSlotSource;
 };
@@ -70,6 +78,9 @@ type AdjacentEarnSlotRow = {
   hours_or_units: NumericValue;
   regular_hours: NumericValue;
   overtime_hours: NumericValue;
+  incentive_mode: IncentiveMode | null;
+  incentive_rate: NumericValue;
+  incentive_amount: NumericValue;
 };
 
 type TransactionRow = {
@@ -250,7 +261,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           supabase
             .from("earn_slots")
             .select(
-              "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,label,source",
+              "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,source",
             )
             .in("day_id", dayIds)
             .order("slot_index", { ascending: true }),
@@ -460,7 +471,7 @@ async function loadAdjacentAbilityPayPeriod({
     adjacentDayIds.length > 0
       ? await supabase
           .from("earn_slots")
-          .select("job_type,pay_type,hours_or_units,regular_hours,overtime_hours")
+          .select("job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount")
           .in("day_id", adjacentDayIds)
       : { data: [], error: null };
 
@@ -510,7 +521,7 @@ function sumAbilityHours(slots: AdjacentEarnSlotRow[]): {
 } {
   return slots.reduce(
     (total, slot) => {
-    if (slot.job_type !== "ability") {
+    if (slot.job_type !== "ability" && slot.job_type !== "ability_incentive") {
       return total;
     }
 
@@ -597,6 +608,9 @@ function mapDashboardDay(
         hoursOrUnits: toNumber(slot?.hours_or_units ?? 0),
         regularHours: toNumber(slot?.regular_hours ?? 0),
         overtimeHours: toNumber(slot?.overtime_hours ?? 0),
+        incentiveMode: mapIncentiveMode(slot?.incentive_mode ?? null),
+        incentiveRate: toNumber(slot?.incentive_rate ?? 0),
+        incentiveAmount: toNumber(slot?.incentive_amount ?? 0),
         label: slot?.label ?? "",
         source: slot?.source ?? "user",
       };
@@ -609,6 +623,14 @@ function mapDashboardDay(
         transaction.status === "excluded" && transaction.date === day.date,
     ),
   };
+}
+
+function mapIncentiveMode(value: string | null): IncentiveMode {
+  if (value === "rate" || value === "lump_sum") {
+    return value;
+  }
+
+  return "none";
 }
 
 function mapPaySettings(row: SettingsRow): PaySettings {

@@ -3,17 +3,19 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
-import type { PayType } from "@/lib/domain/pay";
+import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 import type { TemplateSlotDraft } from "@/lib/template/types";
 
 const JOB_TYPES = [
   "ability",
+  "ability_incentive",
   "prestige",
   "prestige_ilst",
   "incentive",
   "other",
   "none",
 ] as const;
+const INCENTIVE_MODES = ["none", "rate", "lump_sum"] as const;
 
 export type SaveTemplateInput = {
   slots: TemplateSlotDraft[];
@@ -61,6 +63,9 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       hoursOrUnits: 0,
       regularHours: 0,
       overtimeHours: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
     };
   }
 
@@ -76,9 +81,13 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       ),
       regularHours: 0,
       overtimeHours: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
     };
   }
 
+  const incentiveFields = normalizeIncentiveFields(slot, jobType);
   const payType = normalizeWagePayType(slot.payType);
   if (payType === "split") {
     const regularHours = requirePositiveNumber(
@@ -98,6 +107,7 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       hoursOrUnits: regularHours + overtimeHours,
       regularHours,
       overtimeHours,
+      ...incentiveFields,
     };
   }
 
@@ -114,6 +124,43 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
     hoursOrUnits,
     regularHours: payType === "regular" ? hoursOrUnits : 0,
     overtimeHours: payType === "overtime" ? hoursOrUnits : 0,
+    ...incentiveFields,
+  };
+}
+
+function normalizeIncentiveFields(
+  slot: TemplateSlotDraft,
+  jobType: JobType,
+): {
+  incentiveMode: IncentiveMode;
+  incentiveRate: number;
+  incentiveAmount: number;
+} {
+  if (jobType !== "ability_incentive") {
+    return { incentiveMode: "none", incentiveRate: 0, incentiveAmount: 0 };
+  }
+
+  const incentiveMode = requireEnum(
+    slot.incentiveMode ?? "rate",
+    INCENTIVE_MODES,
+    "incentiveMode",
+  );
+
+  if (incentiveMode === "lump_sum") {
+    return {
+      incentiveMode,
+      incentiveRate: 0,
+      incentiveAmount: requireNonNegativeNumber(
+        slot.incentiveAmount,
+        "incentiveAmount",
+      ),
+    };
+  }
+
+  return {
+    incentiveMode: "rate",
+    incentiveRate: requireNonNegativeNumber(slot.incentiveRate, "incentiveRate"),
+    incentiveAmount: 0,
   };
 }
 

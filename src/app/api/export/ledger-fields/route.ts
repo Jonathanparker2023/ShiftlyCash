@@ -65,6 +65,7 @@ type EarnSlotRow = {
   day_id: string;
   job_type:
     | "ability"
+    | "ability_incentive"
     | "prestige"
     | "prestige_ilst"
     | "incentive"
@@ -74,6 +75,9 @@ type EarnSlotRow = {
   hours_or_units: NumericValue;
   regular_hours: NumericValue;
   overtime_hours: NumericValue;
+  incentive_mode: "none" | "rate" | "lump_sum" | null;
+  incentive_rate: NumericValue;
+  incentive_amount: NumericValue;
 };
 
 type SettingsRow = {
@@ -225,7 +229,7 @@ export async function GET(request: Request) {
       dayIds.length > 0
         ? await supabase
             .from("earn_slots")
-            .select("day_id,job_type,pay_type,hours_or_units,regular_hours,overtime_hours")
+            .select("day_id,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount")
             .in("day_id", dayIds)
         : { data: [], error: null };
     const projectionExclusionsRes =
@@ -976,8 +980,15 @@ function grossForSlot(
       ? toNumber(slot.overtime_hours || slot.hours_or_units)
       : 0;
 
-  if (slot.job_type === "ability") {
-    return regularHours * ABILITY_REGULAR_GROSS_RATE + overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
+  if (slot.job_type === "ability" || slot.job_type === "ability_incentive") {
+    const wageGross =
+      regularHours * ABILITY_REGULAR_GROSS_RATE +
+      overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
+    if (slot.job_type !== "ability_incentive") {
+      return wageGross;
+    }
+
+    return wageGross + incentiveGrossForSlot(slot);
   }
 
   if (slot.job_type === "prestige") {
@@ -989,6 +1000,18 @@ function grossForSlot(
   }
 
   return toNumber(slot.hours_or_units);
+}
+
+function incentiveGrossForSlot(slot: EarnSlotRow): number {
+  if (slot.incentive_mode === "lump_sum") {
+    return toNumber(slot.incentive_amount);
+  }
+
+  if (slot.incentive_mode === "rate") {
+    return toNumber(slot.incentive_rate) * toNumber(slot.hours_or_units);
+  }
+
+  return 0;
 }
 
 function netToGrossRate(netRate: number): number {

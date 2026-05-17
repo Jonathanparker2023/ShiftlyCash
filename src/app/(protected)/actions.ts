@@ -6,16 +6,18 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getTodayIso } from "@/lib/dashboard/dates";
 import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
-import type { JobType, PayType } from "@/lib/domain/pay";
+import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 
 const JOB_TYPES = [
   "ability",
+  "ability_incentive",
   "prestige",
   "prestige_ilst",
   "incentive",
   "other",
   "none",
 ] as const;
+const INCENTIVE_MODES = ["none", "rate", "lump_sum"] as const;
 
 export type SaveDayInput = {
   dayId: string;
@@ -31,6 +33,9 @@ export type SaveEarnSlotInput = {
   hoursOrUnits: number;
   regularHours?: number;
   overtimeHours?: number;
+  incentiveMode?: IncentiveMode;
+  incentiveRate?: number;
+  incentiveAmount?: number;
   label: string;
 };
 
@@ -165,6 +170,9 @@ export async function saveEarnSlotAction(
         hours_or_units: normalized.hoursOrUnits,
         regular_hours: normalized.regularHours ?? 0,
         overtime_hours: normalized.overtimeHours ?? 0,
+        incentive_mode: normalized.incentiveMode ?? "none",
+        incentive_rate: normalized.incentiveRate ?? 0,
+        incentive_amount: normalized.incentiveAmount ?? 0,
         label: normalized.label || null,
         source: "user",
       },
@@ -382,6 +390,9 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
       hoursOrUnits: 0,
       regularHours: 0,
       overtimeHours: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
       label: "",
     };
   }
@@ -395,10 +406,14 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
       hoursOrUnits: requireNonNegativeNumber(input.hoursOrUnits, "hoursOrUnits"),
       regularHours: 0,
       overtimeHours: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
       label,
     };
   }
 
+  const incentiveFields = normalizeIncentiveFields(input, jobType);
   const payType = normalizeWagePayType(input.payType);
   if (payType === "split") {
     const regularHours = requirePositiveNumber(
@@ -418,6 +433,7 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
       hoursOrUnits: regularHours + overtimeHours,
       regularHours,
       overtimeHours,
+      ...incentiveFields,
       label,
     };
   }
@@ -435,7 +451,47 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
     hoursOrUnits,
     regularHours: payType === "regular" ? hoursOrUnits : 0,
     overtimeHours: payType === "overtime" ? hoursOrUnits : 0,
+    ...incentiveFields,
     label,
+  };
+}
+
+function normalizeIncentiveFields(
+  input: SaveEarnSlotInput,
+  jobType: JobType,
+): {
+  incentiveMode: IncentiveMode;
+  incentiveRate: number;
+  incentiveAmount: number;
+} {
+  if (jobType !== "ability_incentive") {
+    return { incentiveMode: "none", incentiveRate: 0, incentiveAmount: 0 };
+  }
+
+  const incentiveMode = requireEnum(
+    input.incentiveMode ?? "rate",
+    INCENTIVE_MODES,
+    "incentiveMode",
+  );
+
+  if (incentiveMode === "lump_sum") {
+    return {
+      incentiveMode,
+      incentiveRate: 0,
+      incentiveAmount: requireNonNegativeNumber(
+        input.incentiveAmount ?? 0,
+        "incentiveAmount",
+      ),
+    };
+  }
+
+  return {
+    incentiveMode: "rate",
+    incentiveRate: requireNonNegativeNumber(
+      input.incentiveRate ?? 0,
+      "incentiveRate",
+    ),
+    incentiveAmount: 0,
   };
 }
 

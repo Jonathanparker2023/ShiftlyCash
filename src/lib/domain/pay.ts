@@ -7,12 +7,14 @@ import {
 
 export type JobType =
   | "ability"
+  | "ability_incentive"
   | "prestige"
   | "prestige_ilst"
   | "incentive"
   | "other"
   | "none";
 export type PayType = "regular" | "overtime" | "split" | "unit" | "none";
+export type IncentiveMode = "none" | "rate" | "lump_sum";
 export type PayPeriodRole = "week_1" | "week_2";
 
 export type PaySettings = {
@@ -33,6 +35,9 @@ export type EarnSlotInput = {
   hoursOrUnits?: number;
   regularHours?: number;
   overtimeHours?: number;
+  incentiveMode?: IncentiveMode;
+  incentiveRate?: number;
+  incentiveAmount?: number;
   label?: string;
 };
 
@@ -100,15 +105,23 @@ export function calculateEarnSlot(
     return emptyEarnSlotTotals();
   }
 
-  if (slot.jobType === "ability") {
+  if (slot.jobType === "ability" || slot.jobType === "ability_incentive") {
     const { regularHours, overtimeHours, wageHours } = wageHourParts(slot);
     if (wageHours === 0) {
       return emptyEarnSlotTotals();
     }
 
-    const earningsCents =
+    const wageEarningsCents =
       Math.round(regularHours * settings.abilityRegularNetRateCents) +
       Math.round(overtimeHours * settings.abilityOvertimeNetRateCents);
+    const incentiveCents =
+      slot.jobType === "ability_incentive"
+        ? multiplyCents(
+            dollarsToCents(incentiveGrossAmount(slot, wageHours)),
+            settings.abilityNetMultiplier,
+          )
+        : 0;
+    const earningsCents = wageEarningsCents + incentiveCents;
 
     return {
       earningsCents,
@@ -252,12 +265,28 @@ export function netEarningsByBucket(slots: NetEarningsBucketSlot[]): {
 
     if (slot.jobType === "prestige" || slot.jobType === "prestige_ilst") {
       prestigeNetCents += cents;
-    } else if (slot.jobType === "ability" || slot.jobType === "incentive") {
+    } else if (
+      slot.jobType === "ability" ||
+      slot.jobType === "ability_incentive" ||
+      slot.jobType === "incentive"
+    ) {
       abilityNetCents += cents;
     }
   }
 
   return { prestigeNetCents, abilityNetCents };
+}
+
+function incentiveGrossAmount(slot: EarnSlotInput, wageHours: number): number {
+  if (slot.incentiveMode === "lump_sum") {
+    return Math.max(0, slot.incentiveAmount ?? 0);
+  }
+
+  if (slot.incentiveMode === "rate") {
+    return Math.max(0, slot.incentiveRate ?? 0) * wageHours;
+  }
+
+  return 0;
 }
 
 export function getFirstSundayOfYear(year: number): Date {

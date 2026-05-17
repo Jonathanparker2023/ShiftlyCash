@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { saveDefaultTemplateAction } from "@/app/(protected)/settings/template/actions";
-import type { JobType, PayType } from "@/lib/domain/pay";
+import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 import type {
   TemplateDayDraft,
   TemplateEditorData,
@@ -13,12 +13,14 @@ import type {
 const JOB_OPTIONS: JobType[] = [
   "none",
   "ability",
+  "ability_incentive",
   "prestige",
   "prestige_ilst",
   "incentive",
   "other",
 ];
 const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "split", "unit"];
+const INCENTIVE_MODE_OPTIONS: IncentiveMode[] = ["rate", "lump_sum"];
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -229,6 +231,54 @@ function TemplateSlotRow({
           value={formatNumberInput(slot.hoursOrUnits)}
         />
       )}
+      {slot.jobType === "ability_incentive" ? (
+        <>
+          <select
+            className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            onChange={(event) =>
+              onChange(slot.dayIndex, slot.slotIndex, {
+                incentiveMode: event.target.value as IncentiveMode,
+                incentiveRate:
+                  event.target.value === "rate" ? slot.incentiveRate : 0,
+                incentiveAmount:
+                  event.target.value === "lump_sum" ? slot.incentiveAmount : 0,
+              })
+            }
+            value={slot.incentiveMode === "lump_sum" ? "lump_sum" : "rate"}
+          >
+            {INCENTIVE_MODE_OPTIONS.map((mode) => (
+              <option key={mode} value={mode}>
+                {formatIncentiveModeLabel(mode)}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label={
+              slot.incentiveMode === "lump_sum"
+                ? "Incentive lump sum"
+                : "Incentive rate"
+            }
+            className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
+            min="0"
+            onChange={(event) =>
+              onChange(
+                slot.dayIndex,
+                slot.slotIndex,
+                slot.incentiveMode === "lump_sum"
+                  ? { incentiveAmount: parsePositiveNumber(event.target.value) }
+                  : { incentiveRate: parsePositiveNumber(event.target.value) },
+              )
+            }
+            step="0.01"
+            type="number"
+            value={formatNumberInput(
+              slot.incentiveMode === "lump_sum"
+                ? slot.incentiveAmount
+                : slot.incentiveRate,
+            )}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -270,6 +320,9 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       hoursOrUnits: 0,
       regularHours: 0,
       overtimeHours: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
     };
   }
 
@@ -280,8 +333,18 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       hoursOrUnits: Math.max(0, slot.hoursOrUnits),
       regularHours: 0,
       overtimeHours: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
     };
   }
+
+  const incentiveMode =
+    slot.jobType === "ability_incentive"
+      ? slot.incentiveMode === "lump_sum"
+        ? "lump_sum"
+        : "rate"
+      : "none";
 
   if (slot.payType === "split") {
     const regularHours = Math.max(0, slot.regularHours);
@@ -292,6 +355,11 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       regularHours,
       overtimeHours,
       hoursOrUnits: regularHours + overtimeHours,
+      incentiveMode,
+      incentiveRate:
+        incentiveMode === "rate" ? Math.max(0, slot.incentiveRate) : 0,
+      incentiveAmount:
+        incentiveMode === "lump_sum" ? Math.max(0, slot.incentiveAmount) : 0,
     };
   }
 
@@ -306,6 +374,11 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
     hoursOrUnits,
     regularHours: slot.payType === "overtime" ? 0 : hoursOrUnits,
     overtimeHours: slot.payType === "overtime" ? hoursOrUnits : 0,
+    incentiveMode,
+    incentiveRate:
+      incentiveMode === "rate" ? Math.max(0, slot.incentiveRate) : 0,
+    incentiveAmount:
+      incentiveMode === "lump_sum" ? Math.max(0, slot.incentiveAmount) : 0,
   };
 }
 
@@ -353,11 +426,23 @@ function formatNumberInput(value: number): string {
 }
 
 function formatJobLabel(jobType: JobType): string {
+  if (jobType === "ability_incentive") {
+    return "Shift + incentive";
+  }
+
   if (jobType === "prestige" || jobType === "prestige_ilst") {
     return "Prestige";
   }
 
   return jobType;
+}
+
+function formatIncentiveModeLabel(mode: IncentiveMode): string {
+  if (mode === "lump_sum") {
+    return "Lump sum";
+  }
+
+  return "Rate";
 }
 
 function formatPayOptionLabel(payType: PayType): string {

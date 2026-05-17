@@ -34,6 +34,7 @@ type EarnSlotRow = {
   day_id: string;
   job_type:
     | "ability"
+    | "ability_incentive"
     | "prestige"
     | "prestige_ilst"
     | "incentive"
@@ -43,6 +44,9 @@ type EarnSlotRow = {
   hours_or_units: NumericValue;
   regular_hours: NumericValue;
   overtime_hours: NumericValue;
+  incentive_mode: "none" | "rate" | "lump_sum" | null;
+  incentive_rate: NumericValue;
+  incentive_amount: NumericValue;
 };
 
 type PaycheckActualRow = {
@@ -158,7 +162,7 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
     dayIds.length > 0
       ? await supabase
           .from("earn_slots")
-          .select("day_id,job_type,pay_type,hours_or_units,regular_hours,overtime_hours")
+          .select("day_id,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount")
           .in("day_id", dayIds)
       : { data: [], error: null };
 
@@ -246,7 +250,7 @@ function buildPeriod({
       DEFAULT_PRESTIGE_ILST_OVERTIME_NET_RATE,
   );
   const weekSummaries = periodWeeks.map((week) => {
-    const abilityHours = sumHoursForWeek("ability", week.week_id, dayToWeekId, slots);
+    const abilityHours = sumAbilityHoursForWeek(week.week_id, dayToWeekId, slots);
     const prestigeHours = sumHoursForWeek("prestige", week.week_id, dayToWeekId, slots);
     const prestigeIlstHours = sumHoursForWeek(
       "prestige_ilst",
@@ -256,7 +260,8 @@ function buildPeriod({
     );
     const abilityGross =
       abilityHours.regularHours * ABILITY_REGULAR_GROSS_RATE +
-      abilityHours.overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
+      abilityHours.overtimeHours * ABILITY_OVERTIME_GROSS_RATE +
+      sumAbilityIncentiveGrossForWeek(week.week_id, dayToWeekId, slots);
     const prestigeGross =
       prestigeHours.regularHours * prestigeRegularGrossRate +
       prestigeHours.overtimeHours * prestigeOvertimeGrossRate +
@@ -280,8 +285,10 @@ function buildPeriod({
   const abilityHours = sumJobHours(weekSummaries, "ability");
   const prestigeHours = sumJobHours(weekSummaries, "prestige");
   const abilityGross =
-    abilityHours.regularHours * ABILITY_REGULAR_GROSS_RATE +
-    abilityHours.overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
+    weekSummaries.reduce(
+      (total, week) => total + week.jobs.ability.grossCents / 100,
+      0,
+    );
   const prestigeGross = weekSummaries.reduce(
     (total, week) => total + week.jobs.prestige.grossCents / 100,
     0,
@@ -444,6 +451,76 @@ function sumHoursForWeek(
     },
     { regularHours: 0, overtimeHours: 0 },
   );
+}
+
+function sumAbilityHoursForWeek(
+  weekId: string,
+  dayToWeekId: Map<string, string>,
+  slots: EarnSlotRow[],
+): { regularHours: number; overtimeHours: number } {
+  return slots.reduce(
+    (total, slot) => {
+      if (
+        dayToWeekId.get(slot.day_id) !== weekId ||
+        (slot.job_type !== "ability" && slot.job_type !== "ability_incentive")
+      ) {
+        return total;
+      }
+
+      if (slot.pay_type === "split") {
+        total.regularHours += toNumber(slot.regular_hours);
+        total.overtimeHours += toNumber(slot.overtime_hours);
+      }
+
+      if (slot.pay_type === "regular") {
+        total.regularHours += toNumber(
+          slot.regular_hours ?? slot.hours_or_units,
+        );
+      }
+
+      if (slot.pay_type === "overtime") {
+        total.overtimeHours += toNumber(
+          slot.overtime_hours ?? slot.hours_or_units,
+        );
+      }
+
+      return total;
+    },
+    { regularHours: 0, overtimeHours: 0 },
+  );
+}
+
+function sumAbilityIncentiveGrossForWeek(
+  weekId: string,
+  dayToWeekId: Map<string, string>,
+  slots: EarnSlotRow[],
+): number {
+  return slots.reduce((total, slot) => {
+    if (
+      dayToWeekId.get(slot.day_id) !== weekId ||
+      slot.job_type !== "ability_incentive"
+    ) {
+      return total;
+    }
+
+    if (slot.incentive_mode === "lump_sum") {
+      return total + toNumber(slot.incentive_amount);
+    }
+
+    if (slot.incentive_mode === "rate") {
+      return total + toNumber(slot.incentive_rate) * slotHours(slot);
+    }
+
+    return total;
+  }, 0);
+}
+
+function slotHours(slot: EarnSlotRow): number {
+  if (slot.pay_type === "split") {
+    return toNumber(slot.regular_hours) + toNumber(slot.overtime_hours);
+  }
+
+  return toNumber(slot.hours_or_units);
 }
 
 function estimatePrestigeFlatWithholding(gross: number): {

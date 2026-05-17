@@ -1,5 +1,5 @@
 import { requireUserWithBootstrapStatus } from "@/lib/auth";
-import type { JobType, PayType } from "@/lib/domain/pay";
+import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 import type {
   TemplateDayDraft,
   TemplateEditorData,
@@ -22,6 +22,9 @@ type TemplateSlotRow = {
   hours_or_units: NumericValue;
   regular_hours: NumericValue;
   overtime_hours: NumericValue;
+  incentive_mode: IncentiveMode | null;
+  incentive_rate: NumericValue;
+  incentive_amount: NumericValue;
 };
 
 export async function getTemplateEditorData(): Promise<TemplateEditorData> {
@@ -41,7 +44,7 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
   const { data: slotData, error: slotError } = await supabase
     .from("template_slots")
     .select(
-      "day_index,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours",
+      "day_index,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount",
     )
     .eq("template_id", template.id)
     .order("day_index", { ascending: true })
@@ -88,7 +91,18 @@ function mapTemplateSlot(
     hoursOrUnits: toNumber(row?.hours_or_units ?? 0),
     regularHours: toNumber(row?.regular_hours ?? 0),
     overtimeHours: toNumber(row?.overtime_hours ?? 0),
+    incentiveMode: mapIncentiveMode(row?.incentive_mode ?? null),
+    incentiveRate: toNumber(row?.incentive_rate ?? 0),
+    incentiveAmount: toNumber(row?.incentive_amount ?? 0),
   };
+}
+
+function mapIncentiveMode(value: string | null): IncentiveMode {
+  if (value === "rate" || value === "lump_sum") {
+    return value;
+  }
+
+  return "none";
 }
 
 function toNumber(value: NumericValue): number {

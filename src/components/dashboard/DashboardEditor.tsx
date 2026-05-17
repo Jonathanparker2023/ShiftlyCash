@@ -30,6 +30,7 @@ import {
   calculateWeekTotals,
   getPayPeriodInfo,
   netEarningsByBucket,
+  type IncentiveMode,
   type JobType,
   type PaySettings,
   type PayType,
@@ -44,12 +45,14 @@ import {
 const JOB_OPTIONS: JobType[] = [
   "none",
   "ability",
+  "ability_incentive",
   "prestige",
   "prestige_ilst",
   "incentive",
   "other",
 ];
 const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "split", "unit"];
+const INCENTIVE_MODE_OPTIONS: IncentiveMode[] = ["rate", "lump_sum"];
 const AUTO_SYNC_STORAGE_KEY = "shiftly:lastAutoSyncAt";
 
 type DashboardEditorProps = {
@@ -449,6 +452,9 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       jobType: "ability",
       payType: "regular",
       hoursOrUnits: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
       label: "",
     });
   }
@@ -470,6 +476,9 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       hoursOrUnits: slot.hoursOrUnits,
       regularHours: slot.regularHours,
       overtimeHours: slot.overtimeHours,
+      incentiveMode: slot.incentiveMode,
+      incentiveRate: slot.incentiveRate,
+      incentiveAmount: slot.incentiveAmount,
       label: slot.label,
     };
 
@@ -667,7 +676,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                 Prestige:{" "}
                 {formatHoursFromSlots(days, ["prestige", "prestige_ilst"])}h
               </span>
-              <span>Ability: {formatHoursFromSlots(days, "ability")}h</span>
+              <span>
+                Ability:{" "}
+                {formatHoursFromSlots(days, ["ability", "ability_incentive"])}h
+              </span>
               <span>Total: {weekTotals.wageHours.toFixed(2)}h</span>
             </div>
             <WeekNetSummary
@@ -1451,6 +1463,45 @@ function ShiftRow({
               }
             />
           )}
+          {slot.jobType === "ability_incentive" ? (
+            <>
+              <SelectField
+                label="Incentive"
+                value={slot.incentiveMode === "lump_sum" ? "lump_sum" : "rate"}
+                values={INCENTIVE_MODE_OPTIONS}
+                formatOption={formatIncentiveModeLabel}
+                onChange={(value) =>
+                  onSlotChange(slot.dayId, slot.slotIndex, {
+                    incentiveMode: value as IncentiveMode,
+                    incentiveRate: value === "rate" ? slot.incentiveRate : 0,
+                    incentiveAmount:
+                      value === "lump_sum" ? slot.incentiveAmount : 0,
+                  })
+                }
+              />
+              <NumberField
+                label={
+                  slot.incentiveMode === "lump_sum"
+                    ? "Incentive lump ($)"
+                    : "Incentive rate ($/h)"
+                }
+                value={
+                  slot.incentiveMode === "lump_sum"
+                    ? slot.incentiveAmount
+                    : slot.incentiveRate
+                }
+                onChange={(value) =>
+                  onSlotChange(
+                    slot.dayId,
+                    slot.slotIndex,
+                    slot.incentiveMode === "lump_sum"
+                      ? { incentiveAmount: value }
+                      : { incentiveRate: value },
+                  )
+                }
+              />
+            </>
+          ) : null}
           <TextField
             label="Label"
             value={slot.label}
@@ -1477,7 +1528,11 @@ function ShiftRow({
 }
 
 function shiftBarClass(jobType: JobType): string {
-  if (jobType === "ability" || jobType === "incentive") {
+  if (
+    jobType === "ability" ||
+    jobType === "ability_incentive" ||
+    jobType === "incentive"
+  ) {
     return "border-[#1e3a8a] bg-[#1d4ed8] text-white";
   }
 
@@ -1489,7 +1544,11 @@ function shiftBarClass(jobType: JobType): string {
 }
 
 function shiftDotClass(jobType: JobType): string {
-  if (jobType === "ability" || jobType === "incentive") {
+  if (
+    jobType === "ability" ||
+    jobType === "ability_incentive" ||
+    jobType === "incentive"
+  ) {
     return "h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]";
   }
 
@@ -1768,6 +1827,9 @@ function toDayInput(day: DashboardDay) {
       hoursOrUnits: slot.hoursOrUnits,
       regularHours: slot.regularHours,
       overtimeHours: slot.overtimeHours,
+      incentiveMode: slot.incentiveMode,
+      incentiveRate: slot.incentiveRate,
+      incentiveAmount: slot.incentiveAmount,
       label: slot.label,
     })),
     spendCents: day.spendCents + day.transactionSpendCents,
@@ -1792,6 +1854,9 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
       hoursOrUnits: 0,
       regularHours: 0,
       overtimeHours: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
       label: "",
       source: "user",
     };
@@ -1804,9 +1869,19 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
       hoursOrUnits: Math.max(0, slot.hoursOrUnits),
       regularHours: 0,
       overtimeHours: 0,
+      incentiveMode: "none",
+      incentiveRate: 0,
+      incentiveAmount: 0,
       source: "user",
     };
   }
+
+  const incentiveMode =
+    slot.jobType === "ability_incentive"
+      ? slot.incentiveMode === "lump_sum"
+        ? "lump_sum"
+        : "rate"
+      : "none";
 
   if (slot.payType === "split") {
     const regularHours = Math.max(0, slot.regularHours);
@@ -1817,6 +1892,11 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
       regularHours,
       overtimeHours,
       hoursOrUnits: regularHours + overtimeHours,
+      incentiveMode,
+      incentiveRate:
+        incentiveMode === "rate" ? Math.max(0, slot.incentiveRate) : 0,
+      incentiveAmount:
+        incentiveMode === "lump_sum" ? Math.max(0, slot.incentiveAmount) : 0,
       source: "user",
     };
   }
@@ -1832,6 +1912,11 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
     hoursOrUnits,
     regularHours: slot.payType === "overtime" ? 0 : hoursOrUnits,
     overtimeHours: slot.payType === "overtime" ? hoursOrUnits : 0,
+    incentiveMode,
+    incentiveRate:
+      incentiveMode === "rate" ? Math.max(0, slot.incentiveRate) : 0,
+    incentiveAmount:
+      incentiveMode === "lump_sum" ? Math.max(0, slot.incentiveAmount) : 0,
     source: "user",
   };
 }
@@ -1888,6 +1973,9 @@ function makeEmptySlot(dayId: string, slotIndex: number): DashboardSlot {
     hoursOrUnits: 0,
     regularHours: 0,
     overtimeHours: 0,
+    incentiveMode: "none",
+    incentiveRate: 0,
+    incentiveAmount: 0,
     label: "",
     source: "user",
   };
@@ -1925,11 +2013,23 @@ function formatHoursFromSlots(
 }
 
 function formatJobLabel(value: string): string {
+  if (value === "ability_incentive") {
+    return "Shift + incentive";
+  }
+
   if (value === "prestige" || value === "prestige_ilst") {
     return "Prestige";
   }
 
   return capitalize(value);
+}
+
+function formatIncentiveModeLabel(value: string): string {
+  if (value === "lump_sum") {
+    return "Lump sum";
+  }
+
+  return "Rate";
 }
 
 function formatPlainHours(value: number): string {
@@ -2077,15 +2177,6 @@ function formatDayOnly(value: string): string {
 function shortDayName(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
     weekday: "short",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00.000Z`));
-}
-
-function formatMonDayLabel(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${value}T00:00:00.000Z`));
 }

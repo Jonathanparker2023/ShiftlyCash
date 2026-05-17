@@ -4,6 +4,7 @@ import { sortChronologicalTransactions } from "@/lib/dashboard/transactions";
 import { dollarsToCents } from "@/lib/domain/money";
 import {
   calculateEarnSlot,
+  type IncentiveMode,
   type JobType,
   type PaySettings,
   type PayType,
@@ -78,6 +79,9 @@ type EarnSlotRow = {
   hours_or_units: NumericValue;
   regular_hours: NumericValue;
   overtime_hours: NumericValue;
+  incentive_mode: IncentiveMode | null;
+  incentive_rate: NumericValue;
+  incentive_amount: NumericValue;
   label: string | null;
   source: string;
 };
@@ -270,7 +274,7 @@ export async function getHistoryDetailData(
     const { data, error } = await supabase
       .from("earn_slots")
       .select(
-        "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,label,source",
+        "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,source",
       )
       .eq("user_id", user.id)
       .in("day_id", dayIdsToLoad)
@@ -379,6 +383,9 @@ function mapHistoryDetailSlot(
     hoursOrUnits: toNumber(row.hours_or_units),
     regularHours: toNumber(row.regular_hours),
     overtimeHours: toNumber(row.overtime_hours),
+    incentiveMode: mapIncentiveMode(row.incentive_mode),
+    incentiveRate: toNumber(row.incentive_rate),
+    incentiveAmount: toNumber(row.incentive_amount),
     label: row.label ?? "",
   };
 
@@ -389,6 +396,14 @@ function mapHistoryDetailSlot(
     computedEarningsCents: calculateEarnSlot(slot, settings).earningsCents,
     source: row.source,
   };
+}
+
+function mapIncentiveMode(value: string | null): IncentiveMode {
+  if (value === "rate" || value === "lump_sum") {
+    return value;
+  }
+
+  return "none";
 }
 
 function mapPaySettings(row: SettingsRow): PaySettings {

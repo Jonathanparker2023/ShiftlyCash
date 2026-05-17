@@ -1,6 +1,7 @@
 import type {
   DayTotals,
   EarnSlotInput,
+  IncentiveMode,
   PaySettings,
   WeekTotals,
 } from "@/lib/domain/pay";
@@ -29,6 +30,9 @@ export type DashboardSlot = EarnSlotInput & {
   hoursOrUnits: number;
   regularHours: number;
   overtimeHours: number;
+  incentiveMode: IncentiveMode;
+  incentiveRate: number;
+  incentiveAmount: number;
   label: string;
   source: EarnSlotSource;
 };

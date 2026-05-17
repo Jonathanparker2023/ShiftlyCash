@@ -191,6 +191,40 @@ describe("pay calculations", () => {
     expect(totals.legacyRoundedCashflowCents).toBe(7_000);
   });
 
+  it("calculates ability shift plus incentive by rate or lump sum", () => {
+    expect(
+      calculateEarnSlot({
+        jobType: "ability_incentive",
+        payType: "regular",
+        hoursOrUnits: 8,
+        incentiveMode: "rate",
+        incentiveRate: 5,
+      }),
+    ).toMatchObject({
+      earningsCents: 15_443,
+      abilityPaycheckCents: 15_443,
+      prestigePaycheckCents: 0,
+      wageHours: 8,
+    });
+
+    expect(
+      calculateEarnSlot({
+        jobType: "ability_incentive",
+        payType: "split",
+        hoursOrUnits: 10,
+        regularHours: 8,
+        overtimeHours: 2,
+        incentiveMode: "lump_sum",
+        incentiveAmount: 100,
+      }),
+    ).toMatchObject({
+      earningsCents: 24_198,
+      abilityPaycheckCents: 24_198,
+      prestigePaycheckCents: 0,
+      wageHours: 10,
+    });
+  });
+
   it("sums week totals across days", () => {
     const totals = calculateWeekTotals({
       days: [
@@ -256,13 +290,14 @@ describe("pay calculations", () => {
         { jobType: "prestige", computedEarningsCents: 1_200 },
         { jobType: "prestige_ilst", computedEarningsCents: 800 },
         { jobType: "ability", computedEarningsCents: 1_500 },
+        { jobType: "ability_incentive", computedEarningsCents: 400 },
         { jobType: "incentive", computedEarningsCents: 250 },
         { jobType: "other", computedEarningsCents: 9_999 },
         { jobType: "none", computedEarningsCents: 999 },
       ]),
     ).toEqual({
       prestigeNetCents: 2_000,
-      abilityNetCents: 1_750,
+      abilityNetCents: 2_150,
     });
   });
 });
