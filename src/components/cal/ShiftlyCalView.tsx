@@ -648,12 +648,45 @@ function WeekStripCell({
     weekday: "short",
   }).format(date);
 
+  const toneBorder =
+    tone === "green"
+      ? "border-emerald-400/80"
+      : tone === "amber"
+        ? "border-amber-400/80"
+        : tone === "red"
+          ? "border-rose-400/80"
+          : "border-white/45";
+  const toneBorderFocused =
+    tone === "green"
+      ? "border-emerald-300"
+      : tone === "amber"
+        ? "border-amber-300"
+        : tone === "red"
+          ? "border-rose-300"
+          : "border-white/90";
+  const toneGlow =
+    tone === "green"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
+      : tone === "amber"
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(245,158,11,0.45)]"
+        : tone === "red"
+          ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]"
+          : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
+  const toneGlowFocused =
+    tone === "green"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_0_28px_rgba(16,185,129,0.7)]"
+      : tone === "amber"
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_0_28px_rgba(245,158,11,0.7)]"
+        : tone === "red"
+          ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_0_28px_rgba(244,63,94,0.7)]"
+          : "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_24px_rgba(8,15,28,0.12)]";
+
   return (
     <button
-      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white shadow-sm transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3 ${
+      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3 ${
         isFocused
-          ? "border-2 border-white/90 bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl"
-          : "border-2 border-white/45 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-xl hover:border-white/60 hover:bg-white/14"
+          ? `border-2 ${toneBorderFocused} bg-white/14 ${toneGlowFocused} backdrop-blur-xl`
+          : `border-2 ${toneBorder} bg-white/10 ${toneGlow} backdrop-blur-xl hover:bg-white/14`
       }`}
       onClick={onClick}
       type="button"
