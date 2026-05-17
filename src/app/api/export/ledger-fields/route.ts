@@ -984,10 +984,6 @@ function grossForSlot(
     const wageGross =
       regularHours * ABILITY_REGULAR_GROSS_RATE +
       overtimeHours * ABILITY_OVERTIME_GROSS_RATE;
-    if (slot.job_type !== "ability_incentive") {
-      return wageGross;
-    }
-
     return wageGross + incentiveGrossForSlot(slot);
   }
 

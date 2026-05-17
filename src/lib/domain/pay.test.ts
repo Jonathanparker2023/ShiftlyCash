@@ -194,7 +194,7 @@ describe("pay calculations", () => {
   it("calculates ability shift plus incentive by rate or lump sum", () => {
     expect(
       calculateEarnSlot({
-        jobType: "ability_incentive",
+        jobType: "ability",
         payType: "regular",
         hoursOrUnits: 8,
         incentiveMode: "rate",
@@ -209,7 +209,7 @@ describe("pay calculations", () => {
 
     expect(
       calculateEarnSlot({
-        jobType: "ability_incentive",
+        jobType: "ability",
         payType: "split",
         hoursOrUnits: 10,
         regularHours: 8,
@@ -290,14 +290,13 @@ describe("pay calculations", () => {
         { jobType: "prestige", computedEarningsCents: 1_200 },
         { jobType: "prestige_ilst", computedEarningsCents: 800 },
         { jobType: "ability", computedEarningsCents: 1_500 },
-        { jobType: "ability_incentive", computedEarningsCents: 400 },
         { jobType: "incentive", computedEarningsCents: 250 },
         { jobType: "other", computedEarningsCents: 9_999 },
         { jobType: "none", computedEarningsCents: 999 },
       ]),
     ).toEqual({
       prestigeNetCents: 2_000,
-      abilityNetCents: 2_150,
+      abilityNetCents: 1_750,
     });
   });
 });

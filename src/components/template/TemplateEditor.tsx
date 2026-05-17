@@ -13,10 +13,8 @@ import type {
 const JOB_OPTIONS: JobType[] = [
   "none",
   "ability",
-  "ability_incentive",
   "prestige",
   "prestige_ilst",
-  "incentive",
   "other",
 ];
 const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "split", "unit"];
@@ -231,7 +229,7 @@ function TemplateSlotRow({
           value={formatNumberInput(slot.hoursOrUnits)}
         />
       )}
-      {slot.jobType === "ability_incentive" ? (
+      {isAbilityShift(slot.jobType) ? (
         <>
           <select
             className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
@@ -340,7 +338,7 @@ function normalizeSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
   }
 
   const incentiveMode =
-    slot.jobType === "ability_incentive"
+    isAbilityShift(slot.jobType)
       ? slot.incentiveMode === "lump_sum"
         ? "lump_sum"
         : "rate"
@@ -427,7 +425,7 @@ function formatNumberInput(value: number): string {
 
 function formatJobLabel(jobType: JobType): string {
   if (jobType === "ability_incentive") {
-    return "Shift + incentive";
+    return "Ability";
   }
 
   if (jobType === "prestige" || jobType === "prestige_ilst") {
@@ -435,6 +433,10 @@ function formatJobLabel(jobType: JobType): string {
   }
 
   return jobType;
+}
+
+function isAbilityShift(jobType: JobType): boolean {
+  return jobType === "ability" || jobType === "ability_incentive";
 }
 
 function formatIncentiveModeLabel(mode: IncentiveMode): string {

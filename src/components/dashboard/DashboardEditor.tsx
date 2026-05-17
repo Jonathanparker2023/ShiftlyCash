@@ -45,10 +45,8 @@ import {
 const JOB_OPTIONS: JobType[] = [
   "none",
   "ability",
-  "ability_incentive",
   "prestige",
   "prestige_ilst",
-  "incentive",
   "other",
 ];
 const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "split", "unit"];
@@ -1463,7 +1461,7 @@ function ShiftRow({
               }
             />
           )}
-          {slot.jobType === "ability_incentive" ? (
+          {isAbilityShift(slot.jobType) ? (
             <>
               <SelectField
                 label="Incentive"
@@ -1528,11 +1526,7 @@ function ShiftRow({
 }
 
 function shiftBarClass(jobType: JobType): string {
-  if (
-    jobType === "ability" ||
-    jobType === "ability_incentive" ||
-    jobType === "incentive"
-  ) {
+  if (isAbilityShift(jobType) || jobType === "incentive") {
     return "border-[#1e3a8a] bg-[#1d4ed8] text-white";
   }
 
@@ -1544,11 +1538,7 @@ function shiftBarClass(jobType: JobType): string {
 }
 
 function shiftDotClass(jobType: JobType): string {
-  if (
-    jobType === "ability" ||
-    jobType === "ability_incentive" ||
-    jobType === "incentive"
-  ) {
+  if (isAbilityShift(jobType) || jobType === "incentive") {
     return "h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]";
   }
 
@@ -1877,7 +1867,7 @@ function normalizeSlotForClient(slot: DashboardSlot): DashboardSlot {
   }
 
   const incentiveMode =
-    slot.jobType === "ability_incentive"
+    isAbilityShift(slot.jobType)
       ? slot.incentiveMode === "lump_sum"
         ? "lump_sum"
         : "rate"
@@ -2014,7 +2004,7 @@ function formatHoursFromSlots(
 
 function formatJobLabel(value: string): string {
   if (value === "ability_incentive") {
-    return "Shift + incentive";
+    return "Ability";
   }
 
   if (value === "prestige" || value === "prestige_ilst") {
@@ -2022,6 +2012,10 @@ function formatJobLabel(value: string): string {
   }
 
   return capitalize(value);
+}
+
+function isAbilityShift(jobType: JobType): boolean {
+  return jobType === "ability" || jobType === "ability_incentive";
 }
 
 function formatIncentiveModeLabel(value: string): string {

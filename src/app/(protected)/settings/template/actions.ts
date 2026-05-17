@@ -136,7 +136,7 @@ function normalizeIncentiveFields(
   incentiveRate: number;
   incentiveAmount: number;
 } {
-  if (jobType !== "ability_incentive") {
+  if (jobType !== "ability" && jobType !== "ability_incentive") {
     return { incentiveMode: "none", incentiveRate: 0, incentiveAmount: 0 };
   }
 

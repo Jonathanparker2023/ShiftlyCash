@@ -114,13 +114,10 @@ export function calculateEarnSlot(
     const wageEarningsCents =
       Math.round(regularHours * settings.abilityRegularNetRateCents) +
       Math.round(overtimeHours * settings.abilityOvertimeNetRateCents);
-    const incentiveCents =
-      slot.jobType === "ability_incentive"
-        ? multiplyCents(
-            dollarsToCents(incentiveGrossAmount(slot, wageHours)),
-            settings.abilityNetMultiplier,
-          )
-        : 0;
+    const incentiveCents = multiplyCents(
+      dollarsToCents(incentiveGrossAmount(slot, wageHours)),
+      settings.abilityNetMultiplier,
+    );
     const earningsCents = wageEarningsCents + incentiveCents;
 
     return {

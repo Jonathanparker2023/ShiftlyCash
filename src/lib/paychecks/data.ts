@@ -498,7 +498,7 @@ function sumAbilityIncentiveGrossForWeek(
   return slots.reduce((total, slot) => {
     if (
       dayToWeekId.get(slot.day_id) !== weekId ||
-      slot.job_type !== "ability_incentive"
+      (slot.job_type !== "ability" && slot.job_type !== "ability_incentive")
     ) {
       return total;
     }
