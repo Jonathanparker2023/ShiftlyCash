@@ -615,6 +615,8 @@ function buildProjectionContext({
       weeks_remaining: projection.weeksRemaining,
       ytd_cashflow: money(projection.ytdCfCents),
       ytd_earnings: money(projection.ytdEarningsCents),
+      ytd_wage_net: money(projection.ytdWageNetCents),
+      avg_wage_net: money(projection.avgWageNetCents),
       ypgc: money(projection.ypgcCents),
       ypwi_net: money(projection.ypwiNetCents),
       ypwi_gross: money(projection.ypwiGrossCents),

@@ -198,10 +198,10 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
             value={formatMoney(initialData.projection.wpcCents)}
           />
           <Metric
-            label="Yearly projected wage income"
-            sub={`YTD ${formatMoney(initialData.projection.ytdEarningsCents)} + avg ${formatMoney(initialData.projection.avgEarningsCents)} x ${initialData.projection.weeksRemaining} wks`}
+            label="Yearly projected gross wage income"
+            sub={`grossed from YTD wages ${formatMoney(initialData.projection.ytdWageNetCents)} + avg wages ${formatMoney(initialData.projection.avgWageNetCents)} x ${initialData.projection.weeksRemaining} wks`}
             tone="green"
-            value={formatMoney(initialData.projection.ypwiNetCents)}
+            value={formatMoney(initialData.projection.ypwiGrossCents)}
           />
           <Metric
             label="Estimated due tax"

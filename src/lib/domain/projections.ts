@@ -50,6 +50,8 @@ export type ProjectionOutput = {
   weeksRemaining: number;
   ytdCfCents: number;
   ytdEarningsCents: number;
+  ytdWageNetCents: number;
+  avgWageNetCents: number;
   ypgcCents: number;
   ypwiNetCents: number;
   ypwiGrossCents: number;
@@ -68,20 +70,6 @@ const FICA_SS_RATE = 0.062;
 const FICA_MEDICARE_RATE = 0.0145;
 const MAX_WEEKS_IN_YEAR = 53;
 const DEFAULT_OVERTIME_EXEMPTION_CENTS = 90_000; // $900 federal-only legacy exemption
-
-/**
- * Median of a numeric array. Returns 0 for an empty array.
- * Uses the legacy convention of averaging the two middle elements for an
- * even-length input.
- */
-function medianOfNumbers(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
 
 /** Federal 2025 tax brackets (single filer). Input is taxable income in cents. */
 export function fedTax2025(taxableCents: number): number {
@@ -186,9 +174,15 @@ export function calcWeeklyProjection(input: ProjectionInput): ProjectionOutput {
     (sum, week) => sum + week.earningsCents,
     0,
   );
-  const ypwiNetCents = Math.round(
-    ytdEarningsCents + avgEarningsCents * weeksRemaining,
+  const ytdAeNet = closed.reduce(
+    (sum, week) => sum + week.abilityPaycheckCents,
+    0,
   );
+  const ytdPeNet = closed.reduce(
+    (sum, week) => sum + week.prestigePaycheckCents,
+    0,
+  );
+  const ytdWageNetCents = ytdAeNet + ytdPeNet;
   const ypgcCents = ytdCfCents + wpcCents * weeksRemaining;
 
   // Average paycheck split (NET) across the rolling window
@@ -200,37 +194,13 @@ export function calcWeeklyProjection(input: ProjectionInput): ProjectionOutput {
     last.length > 0
       ? last.reduce((s, w) => s + w.prestigePaycheckCents, 0) / last.length
       : 0;
+  const avgWageNetCents = Math.round(avgAeNet + avgPeNet);
+  const ypwiNetCents = Math.round(
+    ytdWageNetCents + avgWageNetCents * weeksRemaining,
+  );
 
-  // YTD per-job (NET) — MEDIAN-based smoothing.
-  //
-  // Why median × ytdWeekCount instead of Σ:
-  //   The tax engine projects an annual gross to feed bracket math. Summing
-  //   actual realized per-job earnings lets one outlier week (huge grind, sick
-  //   week, big bonus) inflate or deflate the projected gross, which cascades
-  //   through fed/FICA/CT brackets and produces a noisy estTax that swings by
-  //   hundreds of dollars on the strength of a single anomalous week.
-  //
-  //   Using the median of weekly per-job earnings × number of elapsed weeks
-  //   produces a "typical-week × weeks-elapsed" YTD that's robust to outliers
-  //   while still reflecting the user's steady-state earning shape. The
-  //   forecast portion (rolling-window avg × weeksRemaining) stays unchanged,
-  //   so genuine pattern shifts still propagate quickly through the rolling
-  //   window — just smoother.
-  //
-  //   Legacy-imported weeks (1–13) get a 68/32 fallback split applied inside
-  //   v_week_totals, so they show up in the medians on equal footing with
-  //   measured weeks. Per spec: include every week in the data pool.
-  //
-  //   This only affects YPWI_gross (the tax engine input). YPWI_net (the
-  //   displayed card value) keeps using realized YTD sums so the card honestly
-  //   reports what the user actually earned.
-  const medianAeNet = medianOfNumbers(closed.map((w) => w.abilityPaycheckCents));
-  const medianPeNet = medianOfNumbers(closed.map((w) => w.prestigePaycheckCents));
-  const ytdWeekCount = closed.length;
-  const ytdAeNet = medianAeNet * ytdWeekCount;
-  const ytdPeNet = medianPeNet * ytdWeekCount;
-
-  // Gross-up using withholding rates
+  // Gross-up wage-only net earnings using the presumed withholding rates.
+  // "Other" income remains in cashflow, but it is not wage income for YPWI.
   const abilityNetMultiplier = 1 - input.withholding.ability;
   const prestigeNetMultiplier = 1 - input.withholding.prestige;
   const ytdAeGross = abilityNetMultiplier > 0 ? ytdAeNet / abilityNetMultiplier : 0;
@@ -281,6 +251,8 @@ export function calcWeeklyProjection(input: ProjectionInput): ProjectionOutput {
     weeksRemaining,
     ytdCfCents,
     ytdEarningsCents,
+    ytdWageNetCents,
+    avgWageNetCents,
     ypgcCents,
     ypwiNetCents,
     ypwiGrossCents,
