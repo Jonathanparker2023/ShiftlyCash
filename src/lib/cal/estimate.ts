@@ -2,11 +2,29 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 
+import { applyExplicitNutritionOverrides } from "@/lib/cal/manualNutrition";
 import type { FoodCategory } from "@/lib/cal/types";
 
 const ESTIMATOR_MODEL = "claude-sonnet-4-5";
-const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_DESCRIPTION_LENGTH = 4000;
 const SYSTEM_PROMPT = `You are a precise nutrition estimator. Your job is to estimate calories, macros, sodium, added sugar, and saturated fat for food a user has eaten.
+
+## Authoritative user-entered numbers
+
+If the user provides explicit nutrition numbers, those numbers are AUTHORITATIVE. Do not reinterpret, replace, smooth, or "correct" them with your own estimate.
+
+Examples of authoritative numbers:
+- "640 cal, 73g protein, 8g carbs, 28g fat, 2g fiber, 640mg sodium"
+- "Total: calories 912, protein 29, carbs 59, fat 24"
+- An itemized calculation where the user has already summed macros with Claude, labels, a nutrition calculator, or manual math.
+
+Rules:
+- Copy explicit calories, protein, carbs, fat, fiber, sodium, added sugar, and saturated fat exactly into the matching JSON fields.
+- If a field is explicitly provided by the user, never overwrite it with an estimate or web result.
+- Only estimate fields the user did not provide.
+- Preserve every named food/component the user listed in the reasoning component list. Do not drop ingredients just because they are small.
+- If the user gives both itemized component lines and a final total, use the final total for JSON fields and include the itemized components in reasoning.
+- If the user's manual total conflicts with what you would estimate, trust the user's total. Confidence should be "high" for provided numeric fields.
 
 ## Tool use - web search
 
@@ -218,8 +236,9 @@ export async function estimateFood(description: string): Promise<FoodEstimate> {
     throw new Error("Estimator unavailable: ANTHROPIC_API_KEY not set.");
   }
 
-  const trimmed = description.trim().slice(0, MAX_DESCRIPTION_LENGTH);
-  if (!trimmed) {
+  const fullDescription = description.trim();
+  const trimmed = fullDescription.slice(0, MAX_DESCRIPTION_LENGTH);
+  if (!fullDescription) {
     throw new Error("Describe what you ate.");
   }
 
@@ -239,7 +258,10 @@ export async function estimateFood(description: string): Promise<FoodEstimate> {
     messages: [{ role: "user", content: trimmed }],
   });
 
-  return parseEstimate(extractFinalText(response.content));
+  return applyExplicitNutritionOverrides(
+    parseEstimate(extractFinalText(response.content)),
+    fullDescription,
+  );
 }
 
 function extractFinalText(content: Anthropic.Messages.ContentBlock[]): string {
