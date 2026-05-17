@@ -62,9 +62,14 @@ async function syncFoundationLedger(
     "plan_metrics",
     "debt_free_date_iso",
   );
-  const topCategory = firstRecord(
-    readArray(snapshot, "spending", "top_categories_rolling_30d"),
+  const topCategories = readArray(
+    snapshot,
+    "spending",
+    "top_categories_rolling_30d",
   );
+  const topCategory = recordAt(topCategories, 0);
+  const topCategory2 = recordAt(topCategories, 1);
+  const topCategory3 = recordAt(topCategories, 2);
   const historyExclusions = readPath(
     snapshot,
     ["history", "current_week", "exclusions"],
@@ -132,6 +137,37 @@ async function syncFoundationLedger(
     ),
     "Top spending category": richTextProperty(readString(topCategory, "category")),
     "Top spending category ($)": numberProperty(readNumber(topCategory, "amount")),
+    "Top spending category 2": richTextProperty(readString(topCategory2, "category")),
+    "Top spending category 2 ($)": numberProperty(readNumber(topCategory2, "amount")),
+    "Top spending category 3": richTextProperty(readString(topCategory3, "category")),
+    "Top spending category 3 ($)": numberProperty(readNumber(topCategory3, "amount")),
+    "Federal tax liability ($)": numberProperty(
+      readNumber(snapshot, "projection", "fed_liability"),
+    ),
+    "FICA tax liability ($)": numberProperty(
+      readNumber(snapshot, "projection", "fica_liability"),
+    ),
+    "CT tax liability ($)": numberProperty(
+      readNumber(snapshot, "projection", "ct_liability"),
+    ),
+    "Total tax liability ($)": numberProperty(
+      readNumber(snapshot, "projection", "total_liability"),
+    ),
+    "Tax withheld YTD ($)": numberProperty(
+      readNumber(snapshot, "projection", "withheld_year_to_date"),
+    ),
+    "Est remaining tax owed ($)": numberProperty(
+      readNumber(snapshot, "projection", "est_remaining_tax_owed"),
+    ),
+    "Median weekly earnings ($)": numberProperty(
+      readNumber(snapshot, "projection", "mwe"),
+    ),
+    "YPWI gross ($)": numberProperty(
+      readNumber(snapshot, "projection", "ypwi_gross"),
+    ),
+    "YPWI net ($)": numberProperty(
+      readNumber(snapshot, "projection", "ypwi_net"),
+    ),
     "History week #": numberProperty(
       readNumber(snapshot, "history", "current_week", "display_week_number"),
     ),
@@ -324,17 +360,41 @@ async function syncNutritionLedger(
     "7d avg protein (g)": numberProperty(
       readNumber(snapshot, "rolling_7d", "avg_protein_g"),
     ),
+    "7d avg carbs (g)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "avg_carbs_g"),
+    ),
+    "7d avg fat (g)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "avg_fat_g"),
+    ),
     "7d avg fiber (g)": numberProperty(
       readNumber(snapshot, "rolling_7d", "avg_fiber_g"),
     ),
+    "7d avg sodium (mg)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "avg_sodium_mg"),
+    ),
+    "7d avg added sugar (g)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "avg_added_sugar_g"),
+    ),
+    "7d avg saturated fat (g)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "avg_saturated_fat_g"),
+    ),
     "7d avg water (oz)": numberProperty(
       readNumber(snapshot, "rolling_7d", "avg_water_oz"),
+    ),
+    "7d days logged": numberProperty(
+      readNumber(snapshot, "rolling_7d", "days_logged"),
     ),
     "7d days under TDEE": numberProperty(
       readNumber(snapshot, "rolling_7d", "days_under_tdee"),
     ),
     "7d days over TDEE": numberProperty(
       readNumber(snapshot, "rolling_7d", "days_over_tdee"),
+    ),
+    "7d weight start (lbs)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "weight_start_lbs"),
+    ),
+    "7d weight end (lbs)": numberProperty(
+      readNumber(snapshot, "rolling_7d", "weight_end_lbs"),
     ),
     "7d weight trend (lbs)": numberProperty(
       readNumber(snapshot, "rolling_7d", "weight_trend_lbs"),
@@ -345,8 +405,23 @@ async function syncNutritionLedger(
     "28d avg protein (g)": numberProperty(
       readNumber(snapshot, "rolling_28d", "avg_protein_g"),
     ),
+    "28d avg carbs (g)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_carbs_g"),
+    ),
+    "28d avg fat (g)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_fat_g"),
+    ),
     "28d avg fiber (g)": numberProperty(
       readNumber(snapshot, "rolling_28d", "avg_fiber_g"),
+    ),
+    "28d avg sodium (mg)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_sodium_mg"),
+    ),
+    "28d avg added sugar (g)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_added_sugar_g"),
+    ),
+    "28d avg saturated fat (g)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "avg_saturated_fat_g"),
     ),
     "28d avg water (oz)": numberProperty(
       readNumber(snapshot, "rolling_28d", "avg_water_oz"),
@@ -364,6 +439,12 @@ async function syncNutritionLedger(
       wholePercentToNotionPercent(
         readNumber(snapshot, "rolling_28d", "compliance_pct"),
       ),
+    ),
+    "28d weight start (lbs)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "weight_start_lbs"),
+    ),
+    "28d weight end (lbs)": numberProperty(
+      readNumber(snapshot, "rolling_28d", "weight_end_lbs"),
     ),
     "28d weight change (lbs)": numberProperty(
       readNumber(snapshot, "rolling_28d", "weight_change_lbs"),
@@ -552,8 +633,12 @@ function readPath(value: unknown, path: string[]): unknown {
 }
 
 function firstRecord(values: unknown[]): JsonRecord | null {
-  const first = values[0];
-  return isRecord(first) ? first : null;
+  return recordAt(values, 0);
+}
+
+function recordAt(values: unknown[], index: number): JsonRecord | null {
+  const value = values[index];
+  return isRecord(value) ? value : null;
 }
 
 function isRecord(value: unknown): value is JsonRecord {
