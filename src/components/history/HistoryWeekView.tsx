@@ -327,6 +327,10 @@ function TransactionPanel({
 }: {
   transactions: HistoryDetailTransaction[];
 }) {
+  const visible = transactions.filter(
+    (transaction) => transaction.status !== "excluded",
+  );
+
   return (
     <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-sm backdrop-blur-md">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -334,34 +338,27 @@ function TransactionPanel({
           Transactions
         </h3>
         <span className="rounded-full bg-black/20 backdrop-blur-md px-2 py-0.5 text-xs font-semibold text-white">
-          {transactions.length}
+          {visible.length}
         </span>
       </div>
 
-      {transactions.length === 0 ? (
+      {visible.length === 0 ? (
         <p className="rounded-md border border-dashed border-white/15 bg-black/15 p-3 text-sm text-white/60">
           No transactions for this day.
         </p>
       ) : (
         <div className="space-y-1.5">
-          {transactions.map((transaction) => (
+          {visible.map((transaction) => (
             <div
-              className="rounded-md border border-white/10 bg-black/15 px-3 py-2 text-xs text-white"
+              className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/15 px-3 py-2 text-xs text-white"
               key={transaction.id}
             >
-              <div className="flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-sm font-semibold">
-                  {transaction.merchantName}
-                </p>
-                <p className="shrink-0 text-sm font-semibold tabular-nums">
-                  {formatMoney(transaction.amountCents)}
-                </p>
-              </div>
-              {transaction.category ? (
-                <p className="mt-0.5 truncate text-[11px] text-white/55">
-                  {formatTransactionCategory(transaction.category)}
-                </p>
-              ) : null}
+              <p className="min-w-0 truncate text-sm font-semibold">
+                {transaction.merchantName}
+              </p>
+              <p className="shrink-0 text-sm font-semibold tabular-nums">
+                {formatMoney(transaction.amountCents)}
+              </p>
             </div>
           ))}
         </div>
@@ -488,14 +485,6 @@ function formatTimestamp(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function formatTransactionCategory(value: string): string {
-  return value
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((part) => capitalize(part.toLowerCase()))
-    .join(" ");
 }
 
 function capitalize(value: string): string {
