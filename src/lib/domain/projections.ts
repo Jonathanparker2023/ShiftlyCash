@@ -70,6 +70,18 @@ const FICA_SS_RATE = 0.062;
 const FICA_MEDICARE_RATE = 0.0145;
 const MAX_WEEKS_IN_YEAR = 53;
 const DEFAULT_OVERTIME_EXEMPTION_CENTS = 90_000; // $900 federal-only legacy exemption
+const MAX_GROSS_UP_WITHHOLDING_RATE = 0.6;
+
+export function grossUpNetWageCents(
+  netCents: number,
+  withholdingRate: number,
+): number {
+  const safeWithholdingRate = Math.min(
+    MAX_GROSS_UP_WITHHOLDING_RATE,
+    Math.max(0, Number.isFinite(withholdingRate) ? withholdingRate : 0),
+  );
+  return Math.round(netCents / (1 - safeWithholdingRate));
+}
 
 /** Federal 2025 tax brackets (single filer). Input is taxable income in cents. */
 export function fedTax2025(taxableCents: number): number {
@@ -185,7 +197,8 @@ export function calcWeeklyProjection(input: ProjectionInput): ProjectionOutput {
   const ytdWageNetCents = ytdAeNet + ytdPeNet;
   const ypgcCents = ytdCfCents + wpcCents * weeksRemaining;
 
-  // Average paycheck split (NET) across the rolling window
+  // Average paycheck split (NET) across the rolling window. This uses the same
+  // arithmetic mean window as WPC/avg earnings; YTD wage uses all closed weeks.
   const avgAeNet =
     last.length > 0
       ? last.reduce((s, w) => s + w.abilityPaycheckCents, 0) / last.length
@@ -201,12 +214,12 @@ export function calcWeeklyProjection(input: ProjectionInput): ProjectionOutput {
 
   // Gross-up wage-only net earnings using the presumed withholding rates.
   // "Other" income remains in cashflow, but it is not wage income for YPWI.
-  const abilityNetMultiplier = 1 - input.withholding.ability;
-  const prestigeNetMultiplier = 1 - input.withholding.prestige;
-  const ytdAeGross = abilityNetMultiplier > 0 ? ytdAeNet / abilityNetMultiplier : 0;
-  const ytdPeGross = prestigeNetMultiplier > 0 ? ytdPeNet / prestigeNetMultiplier : 0;
-  const avgAeGross = abilityNetMultiplier > 0 ? avgAeNet / abilityNetMultiplier : 0;
-  const avgPeGross = prestigeNetMultiplier > 0 ? avgPeNet / prestigeNetMultiplier : 0;
+  // The weekly buckets come from v_week_totals, which records earned wages by
+  // work week. That avoids bias from the biweekly deposit cadence.
+  const ytdAeGross = grossUpNetWageCents(ytdAeNet, input.withholding.ability);
+  const ytdPeGross = grossUpNetWageCents(ytdPeNet, input.withholding.prestige);
+  const avgAeGross = grossUpNetWageCents(avgAeNet, input.withholding.ability);
+  const avgPeGross = grossUpNetWageCents(avgPeNet, input.withholding.prestige);
 
   // Yearly Projected Wage Income (gross)
   const ypwiGrossCents = Math.round(
@@ -215,10 +228,12 @@ export function calcWeeklyProjection(input: ProjectionInput): ProjectionOutput {
 
   // Total withheld over the year
   const withheldYrCents = Math.round(
-    ytdAeGross * input.withholding.ability +
-      ytdPeGross * input.withholding.prestige +
-      (avgAeGross * input.withholding.ability +
-        avgPeGross * input.withholding.prestige) *
+    (ytdAeGross - ytdAeNet) +
+      (ytdPeGross - ytdPeNet) +
+      (avgAeGross -
+        avgAeNet +
+        avgPeGross -
+        avgPeNet) *
         weeksRemaining,
   );
 

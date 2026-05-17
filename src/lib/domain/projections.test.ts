@@ -4,10 +4,16 @@ import {
   calcWeeklyProjection,
   ctTax2025,
   fedTax2025,
+  grossUpNetWageCents,
   simulateLegacyMillionaire,
 } from "@/lib/domain/projections";
 
 describe("projection math", () => {
+  it("grosses up net wages with a safe withholding ceiling", () => {
+    expect(grossUpNetWageCents(100_000, 0.18)).toBe(121_951);
+    expect(grossUpNetWageCents(100_000, 1)).toBe(250_000);
+  });
+
   it("uses the legacy net wage projection for YPWI", () => {
     const projection = calcWeeklyProjection({
       currentWeekNumber: 10,
@@ -111,9 +117,9 @@ describe("projection math", () => {
     //   avgAeGross = 200_000 / 0.7348 ~= 272_183
     //   avgPeGross = 80_000  / 0.86   ~= 93_023
     //   forecast   = (272_183 + 93_023) * 47 ~= 17_164_690
-    //   ypwiGross  ~= 952_640 + 325_581 + 17_164_690 = 18_442_911
+    //   ypwiGross  = 952_640 + 325_581 + (272_183 + 93_023) * 47 = 18_442_903
     //   ypwiNet = 980_000 + 280_000 * 47 = 980_000 + 13_160_000 = 14_140_000
-    expect(projection.ypwiGrossCents).toBe(18_442_911);
+    expect(projection.ypwiGrossCents).toBe(18_442_903);
     expect(projection.ytdEarningsCents).toBe(1_030_000);
     expect(projection.ytdWageNetCents).toBe(980_000);
     expect(projection.avgWageNetCents).toBe(280_000);
