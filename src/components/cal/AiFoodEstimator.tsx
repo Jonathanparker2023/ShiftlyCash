@@ -80,7 +80,7 @@ export function AiFoodEstimator({
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [description, setDescription] = useState("");
-  const [estimate, setEstimate] = useState<EstimateForm | null>(null);
+  const [estimate, setEstimate] = useState<EstimateForm[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -95,7 +95,7 @@ export function AiFoodEstimator({
     startTransition(async () => {
       try {
         const result = await estimateFoodAction({ description });
-        setEstimate(toEstimateForm(result));
+        setEstimate(result.map(toEstimateForm));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to estimate food.");
       }
@@ -139,23 +139,77 @@ export function AiFoodEstimator({
     setError(null);
   }
 
-  function confirm() {
-    if (!estimate) return;
+  function confirmEstimate(item: EstimateForm) {
     onConfirm({
-      mealName: estimate.mealName,
-      category: estimate.category,
+      mealName: item.mealName,
+      category: item.category,
       loggedTime: currentTimeInput(),
-      calories: estimate.calories,
-      proteinG: estimate.proteinG,
-      carbsG: estimate.carbsG,
-      fatG: estimate.fatG,
-      fiberG: estimate.fiberG,
-      sodiumMg: estimate.sodiumMg,
-      addedSugarG: estimate.addedSugarG,
-      saturatedFatG: estimate.saturatedFatG,
+      calories: item.calories,
+      proteinG: item.proteinG,
+      carbsG: item.carbsG,
+      fatG: item.fatG,
+      fiberG: item.fiberG,
+      sodiumMg: item.sodiumMg,
+      addedSugarG: item.addedSugarG,
+      saturatedFatG: item.saturatedFatG,
     });
+  }
+
+  function confirmSingle() {
+    if (!estimate?.[0]) return;
+    confirmEstimate(estimate[0]);
     reset();
     setIsOpen(false);
+  }
+
+  function confirmBatchItem(index: number) {
+    const item = estimate?.[index];
+    if (!item) return;
+    confirmEstimate(item);
+    removeEstimateItem(index, { closeWhenEmpty: true });
+  }
+
+  function confirmBatchAll() {
+    if (!estimate) return;
+    estimate.forEach(confirmEstimate);
+    reset();
+    setIsOpen(false);
+  }
+
+  function discardBatchItem(index: number) {
+    removeEstimateItem(index, { closeWhenEmpty: true });
+  }
+
+  function discardAll() {
+    reset();
+    setIsOpen(false);
+  }
+
+  function updateEstimate(index: number, nextEstimate: EstimateForm) {
+    setEstimate((current) =>
+      current?.map((item, itemIndex) =>
+        itemIndex === index ? nextEstimate : item,
+      ) ?? null,
+    );
+  }
+
+  function removeEstimateItem(
+    index: number,
+    { closeWhenEmpty }: { closeWhenEmpty: boolean },
+  ) {
+    const nextEstimate =
+      estimate?.filter((_, itemIndex) => itemIndex !== index) ?? null;
+
+    if (nextEstimate && nextEstimate.length > 0) {
+      setEstimate(nextEstimate);
+      return;
+    }
+
+    setEstimate(null);
+    if (closeWhenEmpty) {
+      reset();
+      setIsOpen(false);
+    }
   }
 
   return (
@@ -172,21 +226,34 @@ export function AiFoodEstimator({
       {isOpen ? (
         <div className="mt-3 rounded-md border border-white/15 bg-black/20 p-3 text-white">
           {estimate ? (
-            <EstimateResult
-              confirmLabel={confirmLabel}
-              disabled={disabled}
-              estimate={estimate}
-              onChange={setEstimate}
-              onConfirm={confirm}
-              onDiscard={reset}
-            />
+            estimate.length === 1 ? (
+              <EstimateResult
+                confirmLabel={confirmLabel}
+                disabled={disabled}
+                estimate={estimate[0]}
+                onChange={(nextEstimate) => updateEstimate(0, nextEstimate)}
+                onConfirm={confirmSingle}
+                onDiscard={reset}
+              />
+            ) : (
+              <BatchEstimateResult
+                confirmLabel={confirmLabel}
+                disabled={disabled}
+                estimates={estimate}
+                onChange={updateEstimate}
+                onConfirmAll={confirmBatchAll}
+                onConfirmItem={confirmBatchItem}
+                onDiscardAll={discardAll}
+                onDiscardItem={discardBatchItem}
+              />
+            )
           ) : (
             <div className="mt-3 space-y-3">
               <label className="block text-sm font-semibold text-white/80">
                 What did you eat?
                 <textarea
                   className="mt-1 min-h-24 w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
-                  maxLength={500}
+                  maxLength={4000}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="What did you eat? Be as specific or as casual as you want."
                   value={description}
@@ -352,6 +419,198 @@ function EstimateResult({
           type="button"
         >
           Discard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BatchEstimateResult({
+  confirmLabel,
+  disabled,
+  estimates,
+  onChange,
+  onConfirmAll,
+  onConfirmItem,
+  onDiscardAll,
+  onDiscardItem,
+}: {
+  confirmLabel: string;
+  disabled: boolean;
+  estimates: EstimateForm[];
+  onChange: (index: number, estimate: EstimateForm) => void;
+  onConfirmAll: () => void;
+  onConfirmItem: (index: number) => void;
+  onDiscardAll: () => void;
+  onDiscardItem: (index: number) => void;
+}) {
+  const canConfirmAll = estimates.every((estimate) => estimate.calories.trim());
+  const allLabel = confirmLabel === "Log food" ? "Log all" : "Add all";
+  const itemLabel = confirmLabel === "Log food" ? "Log this" : confirmLabel;
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-white">
+            {estimates.length} foods detected
+          </p>
+          <p className="text-xs text-white/60">
+            Review each item, then log them together or one at a time.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
+            disabled={disabled || !canConfirmAll}
+            onClick={onConfirmAll}
+            type="button"
+          >
+            {allLabel}
+          </button>
+          <button
+            className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+            onClick={onDiscardAll}
+            type="button"
+          >
+            Discard all
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {estimates.map((estimate, index) => (
+          <MiniEstimateCard
+            disabled={disabled}
+            estimate={estimate}
+            itemLabel={itemLabel}
+            key={index}
+            onChange={(nextEstimate) => onChange(index, nextEstimate)}
+            onConfirm={() => onConfirmItem(index)}
+            onDiscard={() => onDiscardItem(index)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MiniEstimateCard({
+  disabled,
+  estimate,
+  itemLabel,
+  onChange,
+  onConfirm,
+  onDiscard,
+}: {
+  disabled: boolean;
+  estimate: EstimateForm;
+  itemLabel: string;
+  onChange: (estimate: EstimateForm) => void;
+  onConfirm: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-white/15 bg-black/25 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${confidenceClass(estimate.confidence)}`}
+        >
+          {estimate.confidence} confidence
+        </span>
+        <span className="text-xs font-semibold text-white/60">
+          {categoryLabel(estimate.category)}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <TextInput
+          className="sm:col-span-2"
+          label="Name"
+          onChange={(value) => onChange({ ...estimate, mealName: value })}
+          value={estimate.mealName}
+        />
+        <CategorySelect
+          label="Category"
+          onChange={(category) => onChange({ ...estimate, category })}
+          value={estimate.category}
+        />
+        <NumberInput
+          label="Calories"
+          onChange={(value) => onChange({ ...estimate, calories: value })}
+          required
+          value={estimate.calories}
+        />
+        <NumberInput
+          label="Protein"
+          onChange={(value) => onChange({ ...estimate, proteinG: value })}
+          suffix="g"
+          value={estimate.proteinG}
+        />
+        <NumberInput
+          label="Carbs"
+          onChange={(value) => onChange({ ...estimate, carbsG: value })}
+          suffix="g"
+          value={estimate.carbsG}
+        />
+        <NumberInput
+          label="Fat"
+          onChange={(value) => onChange({ ...estimate, fatG: value })}
+          suffix="g"
+          value={estimate.fatG}
+        />
+        <NumberInput
+          label="Fiber"
+          onChange={(value) => onChange({ ...estimate, fiberG: value })}
+          suffix="g"
+          value={estimate.fiberG}
+        />
+        <NumberInput
+          label="Sodium"
+          onChange={(value) => onChange({ ...estimate, sodiumMg: value })}
+          suffix="mg"
+          value={estimate.sodiumMg}
+        />
+        <NumberInput
+          label="Added sugar"
+          onChange={(value) => onChange({ ...estimate, addedSugarG: value })}
+          suffix="g"
+          value={estimate.addedSugarG}
+        />
+        <NumberInput
+          label="Sat fat"
+          onChange={(value) =>
+            onChange({ ...estimate, saturatedFatG: value })
+          }
+          suffix="g"
+          value={estimate.saturatedFatG}
+        />
+      </div>
+
+      {estimate.reasoning ? (
+        <details className="mt-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/70">
+          <summary className="cursor-pointer font-semibold text-white/75">
+            Reasoning
+          </summary>
+          <p className="mt-2 whitespace-pre-line">{estimate.reasoning}</p>
+        </details>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          className="rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
+          disabled={disabled || !estimate.calories.trim()}
+          onClick={onConfirm}
+          type="button"
+        >
+          {itemLabel}
+        </button>
+        <button
+          className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          onClick={onDiscard}
+          type="button"
+        >
+          Discard this
         </button>
       </div>
     </div>

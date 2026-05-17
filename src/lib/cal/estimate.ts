@@ -2,8 +2,13 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 
-import { applyExplicitNutritionOverrides } from "@/lib/cal/manualNutrition";
-import type { FoodCategory } from "@/lib/cal/types";
+import { applyExplicitNutritionOverridesToEstimates } from "@/lib/cal/manualNutrition";
+import {
+  parseEstimateResponse,
+  type FoodEstimate,
+} from "@/lib/cal/estimateParser";
+
+export type { FoodEstimate } from "@/lib/cal/estimateParser";
 
 const ESTIMATOR_MODEL = "claude-sonnet-4-5";
 const MAX_DESCRIPTION_LENGTH = 4000;
@@ -25,6 +30,34 @@ Rules:
 - Preserve every named food/component the user listed in the reasoning component list. Do not drop ingredients just because they are small.
 - If the user gives both itemized component lines and a final total, use the final total for JSON fields and include the itemized components in reasoning.
 - If the user's manual total conflicts with what you would estimate, trust the user's total. Confidence should be "high" for provided numeric fields.
+
+## Multi-item input - return an array of entries
+
+If the user describes MULTIPLE distinct foods or meals in one input, split them and return one entry per food. Examples that should return multiple entries:
+
+- "Breakfast: 2 eggs and toast. Lunch: Greek salad." -> 2 entries
+- "Apple. Greek yogurt. Coffee." -> 3 entries
+- "8am: coffee, 12pm: chicken bowl, 6pm: pasta" -> 3 entries
+- Itemized lists pasted from an AI assistant or restaurant order summary -> one entry per dish
+
+Examples that should return ONE entry:
+
+- "Chicken bowl with rice, beans, salsa, and guac" -> 1 entry (single composite meal)
+- "Greek salad with feta, olives, cucumber, tomato, oil and vinegar" -> 1 entry (single dish, even though many ingredients)
+- "Pizza with pepperoni, mushrooms, and extra cheese" -> 1 entry
+
+Rule of thumb: distinct meals/foods at different times or in different "courses" -> multiple entries. A single dish with multiple components -> one entry.
+
+For each entry in a multi-item response, every authoritative-numbers rule still applies independently - if the user provides explicit calories for breakfast and separately for lunch, both sets of numbers are preserved per their respective entry.
+
+JSON output for multi-item must be a top-level array:
+
+[
+  { "mealName": "...", "category": "...", "calories": 0, "proteinG": null, "carbsG": null, "fatG": null, "fiberG": null, "sodiumMg": null, "addedSugarG": null, "saturatedFatG": null, "reasoning": "...", "confidence": "medium" },
+  { "mealName": "...", "category": "...", "calories": 0, "proteinG": null, "carbsG": null, "fatG": null, "fiberG": null, "sodiumMg": null, "addedSugarG": null, "saturatedFatG": null, "reasoning": "...", "confidence": "medium" }
+]
+
+For single-item, return an array with one element. Always return an array.
 
 ## Tool use - web search
 
@@ -190,9 +223,9 @@ Strict rules:
 
 ## Output format
 
-Output JSON ONLY. No prose before or after. No markdown fence. No code blocks. The entire response must be a single valid JSON object.
+Output JSON ONLY. No prose before or after. No markdown fence. No code blocks. The entire response must be a single valid top-level JSON array.
 
-Schema (all keys required; macro fields may be null only if truly unknowable):
+Per-item schema (all keys required; macro fields may be null only if truly unknowable):
 {
   "mealName": string, MAX 5 WORDS (~30 chars), qualifier-style punchy label as described above (e.g. "Heavy Chipotle Bowl", "Unhealthy Mickey D's", "Clean Apple Hit"),
   "category": "meal" | "healthy_snack" | "unhealthy_snack" | "drink" | "other",
@@ -215,22 +248,7 @@ Category rules:
 - "drink" - coffee, juice, soda, smoothies, alcohol, milk, water.
 - "other" - anything that genuinely doesn't fit above.`;
 
-export type FoodEstimate = {
-  mealName: string;
-  category: FoodCategory;
-  calories: number;
-  proteinG: number | null;
-  carbsG: number | null;
-  fatG: number | null;
-  fiberG: number | null;
-  sodiumMg: number | null;
-  addedSugarG: number | null;
-  saturatedFatG: number | null;
-  reasoning: string;
-  confidence: "high" | "medium" | "low";
-};
-
-export async function estimateFood(description: string): Promise<FoodEstimate> {
+export async function estimateFood(description: string): Promise<FoodEstimate[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("Estimator unavailable: ANTHROPIC_API_KEY not set.");
@@ -258,8 +276,8 @@ export async function estimateFood(description: string): Promise<FoodEstimate> {
     messages: [{ role: "user", content: trimmed }],
   });
 
-  return applyExplicitNutritionOverrides(
-    parseEstimate(extractFinalText(response.content)),
+  return applyExplicitNutritionOverridesToEstimates(
+    parseEstimateResponse(extractFinalText(response.content)),
     fullDescription,
   );
 }
@@ -271,77 +289,4 @@ function extractFinalText(content: Anthropic.Messages.ContentBlock[]): string {
   }
   if (!lastText) throw new Error("Estimator returned no text.");
   return lastText;
-}
-
-function parseEstimate(raw: string): FoodEstimate {
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```$/, "")
-    .trim();
-
-  let json: unknown;
-  try {
-    json = JSON.parse(cleaned);
-  } catch {
-    throw new Error("Estimator returned invalid JSON.");
-  }
-
-  if (typeof json !== "object" || json === null) {
-    throw new Error("Estimator returned malformed response.");
-  }
-
-  const obj = json as Record<string, unknown>;
-  const calories = toInteger(obj.calories);
-  if (calories === null || calories < 0) {
-    throw new Error("Estimator returned invalid calories.");
-  }
-
-  return {
-    mealName: String(obj.mealName ?? "").slice(0, 40).trim() || "Estimated food",
-    category: parseCategory(obj.category),
-    calories,
-    proteinG: toOptionalInteger(obj.proteinG),
-    carbsG: toOptionalInteger(obj.carbsG),
-    fatG: toOptionalInteger(obj.fatG),
-    fiberG: toOptionalInteger(obj.fiberG),
-    sodiumMg: toOptionalInteger(obj.sodiumMg),
-    addedSugarG: toOptionalInteger(obj.addedSugarG),
-    saturatedFatG: toOptionalInteger(obj.saturatedFatG),
-    reasoning: String(obj.reasoning ?? "").slice(0, 300),
-    confidence: parseConfidence(obj.confidence),
-  };
-}
-
-function parseCategory(value: unknown): FoodCategory {
-  const valid: FoodCategory[] = [
-    "meal",
-    "healthy_snack",
-    "unhealthy_snack",
-    "drink",
-    "other",
-  ];
-  if (typeof value === "string" && valid.includes(value as FoodCategory)) {
-    return value as FoodCategory;
-  }
-  return "meal";
-}
-
-function parseConfidence(value: unknown): "high" | "medium" | "low" {
-  if (value === "high" || value === "medium" || value === "low") return value;
-  return "medium";
-}
-
-function toInteger(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  const n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  return Math.round(n);
-}
-
-function toOptionalInteger(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  const n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.round(n));
 }

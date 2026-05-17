@@ -122,7 +122,7 @@ export async function createFoodEntryAction(input: {
 
 export async function estimateFoodAction(input: {
   description: string;
-}): Promise<FoodEstimate> {
+}): Promise<FoodEstimate[]> {
   await requireUser();
   return estimateFood(input.description);
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyExplicitNutritionOverridesToEstimates,
   applyExplicitNutritionOverrides,
   extractExplicitNutritionOverrides,
 } from "@/lib/cal/manualNutrition";
@@ -72,5 +73,38 @@ describe("manual nutrition overrides", () => {
       fatG: 33,
       fiberG: null,
     });
+  });
+
+  it("applies per-item totals to multi-item estimate arrays by section order", () => {
+    const result = applyExplicitNutritionOverridesToEstimates(
+      [
+        { calories: 1, proteinG: 1, carbsG: 1 },
+        { calories: 2, proteinG: 2, carbsG: 2 },
+      ],
+      [
+        "Breakfast: 300 cal, 20g protein, 25g carbs",
+        "Lunch: 650 cal, 48g protein, 54g carbs",
+      ].join("\n"),
+    );
+
+    expect(result).toEqual([
+      { calories: 300, proteinG: 20, carbsG: 25 },
+      { calories: 650, proteinG: 48, carbsG: 54 },
+    ]);
+  });
+
+  it("falls back to first-item-only override when a multi-item slice is not reliable", () => {
+    const result = applyExplicitNutritionOverridesToEstimates(
+      [
+        { calories: 1, proteinG: 1 },
+        { calories: 2, proteinG: 2 },
+      ],
+      "Calculated total: 900 cal, 60g protein",
+    );
+
+    expect(result).toEqual([
+      { calories: 900, proteinG: 60 },
+      { calories: 2, proteinG: 2 },
+    ]);
   });
 });

@@ -60,8 +60,13 @@ const FIELD_PATTERNS: FieldPattern[] = [
   },
 ];
 
+type ExtractOptions = {
+  allowSingleField?: boolean;
+};
+
 export function extractExplicitNutritionOverrides(
   description: string,
+  options: ExtractOptions = {},
 ): ExplicitNutritionOverrides {
   const normalized = description.trim();
   if (!normalized) {
@@ -76,7 +81,7 @@ export function extractExplicitNutritionOverrides(
     .map((text) => ({ text, overrides: extractFromText(text), score: 0 }))
     .map((candidate) => ({
       ...candidate,
-      score: scoreCandidate(candidate.text, candidate.overrides),
+      score: scoreCandidate(candidate.text, candidate.overrides, options),
     }))
     .filter((candidate) => candidate.score > 0)
     .sort((left, right) => right.score - left.score);
@@ -96,6 +101,46 @@ export function applyExplicitNutritionOverrides<
   return { ...estimate, ...overrides };
 }
 
+export function applyExplicitNutritionOverridesToEstimates<
+  T extends ExplicitNutritionOverrides,
+>(estimates: T[], description: string): T[] {
+  if (estimates.length === 0) {
+    return estimates;
+  }
+
+  if (estimates.length === 1) {
+    return [applyExplicitNutritionOverrides(estimates[0], description)];
+  }
+
+  const sectionOverrides = splitNutritionSections(description)
+    .map((section) =>
+      extractExplicitNutritionOverrides(section, { allowSingleField: true }),
+    )
+    .filter((overrides) => Object.keys(overrides).length > 0);
+
+  if (sectionOverrides.length >= estimates.length) {
+    return estimates.map((estimate, index) => ({
+      ...estimate,
+      ...sectionOverrides[index],
+    }));
+  }
+
+  const fullInputOverrides = extractExplicitNutritionOverrides(description);
+  if (
+    Object.keys(fullInputOverrides).length === 0 ||
+    hasRepeatedFieldValues(description)
+  ) {
+    return estimates;
+  }
+
+  // TODO: improve fuzzy item-to-section matching beyond order-based nutrition sections.
+  // For now, preserve the previous single-item paste behavior by applying a
+  // reliable whole-input override only to the first returned item.
+  return estimates.map((estimate, index) =>
+    index === 0 ? { ...estimate, ...fullInputOverrides } : estimate,
+  );
+}
+
 function buildCandidates(description: string): string[] {
   const lines = description
     .split(/\r?\n/)
@@ -113,6 +158,46 @@ function buildCandidates(description: string): string[] {
   });
 
   return Array.from(new Set([...lineGroups, description]));
+}
+
+function splitNutritionSections(description: string): string[] {
+  const trimmed = description.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const labeledSections = trimmed
+    .split(
+      /(?=\b(?:breakfast|brunch|lunch|dinner|snack|dessert|drink|\d{1,2}(?::\d{2})?\s*(?:am|pm))\s*[:\-])/i,
+    )
+    .map((section) => section.trim())
+    .filter(hasNutritionField);
+
+  if (labeledSections.length > 1) {
+    return labeledSections;
+  }
+
+  const lineSections = trimmed
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(hasNutritionField);
+
+  if (lineSections.length > 1) {
+    return lineSections;
+  }
+
+  return trimmed
+    .split(/(?:[.;]|(?:\r?\n))\s+/)
+    .map((section) => section.trim())
+    .filter(hasNutritionField);
+}
+
+function hasNutritionField(text: string): boolean {
+  return FIELD_PATTERNS.some(
+    (pattern) =>
+      new RegExp(pattern.prefix.source, "i").test(text) ||
+      new RegExp(pattern.suffix.source, "i").test(text),
+  );
 }
 
 function extractFromText(text: string): ExplicitNutritionOverrides {
@@ -158,6 +243,7 @@ function matchValues(
 function scoreCandidate(
   text: string,
   overrides: ExplicitNutritionOverrides,
+  options: ExtractOptions,
 ): number {
   const fieldCount = Object.keys(overrides).length;
   if (fieldCount === 0) {
@@ -167,7 +253,7 @@ function scoreCandidate(
   const lower = text.toLowerCase();
   const totalCue = hasTotalCue(lower);
 
-  if (fieldCount === 1 && !totalCue) {
+  if (fieldCount === 1 && !totalCue && !options.allowSingleField) {
     return 0;
   }
 
