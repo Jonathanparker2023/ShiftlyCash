@@ -674,18 +674,18 @@ function WeekStripCell({
           : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
   const toneGlowFocused =
     tone === "green"
-      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_0_28px_rgba(16,185,129,0.7)]"
+      ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(16,185,129,0.95),0_0_85px_rgba(16,185,129,0.55)]"
       : tone === "amber"
-        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_0_28px_rgba(245,158,11,0.7)]"
+        ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(245,158,11,0.95),0_0_85px_rgba(245,158,11,0.55)]"
         : tone === "red"
-          ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_0_28px_rgba(244,63,94,0.7)]"
-          : "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_24px_rgba(8,15,28,0.12)]";
+          ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(244,63,94,0.95),0_0_85px_rgba(244,63,94,0.55)]"
+          : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_28px_rgba(255,255,255,0.3)]";
 
   return (
     <button
-      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white transition focus:outline-none sm:p-3 ${
+      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white transition-all duration-200 focus:outline-none sm:p-3 ${
         isFocused
-          ? `border-[3px] ${toneBorderFocused} bg-black/20 ${toneGlowFocused} backdrop-blur-xl`
+          ? `scale-105 border-[3px] ${toneBorderFocused} bg-black/30 ${toneGlowFocused} backdrop-blur-xl`
           : `border-2 ${toneBorder} bg-black/10 ${toneGlow} backdrop-blur-xl hover:bg-black/20`
       }`}
       onClick={onClick}
