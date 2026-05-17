@@ -215,13 +215,21 @@ function FocusedDayPanel({ day }: { day: HistoryDetailDay }) {
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.55fr_1.45fr]">
         <section className="space-y-2">
-          {day.slots.length === 0 ? (
-            <div className="rounded-md border border-dashed border-white/20 bg-black/15 p-3 text-sm text-white/60">
-              No earn slots.
-            </div>
-          ) : (
-            day.slots.map((slot) => <ShiftRow key={slot.id} slot={slot} />)
-          )}
+          {(() => {
+            const realSlots = day.slots.filter(
+              (slot) => slot.jobType !== "none" && slot.hoursOrUnits > 0,
+            );
+            if (realSlots.length === 0) {
+              return (
+                <div className="rounded-md border border-dashed border-white/20 bg-black/15 p-3 text-sm text-white/60">
+                  No earn slots.
+                </div>
+              );
+            }
+            return realSlots.map((slot) => (
+              <ShiftRow key={slot.id} slot={slot} />
+            ));
+          })()}
         </section>
 
         <TotalsPanel day={day} />
@@ -335,29 +343,24 @@ function TransactionPanel({
           No transactions for this day.
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {transactions.map((transaction) => (
             <div
-              className="rounded-md border border-white/15 bg-black/15 p-3 text-xs text-white shadow-sm"
+              className="rounded-md border border-white/10 bg-black/15 px-3 py-2 text-xs text-white"
               key={transaction.id}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">
-                    {transaction.merchantName}
-                  </p>
-                  <p className="mt-1 text-white/60">
-                    {transaction.date}
-                    {transaction.time ? ` ${transaction.time}` : ""} /{" "}
-                    {transaction.source} / {transaction.status}
-                  </p>
-                </div>
-                <p className="shrink-0 text-sm font-semibold">
+              <div className="flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-sm font-semibold">
+                  {transaction.merchantName}
+                </p>
+                <p className="shrink-0 text-sm font-semibold tabular-nums">
                   {formatMoney(transaction.amountCents)}
                 </p>
               </div>
               {transaction.category ? (
-                <p className="mt-2 text-white/60">{transaction.category}</p>
+                <p className="mt-0.5 truncate text-[11px] text-white/55">
+                  {formatTransactionCategory(transaction.category)}
+                </p>
               ) : null}
             </div>
           ))}
@@ -485,6 +488,14 @@ function formatTimestamp(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatTransactionCategory(value: string): string {
+  return value
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => capitalize(part.toLowerCase()))
+    .join(" ");
 }
 
 function capitalize(value: string): string {
