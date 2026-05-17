@@ -907,10 +907,10 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? `min-w-0 rounded-md border-2 ${toneBorderFocused} bg-white/14 px-1.5 py-2 text-left ${toneGlowFocused} backdrop-blur-xl transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3`
+          ? `min-w-0 rounded-md border-[3px] ${toneBorderFocused} bg-black/20 px-1.5 py-2 text-left ${toneGlowFocused} backdrop-blur-xl transition focus:outline-none sm:p-3`
           : day.spendLocked
-            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-white/8 px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-white/14 focus:outline-none focus:ring-2 focus:ring-white sm:p-3`
-            : `min-w-0 rounded-md border-2 ${toneBorder} bg-white/10 px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-white/14 focus:outline-none focus:ring-2 focus:ring-white sm:p-3`
+            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-black/20 focus:outline-none sm:p-3`
+            : `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-black/20 focus:outline-none sm:p-3`
       }
       onClick={() => onFocus(dayIndex)}
       type="button"

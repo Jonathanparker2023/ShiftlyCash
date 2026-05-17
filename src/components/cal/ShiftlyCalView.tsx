@@ -683,10 +683,10 @@ function WeekStripCell({
 
   return (
     <button
-      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3 ${
+      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white transition focus:outline-none sm:p-3 ${
         isFocused
-          ? `border-2 ${toneBorderFocused} bg-white/14 ${toneGlowFocused} backdrop-blur-xl`
-          : `border-2 ${toneBorder} bg-white/10 ${toneGlow} backdrop-blur-xl hover:bg-white/14`
+          ? `border-[3px] ${toneBorderFocused} bg-black/20 ${toneGlowFocused} backdrop-blur-xl`
+          : `border-2 ${toneBorder} bg-black/10 ${toneGlow} backdrop-blur-xl hover:bg-black/20`
       }`}
       onClick={onClick}
       type="button"
