@@ -907,38 +907,39 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? `min-w-0 scale-105 rounded-md border-[3px] ${toneBorderFocused} bg-black/30 px-1.5 py-2 text-left ${toneGlowFocused} backdrop-blur-xl transition-all duration-200 focus:outline-none sm:p-3`
+          ? `min-w-0 scale-105 rounded-md border-[3px] ${toneBorderFocused} bg-black/30 px-1.5 py-2 text-left ${toneGlowFocused} backdrop-blur-xl transition-all duration-200 focus:outline-none sm:aspect-square sm:flex sm:flex-col sm:items-center sm:justify-center sm:p-2 sm:text-center`
           : day.spendLocked
-            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-black/20 focus:outline-none sm:p-3`
-            : `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-black/20 focus:outline-none sm:p-3`
+            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-black/20 focus:outline-none sm:aspect-square sm:flex sm:flex-col sm:items-center sm:justify-center sm:p-2 sm:text-center`
+            : `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-black/20 focus:outline-none sm:aspect-square sm:flex sm:flex-col sm:items-center sm:justify-center sm:p-2 sm:text-center`
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
     >
-      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-white/65 sm:text-[10px] sm:tracking-[0.14em]">
+      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-white/65 sm:hidden">
         <span className="truncate">
           {shortDayName(day.date)} {formatDayOnly(day.date)}
         </span>
-        <span className="flex shrink-0 items-center gap-1">
-          {isToday ? (
-            <span className="hidden rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white/85 sm:inline-flex">
-              Today
-            </span>
-          ) : null}
-          {day.spendLocked ? (
-            <span className="hidden rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white/85 sm:inline-flex">
-              Locked
-            </span>
-          ) : null}
-        </span>
       </div>
       <p
-        className={`mt-2 truncate text-xs font-bold tracking-tight sm:mt-3 sm:text-xl ${cashflowDailyColor(
+        className={`mt-2 truncate text-xs font-bold tracking-tight sm:m-0 sm:text-2xl ${cashflowDailyColor(
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >
         {formatMoney(displayCashflowCents)}
       </p>
+      <div className="hidden sm:mt-1.5 sm:flex sm:items-center sm:justify-center sm:gap-1 sm:text-[10px] sm:font-semibold sm:uppercase sm:tracking-[0.12em] sm:text-white/65">
+        <span className="truncate">{formatMonDayLabel(day.date)}</span>
+        {isToday ? (
+          <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white/85">
+            Today
+          </span>
+        ) : null}
+        {day.spendLocked ? (
+          <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white/85">
+            Locked
+          </span>
+        ) : null}
+      </div>
     </button>
   );
 }
@@ -2077,6 +2078,15 @@ function formatDayOnly(value: string): string {
 function shortDayName(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
     weekday: "short",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function formatMonDayLabel(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${value}T00:00:00.000Z`));
 }
