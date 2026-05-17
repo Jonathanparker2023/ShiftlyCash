@@ -619,7 +619,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
           </div>
 
           <div className="pb-2">
-            <div className="grid grid-cols-7 gap-1.5 sm:mx-auto sm:max-w-2xl sm:gap-2">
+            <div className="grid grid-cols-7 gap-1.5 sm:mx-auto sm:max-w-3xl sm:gap-2">
               {days.map((day, dayIndex) => (
                 <WeekStripCell
                   day={day}
