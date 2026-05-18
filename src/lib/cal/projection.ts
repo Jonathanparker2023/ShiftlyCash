@@ -12,6 +12,17 @@ export const DAILY_CALORIE_THRESHOLDS: MagnitudeThresholds = {
   amber: 300,
 };
 
+export function dailyCalorieThresholdsForTarget(
+  target: number | null,
+): MagnitudeThresholds {
+  if (target === null || target <= 0) return DAILY_CALORIE_THRESHOLDS;
+
+  return {
+    green: Math.round(target * 0.1),
+    amber: Math.round(target * 0.2),
+  };
+}
+
 export const DAILY_MACRO_THRESHOLDS: MagnitudeThresholds = {
   green: 10,
   amber: 30,

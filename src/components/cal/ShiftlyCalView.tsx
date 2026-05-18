@@ -26,8 +26,8 @@ import {
 } from "@/lib/cal/color";
 import {
   colorToneFromMagnitude,
+  dailyCalorieThresholdsForTarget,
   dailyDeviation,
-  DAILY_CALORIE_THRESHOLDS,
   WEEKLY_CALORIE_THRESHOLDS,
   WEEKLY_MACRO_THRESHOLDS,
   type MagnitudeTone,
@@ -641,7 +641,10 @@ function WeekStripCell({
   targets: CalTargets;
 }) {
   const deviation = dailyDeviation(day.totals.calories, targets.tdeeCalories);
-  const tone = colorToneFromMagnitude(deviation, DAILY_CALORIE_THRESHOLDS);
+  const tone = colorToneFromMagnitude(
+    deviation,
+    dailyCalorieThresholdsForTarget(targets.tdeeCalories),
+  );
   const date = new Date(`${day.date}T00:00:00.000Z`);
   const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
@@ -2107,6 +2110,13 @@ function metricState(
       return {
         barPct,
         note: `${formatAmount(remaining, unit)} to goal`,
+        tone: "green" as const,
+      };
+    }
+    if (ratio >= 0.8) {
+      return {
+        barPct,
+        note: `${formatAmount(remaining, unit)} to goal`,
         tone: "amber" as const,
       };
     }
@@ -2117,14 +2127,17 @@ function metricState(
     };
   }
 
-  if (value <= target) {
+  if (ratio <= 1.1) {
     return {
       barPct,
-      note: `${formatAmount(target - value, unit)} left`,
+      note:
+        value <= target
+          ? `${formatAmount(target - value, unit)} left`
+          : `${formatAmount(value - target, unit)} over`,
       tone: "green" as const,
     };
   }
-  if (value <= target * 1.1) {
+  if (ratio <= 1.2) {
     return {
       barPct,
       note: `${formatAmount(value - target, unit)} over`,

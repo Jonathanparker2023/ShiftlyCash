@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   colorToneFromMagnitude,
   computeWeeklyDeficit,
+  dailyCalorieThresholdsForTarget,
   dailyDeviation,
   projectWeeklyWeightChangeLbs,
 } from "@/lib/cal/projection";
@@ -37,6 +38,17 @@ describe("ShiftlyCal projection helpers", () => {
     expect(colorToneFromMagnitude(250, thresholds)).toBe("amber");
     expect(colorToneFromMagnitude(-250, thresholds)).toBe("amber");
     expect(colorToneFromMagnitude(301, thresholds)).toBe("red");
+  });
+
+  it("scales daily calorie thresholds from the active target", () => {
+    expect(dailyCalorieThresholdsForTarget(1650)).toEqual({
+      green: 165,
+      amber: 330,
+    });
+    expect(dailyCalorieThresholdsForTarget(null)).toEqual({
+      green: 100,
+      amber: 300,
+    });
   });
 });
 
