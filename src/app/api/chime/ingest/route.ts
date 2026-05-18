@@ -82,8 +82,8 @@ export async function POST(request: Request) {
       .insert({
         user_id: userId,
         source: "chime",
-        status: "pending_review",
-        review_reason: `Imported from Chime push: ${parsed.kind}, confidence=${parsed.confidence}`,
+        status: "applied",
+        review_reason: null,
         merchant_name: merchantName,
         raw_name: merchantName,
         amount,
