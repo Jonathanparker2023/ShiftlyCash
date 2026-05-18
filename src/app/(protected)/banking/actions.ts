@@ -481,6 +481,39 @@ async function upsertPlaidTransaction(
     return;
   }
 
+  // Cross-source dedup: if a Chime push capture already exists for the
+  // same date and amount, stamp the Plaid id onto it instead of inserting
+  // a duplicate row.
+  const chimeMatch = await findChimeMatchForPlaid(
+    context,
+    transaction.date,
+    transaction.amount,
+  );
+
+  if (chimeMatch) {
+    const { error: stampError } = await context.supabase
+      .from("transactions")
+      .update({
+        plaid_item_id: plaidItemId,
+        plaid_transaction_id: transaction.transaction_id,
+        authorized_date: transaction.authorized_date ?? null,
+        category: row.category,
+        pending: row.pending,
+        notes: chimeMatch.merchant_name
+          ? `${chimeMatch.merchant_name} (cross-verified by Plaid)`
+          : "Cross-verified by Plaid.",
+      })
+      .eq("id", chimeMatch.id)
+      .eq("user_id", context.userId);
+
+    if (stampError) {
+      throw new Error(
+        `Unable to merge Plaid into Chime row: ${stampError.message}`,
+      );
+    }
+    return;
+  }
+
   const { error: insertError } = await context.supabase
     .from("transactions")
     .insert({
@@ -515,6 +548,40 @@ async function findExistingPlaidTransaction(
     id: string;
     day_id: string | null;
     status: "applied" | "pending_review" | "excluded";
+  } | null;
+}
+
+// Cross-source dedup: when Plaid sync sees a transaction, check whether a
+// Chime push capture already landed for the same date + amount. If so, we
+// stamp the existing Chime row with the Plaid id so future Plaid syncs
+// match it and we skip the duplicate insert. The Chime push captures
+// faster, so it usually wins the race.
+async function findChimeMatchForPlaid(
+  context: PlaidSyncContext,
+  date: string,
+  amount: number,
+) {
+  const { data, error } = await context.supabase
+    .from("transactions")
+    .select("id,day_id,status,merchant_name")
+    .eq("user_id", context.userId)
+    .eq("source", "chime")
+    .eq("date", date)
+    .eq("amount", amount)
+    .is("plaid_transaction_id", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to check Chime match: ${error.message}`);
+  }
+
+  return data as {
+    id: string;
+    day_id: string | null;
+    status: "applied" | "pending_review" | "excluded";
+    merchant_name: string | null;
   } | null;
 }
 

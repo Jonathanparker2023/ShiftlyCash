@@ -96,35 +96,55 @@ export async function POST(request: Request) {
         ? "day_locked"
         : "no_matching_day";
 
-    const { data: txInserted, error: txError } = await supabase
+    // Cross-source dedup: if a Plaid sync already landed this exact
+    // transaction (same date + amount), don't double-write — just note
+    // the chime capture in the existing row's notes for traceability.
+    const { data: existingPlaid } = await supabase
       .from("transactions")
-      .insert({
-        user_id: userId,
-        source: "chime",
-        status,
-        day_id: dayId,
-        review_reason: reviewReason,
-        merchant_name: merchantName,
-        raw_name: merchantName,
-        amount,
-        date: todayDate,
-        datetime: receivedAt,
-        import_key: importKey,
-        category: categoryForKind(parsed.kind),
-        pending: parsed.kind === "pending_charge",
-        notes: chimeNotes(parsed),
-      })
       .select("id")
-      .single();
+      .eq("user_id", userId)
+      .eq("source", "plaid")
+      .eq("date", todayDate)
+      .eq("amount", amount)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-    if (txError) {
-      parseFailureReason =
-        txError.code === "23505"
-          ? "Duplicate import_key (already captured)"
-          : `Transaction insert failed: ${txError.message}`;
-    } else {
-      parsedTransactionId = txInserted.id as string;
+    if (existingPlaid?.id) {
+      parsedTransactionId = existingPlaid.id as string;
       parsedAt = new Date().toISOString();
+      parseFailureReason = "Cross-source match: Plaid row already exists";
+    } else {
+      const { data: txInserted, error: txError } = await supabase
+        .from("transactions")
+        .insert({
+          user_id: userId,
+          source: "chime",
+          status,
+          day_id: dayId,
+          review_reason: reviewReason,
+          merchant_name: merchantName,
+          raw_name: merchantName,
+          amount,
+          date: todayDate,
+          datetime: receivedAt,
+          import_key: importKey,
+          category: categoryForKind(parsed.kind),
+          pending: parsed.kind === "pending_charge",
+          notes: chimeNotes(parsed),
+        })
+        .select("id")
+        .single();
+
+      if (txError) {
+        parseFailureReason =
+          txError.code === "23505"
+            ? "Duplicate import_key (already captured)"
+            : `Transaction insert failed: ${txError.message}`;
+      } else {
+        parsedTransactionId = txInserted.id as string;
+        parsedAt = new Date().toISOString();
+      }
     }
   } else if (!parsed.ok) {
     parseFailureReason = parsed.reason;
