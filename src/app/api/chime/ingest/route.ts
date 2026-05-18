@@ -77,13 +77,33 @@ export async function POST(request: Request) {
     const amount = transactionAmount(parsed);
     const merchantName = parsed.merchantOrSource || `Chime ${parsed.kind}`;
 
+    // Resolve the day row for this transaction's date so we can mark it
+    // applied immediately (mirrors Plaid sync logic). If no day exists or
+    // the day is spend-locked, fall back to pending_review.
+    const { data: day } = await supabase
+      .from("days")
+      .select("id,spend_locked")
+      .eq("user_id", userId)
+      .eq("date", todayDate)
+      .maybeSingle();
+
+    const canApply = Boolean(day?.id) && !day?.spend_locked;
+    const status = canApply ? "applied" : "pending_review";
+    const dayId = canApply ? (day!.id as string) : null;
+    const reviewReason = canApply
+      ? null
+      : day?.spend_locked
+        ? "day_locked"
+        : "no_matching_day";
+
     const { data: txInserted, error: txError } = await supabase
       .from("transactions")
       .insert({
         user_id: userId,
         source: "chime",
-        status: "applied",
-        review_reason: null,
+        status,
+        day_id: dayId,
+        review_reason: reviewReason,
         merchant_name: merchantName,
         raw_name: merchantName,
         amount,
