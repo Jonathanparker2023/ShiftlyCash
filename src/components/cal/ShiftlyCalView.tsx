@@ -28,8 +28,6 @@ import {
   colorToneFromMagnitude,
   dailyCalorieThresholdsForTarget,
   dailyDeviation,
-  WEEKLY_CALORIE_THRESHOLDS,
-  WEEKLY_MACRO_THRESHOLDS,
   type MagnitudeTone,
 } from "@/lib/cal/projection";
 import { addDaysIso } from "@/lib/dashboard/dates";
@@ -128,22 +126,6 @@ export function ShiftlyCalView({
   const nextWeekIso = addDaysIso(weekStartIso, 7);
   const isCurrentWeek = initialData.currentWeek.days.some(
     (day) => day.date === initialData.todayIso,
-  );
-  const currentWeight = useMemo(
-    () => getMostRecentWeight(initialData.currentWeek.days),
-    [initialData.currentWeek.days],
-  );
-  const weeklyCalorieDeviation = dailyDeviation(
-    initialData.currentWeek.totals.calories,
-    initialData.targets.tdeeCalories === null
-      ? null
-      : initialData.targets.tdeeCalories * 7,
-  );
-  const weeklyProteinDeviation = dailyDeviation(
-    initialData.currentWeek.totals.proteinG,
-    initialData.targets.proteinTargetG === null
-      ? null
-      : initialData.targets.proteinTargetG * 7,
   );
   const hasRecentPendingVerdicts = useMemo(
     () =>
@@ -421,12 +403,8 @@ export function ShiftlyCalView({
               </div>
             </div>
             <MetricStrip
-              currentWeight={currentWeight?.weightLbs ?? null}
               projection={initialData.projection}
               targets={initialData.targets}
-              totals={initialData.currentWeek.totals}
-              weeklyCalorieDeviation={weeklyCalorieDeviation}
-              weeklyProteinDeviation={weeklyProteinDeviation}
             />
           </div>
 
@@ -536,34 +514,14 @@ export function ShiftlyCalView({
 }
 
 function MetricStrip({
-  currentWeight,
   projection,
   targets,
-  totals,
-  weeklyCalorieDeviation,
-  weeklyProteinDeviation,
 }: {
-  currentWeight: number | null;
   projection: ShiftlyCalData["projection"];
   targets: CalTargets;
-  totals: CalTotals;
-  weeklyCalorieDeviation: number | null;
-  weeklyProteinDeviation: number | null;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-      <TopMetric
-        accent="green"
-        label="Week calories"
-        tone={colorToneFromMagnitude(weeklyCalorieDeviation, WEEKLY_CALORIE_THRESHOLDS)}
-        value={totals.calories.toLocaleString()}
-      />
-      <TopMetric
-        accent="blue"
-        label="Week protein"
-        tone={colorToneFromMagnitude(weeklyProteinDeviation, WEEKLY_MACRO_THRESHOLDS)}
-        value={`${totals.proteinG}g`}
-      />
+    <div className="grid grid-cols-2 gap-2">
       <TopMetric
         label="Weekly delta"
         note={targets.tdeeCalories === null ? "Set TDEE for projections." : null}
@@ -581,10 +539,6 @@ function MetricStrip({
             ? "--"
             : `${formatSignedNumber(projection.projectedWeightDeltaLbs, 2)} lbs`
         }
-      />
-      <TopMetric
-        label="Current weight"
-        value={currentWeight === null ? "--" : `${currentWeight.toFixed(1)} lbs`}
       />
     </div>
   );
@@ -1955,13 +1909,6 @@ function NumberInput({
       </span>
     </label>
   );
-}
-
-function getMostRecentWeight(days: CalDay[]) {
-  return [...days]
-    .reverse()
-    .map((day) => day.weight)
-    .find((weight) => weight !== null) ?? null;
 }
 
 function currentTimeInput(): string {
