@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
 
 const CHIME_SENDER = "alerts@account.chime.com";
 const FORWARDED_LABEL = "shiftlycash-forwarded";
-const FETCH_CAP = 20;
+// Keep low — cron-job.org times out at 30s, and each unforwarded email
+// triggers a Haiku call + Supabase write (~2-3s each). Catch-up will
+// happen over multiple runs since we fire every minute.
+const FETCH_CAP = 5;
+// Hard deadline inside the function so we always return SOMETHING before
+// the external cron timeout closes the connection.
+const SOFT_DEADLINE_MS = 25_000;
 
 type Summary = {
   ok: boolean;
@@ -85,12 +91,20 @@ export async function GET(request: Request) {
 
       const recentUids = uids.slice(-FETCH_CAP);
       summary.scanned = recentUids.length;
+      const startedAt = Date.now();
 
       for await (const message of client.fetch(
         recentUids,
         { source: true, labels: true, internalDate: true, uid: true },
         { uid: false },
       )) {
+        if (Date.now() - startedAt > SOFT_DEADLINE_MS) {
+          summary.errors.push(
+            `Soft deadline hit after ${summary.forwarded} forwarded; remaining will retry next run.`,
+          );
+          break;
+        }
+
         const labels = message.labels ?? new Set<string>();
         if (labels.has(FORWARDED_LABEL)) {
           summary.alreadyLabeled += 1;
