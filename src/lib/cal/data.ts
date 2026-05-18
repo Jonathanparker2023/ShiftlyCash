@@ -10,6 +10,7 @@ import {
   computeWeeklyDeficit,
   projectWeeklyWeightChangeLbs,
 } from "@/lib/cal/projection";
+import { applyShiftlyCalProjectionMaintenance } from "@/lib/cal/projectionMaintenance";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   CalDay,
@@ -47,6 +48,7 @@ type FoodEntryRow = {
   verdict_source: string | null;
   verdict_error: string | null;
   verdict_context: FoodVerdictContext | null;
+  is_projected_plan: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -198,11 +200,29 @@ async function loadShiftlyCalData(
   const weekStartIso = normalizeWeekStartIso(opts?.weekStartIso);
   const weekEndIso = addDaysIso(weekStartIso, 6);
 
-  const [entriesRes, savedFoodsRes, settingsRes, weightRes, waterRes] = await Promise.all([
+  const settingsRes = await supabase
+    .from("settings")
+    .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g,sodium_target_mg,added_sugar_target_g,saturated_fat_target_g,water_target_oz,age,sex,height_cm,activity_level,current_phase,goals_text,health_flags")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (settingsRes.error) throw new Error(`Cal targets: ${settingsRes.error.message}`);
+
+  const targets = mapTargets((settingsRes.data ?? null) as SettingsTargetsRow | null);
+
+  await applyShiftlyCalProjectionMaintenance(supabase, {
+    userId,
+    weekStartIso,
+    weekEndIso,
+    todayIso,
+    targets,
+  });
+
+  const [entriesRes, savedFoodsRes, weightRes, waterRes] = await Promise.all([
     supabase
       .from("food_entries")
       .select(
-        "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g,sodium_mg,added_sugar_g,saturated_fat_g,saved_food_id,verdict,verdict_reason,verdict_source,verdict_error,verdict_context,created_at,updated_at",
+        "id,date,logged_time,meal_name,category,calories,protein_g,carbs_g,fat_g,fiber_g,sodium_mg,added_sugar_g,saturated_fat_g,saved_food_id,verdict,verdict_reason,verdict_source,verdict_error,verdict_context,is_projected_plan,created_at,updated_at",
       )
       .eq("user_id", userId)
       .gte("date", weekStartIso)
@@ -220,11 +240,6 @@ async function loadShiftlyCalData(
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     supabase
-      .from("settings")
-      .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g,sodium_target_mg,added_sugar_target_g,saturated_fat_target_g,water_target_oz,age,sex,height_cm,activity_level,current_phase,goals_text,health_flags")
-      .eq("user_id", userId)
-      .maybeSingle(),
-    supabase
       .from("weight_logs")
       .select("id,date,weight_lbs,created_at,updated_at")
       .eq("user_id", userId)
@@ -240,11 +255,9 @@ async function loadShiftlyCalData(
 
   if (entriesRes.error) throw new Error(`Food entries: ${entriesRes.error.message}`);
   if (savedFoodsRes.error) throw new Error(`Saved foods: ${savedFoodsRes.error.message}`);
-  if (settingsRes.error) throw new Error(`Cal targets: ${settingsRes.error.message}`);
   if (weightRes.error) throw new Error(`Weight log: ${weightRes.error.message}`);
   if (waterRes.error) throw new Error(`Water log: ${waterRes.error.message}`);
 
-  const targets = mapTargets((settingsRes.data ?? null) as SettingsTargetsRow | null);
   const entries = ((entriesRes.data ?? []) as FoodEntryRow[]).map(mapFoodEntry);
   const weights = ((weightRes.data ?? []) as WeightLogRow[]).map(mapWeightLog);
   const currentWeek = buildCalWeek(
@@ -672,6 +685,7 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
     verdictSource: mapVerdictSource(row.verdict_source),
     verdictError: row.verdict_error,
     verdictContext: row.verdict_context ?? null,
+    isProjectedPlan: row.is_projected_plan === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

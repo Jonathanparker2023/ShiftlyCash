@@ -44,6 +44,7 @@ export type FoodEntry = {
   verdictSource: FoodVerdictSource;
   verdictError: string | null;
   verdictContext: FoodVerdictContext | null;
+  isProjectedPlan: boolean;
   createdAt: string;
   updatedAt: string;
 };

@@ -33,8 +33,16 @@ export function categoryBarClass(category: FoodCategory): string {
   }
 }
 
-export function verdictBarClass(entry: Pick<FoodEntry, "verdict" | "verdictSource">): string {
+export function verdictBarClass(
+  entry: Pick<FoodEntry, "verdict" | "verdictSource"> & {
+    isProjectedPlan?: boolean;
+  },
+): string {
   const base = "rounded-md border p-3 text-sm shadow-[0_8px_18px_rgba(8,15,28,0.16)]";
+
+  if (entry.isProjectedPlan === true) {
+    return `${base} border-emerald-600/80 bg-emerald-700/80 text-white`;
+  }
 
   if (entry.verdictSource === "pending") {
     return `${base} animate-pulse border-dashed border-zinc-500 bg-zinc-700 text-white`;

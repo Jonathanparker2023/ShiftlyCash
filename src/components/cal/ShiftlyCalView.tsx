@@ -1115,6 +1115,11 @@ function FoodEntryRow({
         type="button"
       >
         <span className="min-w-0 truncate font-semibold">{title}</span>
+        {entry.isProjectedPlan ? (
+          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+            Plan
+          </span>
+        ) : null}
         {entry.verdictSource === "manual_override" ? (
           <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
             Override
@@ -1144,6 +1149,11 @@ function FoodEntryRow({
         aria-label={`Collapse ${title}`}
       >
         <span className="min-w-0 truncate font-semibold">{title}</span>
+        {entry.isProjectedPlan ? (
+          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+            Plan
+          </span>
+        ) : null}
         <span className="text-right font-semibold opacity-90">
           {entry.calories.toLocaleString()} cal
         </span>
@@ -1162,6 +1172,11 @@ function FoodEntryRow({
           <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
             {categoryLabel(entry.category)}
           </span>
+          {entry.isProjectedPlan ? (
+            <span className="rounded-full border border-emerald-200/30 bg-emerald-900/30 px-2 py-0.5 font-semibold text-emerald-100">
+              Projected plan
+            </span>
+          ) : null}
           {entry.verdictSource === "manual_override" ? (
             <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
               Override
@@ -2001,6 +2016,7 @@ function formatMacrosInline(entry: {
 }
 
 function verdictStatusText(entry: FoodEntry): string {
+  if (entry.isProjectedPlan) return "Projected from the meal plan targets.";
   if (entry.verdictSource === "pending") return "Scoring...";
   if (entry.verdictSource === "unscored") return "Not scored yet.";
   if (entry.verdictSource === "manual_override") return "Manual verdict override.";

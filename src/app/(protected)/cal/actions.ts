@@ -88,6 +88,17 @@ export async function createFoodEntryAction(input: {
   const mealName = input.mealName?.trim() ?? "";
   const category = parseCategory(input.category);
 
+  const { error: projectionDeleteError } = await supabase
+    .from("food_entries")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("date", date)
+    .eq("is_projected_plan", true);
+
+  if (projectionDeleteError) {
+    throw new Error(`Unable to clear projected plan: ${projectionDeleteError.message}`);
+  }
+
   const { data, error } = await supabase
     .from("food_entries")
     .insert({
@@ -109,6 +120,7 @@ export async function createFoodEntryAction(input: {
       verdict_source: "pending",
       verdict_reason: null,
       verdict_context: null,
+      is_projected_plan: false,
     })
     .select("id")
     .single();
@@ -630,6 +642,7 @@ export async function updateFoodEntryAction(input: {
       sodium_mg: optionalNonNegativeInteger(input.sodiumMg, "Sodium"),
       added_sugar_g: optionalNonNegativeInteger(input.addedSugarG, "Added sugar"),
       saturated_fat_g: optionalNonNegativeInteger(input.saturatedFatG, "Saturated fat"),
+      is_projected_plan: false,
       ...(current?.verdict_source === "manual_override"
         ? {}
         : {
