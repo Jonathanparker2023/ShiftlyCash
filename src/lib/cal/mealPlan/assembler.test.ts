@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { assembleMealPlan } from "@/lib/cal/mealPlan/assembler";
+import { validateMealPlan } from "@/lib/cal/mealPlan/validator";
 import type {
   CandidatePool,
   CarbMode,
@@ -183,6 +184,54 @@ describe("meal-plan assembler", () => {
     });
 
     expect(assembleMealPlan(pool, TARGETS)).toBeNull();
+  });
+
+  it("supports preset re-fit by holding the saved main and closing with fillers", () => {
+    const pool = makePool({
+      mains: [
+        candidate("saved-main", "main", "Saved Steak Bowl", {
+          calories: 700,
+          proteinG: 50,
+          carbsG: 75,
+          fiberG: 12,
+          fatG: 25,
+          sodiumMg: 800,
+          addedSugarG: 2,
+          saturatedFatG: 4,
+        }),
+        candidate("other-main", "main", "Other Bowl", {
+          calories: 1000,
+          proteinG: 70,
+          carbsG: 100,
+          fiberG: 15,
+          fatG: 35,
+          sodiumMg: 1000,
+          addedSugarG: 2,
+          saturatedFatG: 7,
+        }),
+      ],
+      fillers: [
+        candidate("filler", "filler", "Greek Yogurt and Fruit", {
+          calories: 300,
+          proteinG: 20,
+          carbsG: 25,
+          fiberG: 3,
+          fatG: 10,
+          sodiumMg: 200,
+          addedSugarG: 2,
+          saturatedFatG: 3,
+        }),
+      ],
+    });
+
+    const plan = assembleMealPlan(pool, TARGETS, { holdMainId: "saved-main" });
+
+    expect(plan).not.toBeNull();
+    expect(plan?.main.id).toBe("saved-main");
+    expect(plan?.fillers.map((filler) => filler.id)).toEqual(["filler"]);
+    if (!plan) return;
+
+    expect(validateMealPlan(plan, TARGETS, pool)).toEqual({ ok: true, plan });
   });
 });
 

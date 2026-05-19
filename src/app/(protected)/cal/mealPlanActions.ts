@@ -49,6 +49,13 @@ export type UseMealPlanPresetResult = {
   validation: ValidationResult;
 };
 
+export type RefitMealPlanPresetResult = {
+  preset: MealPlanPreset;
+  pool: CandidatePool;
+  plan: MealPlan | null;
+  validation: ValidationResult;
+};
+
 type MealPlanPresetRow = {
   id: string;
   name: string;
@@ -274,20 +281,7 @@ export async function useMealPlanPresetAction(
   presetId: string,
 ): Promise<UseMealPlanPresetResult> {
   const { supabase, user } = await requireUser();
-  const { data, error } = await supabase
-    .from("meal_plan_presets")
-    .select(PRESET_SELECT)
-    .eq("user_id", user.id)
-    .eq("id", presetId)
-    .is("archived_at", null)
-    .single();
-
-  if (error) {
-    throw new MealPlanActionError(error.message, "preset_failed");
-  }
-
-  const row = data as MealPlanPresetRow;
-  const preset = mapPresetRow(row);
+  const preset = await loadPreset(supabase, user.id, presetId);
   const shiftlyCalData = await getShiftlyCalData();
   const today =
     shiftlyCalData.currentWeek.days.find(
@@ -298,32 +292,153 @@ export async function useMealPlanPresetAction(
     today.totals,
   );
   const validation = validateMealPlan(preset.plan, remainingTargets, preset.pool);
-  const usedAt = new Date().toISOString();
-
-  const { error: updateError } = await supabase
-    .from("meal_plan_presets")
-    .update({
-      use_count: preset.useCount + 1,
-      last_used_at: usedAt,
-      updated_at: usedAt,
-    })
-    .eq("user_id", user.id)
-    .eq("id", preset.id);
-
-  if (updateError) {
-    throw new MealPlanActionError(updateError.message, "preset_failed");
-  }
+  const updatedPreset = await markPresetUsed(supabase, user.id, preset);
 
   return {
-    preset: { ...preset, useCount: preset.useCount + 1, lastUsedAt: usedAt },
+    preset: updatedPreset,
     pool: preset.pool,
     plan: preset.plan,
     validation,
   };
 }
 
+export async function refitMealPlanPresetAction(
+  presetId: string,
+): Promise<RefitMealPlanPresetResult> {
+  const { supabase, user } = await requireUser();
+  const preset = await loadPreset(supabase, user.id, presetId);
+  const shiftlyCalData = await getShiftlyCalData();
+  const today =
+    shiftlyCalData.currentWeek.days.find(
+      (day) => day.date === shiftlyCalData.todayIso,
+    ) ?? shiftlyCalData.currentWeek.days[0];
+  const remainingTargets = buildRemainingTargets(
+    shiftlyCalData.targets,
+    today.totals,
+  );
+  const assembled = assembleAndValidateMealPlan(preset.pool, remainingTargets, {
+    holdMainId: preset.plan.main.id,
+  });
+  const updatedPreset = await markPresetUsed(supabase, user.id, preset);
+
+  if (!assembled.plan) {
+    return {
+      preset: updatedPreset,
+      pool: preset.pool,
+      plan: null,
+      validation: syntheticFailure(
+        "Re-fit failed against today's targets. Try Use preset instead.",
+      ),
+    };
+  }
+
+  return {
+    preset: updatedPreset,
+    pool: preset.pool,
+    plan: assembled.plan,
+    validation: assembled.validation,
+  };
+}
+
+export async function archiveMealPlanPresetAction(
+  presetId: string,
+): Promise<{ id: string }> {
+  const { supabase, user } = await requireUser();
+  const archivedAt = new Date().toISOString();
+
+  // v1 archive has no undo; restoring archived presets can be a later management pass.
+  const { error } = await supabase
+    .from("meal_plan_presets")
+    .update({ archived_at: archivedAt, updated_at: archivedAt })
+    .eq("user_id", user.id)
+    .eq("id", presetId);
+
+  if (error) {
+    throw new MealPlanActionError(error.message, "preset_failed");
+  }
+
+  revalidatePath("/cal");
+  return { id: presetId };
+}
+
+export async function renameMealPlanPresetAction(
+  presetId: string,
+  name: string,
+): Promise<MealPlanPreset> {
+  const { supabase, user } = await requireUser();
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    throw new MealPlanActionError("Preset name is required.", "preset_failed");
+  }
+  if (trimmed.length > 80) {
+    throw new MealPlanActionError(
+      "Preset name must be 80 characters or fewer.",
+      "preset_failed",
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("meal_plan_presets")
+    .update({ name: trimmed, updated_at: new Date().toISOString() })
+    .eq("user_id", user.id)
+    .eq("id", presetId)
+    .is("archived_at", null)
+    .select(PRESET_SELECT)
+    .single();
+
+  if (error) {
+    throw new MealPlanActionError(error.message, "preset_failed");
+  }
+
+  revalidatePath("/cal");
+  return mapPresetRow(data as MealPlanPresetRow);
+}
+
 const PRESET_SELECT =
   "id,name,axioms,pool,plan,validation,validation_ok,main_name,calories,protein_g,carbs_g,fiber_g,fat_g,sodium_mg,added_sugar_g,saturated_fat_g,use_count,last_used_at,created_at";
+
+async function loadPreset(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+  presetId: string,
+): Promise<MealPlanPreset> {
+  const { data, error } = await supabase
+    .from("meal_plan_presets")
+    .select(PRESET_SELECT)
+    .eq("user_id", userId)
+    .eq("id", presetId)
+    .is("archived_at", null)
+    .single();
+
+  if (error) {
+    throw new MealPlanActionError(error.message, "preset_failed");
+  }
+
+  return mapPresetRow(data as MealPlanPresetRow);
+}
+
+async function markPresetUsed(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+  preset: MealPlanPreset,
+): Promise<MealPlanPreset> {
+  const usedAt = new Date().toISOString();
+  const { error } = await supabase
+    .from("meal_plan_presets")
+    .update({
+      use_count: preset.useCount + 1,
+      last_used_at: usedAt,
+      updated_at: usedAt,
+    })
+    .eq("user_id", userId)
+    .eq("id", preset.id);
+
+  if (error) {
+    throw new MealPlanActionError(error.message, "preset_failed");
+  }
+
+  return { ...preset, useCount: preset.useCount + 1, lastUsedAt: usedAt };
+}
 
 function normalizePresetName(
   name: string | null | undefined,
