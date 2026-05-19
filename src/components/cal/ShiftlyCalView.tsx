@@ -138,9 +138,16 @@ export function ShiftlyCalView({
       ),
     [focusedDay.entries, nowMs],
   );
+  const mealPlanDay = useMemo(
+    () =>
+      initialData.currentWeek.days.find(
+        (day) => day.date === initialData.todayIso,
+      ) ?? focusedDay,
+    [focusedDay, initialData.currentWeek.days, initialData.todayIso],
+  );
   const remainingMealPlanTargets = useMemo(
-    () => buildRemainingTargets(initialData.targets, focusedDay.totals),
-    [focusedDay.totals, initialData.targets],
+    () => buildRemainingTargets(initialData.targets, mealPlanDay.totals),
+    [mealPlanDay.totals, initialData.targets],
   );
 
   useEffect(() => {
@@ -444,7 +451,10 @@ export function ShiftlyCalView({
                   onInstantLog={instantLog}
                   savedFoods={initialData.savedFoods}
                 />
-                <MealPlanGenerator targets={remainingMealPlanTargets} />
+                <MealPlanGenerator
+                  date={mealPlanDay.date}
+                  targets={remainingMealPlanTargets}
+                />
                 <MealOrderPromptBox disabled={isPending} />
                 <FindMealPromptBox disabled={isPending} />
                 <HomeRecipePromptBox disabled={isPending} />
