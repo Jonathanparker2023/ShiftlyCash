@@ -153,18 +153,27 @@ export async function fetchCandidatePool(
   }
 
   const client = new Anthropic({ apiKey });
+  const tools = input.axioms.eatOut
+    ? [
+        {
+          type: "web_search_20250305" as const,
+          name: "web_search" as const,
+          max_uses: 2,
+        },
+      ]
+    : [];
   const response = await client.messages.create({
     model: RESEARCHER_MODEL,
     max_tokens: 8000,
     temperature: 0.1,
-    system: SYSTEM_PROMPT,
-    tools: [
+    system: [
       {
-        type: "web_search_20250305",
-        name: "web_search",
-        max_uses: 3,
+        type: "text",
+        text: SYSTEM_PROMPT,
+        cache_control: { type: "ephemeral" },
       },
     ],
+    tools,
     messages: [{ role: "user", content: JSON.stringify(input) }],
   });
 
