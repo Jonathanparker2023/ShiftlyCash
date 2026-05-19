@@ -17,6 +17,7 @@ import type {
   MealPlanAxioms,
   MealPlanCandidate,
   MealPlanMacros,
+  MealPlanPreset,
   RemainingTargets,
   SavedFoodForResearcher,
   ValidationResult,
@@ -41,6 +42,35 @@ export type ReassembleMealPlanResult = {
   validation: ValidationResult;
 };
 
+export type UseMealPlanPresetResult = {
+  preset: MealPlanPreset;
+  pool: CandidatePool;
+  plan: MealPlan;
+  validation: ValidationResult;
+};
+
+type MealPlanPresetRow = {
+  id: string;
+  name: string;
+  axioms: MealPlanAxioms;
+  pool: CandidatePool;
+  plan: MealPlan;
+  validation: ValidationResult;
+  validation_ok: boolean;
+  main_name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fiber_g: number;
+  fat_g: number;
+  sodium_mg: number;
+  added_sugar_g: number;
+  saturated_fat_g: number;
+  use_count: number;
+  last_used_at: string | null;
+  created_at: string;
+};
+
 class MealPlanActionError extends Error {
   constructor(
     message: string,
@@ -48,7 +78,8 @@ class MealPlanActionError extends Error {
       | "service_unavailable"
       | "researcher_invalid"
       | "no_plan"
-      | "accept_failed",
+      | "accept_failed"
+      | "preset_failed",
   ) {
     super(message);
     this.name = "MealPlanActionError";
@@ -172,6 +203,161 @@ export async function acceptMealPlanAction(
 
   revalidatePath("/cal");
   return { ok: true, loggedEntryIds };
+}
+
+export async function listMealPlanPresetsAction(): Promise<MealPlanPreset[]> {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("meal_plan_presets")
+    .select(PRESET_SELECT)
+    .eq("user_id", user.id)
+    .is("archived_at", null)
+    .order("last_used_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (error) {
+    throw new MealPlanActionError(error.message, "preset_failed");
+  }
+
+  return ((data ?? []) as MealPlanPresetRow[]).map(mapPresetRow);
+}
+
+export async function saveMealPlanPresetAction(input: {
+  name?: string | null;
+  axioms: MealPlanAxioms;
+  pool: CandidatePool;
+  plan: MealPlan;
+  validation: ValidationResult;
+}): Promise<MealPlanPreset> {
+  const { supabase, user } = await requireUser();
+  if (!input.validation.ok) {
+    throw new MealPlanActionError(
+      "Only plans that clear every benchmark can be saved as presets.",
+      "preset_failed",
+    );
+  }
+
+  const name = normalizePresetName(input.name, input.plan);
+  const { data, error } = await supabase
+    .from("meal_plan_presets")
+    .insert({
+      user_id: user.id,
+      name,
+      axioms: input.axioms,
+      pool: input.pool,
+      plan: input.plan,
+      validation: input.validation,
+      validation_ok: true,
+      main_name: input.plan.main.name,
+      calories: input.plan.totals.calories,
+      protein_g: input.plan.totals.proteinG,
+      carbs_g: input.plan.totals.carbsG,
+      fiber_g: input.plan.totals.fiberG,
+      fat_g: input.plan.totals.fatG,
+      sodium_mg: input.plan.totals.sodiumMg,
+      added_sugar_g: input.plan.totals.addedSugarG,
+      saturated_fat_g: input.plan.totals.saturatedFatG,
+    })
+    .select(PRESET_SELECT)
+    .single();
+
+  if (error) {
+    throw new MealPlanActionError(error.message, "preset_failed");
+  }
+
+  revalidatePath("/cal");
+  return mapPresetRow(data as MealPlanPresetRow);
+}
+
+export async function useMealPlanPresetAction(
+  presetId: string,
+): Promise<UseMealPlanPresetResult> {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("meal_plan_presets")
+    .select(PRESET_SELECT)
+    .eq("user_id", user.id)
+    .eq("id", presetId)
+    .is("archived_at", null)
+    .single();
+
+  if (error) {
+    throw new MealPlanActionError(error.message, "preset_failed");
+  }
+
+  const row = data as MealPlanPresetRow;
+  const preset = mapPresetRow(row);
+  const shiftlyCalData = await getShiftlyCalData();
+  const today =
+    shiftlyCalData.currentWeek.days.find(
+      (day) => day.date === shiftlyCalData.todayIso,
+    ) ?? shiftlyCalData.currentWeek.days[0];
+  const remainingTargets = buildRemainingTargets(
+    shiftlyCalData.targets,
+    today.totals,
+  );
+  const validation = validateMealPlan(preset.plan, remainingTargets, preset.pool);
+  const usedAt = new Date().toISOString();
+
+  const { error: updateError } = await supabase
+    .from("meal_plan_presets")
+    .update({
+      use_count: preset.useCount + 1,
+      last_used_at: usedAt,
+      updated_at: usedAt,
+    })
+    .eq("user_id", user.id)
+    .eq("id", preset.id);
+
+  if (updateError) {
+    throw new MealPlanActionError(updateError.message, "preset_failed");
+  }
+
+  return {
+    preset: { ...preset, useCount: preset.useCount + 1, lastUsedAt: usedAt },
+    pool: preset.pool,
+    plan: preset.plan,
+    validation,
+  };
+}
+
+const PRESET_SELECT =
+  "id,name,axioms,pool,plan,validation,validation_ok,main_name,calories,protein_g,carbs_g,fiber_g,fat_g,sodium_mg,added_sugar_g,saturated_fat_g,use_count,last_used_at,created_at";
+
+function normalizePresetName(
+  name: string | null | undefined,
+  plan: MealPlan,
+): string {
+  const trimmed = name?.trim();
+  if (trimmed) return trimmed.slice(0, 80);
+  return plan.main.name.slice(0, 80);
+}
+
+function mapPresetRow(row: MealPlanPresetRow): MealPlanPreset {
+  return {
+    id: row.id,
+    name: row.name,
+    axioms: row.axioms,
+    pool: row.pool,
+    plan: row.plan,
+    validation: row.validation,
+    validationOk: row.validation_ok,
+    mainName: row.main_name,
+    totals: {
+      calories: row.calories,
+      proteinG: row.protein_g,
+      carbsG: row.carbs_g,
+      fiberG: row.fiber_g,
+      fatG: row.fat_g,
+      sodiumMg: row.sodium_mg,
+      addedSugarG: row.added_sugar_g,
+      saturatedFatG: row.saturated_fat_g,
+    },
+    useCount: row.use_count,
+    lastUsedAt: row.last_used_at,
+    createdAt: row.created_at,
+  };
 }
 
 function assembleAndValidateMealPlan(

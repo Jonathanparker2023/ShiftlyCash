@@ -129,3 +129,18 @@ export type ValidationGap = {
 export type ValidationResult =
   | { ok: true; plan: MealPlan }
   | { ok: false; bestAttempt: MealPlan | null; gaps: ValidationGap[] };
+
+export type MealPlanPreset = {
+  id: string;
+  name: string;
+  axioms: MealPlanAxioms;
+  pool: CandidatePool;
+  plan: MealPlan;
+  validation: ValidationResult;
+  validationOk: boolean;
+  mainName: string;
+  totals: MealPlan["totals"];
+  useCount: number;
+  lastUsedAt: string | null;
+  createdAt: string;
+};

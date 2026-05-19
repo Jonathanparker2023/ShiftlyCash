@@ -14,6 +14,7 @@ type MealPlanCardProps = {
   onAccept: (force?: boolean) => void;
   onCycleFiller: () => void;
   onCycleMain: () => void;
+  onSavePreset?: () => void;
   plan: MealPlan;
   validationResult: ValidationResult;
 };
@@ -24,6 +25,7 @@ export function MealPlanCard({
   onAccept,
   onCycleFiller,
   onCycleMain,
+  onSavePreset,
   plan,
   validationResult,
 }: MealPlanCardProps) {
@@ -102,14 +104,21 @@ export function MealPlanCard({
             Cycle filler
           </SecondaryButton>
           {isValid ? (
-            <button
-              className="min-h-9 rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={disabled}
-              onClick={() => onAccept(false)}
-              type="button"
-            >
-              Accept & log
-            </button>
+            <>
+              {onSavePreset ? (
+                <SecondaryButton disabled={disabled} onClick={onSavePreset}>
+                  Save preset
+                </SecondaryButton>
+              ) : null}
+              <button
+                className="min-h-9 rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={disabled}
+                onClick={() => onAccept(false)}
+                type="button"
+              >
+                Accept & log
+              </button>
+            </>
           ) : (
             <SecondaryButton
               disabled={disabled}

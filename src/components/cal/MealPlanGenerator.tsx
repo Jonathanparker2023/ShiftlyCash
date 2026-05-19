@@ -1,12 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   acceptMealPlanAction,
   generateMealPlanAction,
+  listMealPlanPresetsAction,
   reassembleMealPlanAction,
+  saveMealPlanPresetAction,
+  useMealPlanPresetAction,
 } from "@/app/(protected)/cal/mealPlanActions";
 import { MealPlanAxiomBar } from "@/components/cal/MealPlanAxiomBar";
 import { MealPlanCard } from "@/components/cal/MealPlanCard";
@@ -14,6 +17,7 @@ import type {
   CandidatePool,
   MealPlan,
   MealPlanAxioms,
+  MealPlanPreset,
   RemainingTargets,
   ValidationResult,
 } from "@/lib/cal/mealPlan/types";
@@ -23,7 +27,14 @@ type MealPlanGeneratorProps = {
   targets: RemainingTargets;
 };
 
-type LoadingState = "generate" | "cycleMain" | "cycleFiller" | "accept" | null;
+type LoadingState =
+  | "generate"
+  | "cycleMain"
+  | "cycleFiller"
+  | "accept"
+  | "savePreset"
+  | "usePreset"
+  | null;
 
 const CYCLE_EXHAUSTION_LIMIT = 3;
 const DEFAULT_AXIOMS: MealPlanAxioms = {
@@ -47,8 +58,26 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [cyclesExhausted, setCyclesExhausted] = useState(false);
+  const [presets, setPresets] = useState<MealPlanPreset[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
 
   const disabled = loading !== null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    listMealPlanPresetsAction()
+      .then((nextPresets) => {
+        if (!cancelled) setPresets(nextPresets);
+      })
+      .catch(() => {
+        if (!cancelled) setPresets([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function updateAxioms(next: MealPlanAxioms) {
     setAxioms(next);
@@ -68,6 +97,7 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
       setPool(result.pool);
       setPlan(result.plan);
       setValidation(result.validation);
+      setSelectedPresetId(null);
       setCyclesExhausted(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to generate plan.");
@@ -102,6 +132,7 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
       setCyclesUsed(nextCyclesUsed);
       setPlan(result.plan);
       setValidation(result.validation);
+      setSelectedPresetId(null);
       setCyclesExhausted(nextCyclesUsed.main >= CYCLE_EXHAUSTION_LIMIT);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to cycle main.");
@@ -139,9 +170,65 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
       setCyclesUsed(nextCyclesUsed);
       setPlan(result.plan);
       setValidation(result.validation);
+      setSelectedPresetId(null);
       setCyclesExhausted(nextCyclesUsed.filler >= CYCLE_EXHAUSTION_LIMIT);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to cycle filler.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function savePreset() {
+    if (!pool || !plan || !validation) return;
+    if (!validation.ok) {
+      setError("Only plans that clear every benchmark can be saved as presets.");
+      return;
+    }
+
+    setLoading("savePreset");
+    setError(null);
+    try {
+      const preset = await saveMealPlanPresetAction({
+        axioms,
+        pool,
+        plan,
+        validation,
+      });
+      setPresets((current) => [
+        preset,
+        ...current.filter((item) => item.id !== preset.id),
+      ].slice(0, 12));
+      setSelectedPresetId(preset.id);
+      setStatus("Preset saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save preset.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function usePreset(presetId: string) {
+    setLoading("usePreset");
+    setError(null);
+    setStatus(null);
+    resetCycleState();
+
+    try {
+      const result = await useMealPlanPresetAction(presetId);
+      setPresets((current) => [
+        result.preset,
+        ...current.filter((item) => item.id !== result.preset.id),
+      ]);
+      setAxioms(result.pool.axioms);
+      setPool(result.pool);
+      setPlan(result.plan);
+      setValidation(result.validation);
+      setSelectedPresetId(result.preset.id);
+      setCyclesExhausted(false);
+      setStatus("Preset loaded.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load preset.");
     } finally {
       setLoading(null);
     }
@@ -187,6 +274,13 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
       />
 
       <BenchmarkStrip targets={targets} />
+      <PresetReservoir
+        disabled={disabled}
+        loading={loading === "usePreset"}
+        onUse={usePreset}
+        presets={presets}
+        selectedPresetId={selectedPresetId}
+      />
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
@@ -242,6 +336,7 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
             onAccept={acceptPlan}
             onCycleFiller={cycleFiller}
             onCycleMain={cycleMain}
+            onSavePreset={validation.ok ? savePreset : undefined}
             plan={plan}
             validationResult={validation}
           />
@@ -250,6 +345,60 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
         <FailurePanel validation={validation} />
       ) : null}
     </section>
+  );
+}
+
+function PresetReservoir({
+  disabled,
+  loading,
+  onUse,
+  presets,
+  selectedPresetId,
+}: {
+  disabled: boolean;
+  loading: boolean;
+  onUse: (presetId: string) => void;
+  presets: MealPlanPreset[];
+  selectedPresetId: string | null;
+}) {
+  if (presets.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-md border border-white/10 bg-black/30 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+          Presets
+        </p>
+        <p className="text-[10px] font-semibold text-white/35">
+          {loading ? "Loading..." : `${presets.length} saved`}
+        </p>
+      </div>
+      <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+        {presets.map((preset) => (
+          <button
+            className={`min-w-[190px] rounded-md border px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              preset.id === selectedPresetId
+                ? "border-emerald-300/40 bg-emerald-400/10"
+                : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
+            }`}
+            disabled={disabled}
+            key={preset.id}
+            onClick={() => onUse(preset.id)}
+            type="button"
+          >
+            <p className="truncate text-xs font-semibold text-white/80">
+              {preset.name}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-white/45">
+              {formatPresetTotals(preset)}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-white/35">
+              used {preset.useCount}x
+            </p>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -313,9 +462,15 @@ function FailurePanel({ validation }: { validation: ValidationResult }) {
 function loadingLabel(loading: Exclude<LoadingState, null>): string {
   if (loading === "cycleMain") return "Cycling main...";
   if (loading === "cycleFiller") return "Cycling filler...";
+  if (loading === "savePreset") return "Saving preset...";
+  if (loading === "usePreset") return "Loading preset...";
   return "Logging...";
 }
 
 function formatMetric(value: number, unit: string): string {
   return `${Math.max(0, Math.round(value)).toLocaleString()} ${unit}`;
+}
+
+function formatPresetTotals(preset: MealPlanPreset): string {
+  return `${preset.totals.calories} cal | ${preset.totals.proteinG}p | ${preset.totals.carbsG}c`;
 }
