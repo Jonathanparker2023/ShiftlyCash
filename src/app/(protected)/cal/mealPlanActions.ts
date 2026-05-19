@@ -86,8 +86,8 @@ export async function generateMealPlanAction(
     };
   }
 
-  const plan = assembleMealPlan(pool, remainingTargets, {});
-  if (!plan) {
+  const assembled = assembleAndValidateMealPlan(pool, remainingTargets, {});
+  if (!assembled.plan) {
     return {
       pool,
       plan: null,
@@ -99,8 +99,8 @@ export async function generateMealPlanAction(
 
   return {
     pool,
-    plan,
-    validation: validateMealPlan(plan, remainingTargets, pool),
+    plan: assembled.plan,
+    validation: assembled.validation,
   };
 }
 
@@ -114,9 +114,9 @@ export async function reassembleMealPlanAction(
     data.currentWeek.days.find((day) => day.date === data.todayIso) ??
     data.currentWeek.days[0];
   const remainingTargets = buildRemainingTargets(data.targets, today.totals);
-  const plan = assembleMealPlan(pool, remainingTargets, opts);
+  const assembled = assembleAndValidateMealPlan(pool, remainingTargets, opts);
 
-  if (!plan) {
+  if (!assembled.plan) {
     return {
       plan: null,
       validation: syntheticFailure(
@@ -126,8 +126,8 @@ export async function reassembleMealPlanAction(
   }
 
   return {
-    plan,
-    validation: validateMealPlan(plan, remainingTargets, pool),
+    plan: assembled.plan,
+    validation: assembled.validation,
   };
 }
 
@@ -172,6 +172,60 @@ export async function acceptMealPlanAction(
 
   revalidatePath("/cal");
   return { ok: true, loggedEntryIds };
+}
+
+function assembleAndValidateMealPlan(
+  pool: CandidatePool,
+  remainingTargets: RemainingTargets,
+  opts: AssembleOpts,
+): ReassembleMealPlanResult {
+  const attempts =
+    opts.maxFillers === undefined
+      ? [opts, { ...opts, maxFillers: 6 }]
+      : [opts];
+  let bestFailure: ReassembleMealPlanResult | null = null;
+
+  for (const attempt of attempts) {
+    const plan = assembleMealPlan(pool, remainingTargets, attempt);
+    if (!plan) continue;
+
+    const validation = validateMealPlan(plan, remainingTargets, pool);
+    if (validation.ok) return { plan, validation };
+
+    const failure = { plan, validation };
+    if (!bestFailure || isBetterFailure(validation, bestFailure.validation)) {
+      bestFailure = failure;
+    }
+  }
+
+  return bestFailure ?? {
+    plan: null,
+    validation: syntheticFailure(
+      "No candidates matched your axioms â€” try broadening location or allowing non-DoorDash main.",
+    ),
+  };
+}
+
+function isBetterFailure(
+  candidate: ValidationResult,
+  incumbent: ValidationResult,
+): boolean {
+  if (candidate.ok) return true;
+  if (incumbent.ok) return false;
+
+  if (candidate.gaps.length !== incumbent.gaps.length) {
+    return candidate.gaps.length < incumbent.gaps.length;
+  }
+
+  return gapScore(candidate) < gapScore(incumbent);
+}
+
+function gapScore(validation: ValidationResult): number {
+  if (validation.ok) return 0;
+  return validation.gaps.reduce(
+    (score, gap) => score + Math.abs(gap.deltaPct),
+    0,
+  );
 }
 
 function buildRemainingTargets(

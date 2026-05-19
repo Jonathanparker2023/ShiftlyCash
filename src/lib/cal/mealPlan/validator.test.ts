@@ -148,11 +148,87 @@ describe("meal-plan validator", () => {
     });
     expect(result.gaps[0].remediation).toContain("Lower Sodium Bowl");
   });
+
+  it("labels fallback gap remediation with the failed metric", () => {
+    const lowCalorieMain = candidate("light", "main", "Light Plate", {
+      calories: 500,
+      proteinG: 70,
+      carbsG: 100,
+      fiberG: 15,
+      fatG: 35,
+      sodiumMg: 500,
+      addedSugarG: 5,
+      saturatedFatG: 5,
+    });
+    const plan = makePlan(lowCalorieMain, []);
+
+    const result = validateMealPlan(
+      plan,
+      TARGETS,
+      makePool([lowCalorieMain], []),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.gaps[0].remediation).toContain("Calories short by");
+    expect(result.gaps[0].remediation).not.toContain("Gap of");
+  });
+
+  it("does not suggest non-DoorDash main swaps when DoorDash is required", () => {
+    const saltyMain = candidate("salty", "main", "DoorDash Salt Bowl", {
+      calories: 1000,
+      proteinG: 70,
+      carbsG: 100,
+      fiberG: 15,
+      fatG: 35,
+      sodiumMg: 2200,
+      addedSugarG: 5,
+      saturatedFatG: 5,
+    }, { doordashUrl: "https://www.doordash.com/store/salty/item/1" });
+    const nonDoorDashLower = candidate("non-dd", "main", "Non-DoorDash Low Sodium", {
+      calories: 1000,
+      proteinG: 70,
+      carbsG: 100,
+      fiberG: 15,
+      fatG: 35,
+      sodiumMg: 100,
+      addedSugarG: 5,
+      saturatedFatG: 5,
+    });
+    const doorDashLower = candidate("dd", "main", "DoorDash Lower Sodium", {
+      calories: 1000,
+      proteinG: 70,
+      carbsG: 100,
+      fiberG: 15,
+      fatG: 35,
+      sodiumMg: 700,
+      addedSugarG: 5,
+      saturatedFatG: 5,
+    }, { doordashUrl: "https://www.doordash.com/store/lower/item/2" });
+    const plan = makePlan(saltyMain, []);
+
+    const result = validateMealPlan(
+      plan,
+      TARGETS,
+      makePool([saltyMain, nonDoorDashLower, doorDashLower], [], {
+        requireDoorDash: true,
+        allowNonDoorDashMain: false,
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.gaps[0].remediation).toContain("DoorDash Lower Sodium");
+    expect(result.gaps[0].remediation).not.toContain("Non-DoorDash Low Sodium");
+  });
 });
 
 function makePool(
   mains: MealPlanCandidate[],
   fillers: MealPlanCandidate[],
+  axiomOverrides: Partial<CandidatePool["axioms"]> = {},
 ): CandidatePool {
   return {
     fetchedAt: "2026-05-19T00:00:00.000Z",
@@ -162,6 +238,7 @@ function makePool(
       allowNonDoorDashMain: true,
       carbMode: "indifferent",
       locationHint: "Naugatuck, CT",
+      ...axiomOverrides,
     },
     unfetchedReason: null,
     mains,
@@ -208,6 +285,7 @@ function candidate(
   kind: MealPlanCandidate["kind"],
   name: string,
   macros: MealPlanMacros,
+  overrides: Partial<MealPlanCandidate> = {},
 ): MealPlanCandidate {
   return {
     id,
@@ -220,5 +298,6 @@ function candidate(
     macroRange: null,
     confidence: "high",
     notes: null,
+    ...overrides,
   };
 }

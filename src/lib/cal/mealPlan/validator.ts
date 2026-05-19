@@ -131,8 +131,8 @@ function suggestRemediation(
   pool: CandidatePool,
 ): string {
   if (direction === "short") {
-    const filler = bestFillerForGap(metric, gapAmount, pool.fillers);
-    if (!filler) return fallbackRemediation(gapAmount, metric);
+    const filler = bestFillerForGap(metric, gapAmount, plan, pool.fillers);
+    if (!filler) return fallbackRemediation(gapAmount, metric, direction);
 
     return `${label(metric)} short by ${formatAmount(
       gapAmount,
@@ -143,8 +143,8 @@ function suggestRemediation(
     )}${additiveLabelSuffix(metric)}).`;
   }
 
-  const suggestedMain = lowestAlternateMain(metric, plan.main, pool.mains);
-  if (!suggestedMain) return fallbackRemediation(gapAmount, metric);
+  const suggestedMain = lowestAlternateMain(metric, plan.main, pool);
+  if (!suggestedMain) return fallbackRemediation(gapAmount, metric, direction);
 
   return `${label(metric)} over by ${formatAmount(
     gapAmount,
@@ -155,13 +155,25 @@ function suggestRemediation(
 function bestFillerForGap(
   metric: Metric,
   gapAmount: number,
+  plan: MealPlan,
   fillers: MealPlanCandidate[],
 ): MealPlanCandidate | null {
+  const usedIds = new Set(plan.fillers.map((filler) => filler.id));
   const closingFillers = fillers
     .map((filler) => ({ filler, value: macroValue(filler, metric) }))
-    .filter(({ value }) => value >= gapAmount && value > 0);
+    .filter(({ filler, value }) => !usedIds.has(filler.id) && value > 0)
+    .filter(({ value }) => value >= gapAmount);
 
-  if (closingFillers.length === 0) return null;
+  if (closingFillers.length === 0) {
+    const helpfulFillers = fillers
+      .map((filler) => ({ filler, value: macroValue(filler, metric) }))
+      .filter(({ filler, value }) => !usedIds.has(filler.id) && value > 0);
+
+    if (helpfulFillers.length === 0) return null;
+
+    helpfulFillers.sort((left, right) => right.value - left.value);
+    return helpfulFillers[0].filler;
+  }
 
   closingFillers.sort((left, right) => {
     const leftMiss = Math.abs(left.value - gapAmount);
@@ -175,11 +187,12 @@ function bestFillerForGap(
 function lowestAlternateMain(
   metric: Metric,
   currentMain: MealPlanCandidate,
-  mains: MealPlanCandidate[],
+  pool: CandidatePool,
 ): MealPlanCandidate | null {
   const currentValue = macroValue(currentMain, metric);
-  const alternates = mains
+  const alternates = pool.mains
     .filter((main) => main.id !== currentMain.id)
+    .filter((main) => isEligibleSuggestedMain(main, pool))
     .filter((main) => macroValue(main, metric) < currentValue);
 
   if (alternates.length === 0) return null;
@@ -189,8 +202,32 @@ function lowestAlternateMain(
   );
 }
 
-function fallbackRemediation(gapAmount: number, metric: Metric): string {
-  return `Gap of ${formatAmount(
+function isEligibleSuggestedMain(
+  main: MealPlanCandidate,
+  pool: CandidatePool,
+): boolean {
+  if (
+    pool.axioms.eatOut &&
+    pool.axioms.requireDoorDash &&
+    !pool.axioms.allowNonDoorDashMain &&
+    main.doordashUrl === null
+  ) {
+    return false;
+  }
+
+  if (pool.axioms.carbMode === "low" && main.macros.carbsG > 80) {
+    return false;
+  }
+
+  return true;
+}
+
+function fallbackRemediation(
+  gapAmount: number,
+  metric: Metric,
+  direction: Direction,
+): string {
+  return `${label(metric)} ${direction === "short" ? "short" : "over"} by ${formatAmount(
     gapAmount,
     metric,
   )} — no candidate in the pool would close this. Try a different axiom (allow non-DoorDash main, broaden location) or regenerate.`;
