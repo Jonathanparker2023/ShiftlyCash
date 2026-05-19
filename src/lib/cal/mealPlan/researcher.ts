@@ -178,16 +178,24 @@ export async function fetchCandidatePool(
   });
 
   const parsed = parseCandidatePoolResponse(extractFinalText(response.content));
-  const mains = postProcessCandidates(parsed.mains, "main", input).slice(0, 6);
+  const processedMains = postProcessCandidates(parsed.mains, "main", input);
+  const mains = filterDoorDashEligibleMains(processedMains, input).slice(0, 6);
   const fillers = postProcessCandidates(parsed.fillers, "filler", input).slice(
     0,
     12,
   );
+  const unfetchedReason =
+    parsed.unfetchedReason ??
+    (requiresDoorDashMain(input) &&
+    processedMains.length > 0 &&
+    mains.length === 0
+      ? "No DoorDash-verified mains matched your request."
+      : null);
 
   return {
     fetchedAt: new Date().toISOString(),
     axioms: input.axioms,
-    unfetchedReason: parsed.unfetchedReason,
+    unfetchedReason,
     mains,
     fillers,
   };
@@ -431,6 +439,22 @@ function postProcessCandidates(
       }),
     };
   });
+}
+
+function filterDoorDashEligibleMains(
+  mains: MealPlanCandidate[],
+  input: ResearcherInput,
+): MealPlanCandidate[] {
+  if (!requiresDoorDashMain(input)) return mains;
+  return mains.filter((main) => main.doordashUrl !== null);
+}
+
+function requiresDoorDashMain(input: ResearcherInput): boolean {
+  return (
+    input.axioms.eatOut &&
+    input.axioms.requireDoorDash &&
+    !input.axioms.allowNonDoorDashMain
+  );
 }
 
 function normalizeDatabaseClaim(
