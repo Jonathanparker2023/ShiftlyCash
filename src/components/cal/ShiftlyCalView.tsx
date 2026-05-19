@@ -6,6 +6,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { AiFoodEstimator } from "@/components/cal/AiFoodEstimator";
+import { MealPlanGenerator } from "@/components/cal/MealPlanGenerator";
 import {
   createFoodEntryAction,
   deleteFoodEntryAction,
@@ -24,6 +25,7 @@ import {
   magnitudeColorClass,
   verdictBarClass,
 } from "@/lib/cal/color";
+import type { RemainingTargets } from "@/lib/cal/mealPlan/types";
 import {
   colorToneFromMagnitude,
   dailyCalorieThresholdsForTarget,
@@ -135,6 +137,10 @@ export function ShiftlyCalView({
           nowMs - new Date(entry.updatedAt).getTime() < 60_000,
       ),
     [focusedDay.entries, nowMs],
+  );
+  const remainingMealPlanTargets = useMemo(
+    () => buildRemainingTargets(initialData.targets, focusedDay.totals),
+    [focusedDay.totals, initialData.targets],
   );
 
   useEffect(() => {
@@ -438,6 +444,7 @@ export function ShiftlyCalView({
                   onInstantLog={instantLog}
                   savedFoods={initialData.savedFoods}
                 />
+                <MealPlanGenerator targets={remainingMealPlanTargets} />
                 <MealOrderPromptBox disabled={isPending} />
                 <FindMealPromptBox disabled={isPending} />
                 <HomeRecipePromptBox disabled={isPending} />
@@ -542,6 +549,33 @@ function MetricStrip({
       />
     </div>
   );
+}
+
+function buildRemainingTargets(
+  targets: CalTargets,
+  totals: CalTotals,
+): RemainingTargets {
+  return {
+    calories: remainingValue(targets.tdeeCalories, totals.calories),
+    proteinG: remainingValue(targets.proteinTargetG, totals.proteinG),
+    carbsG: remainingValue(targets.carbsTargetG, totals.carbsG),
+    fiberG: remainingValue(targets.fiberTargetG, totals.fiberG),
+    fatG: remainingValue(targets.fatTargetG, totals.fatG),
+    sodiumMg: remainingValue(targets.sodiumTargetMg, totals.sodiumMg),
+    addedSugarG: remainingValue(
+      targets.addedSugarTargetG,
+      totals.addedSugarG,
+    ),
+    saturatedFatG: remainingValue(
+      targets.saturatedFatTargetG,
+      totals.saturatedFatG,
+    ),
+  };
+}
+
+function remainingValue(target: number | null, value: number): number {
+  if (target === null) return 0;
+  return Math.max(0, target - value);
 }
 
 function TopMetric({
