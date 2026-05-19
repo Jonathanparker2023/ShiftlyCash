@@ -25,6 +25,24 @@ export type SavedFoodForResearcher = {
   macros: MealPlanMacros;
 };
 
+export type RemainingTargets = {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fiberG: number;
+  fatG: number;
+  sodiumMg: number;
+  addedSugarG: number;
+  saturatedFatG: number;
+};
+
+export type AssembleOpts = {
+  holdMainId?: string;
+  excludeMainIds?: string[];
+  excludeFillerIds?: string[];
+  maxFillers?: number;
+};
+
 export type MealPlanAxioms = {
   eatOut: boolean;
   requireDoorDash: boolean;
