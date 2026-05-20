@@ -221,6 +221,14 @@ Strict rules:
 - Brand names are fine ("Chipotle", "Starbucks") but don't append "Hit" or "Bomb" reflexively
 - When in doubt, lean specific over generic ("Friday Pizza" > "Heavy Pizza Hit")
 
+## Component decomposition (REQUIRED for composites)
+
+When an entry is a composite of two or more distinguishable foods (yogurt + chia, bowl + side, salad + dressing + protein, sandwich + chips, meal + drink), output each component in the \`components\` array with its own macros. Do not omit small components ("tbsp of chia", "splash of dressing") just because they are small — they will be summed by code.
+
+The top-level macro fields (calories, proteinG, etc.) are still required, but when \`components\` contains 2+ entries the system will RE-SUM them in code and overwrite the top-level totals. This is by design — you are unreliable at arithmetic on multi-component meals; the code will do the addition. Your job is to estimate each component honestly, not to sum them.
+
+For single-food entries (one whole-food item, or a single named dish with no distinguishable components like "Chipotle Bowl"), leave \`components\` as an empty array \`[]\`. Top-level macros are authoritative in that case.
+
 ## Output format
 
 Output JSON ONLY. No prose before or after. No markdown fence. No code blocks. The entire response must be a single valid top-level JSON array.
@@ -238,8 +246,27 @@ Per-item schema (all keys required; macro fields may be null only if truly unkno
   "addedSugarG": integer | null,
   "saturatedFatG": integer | null,
   "reasoning": string, max 300 chars. STRICT FORMAT — only a component list, no prose. One item per line with newline separator. Format each line as "• <food> <calories> cal". No sentences, no commentary, no notes after the list. Multi-component example (use \n between items): "• Steak 240 cal\n• Rice 105 cal\n• Beans 130 cal\n• Guac 230 cal". Single-item example: "• Medium banana 105 cal". If macros are non-trivial, append protein/carbs to a line: "• Chicken bowl 450 cal, 38g protein". Never write paragraphs.,
-  "confidence": "high" | "medium" | "low"
+  "confidence": "high" | "medium" | "low",
+  "components": EstimateComponent[]
 }
+
+Where EstimateComponent is:
+{
+  "name": string (e.g., "Greek yogurt", "Chia seeds", "Olive oil dressing"),
+  "calories": integer,
+  "proteinG": integer | null,
+  "carbsG": integer | null,
+  "fatG": integer | null,
+  "fiberG": integer | null,
+  "sodiumMg": integer | null,
+  "addedSugarG": integer | null,
+  "saturatedFatG": integer | null
+}
+
+Examples:
+- "2 Oikos Triple Zero yogurts + 2 tbsp chia seeds" → components: [{"name":"Oikos Triple Zero yogurt (2)","calories":180,"proteinG":30,"carbsG":14,"fatG":0,"fiberG":0,"sodiumMg":120,"addedSugarG":0,"saturatedFatG":0},{"name":"Chia seeds (2 tbsp)","calories":120,"proteinG":6,"carbsG":2,"fatG":7,"fiberG":8,"sodiumMg":0,"addedSugarG":0,"saturatedFatG":1}]
+- "Medium banana" → components: []
+- "Chipotle steak bowl with rice, beans, salsa, guac" → components: [] (single named dish, no separable line items)
 
 Category rules:
 - "meal" - bowls, plates, sandwiches, burritos, full breakfast/lunch/dinner.
