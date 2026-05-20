@@ -274,7 +274,6 @@ function mapTrendDay(day: CalTrendDay) {
     weight_lbs: day.weightLbs === null ? null : roundWeight(day.weightLbs),
     verdict_counts: {
       good: day.verdictCounts.good,
-      fine: day.verdictCounts.fine,
       bad: day.verdictCounts.bad,
       unscored: day.verdictCounts.unscored,
     },
@@ -370,7 +369,7 @@ function buildRollingWindow(
       tdee === null || loggedDays.length === 0
         ? null
         : roundInteger(
-            (loggedDays.filter((day) => Math.abs(day.calories - tdee) <= tdee * 0.15)
+            (loggedDays.filter((day) => Math.abs(day.calories - tdee) <= tdee * 0.05)
               .length /
               loggedDays.length) *
               100,
@@ -386,7 +385,6 @@ function buildRollingWindow(
 function mapVerdictSummary(summary: VerdictSummary) {
   return {
     good: summary.good,
-    fine: summary.fine,
     bad: summary.bad,
     unscored: summary.unscored,
     manual_override: summary.manualOverride,
@@ -411,7 +409,6 @@ function mapTrendVerdictSummary(days: CalTrendDay[]) {
   const summary = days.reduce(
     (acc, day) => ({
       good: acc.good + day.verdictCounts.good,
-      fine: acc.fine + day.verdictCounts.fine,
       bad: acc.bad + day.verdictCounts.bad,
       unscored: acc.unscored + day.verdictCounts.unscored,
       manualOverride: acc.manualOverride + day.verdictCounts.manualOverride,
@@ -438,7 +435,6 @@ function mapTrendVerdictSummary(days: CalTrendDay[]) {
     }),
     {
       good: 0,
-      fine: 0,
       bad: 0,
       unscored: 0,
       manualOverride: 0,

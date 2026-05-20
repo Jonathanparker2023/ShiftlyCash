@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { waitUntil } from "@vercel/functions";
 
 import { requireUser } from "@/lib/auth";
+import { upsertDayFoodVerdict } from "@/lib/cal/dayVerdict";
 import { estimateFood, type FoodEstimate } from "@/lib/cal/estimate";
 import { getShiftlyCalData } from "@/lib/cal/data";
 import type { FoodCategory, FoodVerdict } from "@/lib/cal/types";
@@ -20,7 +21,7 @@ const FOOD_CATEGORIES = new Set<FoodCategory>([
   "drink",
   "other",
 ]);
-const FOOD_VERDICTS = new Set<FoodVerdict>(["good", "fine", "bad"]);
+const FOOD_VERDICTS = new Set<FoodVerdict>(["good", "bad"]);
 const JON_FALLBACK_WEIGHT_LBS = 201.9;
 const VERDICT_SCORING_TIMEOUT_MS = 45_000;
 
@@ -128,6 +129,7 @@ export async function createFoodEntryAction(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/cal");
+  scheduleDayFoodVerdict(user.id, date);
   scheduleScoreFoodEntry(data.id, user.id);
   return { ok: true, id: data.id };
 }
@@ -590,6 +592,15 @@ export async function deleteFoodEntryAction(input: {
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
 
+  const { data: current, error: currentError } = await supabase
+    .from("food_entries")
+    .select("date")
+    .eq("user_id", user.id)
+    .eq("id", input.id)
+    .single();
+
+  if (currentError) throw new Error(currentError.message);
+
   const { error } = await supabase
     .from("food_entries")
     .delete()
@@ -599,6 +610,7 @@ export async function deleteFoodEntryAction(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/cal");
+  scheduleDayFoodVerdict(user.id, String(current.date));
   return { ok: true };
 }
 
@@ -621,7 +633,7 @@ export async function updateFoodEntryAction(input: {
 
   const { data: current, error: currentError } = await supabase
     .from("food_entries")
-    .select("verdict_source")
+    .select("date,verdict_source")
     .eq("user_id", user.id)
     .eq("id", input.id)
     .single();
@@ -659,6 +671,7 @@ export async function updateFoodEntryAction(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/cal");
+  scheduleDayFoodVerdict(user.id, String(current.date));
   if (current?.verdict_source !== "manual_override") {
     scheduleScoreFoodEntry(input.id, user.id);
   }
@@ -998,6 +1011,34 @@ function scheduleScoreFoodEntry(entryId: string, userId: string) {
   after(async () => {
     await scoreEntryAndUpdate(entryId, userId);
   });
+}
+
+function scheduleDayFoodVerdict(userId: string, date: string) {
+  console.info("[day-verdict] refresh scheduled", { userId, date, ts: Date.now() });
+  if (typeof waitUntil === "function") {
+    waitUntil(refreshDayFoodVerdict(userId, date));
+    return;
+  }
+
+  after(async () => {
+    await refreshDayFoodVerdict(userId, date);
+  });
+}
+
+async function refreshDayFoodVerdict(userId: string, date: string) {
+  try {
+    await upsertDayFoodVerdict(createAdminClient(), userId, date);
+    console.info("[day-verdict] refresh success", { userId, date, ts: Date.now() });
+  } catch (err) {
+    console.info("[day-verdict] refresh failure", {
+      userId,
+      date,
+      ts: Date.now(),
+      error: err instanceof Error ? err.message : "Unknown day verdict error.",
+    });
+  }
+
+  revalidatePath("/cal");
 }
 
 async function scoreEntryAndUpdate(entryId: string, userId: string) {

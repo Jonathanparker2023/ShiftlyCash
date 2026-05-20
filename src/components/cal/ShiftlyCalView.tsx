@@ -27,9 +27,6 @@ import {
 } from "@/lib/cal/color";
 import type { RemainingTargets } from "@/lib/cal/mealPlan/types";
 import {
-  colorToneFromMagnitude,
-  dailyCalorieThresholdsForTarget,
-  dailyDeviation,
   type MagnitudeTone,
 } from "@/lib/cal/projection";
 import { addDaysIso } from "@/lib/dashboard/dates";
@@ -135,7 +132,7 @@ export function ShiftlyCalView({
         (entry) =>
           entry.verdictSource === "pending" &&
           nowMs - new Date(entry.updatedAt).getTime() < 60_000,
-      ),
+    ),
     [focusedDay.entries, nowMs],
   );
   const mealPlanDay = useMemo(
@@ -429,7 +426,6 @@ export function ShiftlyCalView({
                   isFocused={index === focusedDayIndex}
                   key={day.date}
                   onClick={() => focusDay(index)}
-                  targets={initialData.targets}
                 />
               ))}
             </div>
@@ -631,18 +627,12 @@ function WeekStripCell({
   day,
   isFocused,
   onClick,
-  targets,
 }: {
   day: CalDay;
   isFocused: boolean;
   onClick: () => void;
-  targets: CalTargets;
 }) {
-  const deviation = dailyDeviation(day.totals.calories, targets.tdeeCalories);
-  const tone = colorToneFromMagnitude(
-    deviation,
-    dailyCalorieThresholdsForTarget(targets.tdeeCalories),
-  );
+  const verdict = day.dayVerdict?.verdict ?? null;
   const date = new Date(`${day.date}T00:00:00.000Z`);
   const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
@@ -650,44 +640,48 @@ function WeekStripCell({
   }).format(date);
 
   const toneBorder =
-    tone === "green"
+    verdict === "good"
       ? "border-emerald-400/80"
-      : tone === "amber"
-        ? "border-amber-400/80"
-        : tone === "red"
+      : verdict === "bad"
           ? "border-rose-400/80"
           : "border-white/45";
   const toneBorderFocused =
-    tone === "green"
+    verdict === "good"
       ? "border-emerald-300"
-      : tone === "amber"
-        ? "border-amber-300"
-        : tone === "red"
+      : verdict === "bad"
           ? "border-rose-300"
           : "border-white/90";
+  const toneBg =
+    verdict === "good"
+      ? "bg-emerald-500/20"
+      : verdict === "bad"
+        ? "bg-rose-500/20"
+        : "bg-black/10";
   const toneGlow =
-    tone === "green"
+    verdict === "good"
       ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
-      : tone === "amber"
-        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(245,158,11,0.45)]"
-        : tone === "red"
+      : verdict === "bad"
           ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]"
           : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
   const toneGlowFocused =
-    tone === "green"
+    verdict === "good"
       ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(16,185,129,0.95),0_0_85px_rgba(16,185,129,0.55)]"
-      : tone === "amber"
-        ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(245,158,11,0.95),0_0_85px_rgba(245,158,11,0.55)]"
-        : tone === "red"
+      : verdict === "bad"
           ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(244,63,94,0.95),0_0_85px_rgba(244,63,94,0.55)]"
           : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_28px_rgba(255,255,255,0.3)]";
+  const calorieTextClass =
+    verdict === "good"
+      ? "text-emerald-200"
+      : verdict === "bad"
+        ? "text-rose-200"
+        : "text-white/70";
 
   return (
     <button
       className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white transition-all duration-200 focus:outline-none sm:p-3 ${
         isFocused
-          ? `scale-105 border-[3px] ${toneBorderFocused} bg-black/30 ${toneGlowFocused} backdrop-blur-xl`
-          : `border-2 ${toneBorder} bg-black/10 ${toneGlow} backdrop-blur-xl hover:bg-black/20`
+          ? `scale-105 border-[3px] ${toneBorderFocused} ${toneBg} ${toneGlowFocused} backdrop-blur-xl`
+          : `border-2 ${toneBorder} ${toneBg} ${toneGlow} backdrop-blur-xl hover:bg-black/20`
       }`}
       onClick={onClick}
       type="button"
@@ -699,7 +693,13 @@ function WeekStripCell({
         {date.getUTCDate()}
       </p>
       <p
-        className={`mt-3 truncate text-xs font-semibold sm:mt-6 sm:text-sm ${magnitudeColorClass(tone)}`}
+        className="mt-1 h-4 truncate text-[10px] font-medium leading-4 text-white/75 sm:text-xs"
+        title={day.dayVerdict?.reason ?? undefined}
+      >
+        {day.dayVerdict?.reason ?? ""}
+      </p>
+      <p
+        className={`mt-2 truncate text-xs font-semibold sm:mt-4 sm:text-sm ${calorieTextClass}`}
       >
         {day.totals.calories.toLocaleString()}
       </p>
@@ -888,7 +888,7 @@ function FoodEntryRow({
   const [isSaving, setIsSaving] = useState(false);
   const [isVerdictSaving, setIsVerdictSaving] = useState(false);
   const [overrideValue, setOverrideValue] = useState<FoodVerdict>(
-    entry.verdict ?? "fine",
+    entry.verdict ?? "bad",
   );
   const [overrideReason, setOverrideReason] = useState(entry.verdictReason ?? "");
   const [editForm, setEditForm] = useState({
@@ -1068,7 +1068,6 @@ function FoodEntryRow({
               value={overrideValue}
             >
               <option value="good">Good</option>
-              <option value="fine">Fine</option>
               <option value="bad">Bad</option>
             </select>
             <input

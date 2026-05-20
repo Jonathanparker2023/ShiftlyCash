@@ -11,7 +11,7 @@ import {
   refitMealPlanPresetAction,
   renameMealPlanPresetAction,
   saveMealPlanPresetAction,
-  useMealPlanPresetAction,
+  useMealPlanPresetAction as loadMealPlanPresetAction,
 } from "@/app/(protected)/cal/mealPlanActions";
 import { MealPlanAxiomBar } from "@/components/cal/MealPlanAxiomBar";
 import { MealPlanCard } from "@/components/cal/MealPlanCard";
@@ -221,7 +221,7 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
     resetCycleState();
 
     try {
-      const result = await useMealPlanPresetAction(presetId);
+      const result = await loadMealPlanPresetAction(presetId);
       setPresets((current) => [
         result.preset,
         ...current.filter((item) => item.id !== result.preset.id),
@@ -679,7 +679,7 @@ function FailurePanel({ validation }: { validation: ValidationResult }) {
 
   return (
     <div className="mt-3 rounded-lg border border-amber-300/25 bg-black/30 p-3">
-      <p className="text-xs font-semibold text-amber-300">couldn't close</p>
+      <p className="text-xs font-semibold text-amber-300">couldn&apos;t close</p>
       <ul className="mt-2 space-y-1.5 text-xs font-semibold text-amber-100/90">
         {validation.gaps.map((gap) => (
           <li key={`${gap.metric}-${gap.direction}`}>{gap.remediation}</li>

@@ -233,6 +233,98 @@ describe("meal-plan assembler", () => {
 
     expect(validateMealPlan(plan, TARGETS, pool)).toEqual({ ok: true, plan });
   });
+
+  it("does not under-fill when multiple low-risk fillers improve a large calorie gap", () => {
+    const pool = makePool({
+      axioms: {
+        eatOut: true,
+        requireDoorDash: true,
+        allowNonDoorDashMain: false,
+        carbMode: "indifferent",
+        locationHint: "Naugatuck, CT",
+      },
+      mains: [
+        candidate(
+          "chipotle",
+          "main",
+          "Chipotle Chicken Burrito Bowl",
+          {
+            calories: 580,
+            proteinG: 45,
+            carbsG: 55,
+            fiberG: 12,
+            fatG: 19,
+            sodiumMg: 1380,
+            addedSugarG: 4,
+            saturatedFatG: 6,
+          },
+          "https://www.doordash.com/store/chipotle-example",
+        ),
+      ],
+      fillers: [
+        candidate("cottage", "filler", "Cottage cheese", {
+          calories: 81,
+          proteinG: 14,
+          carbsG: 3,
+          fiberG: 0,
+          fatG: 2,
+          sodiumMg: 320,
+          addedSugarG: 2,
+          saturatedFatG: 1,
+        }),
+        candidate("almonds", "filler", "Almonds", {
+          calories: 164,
+          proteinG: 6,
+          carbsG: 6,
+          fiberG: 4,
+          fatG: 14,
+          sodiumMg: 0,
+          addedSugarG: 1,
+          saturatedFatG: 1,
+        }),
+        candidate("yogurt", "filler", "Greek yogurt", {
+          calories: 130,
+          proteinG: 22,
+          carbsG: 9,
+          fiberG: 0,
+          fatG: 0,
+          sodiumMg: 65,
+          addedSugarG: 0,
+          saturatedFatG: 0,
+        }),
+        candidate("banana", "filler", "Banana", {
+          calories: 105,
+          proteinG: 1,
+          carbsG: 27,
+          fiberG: 3,
+          fatG: 0,
+          sodiumMg: 1,
+          addedSugarG: 0,
+          saturatedFatG: 0,
+        }),
+      ],
+    });
+    const targets: RemainingTargets = {
+      calories: 1650,
+      proteinG: 70,
+      carbsG: 60,
+      fiberG: 15,
+      fatG: 20,
+      sodiumMg: 1500,
+      addedSugarG: 25,
+      saturatedFatG: 12,
+    };
+
+    const plan = assembleMealPlan(pool, targets);
+
+    expect(plan).not.toBeNull();
+    expect(plan?.fillers.map((filler) => filler.id).sort()).toEqual([
+      "banana",
+      "cottage",
+      "yogurt",
+    ]);
+    expect(plan?.totals.calories).toBe(896);
+  });
 });
 
 function makePool(input: {
@@ -283,22 +375,27 @@ function scoreForTest(
   carbMode: CarbMode,
 ): number {
   return (
-    centered(plan.totals.calories, targets.calories, 1.0) +
+    calorie(plan.totals.calories, targets.calories) +
     floor(plan.totals.proteinG, targets.proteinG, 1.5) +
     carb(plan.totals.carbsG, targets.carbsG, carbMode) +
     floor(plan.totals.fiberG, targets.fiberG, 0.8) +
-    centered(plan.totals.fatG, targets.fatG, 0.5) +
+    asymmetricCentered(plan.totals.fatG, targets.fatG, 0, 0.5) +
     ceiling(plan.totals.sodiumMg, targets.sodiumMg, 0.8) +
     ceiling(plan.totals.addedSugarG, targets.addedSugarG, 1.0) +
     ceiling(plan.totals.saturatedFatG, targets.saturatedFatG, 0.7)
   );
 }
 
+function calorie(actual: number, target: number): number {
+  const weight = target > 0 && actual < target * 0.8 ? 1.5 : 1;
+  return centered(actual, target, weight);
+}
+
 function carb(actual: number, target: number, carbMode: CarbMode): number {
   const weight = carbMode === "indifferent" ? 1.0 : 1.5;
   if (carbMode === "low") return ceiling(actual, target, weight);
   if (carbMode === "high") return floor(actual, target, weight);
-  return centered(actual, target, 1.0);
+  return asymmetricCentered(actual, target, 1, 0.35);
 }
 
 function centered(actual: number, target: number, weight: number): number {
@@ -317,4 +414,18 @@ function ceiling(actual: number, target: number, weight: number): number {
   if (target <= 0) return 0;
   const deviation = Math.max(0, (actual - target) / target);
   return weight * deviation * deviation;
+}
+
+function asymmetricCentered(
+  actual: number,
+  target: number,
+  underWeight: number,
+  overWeight: number,
+): number {
+  if (target <= 0) return 0;
+  const deviation = (actual - target) / target;
+  const excessDeviation = Math.max(0, Math.abs(deviation) - 0.1);
+  return (deviation < 0 ? underWeight : overWeight) *
+    excessDeviation *
+    excessDeviation;
 }

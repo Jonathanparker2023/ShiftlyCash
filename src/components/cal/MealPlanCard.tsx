@@ -74,7 +74,7 @@ export function MealPlanCard({
             </p>
           ) : (
             <p className="text-xs font-semibold text-amber-300">
-              couldn't close
+              couldn&apos;t close
             </p>
           )}
         </div>

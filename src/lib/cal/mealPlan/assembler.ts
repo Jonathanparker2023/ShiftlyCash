@@ -12,6 +12,10 @@ const DEFAULT_MAX_FILLERS = 4;
 const LOW_CARB_MAIN_CAP_G = 80;
 const LOW_CARB_FILLER_CAP_G = 30;
 const SCORE_EPSILON = 1e-12;
+const CENTERED_TOLERANCE_PCT = 0.1;
+const CALORIE_UNDERFILL_THRESHOLD = 0.8;
+const CALORIE_UNDERFILL_WEIGHT = 1.5;
+const INDIFFERENT_CARB_OVERSHOOT_WEIGHT = 0.35;
 
 const WEIGHTS = {
   calories: 1.0,
@@ -173,11 +177,11 @@ function scoreMealPlan(
 ): number {
   let score = 0;
 
-  score += centeredScore(plan.totals.calories, targets.calories, WEIGHTS.calories);
+  score += calorieScore(plan.totals.calories, targets.calories);
   score += floorScore(plan.totals.proteinG, targets.proteinG, WEIGHTS.proteinG);
   score += carbScore(plan.totals.carbsG, targets.carbsG, carbMode);
   score += floorScore(plan.totals.fiberG, targets.fiberG, WEIGHTS.fiberG);
-  score += centeredScore(plan.totals.fatG, targets.fatG, WEIGHTS.fatG);
+  score += fatScore(plan.totals.fatG, targets.fatG);
   score += ceilingScore(plan.totals.sodiumMg, targets.sodiumMg, WEIGHTS.sodiumMg);
   score += ceilingScore(
     plan.totals.addedSugarG,
@@ -193,6 +197,14 @@ function scoreMealPlan(
   return score;
 }
 
+function calorieScore(actual: number, target: number): number {
+  const weight =
+    target > 0 && actual < target * CALORIE_UNDERFILL_THRESHOLD
+      ? CALORIE_UNDERFILL_WEIGHT
+      : WEIGHTS.calories;
+  return centeredScore(actual, target, weight);
+}
+
 function carbScore(
   actual: number,
   target: number,
@@ -201,13 +213,40 @@ function carbScore(
   const weight = carbMode === "indifferent" ? WEIGHTS.carbsG : 1.5;
   if (carbMode === "low") return ceilingScore(actual, target, weight);
   if (carbMode === "high") return floorScore(actual, target, weight);
-  return centeredScore(actual, target, WEIGHTS.carbsG);
+  return asymmetricCenteredScore(actual, target, {
+    underWeight: WEIGHTS.carbsG,
+    overWeight: INDIFFERENT_CARB_OVERSHOOT_WEIGHT,
+    tolerancePct: CENTERED_TOLERANCE_PCT,
+  });
+}
+
+function fatScore(actual: number, target: number): number {
+  return asymmetricCenteredScore(actual, target, {
+    underWeight: 0,
+    overWeight: WEIGHTS.fatG,
+    tolerancePct: CENTERED_TOLERANCE_PCT,
+  });
 }
 
 function centeredScore(actual: number, target: number, weight: number): number {
   if (target <= 0) return 0;
   const deviation = (actual - target) / target;
   return weight * deviation * deviation;
+}
+
+function asymmetricCenteredScore(
+  actual: number,
+  target: number,
+  opts: { underWeight: number; overWeight: number; tolerancePct: number },
+): number {
+  if (target <= 0) return 0;
+  const deviation = (actual - target) / target;
+  const excessDeviation = Math.max(
+    0,
+    Math.abs(deviation) - opts.tolerancePct,
+  );
+  const weight = deviation < 0 ? opts.underWeight : opts.overWeight;
+  return weight * excessDeviation * excessDeviation;
 }
 
 function floorScore(actual: number, target: number, weight: number): number {
