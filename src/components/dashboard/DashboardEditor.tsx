@@ -1669,6 +1669,26 @@ function NumberField({
   onChange?: (value: number) => void;
   readOnly?: boolean;
 }) {
+  const [draftValue, setDraftValue] = useState(() => formatNumberInput(value));
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draftValue : formatNumberInput(value);
+
+  function updateDraft(nextValue: string) {
+    setDraftValue(nextValue);
+    if (nextValue.trim() === "") return;
+
+    const parsed = Number(nextValue);
+    if (Number.isFinite(parsed)) onChange?.(Math.max(0, parsed));
+  }
+
+  function commitDraft() {
+    setIsEditing(false);
+    const parsed = Number(draftValue);
+    const nextValue = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    setDraftValue(formatNumberInput(nextValue));
+    onChange?.(nextValue);
+  }
+
   return (
     <label className="space-y-1">
       <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
@@ -1676,12 +1696,18 @@ function NumberField({
       </span>
       <input
         className="h-10 w-full rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition read-only:bg-white/10 read-only:text-white/60 focus:border-white/60 focus:ring-2 focus:ring-white"
+        inputMode="decimal"
         min="0"
-        onChange={(event) => onChange?.(parsePositiveNumber(event.target.value))}
+        onBlur={commitDraft}
+        onChange={(event) => updateDraft(event.target.value)}
+        onFocus={() => {
+          setDraftValue(formatNumberInput(value));
+          setIsEditing(true);
+        }}
         readOnly={readOnly}
         step="0.01"
-        type="number"
-        value={formatNumberInput(value)}
+        type="text"
+        value={displayValue}
       />
     </label>
   );
