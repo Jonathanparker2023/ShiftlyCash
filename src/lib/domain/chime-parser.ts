@@ -28,19 +28,43 @@ export type ChimeParseResult =
     }
   | { ok: false; reason: string };
 
-const SYSTEM_PROMPT = `You read Chime bank push notifications from the user's iPhone and extract structured transaction data. Return JSON only.
+const SYSTEM_PROMPT = `You read Chime bank notifications — either short iPhone push notifications OR full Chime email alerts forwarded by an IMAP cron — and extract structured transaction data. Return JSON only.
+
+Email bodies are LONG and contain marketing footers, legal boilerplate, and unsubscribe text. Ignore all of that. Focus on the SUBJECT LINE and the first 1-2 sentences of the body, which always describe the actual event. If you see a dollar amount in the footer (e.g. fee schedule, minimum balance disclosures), do NOT use it — only use the amount associated with the event described in the subject/lede.
 
 ## Known Chime notification types
 
-- **purchase**: card debit at a merchant. Example: "You spent $5.05" / "Your new Chime account balance is $233.76 after your purchase at Anthropic."
-- **deposit**: paycheck or external deposit arriving. Example: "You got paid $1,500.00 from EMPLOYER" or "$500 was deposited"
-- **transfer_in**: money received from another Chime user or external source. Example: "John P. sent you $50"
-- **transfer_out**: money sent to another person. Example: "You sent $50 to John P."
-- **refund**: money returned from a merchant. Example: "You got a $12.34 refund from MERCHANT"
-- **pending_charge**: card auth before settlement. Example: "Pending charge of $43.27 at MERCHANT"
-- **balance_alert**: informational, no transaction. Example: "Your balance is below $100"
-- **card_event**: security/lock notifications. Example: "Your card was used at..." (without dollar amount)
+- **purchase**: card debit at a merchant.
+  - Push: "You spent $5.05" / "Your new Chime account balance is $233.76 after your purchase at Anthropic."
+  - Email subject: "You made a purchase" / "Card swipe at MERCHANT"
+- **deposit**: paycheck or external deposit arriving.
+  - Push: "You got paid $1,500.00 from EMPLOYER" / "$500 was deposited"
+  - Email subject: "Your deposit is now available" / "You got paid 💸"
+- **transfer_in**: money received from another Chime user or external source.
+  - Push: "John P. sent you $50"
+  - Email subject: "kayla b. just sent you money 💸" / "[NAME] just sent you money"
+- **transfer_out**: money sent to another person.
+  - Push: "You sent $50 to John P."
+  - Email subject: "You sent money. 💸" — body starts with "you just sent $X.XX for [memo] to [NAME]" or "Hi [first name], you just sent $X.XX..."
+- **refund**: money returned from a merchant.
+  - Push/Email: "You got a $12.34 refund from MERCHANT"
+- **pending_charge**: card auth before settlement.
+  - Push: "Pending charge of $43.27 at MERCHANT"
+- **balance_alert**: informational, no transaction.
+  - "Your balance is below $100"
+- **card_event**: security/lock notifications.
+  - Email subject: "New login detected" / "Was this you?" — these are NOT transactions even when the body contains numbers
 - **unknown_known_chime**: clearly a Chime notification but doesn't fit any pattern above
+
+## Critical disambiguation
+
+If the subject line is "You sent money", classify as **transfer_out** (debit). The recipient name is the merchantOrSource. The amount is the $X.XX in the first sentence of the body.
+
+If the subject line is "[Name] just sent you money", classify as **transfer_in** (credit). The sender's name is the merchantOrSource.
+
+If the subject is "Your deposit is now available" or "You just got paid", classify as **deposit** (credit).
+
+If the subject is "New login detected" or "Was this you?", classify as **card_event** — these are security alerts, not transactions.
 
 ## Output JSON schema (strict, no markdown)
 

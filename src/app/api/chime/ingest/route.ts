@@ -180,10 +180,19 @@ export async function POST(request: Request) {
     revalidatePath("/");
   }
 
+  // Always log parseFailureReason when present, even on parsed.ok=true —
+  // a parsed=ok with no transaction means Haiku classified the event as
+  // non-money-movement (balance_alert, card_event, etc.) and we want to
+  // see why.
+  const logStatus = parsedTransactionId
+    ? "TX"
+    : parseFailureReason
+      ? `SKIP: ${parseFailureReason}`
+      : parsed.ok
+        ? `NOOP kind=${parsed.kind}`
+        : "PARSE_FAIL";
   console.info(
-    `[chime/ingest] capture=${capInserted?.id ?? "fail"} tx=${parsedTransactionId ?? "none"} ${
-      parsed.ok ? "OK" : (parseFailureReason ?? "no-match")
-    }`,
+    `[chime/ingest] capture=${capInserted?.id ?? "fail"} tx=${parsedTransactionId ?? "none"} ${logStatus}`,
   );
 
   return NextResponse.json({

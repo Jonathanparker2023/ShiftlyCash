@@ -105,16 +105,24 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
     await client.connect();
     const lock = await client.getMailboxLock("INBOX");
     try {
-      // Restrict the search window to recent mail so we don't scan years of
-      // history on every minute-tick.
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const uids = await client.search({ from: CHIME_SENDER, since });
+      // Use Gmail's RAW search (X-GM-RAW) so we can exclude security alert
+      // subjects at the server. Chime sends a "New login detected" /
+      // "Was this you?" email every time the app authenticates, and those
+      // would otherwise crowd out actual money-movement emails from the
+      // FETCH_CAP slice. We also explicitly exclude already-labeled
+      // emails so successful labels stop reappearing in the search.
+      const uids = await client.search({
+        gmailraw: `from:${CHIME_SENDER} newer_than:1d -label:${FORWARDED_LABEL} -subject:"New login detected" -subject:"Was this you"`,
+      });
 
       if (!uids || uids.length === 0) {
         return summary;
       }
 
-      const recentUids = uids.slice(-FETCH_CAP);
+      // Process OLDEST first so backlogs drain in arrival order; newer
+      // emails wait their turn. This prevents a flood of recent emails
+      // from starving older ones.
+      const recentUids = uids.slice(0, FETCH_CAP);
       summary.scanned = recentUids.length;
       const startedAt = Date.now();
 
