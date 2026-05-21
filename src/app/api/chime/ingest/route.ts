@@ -82,6 +82,15 @@ export async function POST(request: Request) {
     const amount = transactionAmount(parsed);
     const merchantName = parsed.merchantOrSource || `Chime ${parsed.kind}`;
 
+    // Guardrail: if Haiku returned amountDollars=null the parser fills
+    // amount with 0. A dedup query keyed on amount=0 matches any
+    // placeholder Plaid row and silently merges unrelated transactions.
+    // Skip the insert in that case and leave the capture with a clear
+    // failure reason for review rather than corrupting dedup state.
+    if (!Number.isFinite(amount) || amount === 0) {
+      parseFailureReason = `No amount extracted for ${parsed.kind} (kind=${parsed.kind}, direction=${parsed.direction})`;
+    } else {
+
     // Resolve the day row for this transaction's date so we can mark it
     // applied immediately (mirrors Plaid sync logic). If no day exists or
     // the day is spend-locked, fall back to pending_review.
@@ -151,6 +160,7 @@ export async function POST(request: Request) {
         parsedAt = new Date().toISOString();
       }
     }
+    } // end amount-guard else
   } else if (!parsed.ok) {
     parseFailureReason = parsed.reason;
   } else {
@@ -184,6 +194,9 @@ export async function POST(request: Request) {
   // a parsed=ok with no transaction means Haiku classified the event as
   // non-money-movement (balance_alert, card_event, etc.) and we want to
   // see why.
+  const parseSummary = parsed.ok
+    ? `kind=${parsed.kind} amount=${parsed.amountDollars ?? "null"} dir=${parsed.direction}`
+    : "parse-failed";
   const logStatus = parsedTransactionId
     ? "TX"
     : parseFailureReason
@@ -192,7 +205,7 @@ export async function POST(request: Request) {
         ? `NOOP kind=${parsed.kind}`
         : "PARSE_FAIL";
   console.info(
-    `[chime/ingest] capture=${capInserted?.id ?? "fail"} tx=${parsedTransactionId ?? "none"} ${logStatus}`,
+    `[chime/ingest] capture=${capInserted?.id ?? "fail"} tx=${parsedTransactionId ?? "none"} ${logStatus} (${parseSummary})`,
   );
 
   return NextResponse.json({
