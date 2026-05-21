@@ -439,18 +439,18 @@ export function ShiftlyCalView({
 
           <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
             {/* Mobile-only quick log bar — first thing the user sees under
-                the calendar. Big Log food button + saved-food chips for
-                one-tap repeats. Hidden on xl where the 3-column desktop
-                layout takes over. */}
-            <div className="mb-4 space-y-3 xl:hidden">
+                the calendar. Big Log food button + a discreet collapsed
+                dropdown for saved foods (presets). The big SavedFoodsList
+                card is hidden on mobile and only the dropdown shows. xl
+                gets the full desktop layout below. */}
+            <div className="mb-4 space-y-2 xl:hidden">
               <AiFoodEstimator
                 disabled={isPending}
                 onConfirm={logFromEstimate}
               />
-              <SavedFoodsList
+              <MobileSavedFoodsDropdown
                 disabled={isPending}
                 loggedFoodId={loggedFoodId}
-                onFill={fillFromSavedFood}
                 onInstantLog={instantLog}
                 savedFoods={initialData.savedFoods}
               />
@@ -1798,6 +1798,70 @@ function WeightPanel({
         </button>
       </form>
     </section>
+  );
+}
+
+// Discreet mobile-only dropdown of saved foods. Renders a thin button
+// "Quick log (N) ▾" that, when tapped, reveals a compact list of saved
+// food rows. Hidden entirely when the user has no saved foods so it
+// doesn't add clutter for new users. Closes after one-tap log.
+function MobileSavedFoodsDropdown({
+  disabled,
+  loggedFoodId,
+  onInstantLog,
+  savedFoods,
+}: {
+  disabled: boolean;
+  loggedFoodId: string | null;
+  onInstantLog: (food: SavedFood) => void;
+  savedFoods: SavedFood[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (savedFoods.length === 0) return null;
+
+  return (
+    <div className="rounded-md border border-white/10 bg-black/20">
+      <button
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-white/70 transition hover:text-white"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>Quick log ({savedFoods.length})</span>
+        <span
+          aria-hidden="true"
+          className={`text-[10px] transition-transform ${isOpen ? "rotate-180" : ""}`}
+        >
+          ▾
+        </span>
+      </button>
+      {isOpen ? (
+        <div className="space-y-1 border-t border-white/10 px-2 py-2">
+          {savedFoods.map((food) => (
+            <button
+              className={`flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                loggedFoodId === food.id
+                  ? "bg-emerald-500/15 text-emerald-200"
+                  : "text-white/80 hover:bg-white/10"
+              }`}
+              disabled={disabled}
+              key={food.id}
+              onClick={() => {
+                onInstantLog(food);
+                setIsOpen(false);
+              }}
+              type="button"
+            >
+              <span className="truncate font-semibold">{food.name}</span>
+              <span className="shrink-0 text-[10px] font-semibold text-white/45">
+                {food.calories} cal
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
