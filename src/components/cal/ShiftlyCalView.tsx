@@ -438,15 +438,35 @@ export function ShiftlyCalView({
           ) : null}
 
           <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+            {/* Mobile-only quick log bar — first thing the user sees under
+                the calendar. Big Log food button + saved-food chips for
+                one-tap repeats. Hidden on xl where the 3-column desktop
+                layout takes over. */}
+            <div className="mb-4 space-y-3 xl:hidden">
+              <AiFoodEstimator
+                disabled={isPending}
+                onConfirm={logFromEstimate}
+              />
+              <SavedFoodsList
+                disabled={isPending}
+                loggedFoodId={loggedFoodId}
+                onFill={fillFromSavedFood}
+                onInstantLog={instantLog}
+                savedFoods={initialData.savedFoods}
+              />
+            </div>
+
             <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
               <div className="space-y-4">
-                <SavedFoodsList
-                  disabled={isPending}
-                  loggedFoodId={loggedFoodId}
-                  onFill={fillFromSavedFood}
-                  onInstantLog={instantLog}
-                  savedFoods={initialData.savedFoods}
-                />
+                <div className="hidden xl:block">
+                  <SavedFoodsList
+                    disabled={isPending}
+                    loggedFoodId={loggedFoodId}
+                    onFill={fillFromSavedFood}
+                    onInstantLog={instantLog}
+                    savedFoods={initialData.savedFoods}
+                  />
+                </div>
                 <MealPlanGenerator
                   date={mealPlanDay.date}
                   targets={remainingMealPlanTargets}
@@ -470,8 +490,8 @@ export function ShiftlyCalView({
                   dayTotals={focusedDay.totals}
                   targets={initialData.targets}
                 />
-                <div className="mt-4 space-y-3">
-        <AiFoodEstimator
+                <div className="mt-4 space-y-3 hidden xl:block">
+                  <AiFoodEstimator
                     disabled={isPending}
                     onConfirm={logFromEstimate}
                   />

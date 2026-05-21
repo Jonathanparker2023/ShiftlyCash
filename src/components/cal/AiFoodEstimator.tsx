@@ -2,7 +2,10 @@
 
 import { useRef, useState, useTransition } from "react";
 
-import { estimateFoodAction } from "@/app/(protected)/cal/actions";
+import {
+  createSavedFoodAction,
+  estimateFoodAction,
+} from "@/app/(protected)/cal/actions";
 import { categoryLabel } from "@/lib/cal/color";
 import type { FoodEstimate } from "@/lib/cal/estimate";
 import type { FoodCategory } from "@/lib/cal/types";
@@ -20,6 +23,11 @@ type EstimateForm = {
   saturatedFatG: string;
   reasoning: string;
   confidence: "high" | "medium" | "low";
+  // When true, log AND save this food to saved_foods so it appears as a
+  // quick-tap chip next time. Only surfaced for the primary "Log food"
+  // entry point; embedded "AI add food" inside the entry editor doesn't
+  // create presets.
+  saveForNextTime: boolean;
 };
 
 type Props = {
@@ -139,7 +147,32 @@ export function AiFoodEstimator({
     setError(null);
   }
 
-  function confirmEstimate(item: EstimateForm) {
+  async function confirmEstimate(item: EstimateForm) {
+    if (item.saveForNextTime) {
+      // Fire-and-forget — if it fails, the food still gets logged. We only
+      // surface the error if BOTH the log and the save fail; not blocking
+      // here keeps the log path snappy.
+      try {
+        await createSavedFoodAction({
+          name: item.mealName,
+          category: item.category,
+          calories: item.calories,
+          proteinG: item.proteinG || null,
+          carbsG: item.carbsG || null,
+          fatG: item.fatG || null,
+          fiberG: item.fiberG || null,
+          sodiumMg: item.sodiumMg || null,
+          addedSugarG: item.addedSugarG || null,
+          saturatedFatG: item.saturatedFatG || null,
+        });
+      } catch (err) {
+        // Non-fatal; log proceeds.
+        console.warn(
+          "[AiFoodEstimator] Save-as-preset failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
     onConfirm({
       mealName: item.mealName,
       category: item.category,
@@ -245,6 +278,7 @@ export function AiFoodEstimator({
           {estimate ? (
             estimate.length === 1 ? (
               <EstimateResult
+                allowSavePreset={isPrimary}
                 confirmLabel={confirmLabel}
                 disabled={disabled}
                 estimate={estimate[0]}
@@ -254,6 +288,7 @@ export function AiFoodEstimator({
               />
             ) : (
               <BatchEstimateResult
+                allowSavePreset={isPrimary}
                 confirmLabel={confirmLabel}
                 disabled={disabled}
                 estimates={estimate}
@@ -363,6 +398,7 @@ function EstimateProgressBar() {
 }
 
 function EstimateResult({
+  allowSavePreset,
   confirmLabel,
   disabled,
   estimate,
@@ -370,6 +406,7 @@ function EstimateResult({
   onConfirm,
   onDiscard,
 }: {
+  allowSavePreset: boolean;
   confirmLabel: string;
   disabled: boolean;
   estimate: EstimateForm;
@@ -450,6 +487,12 @@ function EstimateResult({
           value={estimate.saturatedFatG}
         />
       </div>
+      {allowSavePreset ? (
+        <SavePresetCheckbox
+          checked={estimate.saveForNextTime}
+          onChange={(next) => onChange({ ...estimate, saveForNextTime: next })}
+        />
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
@@ -471,7 +514,31 @@ function EstimateResult({
   );
 }
 
+function SavePresetCheckbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10">
+      <input
+        checked={checked}
+        className="h-4 w-4 cursor-pointer accent-emerald-400"
+        onChange={(event) => onChange(event.target.checked)}
+        type="checkbox"
+      />
+      <span>Save for next time</span>
+      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-white/45">
+        Quick log chip
+      </span>
+    </label>
+  );
+}
+
 function BatchEstimateResult({
+  allowSavePreset,
   confirmLabel,
   disabled,
   estimates,
@@ -481,6 +548,7 @@ function BatchEstimateResult({
   onDiscardAll,
   onDiscardItem,
 }: {
+  allowSavePreset: boolean;
   confirmLabel: string;
   disabled: boolean;
   estimates: EstimateForm[];
@@ -527,6 +595,7 @@ function BatchEstimateResult({
       <div className="space-y-2">
         {estimates.map((estimate, index) => (
           <MiniEstimateCard
+            allowSavePreset={allowSavePreset}
             disabled={disabled}
             estimate={estimate}
             itemLabel={itemLabel}
@@ -542,6 +611,7 @@ function BatchEstimateResult({
 }
 
 function MiniEstimateCard({
+  allowSavePreset,
   disabled,
   estimate,
   itemLabel,
@@ -549,6 +619,7 @@ function MiniEstimateCard({
   onConfirm,
   onDiscard,
 }: {
+  allowSavePreset: boolean;
   disabled: boolean;
   estimate: EstimateForm;
   itemLabel: string;
@@ -640,6 +711,13 @@ function MiniEstimateCard({
           </summary>
           <p className="mt-2 whitespace-pre-line">{estimate.reasoning}</p>
         </details>
+      ) : null}
+
+      {allowSavePreset ? (
+        <SavePresetCheckbox
+          checked={estimate.saveForNextTime}
+          onChange={(next) => onChange({ ...estimate, saveForNextTime: next })}
+        />
       ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -775,5 +853,6 @@ function toEstimateForm(estimate: FoodEstimate): EstimateForm {
     saturatedFatG: estimate.saturatedFatG?.toString() ?? "",
     reasoning: estimate.reasoning,
     confidence: estimate.confidence,
+    saveForNextTime: false,
   };
 }
