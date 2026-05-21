@@ -103,6 +103,26 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
 
   try {
     await client.connect();
+
+    // Ensure the forwarded label exists in Gmail before we try to apply
+    // it. Without this, messageFlagsAdd silently no-ops, the email
+    // never gets labeled, and the cron re-processes the same email
+    // every minute — burning Anthropic tokens and producing duplicate
+    // chime_raw_captures rows. mailboxCreate is idempotent: if the
+    // label already exists, the error is caught and ignored.
+    try {
+      await client.mailboxCreate(FORWARDED_LABEL);
+    } catch (createErr) {
+      // imapflow throws on ALREADYEXISTS; that's expected. Log other
+      // errors but don't abort the run.
+      const msg = createErr instanceof Error ? createErr.message : "";
+      if (!/already exists|alreadyexists/i.test(msg)) {
+        console.warn(
+          `[cron/gmail-chime-sync] label create failed: ${msg}`,
+        );
+      }
+    }
+
     const lock = await client.getMailboxLock("INBOX");
     try {
       // Use Gmail's RAW search (X-GM-RAW) so we can exclude security alert
@@ -189,12 +209,25 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
         }
 
         // Apply the Gmail label so we don't re-forward next minute. Uses
-        // Gmail's X-GM-LABELS IMAP extension via imapflow's setFlags equivalent.
-        await client.messageFlagsAdd(
-          message.uid,
-          [FORWARDED_LABEL],
-          { uid: true, useLabels: true },
-        );
+        // Gmail's X-GM-LABELS IMAP extension via imapflow's setFlags
+        // equivalent. Log success/failure explicitly because a silent
+        // no-op here means the cron re-processes the same email forever.
+        try {
+          const labelResult = await client.messageFlagsAdd(
+            message.uid,
+            [FORWARDED_LABEL],
+            { uid: true, useLabels: true },
+          );
+          if (!labelResult) {
+            console.warn(
+              `[cron/gmail-chime-sync] label add returned false for uid=${message.uid}`,
+            );
+          }
+        } catch (labelErr) {
+          console.warn(
+            `[cron/gmail-chime-sync] label add threw for uid=${message.uid}: ${labelErr instanceof Error ? labelErr.message : labelErr}`,
+          );
+        }
 
         summary.forwarded += 1;
       }
