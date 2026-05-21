@@ -6,6 +6,7 @@ import {
   type ChimeParseKind,
   type ChimeParseResult,
 } from "@/lib/domain/chime-parser";
+import { toLocalIsoDate } from "@/lib/dashboard/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const SECRET_ENV = "CHIME_INGEST_SECRET";
@@ -72,7 +73,11 @@ export async function POST(request: Request) {
   let parsedAt: string | null = null;
 
   if (parsed.ok && isMoneyMovementKind(parsed.kind)) {
-    const todayDate = receivedAt.slice(0, 10);
+    // Use the user's LOCAL date, not the UTC date from the email
+    // timestamp. A Chime email sent at 9:38 PM EDT has receivedAt of
+    // 01:38 UTC the next day; naive UTC slicing would land it on
+    // tomorrow's date and miss the days row, forcing pending_review.
+    const todayDate = toLocalIsoDate(receivedAt);
     const importKey = `${receivedAt}|${title ?? ""}|${text}`.slice(0, 240);
     const amount = transactionAmount(parsed);
     const merchantName = parsed.merchantOrSource || `Chime ${parsed.kind}`;
