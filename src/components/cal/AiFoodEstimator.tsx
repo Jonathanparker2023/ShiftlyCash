@@ -212,15 +212,32 @@ export function AiFoodEstimator({
     }
   }
 
+  // The default "Log food" button is the primary mobile entry point — make
+  // it large, full-width, and high-contrast so it's the obvious next tap
+  // when the user lands on the day view. Embedded usages (e.g. "AI add
+  // food" inside the entry editor) keep the compact style via a smaller
+  // visual variant.
+  const isPrimary = buttonLabel === "Log food";
+  const buttonClass = isPrimary
+    ? "flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-300/60 bg-emerald-500 px-5 py-4 text-base font-bold text-white shadow-md transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-6 sm:py-3"
+    : "rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60";
+
   return (
     <div>
       <button
-        className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+        className={buttonClass}
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
-        {buttonLabel}
+        {isPrimary ? (
+          <>
+            <span aria-hidden="true" className="text-lg leading-none">+</span>
+            {buttonLabel}
+          </>
+        ) : (
+          buttonLabel
+        )}
       </button>
 
       {isOpen ? (
@@ -252,7 +269,7 @@ export function AiFoodEstimator({
               <label className="block text-sm font-semibold text-white/80">
                 What did you eat?
                 <textarea
-                  className="mt-1 min-h-24 w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+                  className="mt-1 min-h-32 w-full rounded-md border border-white/20 bg-black/25 px-3 py-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40 sm:min-h-24 sm:text-sm"
                   maxLength={4000}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="What did you eat? Be as specific or as casual as you want."
@@ -263,6 +280,9 @@ export function AiFoodEstimator({
                 <p className="rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-200">
                   {error}
                 </p>
+              ) : null}
+              {isPending ? (
+                <EstimateProgressBar />
               ) : null}
               <div className="flex flex-wrap gap-2">
                 {speechSupported ? (
@@ -283,15 +303,15 @@ export function AiFoodEstimator({
                   </button>
                 ) : null}
                 <button
-                  className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:py-2 sm:text-sm sm:font-semibold"
                   disabled={disabled || isPending || !description.trim()}
                   onClick={runEstimate}
                   type="button"
                 >
-                  {isPending ? "Looking up nutrition data..." : "Estimate"}
+                  {isPending ? "Estimating…" : "Estimate"}
                 </button>
                 <button
-                  className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                  className="rounded-md border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20 sm:py-2"
                   onClick={() => {
                     reset();
                     setIsOpen(false);
@@ -314,6 +334,32 @@ function currentTimeInput(): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(
     now.getMinutes(),
   ).padStart(2, "0")}`;
+}
+
+// Indeterminate progress bar shown while the estimator is calling the
+// model. Gives the user immediate visual feedback that work is happening
+// (the request takes several seconds) instead of just a text label change.
+function EstimateProgressBar() {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-white/70">
+        <span>Estimating nutrition…</span>
+        <span className="text-white/45">A few seconds</span>
+      </div>
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="estimate-progress-stripe absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-emerald-400/0 via-emerald-400 to-emerald-400/0" />
+      </div>
+      <style>{`
+        @keyframes estimate-progress-slide {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(400%); }
+        }
+        .estimate-progress-stripe {
+          animation: estimate-progress-slide 1.4s ease-in-out infinite;
+        }
+      `}</style>
+    </div>
+  );
 }
 
 function EstimateResult({
