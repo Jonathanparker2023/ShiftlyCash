@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addManualTransactionAction,
   closeWeekAction,
+  deleteTransactionAction,
+  moveTransactionToYesterdayAction,
   refreshDashboardProjectionMaintenanceAction,
   saveEarnSlotAction,
   toggleTransactionStatusAction,
@@ -345,6 +347,87 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     }
   }
 
+  async function deleteTransaction(transaction: DashboardTransaction) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const previousDays = days;
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+    setDays((currentDays) =>
+      currentDays.map((day) => removeTransactionFromDay(day, transaction.id)),
+    );
+
+    try {
+      await deleteTransactionAction({ transactionId: transaction.id });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to delete transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
+  async function moveTransactionToYesterday(transaction: DashboardTransaction) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const previousDays = days;
+    const yesterdayIso = addDaysIso(transaction.date, -1);
+    const targetDay = days.find((day) => day.date === yesterdayIso);
+
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+
+    if (targetDay) {
+      setDays((currentDays) =>
+        moveTransactionToDay(currentDays, transaction, targetDay),
+      );
+    }
+
+    try {
+      await moveTransactionToYesterdayAction({ transactionId: transaction.id });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      router.refresh();
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to move transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
   async function addManualTransaction(
     day: DashboardDay,
     merchantName: string,
@@ -656,6 +739,8 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               totals={focusedDayTotals}
               onAddShift={addShift}
               onAddManualTransaction={addManualTransaction}
+              onDeleteTransaction={deleteTransaction}
+              onMoveTransactionToYesterday={moveTransactionToYesterday}
               onRemoveSlot={removeSlot}
               onReorderSlots={reorderSlots}
               onSlotChange={updateSlot}
@@ -965,6 +1050,8 @@ function FocusedDayEditor({
   onToggleSlot,
   onToggleTransactionStatus,
   onAddManualTransaction,
+  onDeleteTransaction,
+  onMoveTransactionToYesterday,
   onAddShift,
   onRemoveSlot,
   onReorderSlots,
@@ -991,6 +1078,8 @@ function FocusedDayEditor({
     merchantName: string,
     amountCents: number,
   ) => void;
+  onDeleteTransaction: (transaction: DashboardTransaction) => void;
+  onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
   onAddShift: (day: DashboardDay) => void;
   onRemoveSlot: (slot: DashboardSlot) => void;
   onReorderSlots: (
@@ -1019,6 +1108,8 @@ function FocusedDayEditor({
           isManualTransactionPending={isManualTransactionPending}
           pendingTransactionIds={pendingTransactionIds}
           onAddManualTransaction={onAddManualTransaction}
+          onDeleteTransaction={onDeleteTransaction}
+          onMoveTransactionToYesterday={onMoveTransactionToYesterday}
           onToggleTransactionStatus={onToggleTransactionStatus}
         />
       </div>
@@ -1032,6 +1123,8 @@ function TransactionDrawer({
   isManualTransactionPending,
   pendingTransactionIds,
   onToggleTransactionStatus,
+  onDeleteTransaction,
+  onMoveTransactionToYesterday,
   onAddManualTransaction,
 }: {
   day: DashboardDay;
@@ -1042,6 +1135,8 @@ function TransactionDrawer({
     transaction: DashboardTransaction,
     newStatus: "applied" | "excluded",
   ) => void;
+  onDeleteTransaction: (transaction: DashboardTransaction) => void;
+  onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
   onAddManualTransaction: (
     day: DashboardDay,
     merchantName: string,
@@ -1082,6 +1177,8 @@ function TransactionDrawer({
           pendingTransactionIds={pendingTransactionIds}
           transactions={appliedTransactions}
           variant="spending"
+          onDelete={onDeleteTransaction}
+          onMoveToYesterday={onMoveTransactionToYesterday}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "excluded")
           }
@@ -1091,6 +1188,8 @@ function TransactionDrawer({
           pendingTransactionIds={pendingTransactionIds}
           transactions={excludedTransactions}
           variant="exempt"
+          onDelete={onDeleteTransaction}
+          onMoveToYesterday={onMoveTransactionToYesterday}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "applied")
           }
@@ -1157,12 +1256,16 @@ function TransactionColumn({
   pendingTransactionIds,
   transactions,
   variant,
+  onDelete,
+  onMoveToYesterday,
   onToggle,
 }: {
   heading: string;
   pendingTransactionIds: Set<string>;
   transactions: DashboardTransaction[];
   variant: "spending" | "exempt";
+  onDelete: (transaction: DashboardTransaction) => void;
+  onMoveToYesterday: (transaction: DashboardTransaction) => void;
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
   return (
@@ -1183,6 +1286,8 @@ function TransactionColumn({
             transaction={transaction}
             disabled={pendingTransactionIds.has(transaction.id)}
             variant={variant}
+            onDelete={onDelete}
+            onMoveToYesterday={onMoveToYesterday}
             onToggle={onToggle}
           />
         ))}
@@ -1195,20 +1300,38 @@ function TransactionRowButton({
   transaction,
   disabled,
   variant,
+  onDelete,
+  onMoveToYesterday,
   onToggle,
 }: {
   transaction: DashboardTransaction;
   disabled: boolean;
   variant: "spending" | "exempt";
+  onDelete: (transaction: DashboardTransaction) => void;
+  onMoveToYesterday: (transaction: DashboardTransaction) => void;
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
+  function handleMenuAction(action: string) {
+    if (action === "toggle") {
+      onToggle(transaction);
+      return;
+    }
+
+    if (action === "move_yesterday") {
+      onMoveToYesterday(transaction);
+      return;
+    }
+
+    if (
+      action === "delete" &&
+      window.confirm(`Delete ${transaction.merchantName}?`)
+    ) {
+      onDelete(transaction);
+    }
+  }
+
   return (
-    <button
-      className="grid w-full grid-cols-[1fr_auto] gap-3 rounded-md border border-white/10 bg-black/10 px-3 py-2 text-left text-sm shadow-sm transition hover:border-white/40 hover:bg-black/15 focus:outline-none focus:ring-2 focus:ring-white"
-      disabled={disabled}
-      onClick={() => onToggle(transaction)}
-      type="button"
-    >
+    <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-md border border-white/10 bg-black/10 px-3 py-2 text-left text-sm shadow-sm transition hover:border-white/40 hover:bg-black/15">
       <span className="min-w-0">
         <span
           className={
@@ -1229,7 +1352,25 @@ function TransactionRowButton({
       >
         {formatMoney(transaction.amountCents)}
       </span>
-    </button>
+      <select
+        aria-label={`Actions for ${transaction.merchantName}`}
+        className="h-8 rounded-md border border-white/20 bg-[#111827] px-2 text-xs font-semibold text-white outline-none transition hover:border-white/45 focus:border-white/60 focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled}
+        onChange={(event) => {
+          const action = event.target.value;
+          event.target.value = "";
+          handleMenuAction(action);
+        }}
+        value=""
+      >
+        <option value="">...</option>
+        <option value="toggle">
+          {variant === "exempt" ? "Include" : "Exempt"}
+        </option>
+        <option value="move_yesterday">Move to yesterday</option>
+        <option value="delete">Delete</option>
+      </select>
+    </div>
   );
 }
 
@@ -1818,6 +1959,69 @@ function addAppliedTransactionToDay(
       transaction,
     ]),
   };
+}
+
+function removeTransactionFromDay(
+  day: DashboardDay,
+  transactionId: string,
+): DashboardDay {
+  const removedAppliedTransaction = day.appliedTransactions.find(
+    (transaction) => transaction.id === transactionId,
+  );
+
+  return {
+    ...day,
+    transactionSpendCents: removedAppliedTransaction
+      ? day.transactionSpendCents - removedAppliedTransaction.amountCents
+      : day.transactionSpendCents,
+    appliedTransactions: day.appliedTransactions.filter(
+      (transaction) => transaction.id !== transactionId,
+    ),
+    excludedTransactions: day.excludedTransactions.filter(
+      (transaction) => transaction.id !== transactionId,
+    ),
+  };
+}
+
+function moveTransactionToDay(
+  days: DashboardDay[],
+  transaction: DashboardTransaction,
+  targetDay: DashboardDay,
+): DashboardDay[] {
+  const movedTransaction = {
+    ...transaction,
+    dayId: targetDay.id,
+    date: targetDay.date,
+  };
+
+  return days.map((day) => {
+    const dayWithoutTransaction = removeTransactionFromDay(day, transaction.id);
+
+    if (day.id !== targetDay.id) {
+      return dayWithoutTransaction;
+    }
+
+    if (transaction.status === "excluded") {
+      return {
+        ...dayWithoutTransaction,
+        excludedTransactions: sortDashboardTransactions([
+          ...dayWithoutTransaction.excludedTransactions,
+          movedTransaction,
+        ]),
+      };
+    }
+
+    return {
+      ...dayWithoutTransaction,
+      transactionSpendCents:
+        dayWithoutTransaction.transactionSpendCents +
+        movedTransaction.amountCents,
+      appliedTransactions: sortDashboardTransactions([
+        ...dayWithoutTransaction.appliedTransactions,
+        movedTransaction,
+      ]),
+    };
+  });
 }
 
 function replaceTransaction(

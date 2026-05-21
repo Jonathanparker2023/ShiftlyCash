@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
-import { getTodayIso } from "@/lib/dashboard/dates";
+import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
 import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 
@@ -59,6 +59,10 @@ export type CloseWeekInput = {
 export type ToggleTransactionStatusInput = {
   transactionId: string;
   newStatus: "applied" | "excluded";
+};
+
+export type TransactionIdInput = {
+  transactionId: string;
 };
 
 export type AddManualTransactionInput = {
@@ -306,6 +310,75 @@ export async function toggleTransactionStatusAction(
   }
 
   return { ok: true };
+}
+
+export async function deleteTransactionAction(
+  input: TransactionIdInput,
+): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("id", transactionId);
+
+  if (error) {
+    throw new Error(`Unable to delete transaction: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function moveTransactionToYesterdayAction(
+  input: TransactionIdInput,
+): Promise<{ ok: true; dayId: string; date: string }> {
+  const { supabase } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id,date")
+    .eq("id", transactionId)
+    .maybeSingle();
+
+  if (transactionError) {
+    throw new Error(`Unable to validate transaction: ${transactionError.message}`);
+  }
+
+  if (!transaction) {
+    throw new Error("Transaction not found.");
+  }
+
+  const yesterdayIso = addDaysIso(String(transaction.date), -1);
+  const { data: day, error: dayError } = await supabase
+    .from("days")
+    .select("id,date")
+    .eq("date", yesterdayIso)
+    .maybeSingle();
+
+  if (dayError) {
+    throw new Error(`Unable to find yesterday: ${dayError.message}`);
+  }
+
+  if (!day) {
+    throw new Error("Yesterday is outside the active dashboard week.");
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      day_id: day.id,
+      date: day.date,
+    })
+    .eq("id", transactionId);
+
+  if (error) {
+    throw new Error(`Unable to move transaction: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  return { ok: true, dayId: String(day.id), date: String(day.date) };
 }
 
 export async function addManualTransactionAction(
