@@ -1331,6 +1331,15 @@ function TransactionRowButton({
           >
             {transaction.merchantName}
           </span>
+          <span
+            className={
+              variant === "exempt"
+                ? "block text-[10px] font-semibold text-[#64748b]/70"
+                : "block text-[10px] font-semibold text-white/45"
+            }
+          >
+            {formatTransactionTime(transaction.time)}
+          </span>
         </span>
         <span
           className={
@@ -2316,6 +2325,43 @@ function capitalize(value: string): string {
   }
 
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+// Format a transaction's timestamp for chronological display in the
+// transaction row. Returns "—" when time is missing so the row layout
+// stays consistent. Accepts ISO timestamps (Plaid datetime) and bare
+// HH:MM/HH:MM:SS strings (manual entries).
+function formatTransactionTime(time: string | null): string {
+  const raw = time?.trim();
+  if (!raw) return "—";
+
+  // ISO timestamp path
+  const isoMs = Date.parse(raw);
+  if (Number.isFinite(isoMs)) {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date(isoMs));
+  }
+
+  // Bare HH:MM or HH:MM:SS (assume 24h)
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match) {
+    const hour24 = Number(match[1]);
+    const minute = match[2];
+    const period = hour24 >= 12 ? "PM" : "AM";
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    return `${hour12}:${minute} ${period}`;
+  }
+
+  // 12-hour format already
+  const twelve = raw.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (twelve) {
+    return `${twelve[1]}:${twelve[2]} ${twelve[3].toUpperCase()}`;
+  }
+
+  return raw;
 }
 
 function formatMoney(value: number): string {
