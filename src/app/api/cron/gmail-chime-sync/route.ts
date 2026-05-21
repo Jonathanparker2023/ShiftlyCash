@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 
@@ -8,13 +8,12 @@ export const dynamic = "force-dynamic";
 
 const CHIME_SENDER = "alerts@account.chime.com";
 const FORWARDED_LABEL = "shiftlycash-forwarded";
-// Keep low — cron-job.org times out at 30s, and each unforwarded email
-// triggers a Haiku call + Supabase write (~2-3s each). Catch-up will
-// happen over multiple runs since we fire every minute.
-const FETCH_CAP = 5;
-// Hard deadline inside the function so we always return SOMETHING before
-// the external cron timeout closes the connection.
-const SOFT_DEADLINE_MS = 25_000;
+// Reasonable batch size now that the work runs in the background after the
+// response is sent — we have the full maxDuration window instead of 30s.
+const FETCH_CAP = 10;
+// Hard deadline inside the background task so we never exceed Vercel's
+// function timeout. Leaves buffer for connection teardown.
+const SOFT_DEADLINE_MS = 50_000;
 
 type Summary = {
   ok: boolean;
@@ -59,6 +58,31 @@ export async function GET(request: Request) {
     );
   }
 
+  // Hand the actual IMAP/Haiku work to `after()` so the cron caller gets a
+  // fast 200 response. IMAP connect + per-message Haiku parsing was busting
+  // cron-job.org's 30s response limit. Background work runs up to the
+  // route's maxDuration (60s) which is more than enough for FETCH_CAP=10.
+  after(async () => {
+    const result = await processChimeBacklog({
+      user,
+      password,
+      ingestUrl,
+      ingestKey,
+    });
+    console.info("[cron/gmail-chime-sync] result:", JSON.stringify(result));
+  });
+
+  return NextResponse.json({ ok: true, queued: true });
+}
+
+type ProcessOpts = {
+  user: string;
+  password: string;
+  ingestUrl: string;
+  ingestKey: string;
+};
+
+async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
   const summary: Summary = {
     ok: true,
     scanned: 0,
@@ -72,7 +96,7 @@ export async function GET(request: Request) {
     host: "imap.gmail.com",
     port: 993,
     secure: true,
-    auth: { user, pass: password },
+    auth: { user: opts.user, pass: opts.password },
     logger: false,
   });
 
@@ -86,7 +110,7 @@ export async function GET(request: Request) {
       const uids = await client.search({ from: CHIME_SENDER, since });
 
       if (!uids || uids.length === 0) {
-        return NextResponse.json(summary);
+        return summary;
       }
 
       const recentUids = uids.slice(-FETCH_CAP);
@@ -131,10 +155,10 @@ export async function GET(request: Request) {
           continue;
         }
 
-        const response = await fetch(ingestUrl, {
+        const response = await fetch(opts.ingestUrl, {
           method: "POST",
           headers: {
-            "x-chime-ingest-key": ingestKey,
+            "x-chime-ingest-key": opts.ingestKey,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -185,7 +209,7 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json(summary);
+  return summary;
 }
 
 function absoluteIngestUrl(request: Request): string {
