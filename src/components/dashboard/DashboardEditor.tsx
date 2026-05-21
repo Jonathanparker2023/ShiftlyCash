@@ -1316,7 +1316,7 @@ function TransactionRowButton({
   return (
     <div className="overflow-hidden rounded-md border border-white/10 bg-black/10 text-sm shadow-sm transition hover:border-white/40 hover:bg-black/15">
       <button
-        className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-3 px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
         onClick={() => setIsExpanded((current) => !current)}
         type="button"
@@ -1340,9 +1340,6 @@ function TransactionRowButton({
           }
         >
           {formatMoney(transaction.amountCents)}
-        </span>
-        <span className="text-xs font-semibold text-white/65">
-          {isExpanded ? "▲" : "▼"}
         </span>
       </button>
 
