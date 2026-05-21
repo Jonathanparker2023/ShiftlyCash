@@ -8,12 +8,13 @@ export const dynamic = "force-dynamic";
 
 const CHIME_SENDER = "alerts@account.chime.com";
 const FORWARDED_LABEL = "shiftlycash-forwarded";
-// Reasonable batch size now that the work runs in the background after the
-// response is sent — we have the full maxDuration window instead of 30s.
-const FETCH_CAP = 10;
+// IMAP connect + per-email Haiku call (~3-5s each) easily exceeds Vercel's
+// 60s function limit at higher caps. Keep low; the cron fires every minute,
+// so a backlog drains quickly even at 3/run.
+const FETCH_CAP = 3;
 // Hard deadline inside the background task so we never exceed Vercel's
 // function timeout. Leaves buffer for connection teardown.
-const SOFT_DEADLINE_MS = 50_000;
+const SOFT_DEADLINE_MS = 45_000;
 
 type Summary = {
   ok: boolean;
