@@ -457,7 +457,11 @@ export function ShiftlyCalView({
             </div>
 
             <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
-              <div className="space-y-4">
+              {/* Left column. On mobile this stacks LAST so the meal-plan
+                  generator + accompanying prompts (and weight panel) are
+                  at the bottom of the view, below the focused day and
+                  today's entries. xl restores natural column position. */}
+              <div className="order-last space-y-4 xl:order-none">
                 <div className="hidden xl:block">
                   <SavedFoodsList
                     disabled={isPending}
