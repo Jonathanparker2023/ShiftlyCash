@@ -3,6 +3,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 
 import type { FoodCategory, FoodVerdict } from "@/lib/cal/types";
+import { stripQuantitativeClaims } from "@/lib/cal/verdictSanitize";
 
 const VERDICT_MODEL = "claude-sonnet-4-5";
 
@@ -94,6 +95,19 @@ Skip:
 - Abstract pattern analysis ("4th high-sugar item this week", "fits 80/20 window") — too inside-baseball
 - Calorie-budget framing in the reason ("calories already over target") — the day totals show that already
 - Cumulative-context-only reasons. Always start with what the food IS.
+
+## ABSOLUTE RULE — no quantitative claims in verdict_reason
+
+verdict_reason MUST NOT contain ANY of the following:
+- Percentages of any kind ("110% of target", "217% of DASH ceiling", "45%")
+- Ratios ("3x the limit", "double the budget")
+- Specific mg/g/cal numbers about totals ("3,070mg sodium today", "1,510 calories")
+- Comparisons to numeric targets ("over the 1,500mg ceiling", "above the 1,650 budget")
+
+The day-totals UI shows percentages and totals to the user directly. If you state a percentage in verdict_reason, you WILL get it wrong (you do not have a calculator), and the user will see the lie. Use ONLY qualitative descriptors: "high sodium", "low fiber", "protein-light", "calorie-dense", "sugar-heavy". Describe the FOOD, not the math.
+
+Wrong: "Protein shake. Pushes daily calories to 110% of target and sodium to 217% of DASH ceiling."
+Right: "Protein shake — heavy on protein, but the sodium load is high for the day already."
 
 The reason should read like a one-line review from a friend who actually looked at your plate, not a spreadsheet alert.
 
@@ -284,6 +298,7 @@ function sanitizeReason(value: string): string {
   for (const banned of BANNED_REASON_WORDS) {
     sanitized = sanitized.replace(new RegExp(escapeRegExp(banned), "gi"), "pattern");
   }
+  sanitized = stripQuantitativeClaims(sanitized);
   return sanitized;
 }
 
