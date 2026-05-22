@@ -291,6 +291,7 @@ async function loadShiftlyCalData(
     weights,
     (waterRes.data ?? []) as WaterLogRow[],
     ((dayVerdictsRes.data ?? []) as DayFoodVerdictRow[]).map(mapDayFoodVerdict),
+    targets,
   );
   const weeklyDeficitCalories = computeWeeklyDeficit(
     currentWeek,
@@ -516,6 +517,7 @@ function buildCalWeek(
   weights: WeightLog[],
   waterLogs: WaterLogRow[],
   dayVerdicts: DayFoodVerdict[],
+  targets: CalTargets,
 ) {
   const entriesByDate = groupByDate(entries);
   const weightsByDate = new Map(weights.map((weight) => [weight.date, weight]));
@@ -529,13 +531,18 @@ function buildCalWeek(
   const days: CalDay[] = Array.from({ length: 7 }, (_, dayIndex) => {
     const date = addDaysIso(weekStartIso, dayIndex);
     const dayEntries = entriesByDate.get(date) ?? [];
+    const totals = sumTotals(dayEntries);
 
     return {
       date,
       dayIndex,
       entries: dayEntries,
-      totals: sumTotals(dayEntries),
-      dayVerdict: dayVerdictsByDate.get(date) ?? null,
+      totals,
+      dayVerdict: normalizeDayVerdictForCurrentTargets(
+        dayVerdictsByDate.get(date) ?? null,
+        totals,
+        targets,
+      ),
       weight: weightsByDate.get(date) ?? null,
       waterOz: waterByDate.get(date) ?? 0,
     };
@@ -590,6 +597,32 @@ function addTotals(left: CalTotals, right: CalTotals): CalTotals {
     sodiumMg: left.sodiumMg + right.sodiumMg,
     addedSugarG: left.addedSugarG + right.addedSugarG,
     saturatedFatG: left.saturatedFatG + right.saturatedFatG,
+  };
+}
+
+function normalizeDayVerdictForCurrentTargets(
+  verdict: DayFoodVerdict | null,
+  totals: CalTotals,
+  targets: CalTargets,
+): DayFoodVerdict | null {
+  if (!verdict || targets.tdeeCalories === null || targets.proteinTargetG === null) {
+    return verdict;
+  }
+
+  const withinCalorieTolerance =
+    totals.calories >= targets.tdeeCalories * 0.9 &&
+    totals.calories <= targets.tdeeCalories * 1.1;
+  const withinProteinTarget = totals.proteinG >= targets.proteinTargetG * 0.9;
+  const nextVerdict =
+    withinCalorieTolerance && withinProteinTarget ? "good" : "bad";
+
+  return {
+    ...verdict,
+    verdict: nextVerdict,
+    calorieTotal: Math.round(totals.calories),
+    proteinTotal: Math.round(totals.proteinG),
+    withinCalorieTolerance,
+    withinProteinTarget,
   };
 }
 

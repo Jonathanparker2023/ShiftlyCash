@@ -161,8 +161,8 @@ export async function computeDayFoodVerdict(input: {
   const withinCalorieTolerance =
     tdee !== null &&
     tdee > 0 &&
-    calorieTotal >= tdee * 0.95 &&
-    calorieTotal <= tdee * 1.05;
+    calorieTotal >= tdee * 0.9 &&
+    calorieTotal <= tdee * 1.1;
   const withinProteinTarget =
     proteinTarget !== null &&
     proteinTarget > 0 &&

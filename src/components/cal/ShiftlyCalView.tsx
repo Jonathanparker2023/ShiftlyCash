@@ -667,14 +667,14 @@ function WeekStripCell({
     verdict === "good"
       ? "border-emerald-400/80"
       : verdict === "bad"
-          ? "border-rose-400/80"
-          : "border-white/45";
+        ? "border-rose-400/80"
+        : "border-white/45";
   const toneBorderFocused =
     verdict === "good"
       ? "border-emerald-300"
       : verdict === "bad"
-          ? "border-rose-300"
-          : "border-white/90";
+        ? "border-rose-300"
+        : "border-white/90";
   const toneBg =
     verdict === "good"
       ? "bg-emerald-500/20"
@@ -685,14 +685,14 @@ function WeekStripCell({
     verdict === "good"
       ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
       : verdict === "bad"
-          ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]"
-          : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
   const toneGlowFocused =
     verdict === "good"
       ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(16,185,129,0.95),0_0_85px_rgba(16,185,129,0.55)]"
       : verdict === "bad"
-          ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(244,63,94,0.95),0_0_85px_rgba(244,63,94,0.55)]"
-          : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_28px_rgba(255,255,255,0.3)]";
+        ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(244,63,94,0.95),0_0_85px_rgba(244,63,94,0.55)]"
+        : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_28px_rgba(255,255,255,0.3)]";
   const calorieTextClass =
     verdict === "good"
       ? "text-emerald-200"
@@ -715,12 +715,6 @@ function WeekStripCell({
       </p>
       <p className="mt-1 text-base font-semibold text-white sm:text-lg">
         {date.getUTCDate()}
-      </p>
-      <p
-        className="mt-1 h-4 truncate text-[10px] font-medium leading-4 text-white/75 sm:text-xs"
-        title={day.dayVerdict?.reason ?? undefined}
-      >
-        {day.dayVerdict?.reason ?? ""}
       </p>
       <p
         className={`mt-2 truncate text-xs font-semibold sm:mt-4 sm:text-sm ${calorieTextClass}`}
