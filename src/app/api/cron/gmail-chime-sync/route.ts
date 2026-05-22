@@ -2,27 +2,33 @@ import { NextResponse, after } from "next/server";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 
+import { createAdminClient } from "@/lib/supabase/admin";
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const CHIME_SENDER = "alerts@account.chime.com";
-const FORWARDED_LABEL = "shiftlycash-forwarded";
-// IMAP connect + per-email Haiku call (~3-5s each) easily exceeds Vercel's
-// 60s function limit at higher caps. Keep low; the cron fires every minute,
-// so a backlog drains quickly even at 3/run.
+// Process at most this many new emails per firing. Cron fires every
+// minute so even a 10-email backlog drains in ~3 minutes. The cap
+// exists so a sudden burst can't blow the function timeout.
 const FETCH_CAP = 3;
-// Hard deadline inside the background task so we never exceed Vercel's
-// function timeout. Leaves buffer for connection teardown.
-const SOFT_DEADLINE_MS = 45_000;
+// Hard ceiling on background work. We reject AFTER this elapses even
+// if mid-IMAP-fetch, so a hanging Gmail call can't burn the full 60s
+// Vercel function budget. Set conservatively below Vercel's 60s limit.
+const HARD_DEADLINE_MS = 25_000;
+// Look back this far for new Chime emails. Anything older than this
+// window is presumed handled (or intentionally skipped).
+const SEARCH_WINDOW_DAYS = 1;
 
 type Summary = {
   ok: boolean;
   scanned: number;
-  forwarded: number;
+  newlyProcessed: number;
+  alreadyProcessed: number;
   failed: number;
-  alreadyLabeled: number;
   errors: string[];
+  durationMs: number;
 };
 
 export async function GET(request: Request) {
@@ -59,34 +65,51 @@ export async function GET(request: Request) {
     );
   }
 
-  // TEMPORARILY DISABLED 2026-05-21 — label-apply via imapflow's
-  // messageFlagsAdd was hanging silently, causing every cron firing to
-  // re-process the SAME email and burn 60s of background compute. That
-  // path is exhausting Vercel free-tier quotas (50%+ used in 2 days).
-  // Set ENABLE_GMAIL_CHIME_SYNC=1 in Vercel env to re-enable once the
-  // label-apply bug is fixed. Until then, the Plaid 6h backup cron is
-  // the only Chime ingestion path.
+  // Kill switch. Default OFF until manually re-enabled. Lets us land
+  // refactors without immediately resuming production cron load.
   if (process.env.ENABLE_GMAIL_CHIME_SYNC !== "1") {
     return NextResponse.json({
       ok: true,
       disabled: true,
-      reason: "Temporarily disabled — label-apply bug burns Vercel quota",
+      reason:
+        "Set ENABLE_GMAIL_CHIME_SYNC=1 in Vercel env to enable Gmail sync.",
     });
   }
 
-  // Hand the actual IMAP/Haiku work to `after()` so the cron caller gets a
-  // fast 200 response.
+  // Background the IMAP work so cron-job.org gets a fast 200 in <1s.
+  // processChimeBacklog wraps everything in a hard-timeout Promise.race
+  // so a hanging network call can't drag the function past HARD_DEADLINE_MS.
   after(async () => {
-    const result = await processChimeBacklog({
-      user,
-      password,
-      ingestUrl,
-      ingestKey,
-    });
-    console.info("[cron/gmail-chime-sync] result:", JSON.stringify(result));
+    const startedAt = Date.now();
+    try {
+      const result = await Promise.race([
+        processChimeBacklog({ user, password, ingestUrl, ingestKey }),
+        hardDeadline(),
+      ]);
+      console.info(
+        `[cron/gmail-chime-sync] ${oneLineSummary(result, startedAt)}`,
+      );
+    } catch (err) {
+      console.error(
+        `[cron/gmail-chime-sync] aborted after ${Date.now() - startedAt}ms: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   });
 
   return NextResponse.json({ ok: true, queued: true });
+}
+
+function hardDeadline(): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(
+      () => reject(new Error(`hard deadline ${HARD_DEADLINE_MS}ms exceeded`)),
+      HARD_DEADLINE_MS,
+    );
+  });
+}
+
+function oneLineSummary(result: Summary, startedAt: number): string {
+  return `done in ${Date.now() - startedAt}ms scanned=${result.scanned} new=${result.newlyProcessed} dup=${result.alreadyProcessed} fail=${result.failed} ok=${result.ok}${result.errors.length > 0 ? ` errs=${result.errors.slice(0, 3).join(" | ")}` : ""}`;
 }
 
 type ProcessOpts = {
@@ -100,11 +123,32 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
   const summary: Summary = {
     ok: true,
     scanned: 0,
-    forwarded: 0,
+    newlyProcessed: 0,
+    alreadyProcessed: 0,
     failed: 0,
-    alreadyLabeled: 0,
     errors: [],
+    durationMs: 0,
   };
+  const startedAt = Date.now();
+
+  // Resolve the active user once. The ingest endpoint does its own
+  // user lookup so this is only for the dedup table writes.
+  const supabase = createAdminClient();
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .single();
+  if (profileError || !profile?.id) {
+    summary.ok = false;
+    summary.errors.push(
+      `Unable to resolve user: ${profileError?.message ?? "no profile"}`,
+    );
+    summary.durationMs = Date.now() - startedAt;
+    return summary;
+  }
+  const userId = profile.id as string;
 
   const client = new ImapFlow({
     host: "imap.gmail.com",
@@ -116,84 +160,94 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
 
   try {
     await client.connect();
-
-    // Ensure the forwarded label exists in Gmail before we try to apply
-    // it. Without this, messageFlagsAdd silently no-ops, the email
-    // never gets labeled, and the cron re-processes the same email
-    // every minute — burning Anthropic tokens and producing duplicate
-    // chime_raw_captures rows. mailboxCreate is idempotent: if the
-    // label already exists, the error is caught and ignored.
-    try {
-      await client.mailboxCreate(FORWARDED_LABEL);
-    } catch (createErr) {
-      // imapflow throws on ALREADYEXISTS; that's expected. Log other
-      // errors but don't abort the run.
-      const msg = createErr instanceof Error ? createErr.message : "";
-      if (!/already exists|alreadyexists/i.test(msg)) {
-        console.warn(
-          `[cron/gmail-chime-sync] label create failed: ${msg}`,
-        );
-      }
-    }
-
     const lock = await client.getMailboxLock("INBOX");
     try {
-      // Use Gmail's RAW search (X-GM-RAW) so we can exclude security alert
-      // subjects at the server. Chime sends a "New login detected" /
-      // "Was this you?" email every time the app authenticates, and those
-      // would otherwise crowd out actual money-movement emails from the
-      // FETCH_CAP slice. We also explicitly exclude already-labeled
-      // emails so successful labels stop reappearing in the search.
+      // X-GM-RAW search so we can exclude security-alert subjects at
+      // the server. No label filter here — we now dedup via Supabase,
+      // not Gmail labels.
       const uids = await client.search({
-        gmailraw: `from:${CHIME_SENDER} newer_than:1d -label:${FORWARDED_LABEL} -subject:"New login detected" -subject:"Was this you"`,
+        gmailraw: `from:${CHIME_SENDER} newer_than:${SEARCH_WINDOW_DAYS}d -subject:"New login detected" -subject:"Was this you"`,
       });
 
       if (!uids || uids.length === 0) {
+        summary.durationMs = Date.now() - startedAt;
         return summary;
       }
 
-      // Process OLDEST first so backlogs drain in arrival order; newer
-      // emails wait their turn. This prevents a flood of recent emails
-      // from starving older ones.
-      const recentUids = uids.slice(0, FETCH_CAP);
-      summary.scanned = recentUids.length;
-      const startedAt = Date.now();
+      // Process oldest first so backlogs drain in arrival order.
+      const candidateUids = uids.slice(0, Math.min(uids.length, FETCH_CAP * 3));
+      summary.scanned = candidateUids.length;
+
+      // Collect (uid, messageId, source, subject, date) for each candidate.
+      type Candidate = {
+        uid: number;
+        messageId: string;
+        title: string;
+        text: string;
+        receivedAt: string;
+      };
+      const candidates: Candidate[] = [];
 
       for await (const message of client.fetch(
-        recentUids,
-        { source: true, labels: true, internalDate: true, uid: true },
+        candidateUids,
+        { source: true, internalDate: true, uid: true, envelope: true },
         { uid: false },
       )) {
-        if (Date.now() - startedAt > SOFT_DEADLINE_MS) {
-          summary.errors.push(
-            `Soft deadline hit after ${summary.forwarded} forwarded; remaining will retry next run.`,
-          );
-          break;
-        }
-
-        const labels = message.labels ?? new Set<string>();
-        if (labels.has(FORWARDED_LABEL)) {
-          summary.alreadyLabeled += 1;
-          continue;
-        }
-
-        if (!message.source) {
-          summary.failed += 1;
-          summary.errors.push(`uid=${message.uid}: no source`);
-          continue;
-        }
-
+        if (!message.source) continue;
         const parsed = await simpleParser(message.source);
+        const messageId =
+          parsed.messageId?.trim() ||
+          message.envelope?.messageId?.trim() ||
+          `uid:${message.uid}`;
         const title = (parsed.subject ?? "").slice(0, 240);
         const htmlBody = typeof parsed.html === "string" ? parsed.html : "";
         const text = (parsed.text ?? stripHtml(htmlBody)).slice(0, 4000);
         const rawDate =
           message.internalDate ?? parsed.date ?? new Date();
-        const receivedAt = new Date(rawDate).toISOString();
+        candidates.push({
+          uid: message.uid ?? 0,
+          messageId,
+          title,
+          text,
+          receivedAt: new Date(rawDate).toISOString(),
+        });
+      }
 
-        if (!text && !title) {
+      if (candidates.length === 0) {
+        summary.durationMs = Date.now() - startedAt;
+        return summary;
+      }
+
+      // Single DB roundtrip: fetch already-processed IDs from the
+      // candidates we just collected. Filtering server-side keeps the
+      // IN list bounded.
+      const { data: processed, error: processedErr } = await supabase
+        .from("chime_gmail_processed")
+        .select("gmail_message_id")
+        .eq("user_id", userId)
+        .in(
+          "gmail_message_id",
+          candidates.map((c) => c.messageId),
+        );
+      if (processedErr) {
+        summary.ok = false;
+        summary.errors.push(`Dedup query failed: ${processedErr.message}`);
+        summary.durationMs = Date.now() - startedAt;
+        return summary;
+      }
+      const processedSet = new Set(
+        (processed ?? []).map((r) => r.gmail_message_id as string),
+      );
+      summary.alreadyProcessed = processedSet.size;
+
+      const fresh = candidates
+        .filter((c) => !processedSet.has(c.messageId))
+        .slice(0, FETCH_CAP);
+
+      for (const candidate of fresh) {
+        if (!candidate.text && !candidate.title) {
           summary.failed += 1;
-          summary.errors.push(`uid=${message.uid}: empty body`);
+          summary.errors.push(`uid=${candidate.uid}: empty body`);
           continue;
         }
 
@@ -204,11 +258,11 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            title,
-            text,
-            receivedAt,
+            title: candidate.title,
+            text: candidate.text,
+            receivedAt: candidate.receivedAt,
             appBundle: "gmail-imap-cron",
-            shortcutVersion: "v1",
+            shortcutVersion: "v2",
           }),
         });
 
@@ -216,33 +270,43 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
           summary.failed += 1;
           const errBody = await response.text();
           summary.errors.push(
-            `uid=${message.uid}: ingest ${response.status} ${errBody.slice(0, 160)}`,
+            `uid=${candidate.uid}: ingest ${response.status} ${errBody.slice(0, 160)}`,
           );
           continue;
         }
 
-        // Apply the Gmail label so we don't re-forward next minute. Uses
-        // Gmail's X-GM-LABELS IMAP extension via imapflow's setFlags
-        // equivalent. Log success/failure explicitly because a silent
-        // no-op here means the cron re-processes the same email forever.
+        let captureId: string | null = null;
         try {
-          const labelResult = await client.messageFlagsAdd(
-            message.uid,
-            [FORWARDED_LABEL],
-            { uid: true, useLabels: true },
-          );
-          if (!labelResult) {
-            console.warn(
-              `[cron/gmail-chime-sync] label add returned false for uid=${message.uid}`,
-            );
-          }
-        } catch (labelErr) {
-          console.warn(
-            `[cron/gmail-chime-sync] label add threw for uid=${message.uid}: ${labelErr instanceof Error ? labelErr.message : labelErr}`,
-          );
+          const body = (await response.json()) as { capture_id?: string };
+          captureId = typeof body.capture_id === "string" ? body.capture_id : null;
+        } catch {
+          // ingest returned non-JSON; that's fine, capture_id stays null
         }
 
-        summary.forwarded += 1;
+        // Mark this message ID processed BEFORE we count it as a
+        // success. If this insert fails, the next firing will re-try
+        // — which is the correct behavior since the ingest itself
+        // dedups on import_key, so retries are safe.
+        const { error: insertErr } = await supabase
+          .from("chime_gmail_processed")
+          .insert({
+            gmail_message_id: candidate.messageId,
+            user_id: userId,
+            capture_id: captureId,
+          });
+
+        if (insertErr) {
+          // Duplicate-key (23505) means another concurrent run beat
+          // us to it — still a success path. Other errors get
+          // surfaced but don't abort the loop.
+          if (insertErr.code !== "23505") {
+            summary.errors.push(
+              `dedup insert failed for ${candidate.messageId}: ${insertErr.message}`,
+            );
+          }
+        }
+
+        summary.newlyProcessed += 1;
       }
     } finally {
       lock.release();
@@ -252,10 +316,6 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
     summary.errors.push(
       err instanceof Error ? err.message : "Unknown IMAP error",
     );
-    console.error(
-      "[cron/gmail-chime-sync] failed:",
-      err instanceof Error ? err.message : err,
-    );
   } finally {
     try {
       await client.logout();
@@ -264,6 +324,7 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
     }
   }
 
+  summary.durationMs = Date.now() - startedAt;
   return summary;
 }
 
