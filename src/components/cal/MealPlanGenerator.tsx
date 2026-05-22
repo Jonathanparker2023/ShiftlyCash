@@ -634,42 +634,34 @@ function PresetReservoir({
 
 function BenchmarkStrip({ targets }: { targets: RemainingTargets }) {
   const metrics = [
-    { label: "Cal", unit: "cal", value: targets.calories },
-    { label: "Protein", unit: "g", value: targets.proteinG },
-    { label: "Carbs", unit: "g", value: targets.carbsG },
-    { label: "Fiber", unit: "g", value: targets.fiberG },
-    { label: "Fat", unit: "g", value: targets.fatG },
-    { label: "Sodium", unit: "mg", value: targets.sodiumMg },
-    { label: "Sugar", unit: "g", value: targets.addedSugarG },
-    { label: "Sat fat", unit: "g", value: targets.saturatedFatG },
+    { label: "Cal", value: targets.calories },
+    { label: "Protein", value: targets.proteinG },
+    { label: "Carbs", value: targets.carbsG },
+    { label: "Fiber", value: targets.fiberG },
+    { label: "Fat", value: targets.fatG },
+    { label: "Sodium", value: targets.sodiumMg },
+    { label: "Sugar", value: targets.addedSugarG },
+    { label: "Sat fat", value: targets.saturatedFatG },
   ];
 
+  // 4-up grid, each cell stacks the label (small uppercase) above a
+  // single large number. Strips out the "left" suffix and unit labels —
+  // the column header conveys the metric, the number is the value.
   return (
-    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {metrics.map((metric) => {
-        const width = metric.value > 0 ? 100 : 0;
-        return (
-          <div
-            className="rounded-md border border-white/10 bg-black/30 px-2 py-2"
-            key={metric.label}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/45">
-                {metric.label}
-              </p>
-              <p className="text-[10px] font-semibold text-white/65">
-                {formatMetric(metric.value, metric.unit)} left
-              </p>
-            </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-              <span
-                className="block h-1.5 rounded-full bg-emerald-500"
-                style={{ width: `${width}%` }}
-              />
-            </div>
-          </div>
-        );
-      })}
+    <div className="mt-3 grid grid-cols-4 gap-2">
+      {metrics.map((metric) => (
+        <div
+          className="flex flex-col items-center justify-center rounded-md border border-white/10 bg-black/30 px-1 py-2"
+          key={metric.label}
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-white/50">
+            {metric.label}
+          </p>
+          <p className="mt-0.5 text-lg font-bold leading-tight text-white">
+            {Math.max(0, Math.round(metric.value)).toLocaleString()}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -777,9 +769,6 @@ function syntheticCycleFailure(remediation: string): ValidationResult {
   };
 }
 
-function formatMetric(value: number, unit: string): string {
-  return `${Math.max(0, Math.round(value)).toLocaleString()} ${unit}`;
-}
 
 function formatPresetTotals(preset: MealPlanPreset): string {
   return `${preset.totals.calories} cal | ${preset.totals.proteinG}p | ${preset.totals.carbsG}c`;
