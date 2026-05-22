@@ -62,6 +62,9 @@ export async function GET(request: Request) {
   // Kill switch. Default OFF until manually re-enabled. Keep this
   // before Gmail/env validation so disabled runs stay cheap and safe.
   if (process.env.ENABLE_GMAIL_CHIME_SYNC !== "1") {
+    console.info(
+      `[cron/gmail-chime-sync] disabled (env=${process.env.ENABLE_GMAIL_CHIME_SYNC ?? "unset"})`,
+    );
     return NextResponse.json({
       ok: true,
       disabled: true,
@@ -94,6 +97,9 @@ export async function GET(request: Request) {
   // quota burn scenario Codex flagged.
   const throttleCheck = await checkSelfThrottle();
   if (throttleCheck.skip) {
+    console.info(
+      `[cron/gmail-chime-sync] throttled (retryAfter=${Math.round(throttleCheck.retryAfterMs / 1000)}s)`,
+    );
     return NextResponse.json({
       ok: true,
       throttled: true,
