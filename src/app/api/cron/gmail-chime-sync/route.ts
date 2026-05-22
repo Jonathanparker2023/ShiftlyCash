@@ -59,10 +59,23 @@ export async function GET(request: Request) {
     );
   }
 
+  // TEMPORARILY DISABLED 2026-05-21 — label-apply via imapflow's
+  // messageFlagsAdd was hanging silently, causing every cron firing to
+  // re-process the SAME email and burn 60s of background compute. That
+  // path is exhausting Vercel free-tier quotas (50%+ used in 2 days).
+  // Set ENABLE_GMAIL_CHIME_SYNC=1 in Vercel env to re-enable once the
+  // label-apply bug is fixed. Until then, the Plaid 6h backup cron is
+  // the only Chime ingestion path.
+  if (process.env.ENABLE_GMAIL_CHIME_SYNC !== "1") {
+    return NextResponse.json({
+      ok: true,
+      disabled: true,
+      reason: "Temporarily disabled — label-apply bug burns Vercel quota",
+    });
+  }
+
   // Hand the actual IMAP/Haiku work to `after()` so the cron caller gets a
-  // fast 200 response. IMAP connect + per-message Haiku parsing was busting
-  // cron-job.org's 30s response limit. Background work runs up to the
-  // route's maxDuration (60s) which is more than enough for FETCH_CAP=10.
+  // fast 200 response.
   after(async () => {
     const result = await processChimeBacklog({
       user,
