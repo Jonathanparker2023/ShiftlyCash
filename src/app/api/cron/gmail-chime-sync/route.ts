@@ -10,14 +10,25 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const CHIME_SENDER = "alerts@account.chime.com";
-// Process at most this many new emails per firing. Cron fires every
-// minute so even a 10-email backlog drains in ~3 minutes. The cap
-// exists so a sudden burst can't blow the function timeout.
+const CRON_NAME = "gmail-chime-sync";
+// Process at most this many new emails per firing.
 const FETCH_CAP = 3;
-// Hard ceiling on background work. We reject AFTER this elapses even
-// if mid-IMAP-fetch, so a hanging Gmail call can't burn the full 60s
-// Vercel function budget. Set conservatively below Vercel's 60s limit.
+// Hard ceiling on background work via Promise.race. NOTE this does NOT
+// cancel the underlying work — it only stops awaiting. Real socket
+// timeouts below are the actual safety net.
 const HARD_DEADLINE_MS = 25_000;
+// Per-socket timeouts. imapflow doesn't expose a single timeout option,
+// but socket options + per-call awaits give us real cancellation.
+const IMAP_SOCKET_TIMEOUT_MS = 15_000;
+const INGEST_FETCH_TIMEOUT_MS = 8_000;
+// Code-side self-throttle. Even if cron-job.org fires every minute,
+// the route returns "throttled" until this much time has elapsed
+// since the last started run. Codex review pointed out 1/min × 5s =
+// 2 CPU-hours/day, half of Vercel free-tier monthly budget. Default
+// to 15 min, tunable via env if needed.
+const SELF_THROTTLE_MS = Number(
+  process.env.GMAIL_CHIME_SYNC_THROTTLE_MS ?? 15 * 60 * 1000,
+);
 // Look back this far for new Chime emails. Anything older than this
 // window is presumed handled (or intentionally skipped).
 const SEARCH_WINDOW_DAYS = 1;
@@ -77,9 +88,21 @@ export async function GET(request: Request) {
     );
   }
 
+  // Self-throttle BEFORE backgrounding anything. Cheap DB lookup.
+  // If the last started run was less than SELF_THROTTLE_MS ago, skip
+  // entirely. Protects against cron-job.org misconfig + the Vercel
+  // quota burn scenario Codex flagged.
+  const throttleCheck = await checkSelfThrottle();
+  if (throttleCheck.skip) {
+    return NextResponse.json({
+      ok: true,
+      throttled: true,
+      lastStartedAt: throttleCheck.lastStartedAt,
+      retryAfterMs: throttleCheck.retryAfterMs,
+    });
+  }
+
   // Background the IMAP work so cron-job.org gets a fast 200 in <1s.
-  // processChimeBacklog wraps everything in a hard-timeout Promise.race
-  // so a hanging network call can't drag the function past HARD_DEADLINE_MS.
   after(async () => {
     const startedAt = Date.now();
     try {
@@ -87,17 +110,90 @@ export async function GET(request: Request) {
         processChimeBacklog({ user, password, ingestUrl, ingestKey }),
         hardDeadline(),
       ]);
-      console.info(
-        `[cron/gmail-chime-sync] ${oneLineSummary(result, startedAt)}`,
-      );
+      const summary = oneLineSummary(result, startedAt);
+      console.info(`[cron/gmail-chime-sync] ${summary}`);
+      await recordRunComplete(summary);
     } catch (err) {
-      console.error(
-        `[cron/gmail-chime-sync] aborted after ${Date.now() - startedAt}ms: ${err instanceof Error ? err.message : err}`,
-      );
+      const msg = `aborted after ${Date.now() - startedAt}ms: ${err instanceof Error ? err.message : err}`;
+      console.error(`[cron/gmail-chime-sync] ${msg}`);
+      await recordRunComplete(msg).catch(() => undefined);
     }
   });
 
   return NextResponse.json({ ok: true, queued: true });
+}
+
+async function checkSelfThrottle(): Promise<{
+  skip: boolean;
+  lastStartedAt: string | null;
+  retryAfterMs: number;
+}> {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("cron_runs")
+      .select("last_started_at")
+      .eq("cron_name", CRON_NAME)
+      .maybeSingle();
+
+    if (error) {
+      // Fail OPEN so a transient DB error doesn't stop the sync.
+      // The cap+kill switch are still in front of us.
+      console.warn(
+        `[cron/gmail-chime-sync] throttle lookup failed (fail-open): ${error.message}`,
+      );
+      return { skip: false, lastStartedAt: null, retryAfterMs: 0 };
+    }
+
+    const lastStartedAt = data?.last_started_at ?? null;
+    const lastMs = lastStartedAt ? Date.parse(lastStartedAt) : 0;
+    const elapsed = Date.now() - lastMs;
+
+    if (lastStartedAt && elapsed < SELF_THROTTLE_MS) {
+      return {
+        skip: true,
+        lastStartedAt,
+        retryAfterMs: SELF_THROTTLE_MS - elapsed,
+      };
+    }
+
+    // Record the start NOW so concurrent firings see it. Upsert with
+    // last_started_at = now() but DO NOT touch last_completed_at;
+    // recordRunComplete will set that when the work finishes.
+    await supabase
+      .from("cron_runs")
+      .upsert(
+        {
+          cron_name: CRON_NAME,
+          last_started_at: new Date().toISOString(),
+        },
+        { onConflict: "cron_name" },
+      );
+
+    return { skip: false, lastStartedAt, retryAfterMs: 0 };
+  } catch (err) {
+    console.warn(
+      `[cron/gmail-chime-sync] throttle check threw (fail-open): ${err instanceof Error ? err.message : err}`,
+    );
+    return { skip: false, lastStartedAt: null, retryAfterMs: 0 };
+  }
+}
+
+async function recordRunComplete(summary: string): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    await supabase
+      .from("cron_runs")
+      .update({
+        last_completed_at: new Date().toISOString(),
+        last_summary: summary.slice(0, 500),
+      })
+      .eq("cron_name", CRON_NAME);
+  } catch (err) {
+    console.warn(
+      `[cron/gmail-chime-sync] recordRunComplete failed: ${err instanceof Error ? err.message : err}`,
+    );
+  }
 }
 
 function hardDeadline(): Promise<never> {
@@ -157,6 +253,11 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
     secure: true,
     auth: { user: opts.user, pass: opts.password },
     logger: false,
+    // Real socket-level timeouts so a hanging Gmail call actually
+    // throws instead of dangling behind a Promise.race we already
+    // settled.
+    socketTimeout: IMAP_SOCKET_TIMEOUT_MS,
+    greetingTimeout: 8_000,
   });
 
   try {
@@ -271,6 +372,10 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
             appBundle: "gmail-imap-cron",
             shortcutVersion: "v2",
           }),
+          // Real abort so a slow ingest call can't burn the function
+          // budget. AbortController is the only way to make Node fetch
+          // honor a deadline.
+          signal: AbortSignal.timeout(INGEST_FETCH_TIMEOUT_MS),
         });
 
         if (!response.ok) {
