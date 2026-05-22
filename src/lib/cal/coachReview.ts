@@ -46,9 +46,9 @@ export type CoachSuggestion = {
 // What the AI ultimately sees. NO raw numbers anywhere.
 export type CoachObservations = {
   scope: CoachReviewScope;
-  // ISO date for day; ISO Monday for week.
+  // ISO date for day; weekStartIso for week.
   periodKey: string;
-  // Verbatim food names from entries (strings = zero math = safe).
+  // Day scope: verbatim food names. Week scope: trend labels only.
   recentEntries: string[];
   // Categorical flags. Stable enum strings, no embedded numbers.
   signals: CoachSignal[];
@@ -301,8 +301,7 @@ export function buildWeekObservations(
     signals.push("week_clean_streak");
   }
 
-  // Recent foods = top items by frequency across the week (capped).
-  const recentEntries = topFoodsByFrequency(week, 6);
+  const recentEntries = weekTrendLabels(signals);
 
   const suggestion = pickSuggestion(signals, "week");
 
@@ -317,11 +316,18 @@ export function buildWeekObservations(
 
 // ── Hashing ──────────────────────────────────────────────────────────
 
+// Bump this when the prompt/voice changes meaningfully — every cached
+// review from a prior version will naturally miss and regenerate
+// against the new prompt. Cheap cache buster, no migrations needed.
+export const COACH_PROMPT_VERSION = "v2-snark";
+
 // Stable SHA-1 over the user-facing semantic content. style_seed is
 // NOT included — same observations should not regenerate just because
-// a cosmetic seed rotates.
+// a cosmetic seed rotates. COACH_PROMPT_VERSION IS included so prompt
+// rewrites invalidate the cache.
 export function hashObservations(obs: CoachObservations): string {
   const canonical = JSON.stringify({
+    promptVersion: COACH_PROMPT_VERSION,
     scope: obs.scope,
     periodKey: obs.periodKey,
     recentEntries: obs.recentEntries,
@@ -335,7 +341,16 @@ export function hashObservations(obs: CoachObservations): string {
 // observations land on the same style but different days nudge
 // toward different voices.
 export function deriveStyleSeed(observationsHash: string, periodKey: string): string {
-  const seeds = ["dry", "wry", "flat-coach", "observational", "deadpan"];
+  // Voice rotation. All weighted toward snark/humor per Jon's brief —
+  // the safety guardrails (no numbers, no moralizing, no medical) are
+  // enforced by the prompt + sanitizer, NOT by flattening the tone.
+  const seeds = [
+    "snarky-friend",
+    "dry-roast",
+    "deadpan-comic",
+    "sports-commentator",
+    "wry-observer",
+  ];
   const mix = createHash("md5")
     .update(observationsHash + periodKey)
     .digest()
@@ -394,19 +409,19 @@ function countVerdicts(week: CalWeek): { good: number; bad: number } {
   return { good, bad };
 }
 
-function topFoodsByFrequency(week: CalWeek, max: number): string[] {
-  const counts = new Map<string, number>();
-  for (const day of week.days) {
-    for (const entry of day.entries) {
-      const name = entry.mealName.trim();
-      if (!name) continue;
-      counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-  }
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, max)
-    .map(([name]) => name);
+function weekTrendLabels(signals: CoachSignal[]): string[] {
+  const labels: string[] = [];
+  const has = (signal: CoachSignal) => signals.includes(signal);
+
+  if (has("sodium_dash_streak") || has("bp_alert")) labels.push("sodium trend");
+  if (has("fiber_week_short")) labels.push("fiber trend");
+  if (has("week_indulgence_heavy")) labels.push("verdict mix");
+  if (has("week_clean_streak")) labels.push("clean streak");
+  if (has("week_deficit")) labels.push("weekly deficit");
+  if (has("week_surplus")) labels.push("weekly surplus");
+  if (has("week_balanced")) labels.push("balanced week");
+
+  return labels.length > 0 ? labels : ["weekly trend"];
 }
 
 // Suppress unused-import warnings until Commit B starts using the
