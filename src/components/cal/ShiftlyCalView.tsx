@@ -6,6 +6,10 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { AiFoodEstimator } from "@/components/cal/AiFoodEstimator";
+import {
+  FocusedDayCoachStrip,
+  WeeklyCoachBand,
+} from "@/components/cal/CoachReviewBand";
 import { MealPlanGenerator } from "@/components/cal/MealPlanGenerator";
 import {
   createFoodEntryAction,
@@ -126,6 +130,23 @@ export function ShiftlyCalView({
     return () => window.clearInterval(id);
   }, [hasRecentPendingVerdicts, router]);
 
+  // Coach-review signatures. Re-fetch when the underlying data
+  // composition shifts. Cheap to recompute, cheap to send up to the
+  // server actions (which dedup via observation hash anyway).
+  const focusedDaySignature = useMemo(() => {
+    const ids = focusedDay.entries
+      .map((entry) => `${entry.id}:${entry.verdict ?? "_"}`)
+      .sort()
+      .join("|");
+    return `${focusedDay.totals.calories}|${focusedDay.totals.sodiumMg}|${ids}`;
+  }, [focusedDay.entries, focusedDay.totals]);
+
+  const weekSignature = useMemo(() => {
+    const dayKeys = initialData.currentWeek.days
+      .map((day) => `${day.date}:${day.entries.length}:${day.totals.calories}`)
+      .join("|");
+    return dayKeys;
+  }, [initialData.currentWeek.days]);
 
   function instantLog(food: SavedFood) {
     setError(null);
@@ -375,7 +396,12 @@ export function ShiftlyCalView({
               />
             </div>
 
-            <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
+            <WeeklyCoachBand
+              weekStartIso={weekStartIso}
+              weekEntriesSignature={weekSignature}
+            />
+
+            <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
               {/* Left column. On mobile this stacks LAST so the meal-plan
                   generator + accompanying prompts (and weight panel) are
                   at the bottom of the view, below the focused day and
@@ -411,6 +437,10 @@ export function ShiftlyCalView({
                   day={focusedDay}
                   dayTotals={focusedDay.totals}
                   targets={initialData.targets}
+                />
+                <FocusedDayCoachStrip
+                  focusedDate={focusedDay.date}
+                  daySignature={focusedDaySignature}
                 />
                 <div className="mt-4 space-y-3 hidden xl:block">
                   <AiFoodEstimator
