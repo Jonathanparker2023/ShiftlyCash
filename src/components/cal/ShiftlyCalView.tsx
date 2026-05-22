@@ -41,21 +41,6 @@ import type {
   ShiftlyCalData,
 } from "@/lib/cal/types";
 
-type MealFormState = {
-  mealName: string;
-  category: FoodCategory;
-  loggedTime: string;
-  calories: string;
-  proteinG: string;
-  carbsG: string;
-  fatG: string;
-  fiberG: string;
-  sodiumMg: string;
-  addedSugarG: string;
-  saturatedFatG: string;
-  savedFoodId: string | null;
-};
-
 type UpdateFoodEntryPatch = {
   mealName?: string | null;
   category?: FoodCategory | string | null;
@@ -69,23 +54,6 @@ type UpdateFoodEntryPatch = {
   addedSugarG?: number | string | null;
   saturatedFatG?: number | string | null;
 };
-
-function emptyMealForm(): MealFormState {
-  return {
-    mealName: "",
-    category: "meal",
-    loggedTime: currentTimeInput(),
-    calories: "",
-    proteinG: "",
-    carbsG: "",
-    fatG: "",
-    fiberG: "",
-    sodiumMg: "",
-    addedSugarG: "",
-    saturatedFatG: "",
-    savedFoodId: null,
-  };
-}
 
 const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
   { value: "meal", label: "Meal" },
@@ -110,8 +78,6 @@ export function ShiftlyCalView({
     ),
   );
   const [focusedDayIndex, setFocusedDayIndex] = useState(todayIndex);
-  const [mealForm, setMealForm] = useState<MealFormState>(() => emptyMealForm());
-  const [isMealFormOpen, setIsMealFormOpen] = useState(false);
   const [weightValue, setWeightValue] = useState(
     initialData.currentWeek.days[todayIndex]?.weight?.weightLbs.toString() ?? "",
   );
@@ -160,35 +126,6 @@ export function ShiftlyCalView({
     return () => window.clearInterval(id);
   }, [hasRecentPendingVerdicts, router]);
 
-  function submitMeal(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-
-    startTransition(async () => {
-      try {
-        await createFoodEntryAction({
-          date: focusedDay.date,
-          loggedTime: mealForm.loggedTime,
-          mealName: mealForm.mealName,
-          category: mealForm.category,
-          calories: mealForm.calories,
-          proteinG: mealForm.proteinG,
-          carbsG: mealForm.carbsG,
-          fatG: mealForm.fatG,
-          fiberG: mealForm.fiberG,
-          sodiumMg: mealForm.sodiumMg,
-          addedSugarG: mealForm.addedSugarG,
-          saturatedFatG: mealForm.saturatedFatG,
-          savedFoodId: mealForm.savedFoodId,
-        });
-        setMealForm(emptyMealForm());
-        setIsMealFormOpen(false);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to log meal.");
-      }
-    });
-  }
 
   function instantLog(food: SavedFood) {
     setError(null);
@@ -339,24 +276,6 @@ export function ShiftlyCalView({
     }
   }
 
-  function fillFromSavedFood(food: SavedFood) {
-    setMealForm({
-      mealName: food.name,
-      category: food.category,
-      loggedTime: currentTimeInput(),
-      calories: food.calories.toString(),
-      proteinG: food.proteinG?.toString() ?? "",
-      carbsG: food.carbsG?.toString() ?? "",
-      fatG: food.fatG?.toString() ?? "",
-      fiberG: food.fiberG?.toString() ?? "",
-      sodiumMg: food.sodiumMg?.toString() ?? "",
-      addedSugarG: food.addedSugarG?.toString() ?? "",
-      saturatedFatG: food.saturatedFatG?.toString() ?? "",
-      savedFoodId: food.id,
-    });
-    setIsMealFormOpen(true);
-  }
-
   function focusDay(index: number) {
     setFocusedDayIndex(index);
     setWeightValue(
@@ -466,7 +385,6 @@ export function ShiftlyCalView({
                   <SavedFoodsList
                     disabled={isPending}
                     loggedFoodId={loggedFoodId}
-                    onFill={fillFromSavedFood}
                     onInstantLog={instantLog}
                     savedFoods={initialData.savedFoods}
                   />
@@ -500,14 +418,6 @@ export function ShiftlyCalView({
                     onConfirm={logFromEstimate}
                   />
                 </div>
-                {isMealFormOpen ? (
-                  <MealEntryForm
-                    disabled={isPending}
-                    mealForm={mealForm}
-                    onMealFormChange={setMealForm}
-                    onSubmit={submitMeal}
-                  />
-                ) : null}
                 <div className="mt-4 space-y-2">
                   {focusedDay.entries.length > 0 ? (
                     focusedDay.entries.map((entry) => (
@@ -783,100 +693,6 @@ function RemainingBadge({ remaining }: { remaining: number }) {
     <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white">
       Right on target
     </span>
-  );
-}
-
-function MealEntryForm({
-  disabled,
-  mealForm,
-  onMealFormChange,
-  onSubmit,
-}: {
-  disabled: boolean;
-  mealForm: MealFormState;
-  onMealFormChange: (form: MealFormState) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <form className="mt-4 rounded-md border border-white/15 bg-black/20 p-3" onSubmit={onSubmit}>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
-        <TextInput
-          className="lg:col-span-2"
-        label="Meal"
-          onChange={(value) => onMealFormChange({ ...mealForm, mealName: value })}
-          placeholder="Chicken bowl"
-          value={mealForm.mealName}
-        />
-        <TextInput
-          label="Time"
-          onChange={(value) => onMealFormChange({ ...mealForm, loggedTime: value })}
-          type="time"
-          value={mealForm.loggedTime}
-        />
-        <CategorySelect
-          label="Category"
-          onChange={(category) => onMealFormChange({ ...mealForm, category })}
-          value={mealForm.category}
-        />
-        <NumberInput
-          label="Calories"
-          onChange={(value) => onMealFormChange({ ...mealForm, calories: value })}
-          required
-          value={mealForm.calories}
-        />
-        <NumberInput
-          label="Protein"
-          onChange={(value) => onMealFormChange({ ...mealForm, proteinG: value })}
-          suffix="g"
-          value={mealForm.proteinG}
-        />
-        <NumberInput
-          label="Carbs"
-          onChange={(value) => onMealFormChange({ ...mealForm, carbsG: value })}
-          suffix="g"
-          value={mealForm.carbsG}
-        />
-        <NumberInput
-          label="Fat"
-          onChange={(value) => onMealFormChange({ ...mealForm, fatG: value })}
-          suffix="g"
-          value={mealForm.fatG}
-        />
-        <NumberInput
-          label="Fiber"
-          onChange={(value) => onMealFormChange({ ...mealForm, fiberG: value })}
-          suffix="g"
-          value={mealForm.fiberG}
-        />
-        <NumberInput
-          label="Sodium"
-          onChange={(value) => onMealFormChange({ ...mealForm, sodiumMg: value })}
-          suffix="mg"
-          value={mealForm.sodiumMg}
-        />
-        <NumberInput
-          label="Added sugar"
-          onChange={(value) => onMealFormChange({ ...mealForm, addedSugarG: value })}
-          suffix="g"
-          value={mealForm.addedSugarG}
-        />
-        <NumberInput
-          label="Sat fat"
-          onChange={(value) => onMealFormChange({ ...mealForm, saturatedFatG: value })}
-          suffix="g"
-          value={mealForm.saturatedFatG}
-        />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
-          disabled={disabled || !mealForm.calories.trim()}
-          type="submit"
-        >
-          Log entry
-        </button>
-      </div>
-    </form>
   );
 }
 
@@ -1862,13 +1678,11 @@ function MobileSavedFoodsDropdown({
 function SavedFoodsList({
   disabled,
   loggedFoodId,
-  onFill,
   onInstantLog,
   savedFoods,
 }: {
   disabled: boolean;
   loggedFoodId: string | null;
-  onFill: (food: SavedFood) => void;
   onInstantLog: (food: SavedFood) => void;
   savedFoods: SavedFood[];
 }) {
@@ -1886,7 +1700,6 @@ function SavedFoodsList({
               food={food}
               isLogged={loggedFoodId === food.id}
               key={food.id}
-              onFill={onFill}
               onInstantLog={onInstantLog}
             />
           ))
@@ -1904,13 +1717,11 @@ function SavedFoodRow({
   disabled,
   food,
   isLogged,
-  onFill,
   onInstantLog,
 }: {
   disabled: boolean;
   food: SavedFood;
   isLogged: boolean;
-  onFill: (food: SavedFood) => void;
   onInstantLog: (food: SavedFood) => void;
 }) {
   return (
@@ -1932,14 +1743,6 @@ function SavedFoodRow({
           {isLogged ? "Logged" : "Log"}
         </button>
       </div>
-      <button
-        className="mt-2 text-xs font-semibold text-white/60 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={disabled}
-        onClick={() => onFill(food)}
-        type="button"
-      >
-        Edit
-      </button>
     </div>
   );
 }
