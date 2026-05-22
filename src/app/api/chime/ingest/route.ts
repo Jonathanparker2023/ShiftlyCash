@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const todayDate = toLocalIsoDate(receivedAt);
     const importKey = `${receivedAt}|${title ?? ""}|${text}`.slice(0, 240);
     const amount = transactionAmount(parsed);
-    const merchantName = parsed.merchantOrSource || `Chime ${parsed.kind}`;
+    const merchantName = formatChimeMerchantName(parsed);
 
     // Guardrail: if Haiku returned amountDollars=null the parser fills
     // amount with 0. A dedup query keyed on amount=0 matches any
@@ -215,6 +215,31 @@ export async function POST(request: Request) {
     parsed: parsed.ok,
     parse_failure_reason: parseFailureReason,
   });
+}
+
+// Build a merchant-name string that makes the kind obvious at-a-glance
+// in the dashboard transaction list. Without this, a transfer_out to
+// "kayla b" rendered as just "kayla b" — visually indistinguishable
+// from a card purchase at a merchant named kayla b. Prefix transfers,
+// deposits, and refunds with a direction word so the row label is
+// self-describing.
+function formatChimeMerchantName(
+  parsed: Extract<ChimeParseResult, { ok: true }>,
+): string {
+  const source = parsed.merchantOrSource?.trim() || `Chime ${parsed.kind}`;
+  switch (parsed.kind) {
+    case "transfer_out":
+      return `Sent to ${source}`;
+    case "transfer_in":
+      return `From ${source}`;
+    case "deposit":
+      return `Deposit: ${source}`;
+    case "refund":
+      return `Refund: ${source}`;
+    default:
+      // purchase, pending_charge, etc. — keep the merchant name plain
+      return source;
+  }
 }
 
 function isMoneyMovementKind(kind: ChimeParseKind): boolean {
