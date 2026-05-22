@@ -89,23 +89,38 @@ export function AiFoodEstimator({
   const [isOpen, setIsOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [estimate, setEstimate] = useState<EstimateForm[] | null>(null);
+  const [estimateStatus, setEstimateStatus] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [isPending, startTransition] = useTransition();
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const requestSeqRef = useRef(0);
   const speechSupported =
     typeof window !== "undefined" &&
     Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
 
   function runEstimate() {
+    const trimmed = description.trim();
+    if (!trimmed) return;
+
+    const requestSeq = requestSeqRef.current + 1;
+    requestSeqRef.current = requestSeq;
     setError(null);
+    setEstimate(null);
+    setEstimateStatus("loading");
 
     startTransition(async () => {
       try {
-        const result = await estimateFoodAction({ description });
+        const result = await estimateFoodAction({ description: trimmed });
+        if (requestSeqRef.current !== requestSeq) return;
         setEstimate(result.map(toEstimateForm));
+        setEstimateStatus("ready");
       } catch (err) {
+        if (requestSeqRef.current !== requestSeq) return;
         setError(err instanceof Error ? err.message : "Unable to estimate food.");
+        setEstimateStatus("error");
       }
     });
   }
@@ -142,8 +157,10 @@ export function AiFoodEstimator({
   }
 
   function reset() {
+    requestSeqRef.current += 1;
     setDescription("");
     setEstimate(null);
+    setEstimateStatus("idle");
     setError(null);
   }
 
@@ -190,7 +207,7 @@ export function AiFoodEstimator({
 
   function confirmSingle() {
     if (!estimate?.[0]) return;
-    confirmEstimate(estimate[0]);
+    void confirmEstimate(estimate[0]);
     reset();
     setIsOpen(false);
   }
@@ -198,13 +215,13 @@ export function AiFoodEstimator({
   function confirmBatchItem(index: number) {
     const item = estimate?.[index];
     if (!item) return;
-    confirmEstimate(item);
+    void confirmEstimate(item);
     removeEstimateItem(index, { closeWhenEmpty: true });
   }
 
   function confirmBatchAll() {
     if (!estimate) return;
-    estimate.forEach(confirmEstimate);
+    estimate.forEach((item) => void confirmEstimate(item));
     reset();
     setIsOpen(false);
   }
@@ -275,7 +292,23 @@ export function AiFoodEstimator({
 
       {isOpen ? (
         <div className="mt-3 rounded-md border border-white/15 bg-black/20 p-3 text-white">
-          {estimate ? (
+          {estimateStatus === "loading" ? (
+            <EstimateLoadingPanel
+              onCancel={() => {
+                reset();
+                setIsOpen(false);
+              }}
+            />
+          ) : estimateStatus === "error" ? (
+            <EstimateErrorPanel
+              error={error ?? "Unable to estimate food."}
+              onCancel={() => {
+                reset();
+                setIsOpen(false);
+              }}
+              onRetry={runEstimate}
+            />
+          ) : estimate ? (
             estimate.length === 1 ? (
               <EstimateResult
                 allowSavePreset={isPrimary}
@@ -316,9 +349,6 @@ export function AiFoodEstimator({
                   {error}
                 </p>
               ) : null}
-              {isPending ? (
-                <EstimateProgressBar />
-              ) : null}
               <div className="flex flex-wrap gap-2">
                 {speechSupported ? (
                   <button
@@ -343,7 +373,7 @@ export function AiFoodEstimator({
                   onClick={runEstimate}
                   type="button"
                 >
-                  {isPending ? "Estimating…" : "Estimate"}
+                  {isPending ? "Estimating..." : "Estimate"}
                 </button>
                 <button
                   className="rounded-md border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20 sm:py-2"
@@ -371,14 +401,83 @@ function currentTimeInput(): string {
   ).padStart(2, "0")}`;
 }
 
-// Indeterminate progress bar shown while the estimator is calling the
-// model. Gives the user immediate visual feedback that work is happening
-// (the request takes several seconds) instead of just a text label change.
+function EstimateLoadingPanel({ onCancel }: { onCancel: () => void }) {
+  return (
+    <div className="mt-3 rounded-md border border-white/15 bg-black/25 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="rounded-full border border-emerald-300/50 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200">
+          Working...
+        </span>
+        <span className="text-xs font-semibold text-white/55">
+          Looking up nutrition data
+        </span>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <SkeletonField className="sm:col-span-2" label="Name" />
+        <SkeletonField label="Category" />
+        <SkeletonField label="Calories" badge="Working..." />
+        <SkeletonField label="Protein" suffix="g" />
+        <SkeletonField label="Carbs" suffix="g" />
+        <SkeletonField label="Fat" suffix="g" />
+        <SkeletonField label="Fiber" suffix="g" />
+        <SkeletonField label="Sodium" suffix="mg" />
+        <SkeletonField label="Added sugar" suffix="g" />
+        <SkeletonField label="Sat fat" suffix="g" />
+      </div>
+      <EstimateProgressBar />
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          onClick={onCancel}
+          type="button"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EstimateErrorPanel({
+  error,
+  onCancel,
+  onRetry,
+}: {
+  error: string;
+  onCancel: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="mt-3 rounded-md border border-red-300/50 bg-red-500/10 p-3">
+      <span className="rounded-full border border-red-300/50 bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-100">
+        Estimate failed
+      </span>
+      <p className="mt-3 text-sm font-medium text-red-100">{error}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400"
+          onClick={onRetry}
+          type="button"
+        >
+          Retry
+        </button>
+        <button
+          className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          onClick={onCancel}
+          type="button"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function EstimateProgressBar() {
   return (
-    <div className="space-y-2">
+    <div className="mt-4 space-y-2">
       <div className="flex items-center justify-between gap-2 text-xs font-semibold text-white/70">
-        <span>Estimating nutrition…</span>
+        <span>Estimating nutrition...</span>
         <span className="text-white/45">A few seconds</span>
       </div>
       <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/10">
@@ -393,6 +492,37 @@ function EstimateProgressBar() {
           animation: estimate-progress-slide 1.4s ease-in-out infinite;
         }
       `}</style>
+    </div>
+  );
+}
+
+function SkeletonField({
+  badge,
+  className = "",
+  label,
+  suffix,
+}: {
+  badge?: string;
+  className?: string;
+  label: string;
+  suffix?: string;
+}) {
+  return (
+    <div className={`block text-sm font-semibold text-white/80 ${className}`}>
+      {label}
+      <div className="relative mt-1 h-10 w-full overflow-hidden rounded-md border border-white/15 bg-black/25">
+        <div className="absolute inset-y-0 left-0 w-1/2 animate-pulse bg-white/10" />
+        {badge ? (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-white/20 bg-black/30 px-2 py-0.5 text-xs text-white/70">
+            {badge}
+          </span>
+        ) : null}
+        {suffix ? (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/40">
+            {suffix}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

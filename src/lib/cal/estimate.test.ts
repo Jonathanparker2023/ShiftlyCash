@@ -264,4 +264,64 @@ describe("food estimate response parsing", () => {
       sodiumMg: 100,
     });
   });
+
+  it("extracts JSON when the model wraps the array in prose", () => {
+    const result = parseEstimateResponse(
+      `Here's the estimate:\n${JSON.stringify([BASE_ITEM])}\nHope that helps.`,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].mealName).toBe("Apple Snack");
+  });
+
+  it("extracts nested component arrays with brackets inside strings", () => {
+    const result = parseEstimateResponse(
+      `Result: ${JSON.stringify([
+        {
+          ...BASE_ITEM,
+          mealName: "Bracket Bowl",
+          reasoning: "Component name has [brackets] and escaped \"quotes\".",
+          components: [
+            {
+              name: "Sauce [light]",
+              calories: 40,
+              proteinG: 0,
+              carbsG: 6,
+              fatG: 2,
+              fiberG: 0,
+              sodiumMg: 120,
+              addedSugarG: 3,
+              saturatedFatG: 0,
+            },
+            {
+              name: "Chicken \"grilled\"",
+              calories: 160,
+              proteinG: 30,
+              carbsG: 0,
+              fatG: 4,
+              fiberG: 0,
+              sodiumMg: 320,
+              addedSugarG: 0,
+              saturatedFatG: 1,
+            },
+          ],
+        },
+      ])}`,
+    );
+
+    expect(result[0]).toMatchObject({
+      calories: 200,
+      proteinG: 30,
+      sodiumMg: 440,
+    });
+    expect(result[0].components).toHaveLength(2);
+  });
+
+  it("throws when wrapped JSON is truncated before the balanced close", () => {
+    expect(() =>
+      parseEstimateResponse(
+        `Here: [{"mealName":"Bad","category":"meal","calories":100`,
+      ),
+    ).toThrow("Estimator returned invalid JSON.");
+  });
 });
