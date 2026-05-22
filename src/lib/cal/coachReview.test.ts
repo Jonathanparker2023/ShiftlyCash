@@ -249,4 +249,35 @@ describe("coachReview weekly observations", () => {
     const obs = buildWeekObservations(week, DEFAULT_TARGETS);
     expect(obs.signals).toContain("week_indulgence_heavy");
   });
+
+  it("uses trend labels instead of food names for week observations", () => {
+    const days = ["05-17", "05-18", "05-19"].map((d) =>
+      makeDay(`2026-${d}`, [
+        makeEntry({
+          id: `${d}-1`,
+          mealName: "Chick-fil-A Meal Deal",
+          sodiumMg: 2500,
+        }),
+      ]),
+    );
+    const week: CalWeek = {
+      weekStartIso: "2026-05-17",
+      weekEndIso: "2026-05-23",
+      days,
+      totals: {
+        calories: 0,
+        proteinG: 0,
+        carbsG: 0,
+        fatG: 0,
+        fiberG: 0,
+        sodiumMg: 0,
+        addedSugarG: 0,
+        saturatedFatG: 0,
+      },
+    };
+
+    const obs = buildWeekObservations(week, DEFAULT_TARGETS);
+    expect(obs.recentEntries).toContain("sodium trend");
+    expect(obs.recentEntries).not.toContain("Chick-fil-A Meal Deal");
+  });
 });

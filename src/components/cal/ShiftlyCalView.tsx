@@ -358,7 +358,12 @@ export function ShiftlyCalView({
             />
           </div>
 
-          <div className="pb-2">
+          <WeeklyCoachBand
+            weekStartIso={weekStartIso}
+            weekEntriesSignature={weekSignature}
+          />
+
+          <div className="mt-4 pb-2">
             <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
               {initialData.currentWeek.days.map((day, index) => (
                 <WeekStripCell
@@ -396,12 +401,7 @@ export function ShiftlyCalView({
               />
             </div>
 
-            <WeeklyCoachBand
-              weekStartIso={weekStartIso}
-              weekEntriesSignature={weekSignature}
-            />
-
-            <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
               {/* Left column. On mobile this stacks LAST so the meal-plan
                   generator + accompanying prompts (and weight panel) are
                   at the bottom of the view, below the focused day and

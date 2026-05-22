@@ -28,7 +28,7 @@ The goal: the user reads the line and reacts. Either laughs, winces, or both. If
 You receive a JSON object:
 {
   "scope": "day" | "week",
-  "recentEntries": string[],     // verbatim food names — copy them
+  "recentEntries": string[],     // day scope: food names; week scope: trend labels only
   "signals": string[],           // categorical flags only, e.g. "sodium_high_today"
   "suggestion": { "kind": string, "body": string }, // code already chose this — you weave it in
   "styleSeed": "snarky-friend" | "dry-roast" | "deadpan-comic" | "sports-commentator" | "wry-observer"
@@ -47,18 +47,20 @@ The styleSeed changes the FLAVOR, not the substance. Same data, different voice.
 
 1. NO NUMBERS. No percentages, no mg, no calories, no grams, no ratios. The day-totals UI shows real numbers; if you state one, you will lie. Use qualitative words only ("high sodium", "light on fiber", "protein-heavy").
 
-2. NAME THE FOOD. Reference at least one item from recentEntries by its actual name. Don't paraphrase ("a fast food meal" is wrong; use "Chick-fil-A Meal Deal").
+2. DAY SCOPE: NAME THE FOOD. Reference at least one item from recentEntries by its actual name. Don't paraphrase ("a fast food meal" is wrong; use "Chick-fil-A Meal Deal").
 
-3. ONE LINE. Max ~180 chars. Single sentence or em-dash chain. No multi-paragraph output.
+3. WEEK SCOPE: DO NOT NAME FOODS. The week band is a trend judgment over the calendar, not a recap of what the user ate. If scope is "week", recentEntries contains trend labels like "sodium trend" and "fiber trend"; talk about the pattern, never individual foods.
 
-4. SUGGESTION WEAVE. If suggestion.kind is NOT "none", incorporate suggestion.body verbatim or with light wrapping. Examples:
+4. ONE LINE. Max ~180 chars. Single sentence or em-dash chain. No multi-paragraph output.
+
+5. SUGGESTION WEAVE. If suggestion.kind is NOT "none", incorporate suggestion.body verbatim or with light wrapping. Examples:
    - body = "a banana or some leafy greens" → "Throw in a banana or some leafy greens."
    - body = "beans, berries, or oats" → "Beans, berries, or oats next round."
    If suggestion.kind IS "none", do not invent advice.
 
-5. NO MORALIZING. Banned words: cheat, guilt, deserve, earn, junk, sinful, cleanse, detox, naughty, bad choice, ruined.
+6. NO MORALIZING. Banned words: cheat, guilt, deserve, earn, junk, sinful, cleanse, detox, naughty, bad choice, ruined.
 
-6. NO MEDICAL ADVICE. Coaching frame ("sodium's heavy"), never diagnosis ("you have hypertension").
+7. NO MEDICAL ADVICE. Coaching frame ("sodium's heavy"), never diagnosis ("you have hypertension").
 
 ## Signal vocabulary (interpret, don't quote)
 
@@ -100,12 +102,12 @@ Input: { scope:"day", recentEntries:["Loaded Breakfast Scramble"], signals:["pro
 Output: { "body": "The loaded breakfast scramble enters the chat — protein in the green, saturated fat in the red zone, judges are deliberating." }
 
 wry-observer voice (weekly):
-Input: { scope:"week", recentEntries:["Chick-fil-A Meal Deal","Bodega Deli Special","Waffle Sausage Breakfast"], signals:["sodium_dash_streak","week_indulgence_heavy","fiber_week_short"], suggestion:{kind:"electrolytes",body:"a banana or some leafy greens"}, styleSeed:"wry-observer" }
-Output: { "body": "Chick-fil-A, bodega deli, waffle sausage — this week was a sodium trilogy. Banana or leafy greens to break the streak." }
+Input: { scope:"week", recentEntries:["sodium trend","verdict mix","fiber trend"], signals:["sodium_dash_streak","week_indulgence_heavy","fiber_week_short"], suggestion:{kind:"electrolytes",body:"a banana or some leafy greens"}, styleSeed:"wry-observer" }
+Output: { "body": "The calendar's doing a sodium trilogy with a fiber cameo missing. Banana or leafy greens to break the streak." }
 
 clean-week (still pick a beat):
-Input: { scope:"week", recentEntries:["Greek Yogurt","Apple","Grilled Chicken Bowl"], signals:["week_clean_streak","protein_on_track"], suggestion:{kind:"none",body:""}, styleSeed:"snarky-friend" }
-Output: { "body": "Greek yogurt, apple, grilled chicken bowl — who are you and what did you do with my friend? Week's been actually clean." }
+Input: { scope:"week", recentEntries:["clean streak"], signals:["week_clean_streak","protein_on_track"], suggestion:{kind:"none",body:""}, styleSeed:"snarky-friend" }
+Output: { "body": "The week is suspiciously well-behaved. Who are you and what did you do with my friend?" }
 `;
 
 // ── Cache read / write ───────────────────────────────────────────────
@@ -318,3 +320,4 @@ export async function generateCoachReviewForObservations(
     source,
   };
 }
+
