@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
+import { createHash } from "node:crypto";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -47,6 +48,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Kill switch. Default OFF until manually re-enabled. Keep this
+  // before Gmail/env validation so disabled runs stay cheap and safe.
+  if (process.env.ENABLE_GMAIL_CHIME_SYNC !== "1") {
+    return NextResponse.json({
+      ok: true,
+      disabled: true,
+      reason:
+        "Set ENABLE_GMAIL_CHIME_SYNC=1 in Vercel env to enable Gmail sync.",
+    });
+  }
+
   const user = process.env.GMAIL_USER;
   const password = process.env.GMAIL_APP_PASSWORD;
   if (!user || !password) {
@@ -63,17 +75,6 @@ export async function GET(request: Request) {
       { error: "CHIME_INGEST_SECRET not configured" },
       { status: 500 },
     );
-  }
-
-  // Kill switch. Default OFF until manually re-enabled. Lets us land
-  // refactors without immediately resuming production cron load.
-  if (process.env.ENABLE_GMAIL_CHIME_SYNC !== "1") {
-    return NextResponse.json({
-      ok: true,
-      disabled: true,
-      reason:
-        "Set ENABLE_GMAIL_CHIME_SYNC=1 in Vercel env to enable Gmail sync.",
-    });
   }
 
   // Background the IMAP work so cron-job.org gets a fast 200 in <1s.
@@ -195,10 +196,16 @@ async function processChimeBacklog(opts: ProcessOpts): Promise<Summary> {
       )) {
         if (!message.source) continue;
         const parsed = await simpleParser(message.source);
+        const sourceHash = createHash("sha256")
+          .update(message.source)
+          .digest("hex")
+          .slice(0, 32);
         const messageId =
           parsed.messageId?.trim() ||
           message.envelope?.messageId?.trim() ||
-          `uid:${message.uid}`;
+          (typeof message.uid === "number"
+            ? `uid:${message.uid}`
+            : `source:${sourceHash}`);
         const title = (parsed.subject ?? "").slice(0, 240);
         const htmlBody = typeof parsed.html === "string" ? parsed.html : "";
         const text = (parsed.text ?? stripHtml(htmlBody)).slice(0, 4000);
