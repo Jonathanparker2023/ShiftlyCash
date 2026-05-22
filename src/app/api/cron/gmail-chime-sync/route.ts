@@ -23,11 +23,13 @@ const IMAP_SOCKET_TIMEOUT_MS = 15_000;
 const INGEST_FETCH_TIMEOUT_MS = 8_000;
 // Code-side self-throttle. Even if cron-job.org fires every minute,
 // the route returns "throttled" until this much time has elapsed
-// since the last started run. Codex review pointed out 1/min × 5s =
-// 2 CPU-hours/day, half of Vercel free-tier monthly budget. Default
-// to 15 min, tunable via env if needed.
+// since the last started run. Codex's review correction: 15-min
+// throttle allows up to 96 real runs/day, which at 5-8s/run is
+// 4-6.4 CPU-hours/month — right at or over the 4h free-tier budget.
+// Default to 30 min (48 real runs/day max ≈ 2-3.2 CPU-hours/month)
+// with comfortable headroom. Tunable via env.
 const SELF_THROTTLE_MS = Number(
-  process.env.GMAIL_CHIME_SYNC_THROTTLE_MS ?? 15 * 60 * 1000,
+  process.env.GMAIL_CHIME_SYNC_THROTTLE_MS ?? 30 * 60 * 1000,
 );
 // Look back this far for new Chime emails. Anything older than this
 // window is presumed handled (or intentionally skipped).
