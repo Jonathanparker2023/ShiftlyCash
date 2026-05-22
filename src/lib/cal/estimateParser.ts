@@ -48,7 +48,26 @@ export function parseEstimateResponse(raw: string): FoodEstimate[] {
   try {
     json = JSON.parse(cleaned);
   } catch {
-    throw new Error("Estimator returned invalid JSON.");
+    // Sonnet occasionally prefixes JSON with prose ("Here's the
+    // estimate:") despite the JSON-only instruction. Try extracting
+    // the first balanced JSON value (array or object) and parsing
+    // that before giving up.
+    const extracted = extractFirstJsonValue(cleaned);
+    if (extracted) {
+      try {
+        json = JSON.parse(extracted);
+      } catch {
+        console.warn(
+          `[estimateParser] invalid JSON after extraction. Raw (first 500): ${raw.slice(0, 500)}`,
+        );
+        throw new Error("Estimator returned invalid JSON.");
+      }
+    } else {
+      console.warn(
+        `[estimateParser] invalid JSON, no value found. Raw (first 500): ${raw.slice(0, 500)}`,
+      );
+      throw new Error("Estimator returned invalid JSON.");
+    }
   }
 
   if (typeof json !== "object" || json === null) {
@@ -61,6 +80,45 @@ export function parseEstimateResponse(raw: string): FoodEstimate[] {
   }
 
   return items.map(parseEstimateItem);
+}
+
+// Scan `text` for the first balanced JSON array or object and return
+// the substring. Counts brackets/braces to find the matching close,
+// respecting strings and escapes. Returns null if no balanced value
+// is found.
+function extractFirstJsonValue(text: string): string | null {
+  const startIdx = text.search(/[[{]/);
+  if (startIdx < 0) return null;
+
+  const open = text[startIdx];
+  const close = open === "[" ? "]" : "}";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = startIdx; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) return text.slice(startIdx, i + 1);
+    }
+  }
+
+  return null;
 }
 
 function parseEstimateItem(item: unknown): FoodEstimate {
