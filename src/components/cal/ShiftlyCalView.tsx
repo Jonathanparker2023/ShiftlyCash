@@ -96,6 +96,7 @@ export function ShiftlyCalView({
     initialData.currentWeek.days[todayIndex]?.weight?.weightLbs.toString() ?? "",
   );
   const [loggedFoodId, setLoggedFoodId] = useState<string | null>(null);
+  const [pendingScrollEntryId, setPendingScrollEntryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isPending, startTransition] = useTransition();
@@ -139,6 +140,21 @@ export function ShiftlyCalView({
     }, 4000);
     return () => window.clearInterval(id);
   }, [hasRecentPendingVerdicts, router]);
+
+  useEffect(() => {
+    if (!pendingScrollEntryId) return;
+    const hasEntry = focusedDay.entries.some(
+      (entry) => entry.id === pendingScrollEntryId,
+    );
+    if (!hasEntry) return;
+
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-food-entry-id="${pendingScrollEntryId}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      setPendingScrollEntryId(null);
+    });
+  }, [focusedDay.entries, pendingScrollEntryId]);
 
   // Coach-review signatures. Re-fetch when the underlying data
   // composition shifts. Cheap to recompute, cheap to send up to the
@@ -202,7 +218,7 @@ export function ShiftlyCalView({
     setError(null);
     startTransition(async () => {
       try {
-        await createFoodEntryAction({
+        const result = await createFoodEntryAction({
           date: focusedDay.date,
           loggedTime: input.loggedTime,
           mealName: input.mealName,
@@ -217,6 +233,7 @@ export function ShiftlyCalView({
           saturatedFatG: input.saturatedFatG,
           savedFoodId: null,
         });
+        setPendingScrollEntryId(result.id);
         router.refresh();
       } catch (err) {
         setError(
@@ -469,16 +486,17 @@ export function ShiftlyCalView({
                 <div className="mt-4 space-y-2">
                   {focusedDay.entries.length > 0 ? (
                     focusedDay.entries.map((entry) => (
-                      <FoodEntryRow
-                        disabled={isPending}
-                        entry={entry}
-                        key={entry.id}
-                        nowMs={nowMs}
-                        onDelete={deleteEntry}
-                        onOverrideVerdict={overrideVerdict}
-                        onRegenerateVerdict={regenerateVerdict}
-                        onUpdate={updateEntry}
-                      />
+                      <div data-food-entry-id={entry.id} key={entry.id}>
+                        <FoodEntryRow
+                          disabled={isPending}
+                          entry={entry}
+                          nowMs={nowMs}
+                          onDelete={deleteEntry}
+                          onOverrideVerdict={overrideVerdict}
+                          onRegenerateVerdict={regenerateVerdict}
+                          onUpdate={updateEntry}
+                        />
+                      </div>
                     ))
                   ) : (
                     <div className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-6 text-center text-sm text-[var(--text-secondary)]">
