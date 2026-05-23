@@ -887,7 +887,7 @@ function TopMetric({
         </div>
         {trend ? (
           <div
-            className={`shrink-0 text-right text-[10px] font-bold uppercase tracking-[0.08em] ${cashflowColorFromTone(
+            className={`shrink-0 whitespace-nowrap pr-px text-right text-[8px] font-bold uppercase leading-none tracking-[0.02em] sm:text-[9px] md:text-[10px] md:tracking-[0.08em] ${cashflowColorFromTone(
               trend.tone,
             )}`}
           >
