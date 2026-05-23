@@ -997,17 +997,25 @@ function WeekStripCell({
       : dayTone === "amber"
         ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
         : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
+  const selectedStyle = isFocused
+    ? {
+        borderColor: "var(--accent-primary)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px var(--accent-primary), 0 0 24px -6px rgba(10, 129, 86, 0.45)",
+      }
+    : undefined;
 
   return (
     <button
-        className={
-          isFocused
+      className={
+        isFocused
           ? `min-w-0 rounded-md border-[3px] ${toneBorderFocused} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlowFocused} transition-colors duration-150 focus:outline-none sm:p-3`
           : day.spendLocked
             ? `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left opacity-75 ${toneGlow} transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
             : `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlow} transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
       }
       onClick={() => onFocus(dayIndex)}
+      style={selectedStyle}
       type="button"
     >
       <div className="flex min-w-0 items-center justify-between gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
@@ -1028,7 +1036,7 @@ function WeekStripCell({
         </span>
       </div>
       <p
-        className={`mt-2 truncate text-3xl font-bold tracking-tight sm:mt-3 ${cashflowDailyColor(
+        className={`mt-2 truncate text-lg font-bold tracking-tight sm:mt-3 sm:text-xl md:text-2xl lg:text-3xl ${cashflowDailyColor(
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >

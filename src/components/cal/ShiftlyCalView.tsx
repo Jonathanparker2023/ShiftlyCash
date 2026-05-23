@@ -641,15 +641,28 @@ function WeekStripCell({
       : verdict === "bad"
         ? "text-[var(--accent-negative-text)]"
         : "text-[var(--text-secondary)]";
+  const hasEntries = day.entries.length > 0;
+  const selectedStyle = isFocused
+    ? {
+        borderColor: "var(--accent-primary)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px var(--accent-primary), 0 0 24px -6px rgba(10, 129, 86, 0.45)",
+      }
+    : undefined;
+  const hoverGlowClass =
+    !isFocused && hasEntries
+      ? "hover:border-[var(--border-default)] hover:shadow-[0_0_16px_-6px_rgba(10,129,86,0.30)]"
+      : "";
 
   return (
     <button
       className={`min-w-0 rounded-md px-1.5 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 focus:outline-none sm:p-3 ${
         isFocused
           ? `border-[3px] ${toneBorderFocused} ${toneBg} ${toneGlowFocused}`
-          : `border-2 ${toneBorder} ${toneBg} ${toneGlow} hover:bg-[var(--surface-elevated)]`
+          : `border-2 ${toneBorder} ${toneBg} ${toneGlow} ${hoverGlowClass}`
       }`}
       onClick={onClick}
+      style={selectedStyle}
       type="button"
     >
       <p className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)] sm:text-[10px] sm:tracking-[0.14em]">
