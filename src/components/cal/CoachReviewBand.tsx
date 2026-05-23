@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   generateFocusedDayCoachReviewAction,
   generateWeeklyCoachReviewAction,
   type CoachReviewActionResult,
 } from "@/app/(protected)/cal/coachReviewActions";
+import { AppPanel } from "@/components/shell";
 
 // ── Weekly coach band ────────────────────────────────────────────────
 //
@@ -25,38 +26,42 @@ export function WeeklyCoachBand({
   // week's data shifts.
   weekEntriesSignature: string;
 }) {
-  const [state, setState] = useState<FetchState>({ status: "loading" });
-  const seqRef = useRef(0);
+  const [state, setState] = useState<FetchState>(() => ({ status: "loading" }));
 
   useEffect(() => {
-    const seq = seqRef.current + 1;
-    seqRef.current = seq;
-    setState({ status: "loading" });
+    let cancelled = false;
 
     generateWeeklyCoachReviewAction()
       .then((result) => {
-        if (seqRef.current !== seq) return;
+        if (cancelled) return;
         setState(stateFromResult(result));
       })
       .catch((err: unknown) => {
-        if (seqRef.current !== seq) return;
+        if (cancelled) return;
         setState({
           status: "hidden",
           reason: err instanceof Error ? err.message : "unknown error",
         });
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [weekStartIso, weekEntriesSignature]);
 
   if (state.status === "hidden") return null;
 
   return (
-    <div className="mt-4 rounded-lg border border-emerald-300/15 bg-emerald-500/[0.04] px-4 py-3 text-white/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+    <AppPanel
+      className="mt-4 px-4 py-3 text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+      elevated
+    >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200/70">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-primary-text)]">
           Coach read — week
         </p>
         {state.status === "loading" ? (
-          <span className="h-3 w-3 animate-pulse rounded-full bg-emerald-400/40" />
+          <span className="h-3 w-3 animate-pulse rounded-full bg-[var(--accent-primary-fill)]" />
         ) : null}
       </div>
       <p className="mt-1 text-sm font-medium leading-snug">
@@ -66,7 +71,7 @@ export function WeeklyCoachBand({
           state.body
         )}
       </p>
-    </div>
+    </AppPanel>
   );
 }
 
@@ -83,38 +88,39 @@ export function FocusedDayCoachStrip({
   focusedDate: string;
   daySignature: string;
 }) {
-  const [state, setState] = useState<FetchState>({ status: "loading" });
-  const seqRef = useRef(0);
+  const [state, setState] = useState<FetchState>(() => ({ status: "loading" }));
 
   useEffect(() => {
-    const seq = seqRef.current + 1;
-    seqRef.current = seq;
-    setState({ status: "loading" });
+    let cancelled = false;
 
     generateFocusedDayCoachReviewAction(focusedDate)
       .then((result) => {
-        if (seqRef.current !== seq) return;
+        if (cancelled) return;
         setState(stateFromResult(result));
       })
       .catch((err: unknown) => {
-        if (seqRef.current !== seq) return;
+        if (cancelled) return;
         setState({
           status: "hidden",
           reason: err instanceof Error ? err.message : "unknown error",
         });
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [focusedDate, daySignature]);
 
   if (state.status === "hidden") return null;
 
   return (
-    <div className="mt-3 rounded-md border border-white/10 bg-black/30 px-3 py-2 text-white/80 backdrop-blur-md">
+    <AppPanel className="mt-3 px-3 py-2 text-[var(--text-secondary)]" elevated>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
           Coach read
         </p>
         {state.status === "loading" ? (
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white/25" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--surface-hover)]" />
         ) : null}
       </div>
       <p className="mt-1 text-xs font-medium leading-snug">
@@ -124,7 +130,7 @@ export function FocusedDayCoachStrip({
           state.body
         )}
       </p>
-    </div>
+    </AppPanel>
   );
 }
 
@@ -150,7 +156,7 @@ function SkeletonLine() {
   return (
     <span
       aria-hidden="true"
-      className="inline-block h-3 w-3/4 animate-pulse rounded bg-white/15"
+      className="inline-block h-3 w-3/4 animate-pulse rounded bg-[var(--surface-elevated)]"
     />
   );
 }

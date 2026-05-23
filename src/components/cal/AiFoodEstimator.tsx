@@ -269,8 +269,8 @@ export function AiFoodEstimator({
   // visual variant.
   const isPrimary = buttonLabel === "Log food";
   const buttonClass = isPrimary
-    ? "flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-300/60 bg-emerald-500 px-5 py-4 text-base font-bold text-white shadow-md transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-6 sm:py-3"
-    : "rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60";
+    ? "flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-5 py-4 text-base font-bold text-[var(--text-primary)] shadow-md transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-6 sm:py-3"
+    : "rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60";
 
   return (
     <div>
@@ -291,7 +291,7 @@ export function AiFoodEstimator({
       </button>
 
       {isOpen ? (
-        <div className="mt-3 rounded-md border border-white/15 bg-black/20 p-3 text-white">
+        <div className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)]">
           {estimateStatus === "loading" ? (
             <EstimateLoadingPanel
               onCancel={() => {
@@ -334,10 +334,10 @@ export function AiFoodEstimator({
             )
           ) : (
             <div className="mt-3 space-y-3">
-              <label className="block text-sm font-semibold text-white/80">
+              <label className="block text-sm font-semibold text-[var(--text-secondary)]">
                 What did you eat?
                 <textarea
-                  className="mt-1 min-h-32 w-full rounded-md border border-white/20 bg-black/25 px-3 py-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40 sm:min-h-24 sm:text-sm"
+                  className="mt-1 min-h-32 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-3 text-base text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40 sm:min-h-24 sm:text-sm"
                   maxLength={4000}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="What did you eat? Be as specific or as casual as you want."
@@ -352,7 +352,7 @@ export function AiFoodEstimator({
               <div className="flex flex-wrap gap-2">
                 {speechSupported ? (
                   <button
-                    className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={disabled || isPending}
                     onClick={toggleListening}
                     type="button"
@@ -368,7 +368,7 @@ export function AiFoodEstimator({
                   </button>
                 ) : null}
                 <button
-                  className="flex-1 rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:py-2 sm:text-sm sm:font-semibold"
+                  className="flex-1 rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-3 text-base font-bold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:py-2 sm:text-sm sm:font-semibold"
                   disabled={disabled || isPending || !description.trim()}
                   onClick={runEstimate}
                   type="button"
@@ -376,7 +376,7 @@ export function AiFoodEstimator({
                   {isPending ? "Estimating..." : "Estimate"}
                 </button>
                 <button
-                  className="rounded-md border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20 sm:py-2"
+                  className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] sm:py-2"
                   onClick={() => {
                     reset();
                     setIsOpen(false);
@@ -403,12 +403,12 @@ function currentTimeInput(): string {
 
 function EstimateLoadingPanel({ onCancel }: { onCancel: () => void }) {
   return (
-    <div className="mt-3 rounded-md border border-white/15 bg-black/25 p-3">
+    <div className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="rounded-full border border-emerald-300/50 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200">
+        <span className="rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-3 py-1 text-xs font-semibold text-[var(--accent-primary-text)]">
           Working...
         </span>
-        <span className="text-xs font-semibold text-white/55">
+        <span className="text-xs font-semibold text-[var(--text-tertiary)]">
           Looking up nutrition data
         </span>
       </div>
@@ -427,7 +427,7 @@ function EstimateLoadingPanel({ onCancel }: { onCancel: () => void }) {
       <EstimateProgressBar />
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
           onClick={onCancel}
           type="button"
         >
@@ -455,14 +455,14 @@ function EstimateErrorPanel({
       <p className="mt-3 text-sm font-medium text-red-100">{error}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400"
+          className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)]"
           onClick={onRetry}
           type="button"
         >
           Retry
         </button>
         <button
-          className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
           onClick={onCancel}
           type="button"
         >
@@ -476,12 +476,12 @@ function EstimateErrorPanel({
 function EstimateProgressBar() {
   return (
     <div className="mt-4 space-y-2">
-      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-white/70">
+      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-[var(--text-secondary)]">
         <span>Estimating nutrition...</span>
-        <span className="text-white/45">A few seconds</span>
+        <span className="text-[var(--text-tertiary)]">A few seconds</span>
       </div>
-      <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/10">
-        <div className="estimate-progress-stripe absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-emerald-400/0 via-emerald-400 to-emerald-400/0" />
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
+        <div className="estimate-progress-stripe absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-transparent via-[var(--accent-primary-text)] to-transparent" />
       </div>
       <style>{`
         @keyframes estimate-progress-slide {
@@ -508,17 +508,17 @@ function SkeletonField({
   suffix?: string;
 }) {
   return (
-    <div className={`block text-sm font-semibold text-white/80 ${className}`}>
+    <div className={`block text-sm font-semibold text-[var(--text-secondary)] ${className}`}>
       {label}
-      <div className="relative mt-1 h-10 w-full overflow-hidden rounded-md border border-white/15 bg-black/25">
-        <div className="absolute inset-y-0 left-0 w-1/2 animate-pulse bg-white/10" />
+      <div className="relative mt-1 h-10 w-full overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+        <div className="absolute inset-y-0 left-0 w-1/2 animate-pulse bg-[var(--surface-elevated)]" />
         {badge ? (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-white/20 bg-black/30 px-2 py-0.5 text-xs text-white/70">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
             {badge}
           </span>
         ) : null}
         {suffix ? (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/40">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-muted)]">
             {suffix}
           </span>
         ) : null}
@@ -545,14 +545,14 @@ function EstimateResult({
   onDiscard: () => void;
 }) {
   return (
-    <div className="mt-3 rounded-md border border-white/15 bg-black/25 p-3">
+    <div className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span
           className={`rounded-full border px-3 py-1 text-xs font-semibold ${confidenceClass(estimate.confidence)}`}
         >
           {estimate.confidence} confidence
         </span>
-        <span className="text-xs font-semibold text-white/60">
+        <span className="text-xs font-semibold text-[var(--text-tertiary)]">
           {categoryLabel(estimate.category)}
         </span>
       </div>
@@ -625,7 +625,7 @@ function EstimateResult({
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
+          className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
           disabled={disabled || !estimate.calories.trim()}
           onClick={onConfirm}
           type="button"
@@ -633,7 +633,7 @@ function EstimateResult({
           {confirmLabel}
         </button>
         <button
-          className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
           onClick={onDiscard}
           type="button"
         >
@@ -652,15 +652,15 @@ function SavePresetCheckbox({
   onChange: (next: boolean) => void;
 }) {
   return (
-    <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10">
+    <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-elevated)]">
       <input
         checked={checked}
-        className="h-4 w-4 cursor-pointer accent-emerald-400"
+        className="h-4 w-4 cursor-pointer accent-[var(--accent-primary)]"
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />
       <span>Save for next time</span>
-      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-white/45">
+      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
         Quick log chip
       </span>
     </label>
@@ -696,16 +696,16 @@ function BatchEstimateResult({
     <div className="mt-3 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-white">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">
             {estimates.length} foods detected
           </p>
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-[var(--text-tertiary)]">
             Review each item, then log them together or one at a time.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
+            className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
             disabled={disabled || !canConfirmAll}
             onClick={onConfirmAll}
             type="button"
@@ -713,7 +713,7 @@ function BatchEstimateResult({
             {allLabel}
           </button>
           <button
-            className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
             onClick={onDiscardAll}
             type="button"
           >
@@ -758,14 +758,14 @@ function MiniEstimateCard({
   onDiscard: () => void;
 }) {
   return (
-    <div className="rounded-md border border-white/15 bg-black/25 p-3">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span
           className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${confidenceClass(estimate.confidence)}`}
         >
           {estimate.confidence} confidence
         </span>
-        <span className="text-xs font-semibold text-white/60">
+        <span className="text-xs font-semibold text-[var(--text-tertiary)]">
           {categoryLabel(estimate.category)}
         </span>
       </div>
@@ -835,8 +835,8 @@ function MiniEstimateCard({
       </div>
 
       {estimate.reasoning ? (
-        <details className="mt-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/70">
-          <summary className="cursor-pointer font-semibold text-white/75">
+        <details className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+          <summary className="cursor-pointer font-semibold text-[var(--text-secondary)]">
             Reasoning
           </summary>
           <p className="mt-2 whitespace-pre-line">{estimate.reasoning}</p>
@@ -852,7 +852,7 @@ function MiniEstimateCard({
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button
-          className="rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
+          className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
           disabled={disabled || !estimate.calories.trim()}
           onClick={onConfirm}
           type="button"
@@ -860,7 +860,7 @@ function MiniEstimateCard({
           {itemLabel}
         </button>
         <button
-          className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
           onClick={onDiscard}
           type="button"
         >
@@ -881,10 +881,10 @@ function CategorySelect({
   value: FoodCategory;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <select
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-[#111827] px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value as FoodCategory)}
         value={value}
       >
@@ -910,10 +910,10 @@ function TextInput({
   value: string;
 }) {
   return (
-    <label className={`block text-sm font-semibold text-white/80 ${className}`}>
+    <label className={`block text-sm font-semibold text-[var(--text-secondary)] ${className}`}>
       {label}
       <input
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value)}
         type="text"
         value={value}
@@ -936,11 +936,11 @@ function NumberInput({
   value: string;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <span className="relative mt-1 block">
         <input
-          className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+          className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
           min={0}
           onChange={(event) => onChange(event.target.value)}
           required={required}
@@ -949,7 +949,7 @@ function NumberInput({
           value={value}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/50">
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-tertiary)]">
             {suffix}
           </span>
         ) : null}
@@ -961,9 +961,9 @@ function NumberInput({
 function confidenceClass(confidence: EstimateForm["confidence"]): string {
   switch (confidence) {
     case "high":
-      return "border-emerald-300/50 bg-emerald-500/15 text-emerald-300";
+      return "border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]";
     case "medium":
-      return "border-amber-300/50 bg-amber-500/15 text-amber-300";
+      return "border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] text-[var(--accent-warning-text)]";
     case "low":
       return "border-red-300/50 bg-red-500/15 text-red-300";
   }

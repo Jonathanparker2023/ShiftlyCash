@@ -640,34 +640,34 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1220]/10 px-3 py-4 text-[#f8fafc] sm:px-4 lg:px-6">
+    <div className="min-h-screen bg-[var(--surface-base)] px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6">
       {closeError ? (
-        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[#fecaca] bg-[#fff1f2] p-3 text-sm font-medium text-[#b91c1c]">
+        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] p-3 text-sm font-medium text-[var(--accent-negative-text)]">
           {closeError}
         </div>
       ) : null}
 
       {closeToast ? (
-        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[#bae6fd] bg-[#e0f2fe] p-3 text-sm font-medium text-[#0e7490]">
+        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] p-3 text-sm font-medium text-[var(--accent-primary-text)]">
           {closeToast}
         </div>
       ) : null}
 
       <main className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
-          <div className="h-2 bg-white/10" />
+        <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
+          <div className="h-2 bg-[var(--surface-elevated)]" />
           <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                 Week {initialData.week.displayWeekNumber}
               </p>
-              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] drop-shadow-sm sm:text-3xl">
                 {formatFullRange(initialData.week.startDate, initialData.week.endDate)}
                 <CalendarIcon />
               </h1>
               <div className="mt-3 flex flex-wrap gap-2">
-                <p className="inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm">
                   {initialData.week.payPeriodRole === "week_1"
                     ? "Week 1 of Pay Period"
                     : "Week 2 of Pay Period"}
@@ -682,11 +682,11 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
             <div>
               <div className="mb-3 flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-                <span className="inline-flex rounded-full border border-white/25 bg-white/15 px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm">
                   Active week
                 </span>
                 <button
-                  className="inline-flex rounded-full border border-emerald-200/60 bg-emerald-400/90 px-3 py-1 text-xs font-bold text-[#052e16] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isSyncing}
                   onClick={handleManualSync}
                   type="button"
@@ -694,7 +694,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                   {isSyncing ? "Syncing..." : "Sync now"}
                 </button>
                 {syncStatus ? (
-                  <span className="inline-flex rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                  <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm">
                     {syncStatus}
                   </span>
                 ) : null}
@@ -753,8 +753,8 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             />
           ) : null}
 
-          <div className="mt-4 flex flex-col gap-3 border-t border-white/20 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-white">
+          <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border-default)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[var(--text-primary)]">
               <span>
                 Prestige:{" "}
                 {formatHoursFromSlots(days, ["prestige", "prestige_ilst"])}h
@@ -770,7 +770,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               prestigeNetCents={weekNetTotals.prestigeNetCents}
             />
             <button
-              className="h-10 w-full rounded-md bg-[#0b1220] px-5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(16,16,15,0.18)] transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#d7dee8] disabled:text-[#64748b] disabled:shadow-none sm:w-auto"
+              className="h-10 w-full rounded-md bg-[var(--surface-base)] px-5 text-sm font-semibold text-[var(--text-primary)] shadow-[0_8px_18px_rgba(16,16,15,0.18)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:shadow-none sm:w-auto"
               disabled={!canCloseWeek || isClosing}
               onClick={closeWeek}
               title={canCloseWeek ? "Close this week" : "Available after Saturday"}
@@ -860,27 +860,27 @@ function TopMetric({
       : accent === "positive"
         ? "before:bg-green-600"
         : accent === "amber"
-          ? "before:bg-amber-500"
+          ? "before:bg-[var(--accent-warning)]"
           : accent === "negative"
             ? "before:bg-red-600"
       : accent === "blue"
-        ? "before:bg-[#7e22ce]"
-        : "before:bg-[#cbd5e1]";
+        ? "before:bg-[var(--accent-primary)]"
+        : "before:bg-[var(--border-strong)]";
 
   return (
     <div
       className={
         dark
-          ? `rounded-md bg-[#0b1220] px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border-2 border-white/45 bg-white/10 px-2.5 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
+          ? `rounded-md bg-[var(--surface-base)] px-2.5 py-3 text-[var(--text-primary)] shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
+          : `relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
       <div className="flex items-start justify-between gap-2">
         <div
           className={
             dark
-              ? "text-[9px] font-semibold uppercase tracking-[0.12em] text-[#cbd5e1] sm:text-[10px] sm:tracking-[0.14em]"
-              : "text-[9px] font-semibold uppercase tracking-[0.12em] text-white/85 sm:text-[10px] sm:tracking-[0.14em]"
+              ? "text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] sm:text-[10px] sm:tracking-[0.14em]"
+              : "text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] sm:text-[10px] sm:tracking-[0.14em]"
           }
         >
           {label}
@@ -903,10 +903,10 @@ function TopMetric({
       <div
         className={
           dark
-            ? "mt-1 text-base font-semibold text-white sm:text-lg"
+            ? "mt-1 text-base font-semibold text-[var(--text-primary)] sm:text-lg"
             : tone
               ? `mt-1 text-base font-semibold sm:text-lg ${cashflowColorFromTone(tone)}`
-              : "mt-1 text-base font-semibold text-white sm:text-lg"
+              : "mt-1 text-base font-semibold text-[var(--text-primary)] sm:text-lg"
         }
       >
         {value}
@@ -919,7 +919,7 @@ function CalendarIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4 text-white"
+      className="h-4 w-4 text-[var(--text-primary)]"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -975,16 +975,16 @@ function WeekStripCell({
   const dayTone = cashflowDailyTone(displayCashflowCents);
   const toneBorder =
     dayTone === "positive"
-      ? "border-emerald-400/80"
+      ? "border-[var(--accent-primary-border)]"
       : dayTone === "amber"
-        ? "border-amber-400/80"
-        : "border-rose-400/80";
+        ? "border-[var(--accent-warning-border)]"
+        : "border-[var(--accent-negative-border)]";
   const toneBorderFocused =
     dayTone === "positive"
-      ? "border-emerald-300"
+      ? "border-[var(--accent-primary-border)]"
       : dayTone === "amber"
-        ? "border-amber-300"
-        : "border-rose-300";
+        ? "border-[var(--accent-warning-border)]"
+        : "border-[var(--accent-negative-border)]";
   const toneGlow =
     dayTone === "positive"
       ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
@@ -1002,26 +1002,26 @@ function WeekStripCell({
     <button
         className={
           isFocused
-          ? `min-w-0 scale-105 rounded-md border-[3px] ${toneBorderFocused} bg-black/30 px-1.5 py-2 text-left ${toneGlowFocused} backdrop-blur-xl transition-all duration-200 focus:outline-none sm:p-3`
+          ? `min-w-0 scale-105 rounded-md border-[3px] ${toneBorderFocused} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlowFocused} backdrop-blur-xl transition-all duration-200 focus:outline-none sm:p-3`
           : day.spendLocked
-            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-black/20 focus:outline-none sm:p-3`
-            : `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-black/20 focus:outline-none sm:p-3`
+            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
+            : `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
     >
-      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.14em]">
+      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)] sm:text-[10px] sm:tracking-[0.14em]">
         <span className="truncate">
           {shortDayName(day.date)} {formatDayOnly(day.date)}
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {isToday ? (
-            <span className="hidden rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-semibold text-white sm:inline-flex">
+            <span className="hidden rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-primary)] sm:inline-flex">
               Today
             </span>
           ) : null}
           {day.spendLocked ? (
-            <span className="hidden rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-semibold text-white sm:inline-flex">
+            <span className="hidden rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-primary)] sm:inline-flex">
               Locked
             </span>
           ) : null}
@@ -1089,7 +1089,7 @@ function FocusedDayEditor({
   ) => void;
 }) {
   return (
-    <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+    <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
         <ShiftList
           day={day}
@@ -1164,9 +1164,9 @@ function TransactionDrawer({
   }
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/15 p-3 text-white shadow-sm backdrop-blur-md">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)] shadow-sm backdrop-blur-md">
       {error ? (
-        <div className="mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
+        <div className="mb-3 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-negative-text)]">
           {error}
         </div>
       ) : null}
@@ -1196,21 +1196,21 @@ function TransactionDrawer({
         />
       </div>
 
-      <div className="mt-3 border-t border-dashed border-white/20 pt-3">
+      <div className="mt-3 border-t border-dashed border-[var(--border-default)] pt-3">
         {isAdding ? (
           <form
             className="grid gap-2 sm:grid-cols-[1fr_140px_auto_auto]"
             onSubmit={submitManualTransaction}
           >
             <input
-              className="h-10 rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
+              className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
               onChange={(event) => setMerchantName(event.target.value)}
               placeholder="Merchant"
               type="text"
               value={merchantName}
             />
             <input
-              className="h-10 rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
+              className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
               min="0"
               onChange={(event) => setAmount(event.target.value)}
               placeholder="Amount"
@@ -1219,14 +1219,14 @@ function TransactionDrawer({
               value={amount}
             />
             <button
-              className="h-10 rounded-md bg-[#0b1220] px-3 text-sm font-semibold text-white transition hover:bg-[#1e293b]"
+              className="h-10 rounded-md bg-[var(--surface-base)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
               disabled={isManualTransactionPending}
               type="submit"
             >
               {isManualTransactionPending ? "Saving..." : "Save"}
             </button>
             <button
-              className="h-10 rounded-md border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-white/15"
+              className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)]"
               onClick={() => {
                 setIsAdding(false);
                 setMerchantName("");
@@ -1239,7 +1239,7 @@ function TransactionDrawer({
           </form>
         ) : (
           <button
-            className="h-9 rounded-md border border-dashed border-white/25 bg-black/5 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/10"
+            className="h-9 rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)]"
             onClick={() => setIsAdding(true)}
             type="button"
           >
@@ -1269,12 +1269,12 @@ function TransactionColumn({
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
   return (
-    <div className="min-h-0 rounded-md border border-white/15 bg-black/15 p-3 backdrop-blur-md">
+    <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 backdrop-blur-md">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
           {heading}
         </h3>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
+        <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
           {transactions.length}
         </span>
       </div>
@@ -1314,7 +1314,7 @@ function TransactionRowButton({
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="overflow-hidden rounded-md border border-white/10 bg-black/10 text-sm shadow-sm transition hover:border-white/40 hover:bg-black/15">
+    <div className="overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-sm shadow-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]">
       <button
         className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
@@ -1325,8 +1325,8 @@ function TransactionRowButton({
           <span
             className={
               variant === "exempt"
-                ? "block truncate font-semibold text-[#64748b] line-through"
-                : "block truncate font-semibold text-white"
+                ? "block truncate font-semibold text-[var(--text-muted)] line-through"
+                : "block truncate font-semibold text-[var(--text-primary)]"
             }
           >
             {transaction.merchantName}
@@ -1334,8 +1334,8 @@ function TransactionRowButton({
           <span
             className={
               variant === "exempt"
-                ? "block text-[10px] font-semibold text-[#64748b]/70"
-                : "block text-[10px] font-semibold text-white/45"
+                ? "block text-[10px] font-semibold text-[var(--text-tertiary)]"
+                : "block text-[10px] font-semibold text-[var(--text-tertiary)]"
             }
           >
             {formatTransactionTime(transaction.time)}
@@ -1344,8 +1344,8 @@ function TransactionRowButton({
         <span
           className={
             variant === "exempt"
-              ? "font-semibold text-[#94a3b8] line-through"
-              : "font-semibold text-[#b91c1c]"
+              ? "font-semibold text-[var(--text-tertiary)] line-through"
+              : "font-semibold text-[var(--accent-negative-text)]"
           }
         >
           {formatMoney(transaction.amountCents)}
@@ -1353,9 +1353,9 @@ function TransactionRowButton({
       </button>
 
       {isExpanded ? (
-        <div className="flex flex-wrap gap-2 border-t border-dashed border-white/20 bg-black/15 px-3 py-2 backdrop-blur-md">
+        <div className="flex flex-wrap gap-2 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 backdrop-blur-md">
           <button
-            className="rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white transition hover:border-white/45 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled}
             onClick={() => onToggle(transaction)}
             type="button"
@@ -1363,7 +1363,7 @@ function TransactionRowButton({
             {variant === "exempt" ? "Include" : "Exempt"}
           </button>
           <button
-            className="rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white transition hover:border-white/45 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled}
             onClick={() => onMoveToYesterday(transaction)}
             type="button"
@@ -1371,7 +1371,7 @@ function TransactionRowButton({
             Move to yesterday
           </button>
           <button
-            className="rounded-md border border-[#fecaca]/70 bg-[#fff1f2] px-2.5 py-1 text-xs font-semibold text-[#b91c1c] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-negative-text)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled}
             onClick={() => {
               if (window.confirm(`Delete ${transaction.merchantName}?`)) {
@@ -1450,13 +1450,13 @@ function ShiftList({
             />
           ))
         ) : (
-          <div className="rounded-md border border-dashed border-white/25 bg-black/5 p-4 text-sm text-white/70">
+          <div className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-secondary)]">
             No shifts logged for this day.
           </div>
         )}
       </div>
       <button
-        className="h-10 w-full rounded-md border border-dashed border-white/25 bg-black/5 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-10 w-full rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
         disabled={day.spendLocked || activeSlots.length >= 4}
         onClick={() => onAddShift(day)}
         type="button"
@@ -1502,7 +1502,7 @@ function ShiftRow({
     "rounded-md border shadow-sm transition",
     shiftBarClass(slot.jobType),
     locked ? "opacity-60" : "",
-    isDragging ? "scale-[0.99] opacity-70 ring-2 ring-[#0e7490]" : "",
+    isDragging ? "scale-[0.99] opacity-70 ring-2 ring-[var(--accent-primary)]" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -1553,7 +1553,7 @@ function ShiftRow({
       </button>
 
       {expanded && !locked ? (
-        <div className="grid gap-3 border-t border-dashed border-white/25 bg-black/15 p-3 backdrop-blur-md sm:grid-cols-2">
+        <div className="grid gap-3 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 backdrop-blur-md sm:grid-cols-2">
           <SelectField
             label="Job"
             value={slot.jobType}
@@ -1663,11 +1663,11 @@ function ShiftRow({
             }
           />
           <div className="flex items-center justify-between sm:col-span-2">
-            <span className="text-xs text-white/70">
+            <span className="text-xs text-[var(--text-secondary)]">
               Auto-saves after edits.
             </span>
             <button
-              className="text-xs font-medium text-[#b91c1c] hover:underline"
+              className="text-xs font-medium text-[var(--accent-negative-text)] hover:underline"
               onClick={() => onRemove(slot)}
               type="button"
             >
@@ -1682,38 +1682,38 @@ function ShiftRow({
 
 function shiftBarClass(jobType: JobType): string {
   if (isAbilityShift(jobType) || jobType === "incentive") {
-    return "border-[#1e3a8a] bg-[#1d4ed8] text-white";
+    return "border-[var(--accent-primary-border)] bg-[var(--accent-primary)] text-[var(--text-primary)]";
   }
 
   if (jobType === "prestige" || jobType === "prestige_ilst") {
-    return "border-[#d97706] bg-[#facc15] text-[#1f2937]";
+    return "border-[var(--accent-warning-border)] bg-[var(--accent-warning)] text-[var(--surface-base)]";
   }
 
-  return "border-[#d7dee8] bg-white text-[#0f172a]";
+  return "border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--text-primary)]";
 }
 
 function shiftDotClass(jobType: JobType): string {
   if (isAbilityShift(jobType) || jobType === "incentive") {
-    return "h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]";
+    return "h-2.5 w-2.5 rounded-full bg-[var(--text-primary)] shadow-[0_0_0_3px_var(--border-default)]";
   }
 
   if (jobType === "prestige" || jobType === "prestige_ilst") {
-    return "h-2.5 w-2.5 rounded-full bg-[#92400e] shadow-[0_0_0_3px_rgba(146,64,14,0.16)]";
+    return "h-2.5 w-2.5 rounded-full bg-[var(--accent-warning)] shadow-[0_0_0_3px_rgba(245,158,11,0.16)]";
   }
 
-  return "h-2.5 w-2.5 rounded-full bg-[#0e7490] shadow-[0_0_0_3px_rgba(14,116,144,0.16)]";
+  return "h-2.5 w-2.5 rounded-full bg-[var(--accent-primary)] shadow-[0_0_0_3px_rgba(16,185,129,0.16)]";
 }
 
 function payTypeBadgeClass(payType: PayType | null | undefined): string {
   if (payType === "split") {
-    return "rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-[#0f172a]";
+    return "rounded-full bg-[var(--text-primary)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--surface-base)]";
   }
 
   if (payType === "overtime") {
-    return "rounded-full bg-[#22c55e] px-2 py-0.5 text-[10px] font-bold uppercase text-white";
+    return "rounded-full bg-[var(--accent-primary)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--text-primary)]";
   }
 
-  return "rounded-full bg-[#dbeafe] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#1d4ed8]";
+  return "rounded-full bg-[var(--accent-primary-fill)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--accent-primary-text)]";
 }
 
 function TotalsPanel({
@@ -1731,7 +1731,7 @@ function TotalsPanel({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-white/15 bg-black/15 p-2.5 text-sm backdrop-blur-md">
+      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-sm backdrop-blur-md">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
           label="Spend"
@@ -1739,7 +1739,7 @@ function TotalsPanel({
           value={formatMoney(spendCents)}
         />
         <TotalLine label="Base" value={formatMoney(baseCents)} />
-        <div className="my-2 border-t border-white/20" />
+        <div className="my-2 border-t border-[var(--border-default)]" />
         <TotalLine
           strong
           label="Cashflow"
@@ -1764,14 +1764,14 @@ function TotalLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <span className={strong ? "font-semibold text-white" : "text-white/75"}>{label}</span>
+      <span className={strong ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}>{label}</span>
       <span
         className={
           tone
             ? `font-semibold ${cashflowColorFromTone(tone)}`
             : strong
-              ? "font-semibold text-white"
-              : "font-medium text-white"
+              ? "font-semibold text-[var(--text-primary)]"
+              : "font-medium text-[var(--text-primary)]"
         }
       >
         {value}
@@ -1795,11 +1795,11 @@ function SelectField({
 }) {
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         {label}
       </span>
       <select
-        className="h-9 w-full rounded-md border border-white/20 bg-[#111827] px-2 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white"
+        className="h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
         onChange={(event) => onChange(event.target.value)}
         value={value}
       >
@@ -1846,11 +1846,11 @@ function NumberField({
 
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition read-only:bg-white/10 read-only:text-white/60 focus:border-white/60 focus:ring-2 focus:ring-white"
+        className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition read-only:bg-[var(--surface-elevated)] read-only:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
         inputMode="decimal"
         min="0"
         onBlur={commitDraft}
@@ -1879,11 +1879,11 @@ function TextField({
 }) {
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white"
+        className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
         onChange={(event) => onChange(event.target.value)}
         type="text"
         value={value}
@@ -1912,8 +1912,8 @@ function SaveIndicator({
     <div
       className={
         state === "error"
-          ? "rounded-full bg-[#fff1f2] px-3 py-1 text-xs font-medium text-[#b91c1c]"
-          : "rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white"
+          ? "rounded-full bg-[var(--accent-negative-fill)] px-3 py-1 text-xs font-medium text-[var(--accent-negative-text)]"
+          : "rounded-full bg-[var(--surface-elevated)] px-3 py-1 text-xs font-medium text-[var(--text-primary)]"
       }
     >
       {label}

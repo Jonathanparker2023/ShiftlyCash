@@ -306,34 +306,34 @@ export function ShiftlyCalView({
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
-        <div className="h-2 bg-white/10" />
+      <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
+        <div className="h-2 bg-[var(--surface-elevated)]" />
         <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(520px,1.05fr)] lg:items-start">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                 ShiftlyCal
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <Link
-                  className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                  className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm transition hover:bg-[var(--surface-hover)]"
                   href={`/cal?week=${prevWeekIso}`}
                 >
                   Prev
                 </Link>
-                <h2 className="text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+                <h2 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] drop-shadow-sm sm:text-3xl">
                   {formatWeekRange(
                     initialData.currentWeek.weekStartIso,
                     initialData.currentWeek.weekEndIso,
                   )}
                 </h2>
                 {isCurrentWeek ? (
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-white/40">
+                  <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-muted)]">
                     Next
                   </span>
                 ) : (
                   <Link
-                    className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                    className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm transition hover:bg-[var(--surface-hover)]"
                     href={`/cal?week=${nextWeekIso}`}
                   >
                     Next
@@ -341,11 +341,11 @@ export function ShiftlyCalView({
                 )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <p className="inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm">
                   Energy balance tracker
                 </p>
                 <Link
-                  className="inline-flex rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                  className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm transition hover:bg-[var(--surface-hover)]"
                   href={`/cal/trends?week=${weekStartIso}`}
                 >
                   Trends
@@ -359,6 +359,7 @@ export function ShiftlyCalView({
           </div>
 
           <WeeklyCoachBand
+            key={weekSignature}
             weekStartIso={weekStartIso}
             weekEntriesSignature={weekSignature}
           />
@@ -382,7 +383,7 @@ export function ShiftlyCalView({
             </p>
           ) : null}
 
-          <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+          <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
             {/* Mobile-only quick log bar — first thing the user sees under
                 the calendar. Big Log food button + a discreet collapsed
                 dropdown for saved foods (presets). The big SavedFoodsList
@@ -439,6 +440,7 @@ export function ShiftlyCalView({
                   targets={initialData.targets}
                 />
                 <FocusedDayCoachStrip
+                  key={`${focusedDay.date}:${focusedDaySignature}`}
                   focusedDate={focusedDay.date}
                   daySignature={focusedDaySignature}
                 />
@@ -463,7 +465,7 @@ export function ShiftlyCalView({
                       />
                     ))
                   ) : (
-                    <div className="rounded-md border border-dashed border-white/20 bg-black/15 p-6 text-center text-sm text-white/70">
+                    <div className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-6 text-center text-sm text-[var(--text-secondary)]">
                       No food logged for this day.
                     </div>
                   )}
@@ -565,24 +567,24 @@ function TopMetric({
     accent === "green"
       ? "before:bg-green-600"
       : accent === "blue"
-        ? "before:bg-[#7e22ce]"
+        ? "before:bg-[var(--accent-primary)]"
         : accent === "amber"
-          ? "before:bg-amber-500"
+          ? "before:bg-[var(--accent-warning)]"
           : accent === "negative"
             ? "before:bg-red-600"
-            : "before:bg-[#cbd5e1]";
+            : "before:bg-[var(--border-strong)]";
 
   return (
     <div
-      className={`relative overflow-hidden rounded-md border-2 border-white/45 bg-white/10 px-2.5 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
+      className={`relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
     >
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/85 sm:text-[10px] sm:tracking-[0.14em]">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] sm:text-[10px] sm:tracking-[0.14em]">
         {label}
       </p>
       <p className={`mt-1 text-base font-semibold sm:text-lg ${magnitudeColorClass(tone)}`}>
         {value}
       </p>
-      {note ? <p className="mt-2 text-xs text-white/60">{note}</p> : null}
+      {note ? <p className="mt-2 text-xs text-[var(--text-tertiary)]">{note}</p> : null}
     </div>
   );
 }
@@ -605,22 +607,22 @@ function WeekStripCell({
 
   const toneBorder =
     verdict === "good"
-      ? "border-emerald-400/80"
+      ? "border-[var(--accent-primary-border)]"
       : verdict === "bad"
-        ? "border-rose-400/80"
-        : "border-white/45";
+        ? "border-[var(--accent-negative-border)]"
+        : "border-[var(--border-strong)]";
   const toneBorderFocused =
     verdict === "good"
-      ? "border-emerald-300"
+      ? "border-[var(--accent-primary-border)]"
       : verdict === "bad"
-        ? "border-rose-300"
-        : "border-white/90";
+        ? "border-[var(--accent-negative-border)]"
+        : "border-[var(--border-strong)]";
   const toneBg =
     verdict === "good"
-      ? "bg-emerald-500/20"
+      ? "bg-[var(--accent-primary-fill)]"
       : verdict === "bad"
-        ? "bg-rose-500/20"
-        : "bg-black/10";
+        ? "bg-[var(--accent-negative-fill)]"
+        : "bg-[var(--surface-elevated)]";
   const toneGlow =
     verdict === "good"
       ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
@@ -635,25 +637,25 @@ function WeekStripCell({
         : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_28px_rgba(255,255,255,0.3)]";
   const calorieTextClass =
     verdict === "good"
-      ? "text-emerald-200"
+      ? "text-[var(--accent-primary-text)]"
       : verdict === "bad"
-        ? "text-rose-200"
-        : "text-white/70";
+        ? "text-[var(--accent-negative-text)]"
+        : "text-[var(--text-secondary)]";
 
   return (
     <button
-      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white transition-all duration-200 focus:outline-none sm:p-3 ${
+      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-[var(--text-primary)] transition-all duration-200 focus:outline-none sm:p-3 ${
         isFocused
           ? `scale-105 border-[3px] ${toneBorderFocused} ${toneBg} ${toneGlowFocused} backdrop-blur-xl`
-          : `border-2 ${toneBorder} ${toneBg} ${toneGlow} backdrop-blur-xl hover:bg-black/20`
+          : `border-2 ${toneBorder} ${toneBg} ${toneGlow} backdrop-blur-xl hover:bg-[var(--surface-elevated)]`
       }`}
       onClick={onClick}
       type="button"
     >
-      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.14em]">
+      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)] sm:text-[10px] sm:tracking-[0.14em]">
         {weekday}
       </p>
-      <p className="mt-1 text-base font-semibold text-white sm:text-lg">
+      <p className="mt-1 text-base font-semibold text-[var(--text-primary)] sm:text-lg">
         {date.getUTCDate()}
       </p>
       <p
@@ -687,13 +689,13 @@ function FocusedDayHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
           Focused day
         </p>
-        <h2 className="mt-1 text-xl font-semibold text-white">{label}</h2>
+        <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{label}</h2>
       </div>
       <div className="flex flex-wrap gap-2">
-        <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-sm font-semibold text-white/80">
+        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-secondary)]">
           {day.entries.length} entries
         </span>
         {remaining !== null ? <RemainingBadge remaining={remaining} /> : null}
@@ -705,7 +707,7 @@ function FocusedDayHeader({
 function RemainingBadge({ remaining }: { remaining: number }) {
   if (remaining > 0) {
     return (
-      <span className="rounded-full border border-emerald-300/50 bg-white/10 px-3 py-1 text-sm font-semibold text-emerald-300">
+      <span className="rounded-full border border-[var(--accent-primary-border)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--accent-primary-text)]">
         {remaining.toLocaleString()} cal left
       </span>
     );
@@ -713,14 +715,14 @@ function RemainingBadge({ remaining }: { remaining: number }) {
 
   if (remaining < 0) {
     return (
-      <span className="rounded-full border border-red-300/50 bg-white/10 px-3 py-1 text-sm font-semibold text-red-300">
+      <span className="rounded-full border border-red-300/50 bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-red-300">
         {Math.abs(remaining).toLocaleString()} cal over
       </span>
     );
   }
 
   return (
-    <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white">
+    <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)]">
       Right on target
     </span>
   );
@@ -797,26 +799,26 @@ function FoodEntryRow({
     entry.verdictSource === "pending" &&
     nowMs - new Date(entry.updatedAt).getTime() > 60_000;
   const rowClass = isStuck
-    ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-white shadow-[0_8px_18px_rgba(8,15,28,0.16)]"
+    ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-[var(--text-primary)] shadow-[0_8px_18px_rgba(8,15,28,0.16)]"
     : verdictBarClass(entry);
 
   if (isEditing) {
     return (
       <form className={rowClass} onSubmit={submitEdit}>
         <button
-          className="mb-3 w-full rounded-md border border-white/20 bg-black/20 p-3 text-left transition hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-white/60"
+          className="mb-3 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 text-left transition hover:bg-[var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-white/60"
           onClick={() => setIsEditing(false)}
           type="button"
         >
           <div className="flex items-start justify-between gap-3">
-            <p className="text-sm italic text-white/85">
+            <p className="text-sm italic text-[var(--text-secondary)]">
               {entry.verdictReason
                 ? `${entry.verdictReason}${
                     entry.verdictSource === "manual_override" ? " (your override)" : ""
                   }`
                 : verdictStatus}
             </p>
-            <span aria-hidden="true" className="shrink-0 text-xs text-white/60">
+            <span aria-hidden="true" className="shrink-0 text-xs text-[var(--text-tertiary)]">
               tap to close
             </span>
           </div>
@@ -825,7 +827,7 @@ function FoodEntryRow({
               Scoring failed: {entry.verdictError}
             </p>
           ) : null}
-          <span className="mt-2 inline-flex rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-xs font-semibold text-white/65">
+          <span className="mt-2 inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
             {categoryLabel(entry.category)}
           </span>
         </button>
@@ -897,14 +899,14 @@ function FoodEntryRow({
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
-            className="rounded border border-white/30 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled || isSaving || !editForm.calories.trim()}
             type="submit"
           >
             Save
           </button>
           <button
-            className="rounded border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled || isSaving}
             onClick={() => setIsEditing(false)}
             type="button"
@@ -912,7 +914,7 @@ function FoodEntryRow({
             Cancel
           </button>
           <button
-            className="rounded border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled || isSaving || isVerdictSaving}
             onClick={regenerateVerdict}
             type="button"
@@ -920,13 +922,13 @@ function FoodEntryRow({
             Regenerate verdict
           </button>
         </div>
-        <div className="mt-3 rounded-md border border-white/20 bg-black/20 p-3">
-          <p className="mb-2 text-xs font-semibold text-white/75">
+        <div className="mt-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
+          <p className="mb-2 text-xs font-semibold text-[var(--text-secondary)]">
             Lock verdict override
           </p>
           <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
             <select
-              className="rounded-md border border-white/20 bg-[#111827] px-3 py-2 text-sm font-semibold text-white focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white/30"
               disabled={disabled || isVerdictSaving}
               onChange={(event) => setOverrideValue(event.target.value as FoodVerdict)}
               value={overrideValue}
@@ -935,14 +937,14 @@ function FoodEntryRow({
               <option value="bad">Bad</option>
             </select>
             <input
-              className="rounded-md border border-white/20 bg-black/25 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white/30"
               disabled={disabled || isVerdictSaving}
               onChange={(event) => setOverrideReason(event.target.value)}
               placeholder="Reason"
               value={overrideReason}
             />
             <button
-              className="rounded border border-white/30 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={disabled || isVerdictSaving}
               onClick={submitOverride}
               type="button"
@@ -951,8 +953,8 @@ function FoodEntryRow({
             </button>
           </div>
         </div>
-        <div className="mt-3 rounded-md border border-white/20 bg-black/20 p-3">
-          <p className="mb-2 text-xs font-semibold text-white/75">
+        <div className="mt-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
+          <p className="mb-2 text-xs font-semibold text-[var(--text-secondary)]">
             Forgot something?
           </p>
           <AiFoodEstimator
@@ -977,12 +979,12 @@ function FoodEntryRow({
       >
         <span className="min-w-0 truncate font-semibold">{title}</span>
         {entry.isProjectedPlan ? (
-          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+          <span className="shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             Plan
           </span>
         ) : null}
         {entry.verdictSource === "manual_override" ? (
-          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+          <span className="shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             Override
           </span>
         ) : null}
@@ -990,7 +992,7 @@ function FoodEntryRow({
           {entry.calories.toLocaleString()} cal
         </span>
         {isStuck ? (
-          <span className="shrink-0 rounded border border-white/30 bg-black/20 px-2 py-1 text-xs font-semibold text-white">
+          <span className="shrink-0 rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)]">
             Scoring stuck - retry
           </span>
         ) : null}
@@ -1011,7 +1013,7 @@ function FoodEntryRow({
       >
         <span className="min-w-0 truncate font-semibold">{title}</span>
         {entry.isProjectedPlan ? (
-          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+          <span className="shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             Plan
           </span>
         ) : null}
@@ -1022,7 +1024,7 @@ function FoodEntryRow({
           ^
         </span>
       </button>
-      <div className="mt-2 rounded-md border border-white/20 bg-black/20 p-2 text-xs text-white/85">
+      <div className="mt-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-2 text-xs text-[var(--text-secondary)]">
         <p className="line-clamp-2 italic">{entry.verdictReason ?? verdictStatus}</p>
         {entry.verdictSource === "unscored" && entry.verdictError ? (
           <p className="mt-2 rounded-md border border-red-300/50 bg-red-500/15 px-2 py-1 font-semibold text-red-200">
@@ -1030,16 +1032,16 @@ function FoodEntryRow({
           </p>
         ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
+          <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 font-semibold text-[var(--text-secondary)]">
             {categoryLabel(entry.category)}
           </span>
           {entry.isProjectedPlan ? (
-            <span className="rounded-full border border-emerald-200/30 bg-emerald-900/30 px-2 py-0.5 font-semibold text-emerald-100">
+            <span className="rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-2 py-0.5 font-semibold text-[var(--accent-primary-text)]">
               Projected plan
             </span>
           ) : null}
           {entry.verdictSource === "manual_override" ? (
-            <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
+            <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 font-semibold text-[var(--text-secondary)]">
               Override
             </span>
           ) : null}
@@ -1049,7 +1051,7 @@ function FoodEntryRow({
         <span>{formatMacrosInline(entry) || "No macros logged"}</span>
         <div className="flex items-center gap-2">
           <button
-            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white"
+            className="rounded px-1 py-0.5 font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
             onClick={() => setIsExpanded(false)}
             type="button"
           >
@@ -1057,7 +1059,7 @@ function FoodEntryRow({
           </button>
           {entry.verdictSource === "unscored" || isStuck ? (
             <button
-              className="rounded border border-white/30 bg-black/20 px-2 py-1 font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={disabled || isVerdictSaving}
               onClick={regenerateVerdict}
               type="button"
@@ -1066,7 +1068,7 @@ function FoodEntryRow({
             </button>
           ) : null}
           <button
-            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded px-1 py-0.5 font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();
@@ -1077,7 +1079,7 @@ function FoodEntryRow({
             Edit
           </button>
           <button
-            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded px-1 py-0.5 font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();
@@ -1154,7 +1156,7 @@ function DayTotalsPanel({
 
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Day totals
       </p>
       <div className="mt-3 space-y-3">
@@ -1197,9 +1199,9 @@ function DayTotalHero({
   const textClass = metricTextClass(state.tone);
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
           {label}
         </p>
         <p className={`text-xl font-bold ${textClass}`}>
@@ -1207,7 +1209,7 @@ function DayTotalHero({
         </p>
       </div>
       {target !== null ? (
-        <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
             className={`h-2.5 rounded-full transition-all ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
@@ -1233,7 +1235,7 @@ function DayTotalMetric({
   const textClass = metricTextClass(state.tone);
 
   return (
-    <div className="rounded-md border border-white/10 bg-black/15 p-3">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex items-start justify-between gap-2">
         <p className={`text-sm font-bold ${textClass}`}>{label}</p>
         <p className={`text-sm font-bold ${textClass}`}>
@@ -1241,7 +1243,7 @@ function DayTotalMetric({
         </p>
       </div>
       {target !== null ? (
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
             className={`h-1.5 rounded-full transition-all ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
@@ -1292,9 +1294,9 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
   }
 
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
       <button
-        className="w-full rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled || isGenerating}
         onClick={() => {
           if (!isOpen || !prompt) {
@@ -1312,7 +1314,7 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap gap-2">
             <button
-              className="rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!prompt}
               onClick={copyPrompt}
               type="button"
@@ -1320,7 +1322,7 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
               📋 Copy to clipboard
             </button>
             <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={disabled || isGenerating}
               onClick={generatePrompt}
               type="button"
@@ -1328,25 +1330,25 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
               Regenerate
             </button>
             <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
               onClick={() => setIsOpen(false)}
               type="button"
             >
               Close
             </button>
           </div>
-          {status ? <p className="text-xs font-semibold text-white/70">{status}</p> : null}
-          <label className="block text-xs font-semibold text-white/75">
+          {status ? <p className="text-xs font-semibold text-[var(--text-secondary)]">{status}</p> : null}
+          <label className="block text-xs font-semibold text-[var(--text-secondary)]">
             Zip code
             <input
-              className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+              className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
               onChange={(event) => setZipCode(event.target.value)}
               placeholder="10001"
               value={zipCode}
             />
           </label>
           <textarea
-            className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            className="h-[400px] w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 font-mono text-xs leading-5 text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
             onChange={(event) => setPrompt(event.target.value)}
             value={prompt}
           />
@@ -1395,9 +1397,9 @@ function FindMealPromptBox({ disabled }: { disabled: boolean }) {
   }
 
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
       <button
-        className="w-full rounded-md border border-sky-300/50 bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-sky-300/50 bg-sky-500 px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled || isGenerating}
         onClick={() => {
           if (!isOpen || !prompt) {
@@ -1415,7 +1417,7 @@ function FindMealPromptBox({ disabled }: { disabled: boolean }) {
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap gap-2">
             <button
-              className="rounded-md border border-sky-300/50 bg-sky-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-sky-300/50 bg-sky-500 px-3 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!prompt}
               onClick={copyPrompt}
               type="button"
@@ -1423,7 +1425,7 @@ function FindMealPromptBox({ disabled }: { disabled: boolean }) {
               📋 Copy to clipboard
             </button>
             <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={disabled || isGenerating}
               onClick={generatePrompt}
               type="button"
@@ -1431,25 +1433,25 @@ function FindMealPromptBox({ disabled }: { disabled: boolean }) {
               Regenerate
             </button>
             <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
               onClick={() => setIsOpen(false)}
               type="button"
             >
               Close
             </button>
           </div>
-          {status ? <p className="text-xs font-semibold text-white/70">{status}</p> : null}
-          <label className="block text-xs font-semibold text-white/75">
+          {status ? <p className="text-xs font-semibold text-[var(--text-secondary)]">{status}</p> : null}
+          <label className="block text-xs font-semibold text-[var(--text-secondary)]">
             Zip code or area
             <input
-              className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+              className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
               onChange={(event) => setZipCode(event.target.value)}
               placeholder="10001 or New Milford CT"
               value={zipCode}
             />
           </label>
           <textarea
-            className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            className="h-[400px] w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 font-mono text-xs leading-5 text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
             onChange={(event) => setPrompt(event.target.value)}
             value={prompt}
           />
@@ -1492,9 +1494,9 @@ function HomeRecipePromptBox({ disabled }: { disabled: boolean }) {
   }
 
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
       <button
-        className="w-full rounded-md border border-amber-300/50 bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-warning)] disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled || isGenerating}
         onClick={() => {
           if (!isOpen || !prompt) {
@@ -1512,7 +1514,7 @@ function HomeRecipePromptBox({ disabled }: { disabled: boolean }) {
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap gap-2">
             <button
-              className="rounded-md border border-amber-300/50 bg-amber-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-warning)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!prompt}
               onClick={copyPrompt}
               type="button"
@@ -1520,7 +1522,7 @@ function HomeRecipePromptBox({ disabled }: { disabled: boolean }) {
               📋 Copy to clipboard
             </button>
             <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={disabled || isGenerating}
               onClick={generatePrompt}
               type="button"
@@ -1528,16 +1530,16 @@ function HomeRecipePromptBox({ disabled }: { disabled: boolean }) {
               Regenerate
             </button>
             <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
               onClick={() => setIsOpen(false)}
               type="button"
             >
               Close
             </button>
           </div>
-          {status ? <p className="text-xs font-semibold text-white/70">{status}</p> : null}
+          {status ? <p className="text-xs font-semibold text-[var(--text-secondary)]">{status}</p> : null}
           <textarea
-            className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            className="h-[400px] w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 font-mono text-xs leading-5 text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
             onChange={(event) => setPrompt(event.target.value)}
             value={prompt}
           />
@@ -1565,7 +1567,7 @@ function WaterPanel({
   const fillClass = metricFillClass(state.tone);
 
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
       <div className="flex items-center justify-between gap-3">
         <p className={`text-sm font-bold ${textClass}`}>Water</p>
         <p className={`text-sm font-bold ${textClass}`}>
@@ -1573,7 +1575,7 @@ function WaterPanel({
         </p>
       </div>
       {targetOz !== null ? (
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
             className={`h-1.5 rounded-full transition-all ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
@@ -1583,7 +1585,7 @@ function WaterPanel({
       <div className="mt-3 flex flex-wrap gap-2">
         {[8, 10, 12, 16].map((amount) => (
           <button
-            className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             key={amount}
             onClick={() => onLog(amount)}
@@ -1613,15 +1615,15 @@ function WeightPanel({
   weightValue: string;
 }) {
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Weight
       </p>
       <form className="mt-3 flex gap-2" onSubmit={onSubmit}>
-        <label className="min-w-0 flex-1 text-sm font-semibold text-white/80">
+        <label className="min-w-0 flex-1 text-sm font-semibold text-[var(--text-secondary)]">
           {focusedDayLabel(day.date, todayIso)}
           <input
-            className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
             min={1}
             onChange={(event) => setWeightValue(event.target.value)}
             step="0.1"
@@ -1630,7 +1632,7 @@ function WeightPanel({
           />
         </label>
         <button
-          className="mt-6 rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+          className="mt-6 rounded-md bg-[var(--surface-base)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
           disabled={disabled || !weightValue.trim()}
           type="submit"
         >
@@ -1661,10 +1663,10 @@ function MobileSavedFoodsDropdown({
   if (savedFoods.length === 0) return null;
 
   return (
-    <div className="rounded-md border border-white/10 bg-black/20">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
       <button
         aria-expanded={isOpen}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-white/70 transition hover:text-white"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
@@ -1677,13 +1679,13 @@ function MobileSavedFoodsDropdown({
         </span>
       </button>
       {isOpen ? (
-        <div className="space-y-1 border-t border-white/10 px-2 py-2">
+        <div className="space-y-1 border-t border-[var(--border-subtle)] px-2 py-2">
           {savedFoods.map((food) => (
             <button
               className={`flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 loggedFoodId === food.id
-                  ? "bg-emerald-500/15 text-emerald-200"
-                  : "text-white/80 hover:bg-white/10"
+                  ? "bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]"
               }`}
               disabled={disabled}
               key={food.id}
@@ -1694,7 +1696,7 @@ function MobileSavedFoodsDropdown({
               type="button"
             >
               <span className="truncate font-semibold">{food.name}</span>
-              <span className="shrink-0 text-[10px] font-semibold text-white/45">
+              <span className="shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)]">
                 {food.calories} cal
               </span>
             </button>
@@ -1718,10 +1720,10 @@ function SavedFoodsList({
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Saved foods
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">Quick log</h2>
+      <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Quick log</h2>
       <div className="mt-4 grid gap-2">
         {savedFoods.length > 0 ? (
           savedFoods.map((food) => (
@@ -1734,7 +1736,7 @@ function SavedFoodsList({
             />
           ))
         ) : (
-          <p className="rounded-md border border-dashed border-white/20 bg-black/15 p-4 text-sm text-white/70">
+          <p className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-secondary)]">
             Create saved foods from Trends.
           </p>
         )}
@@ -1759,13 +1761,13 @@ function SavedFoodRow({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold">{food.name}</p>
-          <p className="text-sm text-white/70">
+          <p className="text-sm text-[var(--text-secondary)]">
             {categoryLabel(food.category)} - {food.calories.toLocaleString()} cal
             {formatMacros(food)}
           </p>
         </div>
         <button
-          className="rounded-md bg-zinc-950 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+          className="rounded-md bg-[var(--surface-base)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
           disabled={disabled}
           onClick={() => onInstantLog(food)}
           type="button"
@@ -1787,10 +1789,10 @@ function CategorySelect({
   value: FoodCategory;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <select
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-[#111827] px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value as FoodCategory)}
         value={value}
       >
@@ -1820,10 +1822,10 @@ function TextInput({
   value: string;
 }) {
   return (
-    <label className={`block text-sm font-semibold text-white/80 ${className}`}>
+    <label className={`block text-sm font-semibold text-[var(--text-secondary)] ${className}`}>
       {label}
       <input
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -1847,11 +1849,11 @@ function NumberInput({
   value: string;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <span className="relative mt-1 block">
         <input
-          className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+          className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
           min={0}
           onChange={(event) => onChange(event.target.value)}
           required={required}
@@ -1860,7 +1862,7 @@ function NumberInput({
           value={value}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/50">
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-tertiary)]">
             {suffix}
           </span>
         ) : null}
@@ -2075,13 +2077,13 @@ function metricState(
 function metricTextClass(tone: "green" | "amber" | "red" | "neutral"): string {
   switch (tone) {
     case "green":
-      return "text-emerald-300";
+      return "text-[var(--accent-primary-text)]";
     case "amber":
-      return "text-amber-300";
+      return "text-[var(--accent-warning-text)]";
     case "red":
       return "text-red-300";
     case "neutral":
-      return "text-white";
+      return "text-[var(--text-primary)]";
   }
 }
 
@@ -2092,13 +2094,13 @@ function formatAmount(value: number, unit: string): string {
 function metricFillClass(tone: "green" | "amber" | "red" | "neutral"): string {
   switch (tone) {
     case "green":
-      return "bg-emerald-300";
+      return "bg-[var(--accent-primary-text)]";
     case "amber":
-      return "bg-amber-300";
+      return "bg-[var(--accent-warning-text)]";
     case "red":
       return "bg-red-300";
     case "neutral":
-      return "bg-white/40";
+      return "bg-[var(--surface-hover)]";
   }
 }
 

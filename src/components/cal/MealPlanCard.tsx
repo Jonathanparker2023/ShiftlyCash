@@ -34,14 +34,14 @@ export function MealPlanCard({
 
   return (
     <section
-      className={`overflow-hidden rounded-lg border bg-black/40 text-white shadow-[0_24px_70px_rgba(0,0,0,0.32)] backdrop-blur-xl ${
-        isValid ? "border-emerald-300/25" : "border-amber-300/25"
+      className={`overflow-hidden rounded-lg border bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-[0_24px_70px_rgba(0,0,0,0.32)] backdrop-blur-xl ${
+        isValid ? "border-[var(--accent-primary-border)]" : "border-[var(--accent-warning-border)]"
       }`}
     >
       <div className={isValid ? "" : "opacity-90 saturate-75"}>
         <MainCourseRow candidate={plan.main} />
-        <div className="border-t border-white/10 px-3 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+        <div className="border-t border-[var(--border-subtle)] px-3 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
             Fillers
           </p>
           <div className="mt-2 space-y-1.5">
@@ -50,7 +50,7 @@ export function MealPlanCard({
                 <FillerRow filler={filler} key={filler.id} />
               ))
             ) : (
-              <p className="text-xs font-semibold text-white/45">
+              <p className="text-xs font-semibold text-[var(--text-tertiary)]">
                 No filler needed.
               </p>
             )}
@@ -58,22 +58,22 @@ export function MealPlanCard({
         </div>
       </div>
 
-      <div className="border-t border-white/10 px-3 py-3">
+      <div className="border-t border-[var(--border-subtle)] px-3 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
               Totals
             </p>
-            <p className="mt-1 text-xs font-semibold text-white/75">
+            <p className="mt-1 text-xs font-semibold text-[var(--text-secondary)]">
               {formatTotals(plan)}
             </p>
           </div>
           {isValid ? (
-            <p className="text-xs font-semibold text-emerald-300">
+            <p className="text-xs font-semibold text-[var(--accent-primary-text)]">
               All benchmarks clear.
             </p>
           ) : (
-            <p className="text-xs font-semibold text-amber-300">
+            <p className="text-xs font-semibold text-[var(--accent-warning-text)]">
               couldn&apos;t close
             </p>
           )}
@@ -81,11 +81,11 @@ export function MealPlanCard({
       </div>
 
       {!isValid ? (
-        <div className="border-t border-white/10 px-3 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+        <div className="border-t border-[var(--border-subtle)] px-3 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
             Gaps
           </p>
-          <ul className="mt-2 space-y-1.5 text-xs font-semibold text-amber-100/90">
+          <ul className="mt-2 space-y-1.5 text-xs font-semibold text-[var(--accent-warning-text)]">
             {validationResult.gaps.map((gap) => (
               <li key={`${gap.metric}-${gap.direction}`}>
                 {gap.remediation}
@@ -95,7 +95,7 @@ export function MealPlanCard({
         </div>
       ) : null}
 
-      <div className="border-t border-white/10 px-3 py-3">
+      <div className="border-t border-[var(--border-subtle)] px-3 py-3">
         <div className="flex flex-wrap gap-2">
           <SecondaryButton disabled={disabled} onClick={onCycleMain}>
             Cycle main
@@ -111,7 +111,7 @@ export function MealPlanCard({
                 </SecondaryButton>
               ) : null}
               <button
-                className="min-h-9 rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-9 rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={disabled}
                 onClick={() => onAccept(false)}
                 type="button"
@@ -129,18 +129,18 @@ export function MealPlanCard({
           )}
         </div>
         {cyclesExhausted ? (
-          <p className="mt-2 text-xs font-semibold text-amber-200/80">
+          <p className="mt-2 text-xs font-semibold text-[var(--accent-warning-text)]">
             Cycle pool is thin. Regenerate to broaden candidates.
           </p>
         ) : null}
         {!isValid && confirmAcceptAnyway ? (
-          <div className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/10 p-3">
-            <p className="text-xs font-semibold text-amber-100">
+          <div className="mt-3 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] p-3">
+            <p className="text-xs font-semibold text-[var(--accent-warning-text)]">
               Log this plan even though it misses some targets?
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
-                className="min-h-8 rounded-md border border-amber-300/40 bg-amber-300/20 px-3 text-xs font-semibold text-amber-50 transition hover:bg-amber-300/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-8 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-3 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--accent-warning-fill)] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={disabled}
                 onClick={() => onAccept(true)}
                 type="button"
@@ -165,7 +165,7 @@ function MainCourseRow({ candidate }: { candidate: MealPlanCandidate }) {
   return (
     <div className="px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
           Main
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -173,10 +173,10 @@ function MainCourseRow({ candidate }: { candidate: MealPlanCandidate }) {
           <ExternalChip href={candidate.sourceUrl} label="Source" />
         </div>
       </div>
-      <h3 className="mt-1 text-base font-semibold leading-tight text-white">
+      <h3 className="mt-1 text-base font-semibold leading-tight text-[var(--text-primary)]">
         {candidate.name}
       </h3>
-      <p className="mt-1 text-xs font-semibold text-white/70">
+      <p className="mt-1 text-xs font-semibold text-[var(--text-secondary)]">
         {formatCandidateMacros(candidate)}
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -189,12 +189,12 @@ function MainCourseRow({ candidate }: { candidate: MealPlanCandidate }) {
 
 function FillerRow({ filler }: { filler: MealPlanCandidate }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5">
+    <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 py-1.5">
       <div className="min-w-0">
-        <p className="truncate text-xs font-semibold text-white/80">
+        <p className="truncate text-xs font-semibold text-[var(--text-secondary)]">
           {filler.name}
         </p>
-        <p className="text-[10px] font-semibold text-white/40">
+        <p className="text-[10px] font-semibold text-[var(--text-muted)]">
           {filler.macros.calories} cal • {filler.macros.proteinG}p
         </p>
       </div>
@@ -211,9 +211,9 @@ function TierBadge({
   compact?: boolean;
 }) {
   const classes = {
-    database: "bg-emerald-700/30 text-emerald-200",
+    database: "bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]",
     published: "bg-sky-700/30 text-sky-200",
-    inferred: "bg-amber-700/30 text-amber-200",
+    inferred: "bg-[var(--accent-warning-fill)] text-[var(--accent-warning-text)]",
   }[candidate.tier];
   const range =
     candidate.tier === "inferred" && candidate.macroRange
@@ -231,14 +231,14 @@ function TierBadge({
 
 function ConfidenceBadge({ candidate }: { candidate: MealPlanCandidate }) {
   const classes = {
-    high: "text-white/70",
-    medium: "text-white/60",
-    low: "text-white/50",
+    high: "text-[var(--text-secondary)]",
+    medium: "text-[var(--text-tertiary)]",
+    low: "text-[var(--text-tertiary)]",
   }[candidate.confidence];
 
   return (
     <span
-      className={`rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${classes}`}
+      className={`rounded-full bg-[var(--surface-elevated)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${classes}`}
     >
       {candidate.confidence}
     </span>
@@ -249,7 +249,7 @@ function ExternalChip({ href, label }: { href: string | null; label: string }) {
   if (!href) return null;
   return (
     <button
-      className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/45 transition hover:border-white/20 hover:text-white/70"
+      className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 py-1 text-[10px] font-semibold text-[var(--text-tertiary)] transition hover:border-[var(--border-default)] hover:text-[var(--text-secondary)]"
       onClick={() => window.open(href, "_blank", "noopener,noreferrer")}
       type="button"
     >
@@ -269,7 +269,7 @@ function SecondaryButton({
 }) {
   return (
     <button
-      className="min-h-9 rounded-md border border-white/15 bg-transparent px-3 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+      className="min-h-9 rounded-md border border-[var(--border-subtle)] bg-transparent px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
       disabled={disabled}
       onClick={onClick}
       type="button"

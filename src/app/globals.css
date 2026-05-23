@@ -160,6 +160,7 @@ html {
   single layout-level element so every protected route shares it.
 */
 .penthouse-bg-layer {
+  display: none;
   position: fixed;
   inset: 0;
   z-index: -1;
@@ -169,6 +170,10 @@ html {
   pointer-events: none;
   transform: scale(1.15);
   transform-origin: center;
+}
+
+html[data-theme="legacy"] .penthouse-bg-layer {
+  display: block;
 }
 
 @media (min-width: 768px) {
