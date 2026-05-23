@@ -20,6 +20,110 @@
   --shift-purple-soft: #f3e8ff;
   --shift-danger: #b91c1c;
   --shift-danger-soft: #fff1f2;
+
+  /*
+    ============================================================
+    Shiftly-next design tokens (DebatePro truth map 2026-05-22)
+    ============================================================
+    Premium-clean-Uber-ish with a little warmth. NEAR-black base
+    (warm slate, not pure black). Two-tier surface separation.
+    Strict text opacity tiers. Three semantic accent families
+    pinned to one hue each. Three-tier radius scale.
+
+    These tokens are INERT until Commit C/D sweeps components to
+    reference them. Commit A just installs the contract.
+
+    Rollback: set `data-theme="legacy"` on <html> to flip every
+    swept component back to current visuals in one attribute.
+    See [data-theme="legacy"] block below.
+  */
+
+  /* Surfaces — two tiers + overlay for modals */
+  --surface-base: #0d1117;
+  --surface-elevated: #161b22;
+  --surface-overlay: #1c232c;
+  --surface-hover: #1a2029;
+
+  /* Borders — subtle/default/strong */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  /* Text — strict opacity tiers */
+  --text-primary: #f5f7fa;
+  --text-secondary: rgba(245, 247, 250, 0.7);
+  --text-tertiary: rgba(245, 247, 250, 0.5);
+  --text-muted: rgba(245, 247, 250, 0.35);
+
+  /* Accents — emerald primary (signature), amber + rose secondary */
+  --accent-primary: #10b981;
+  --accent-primary-fill: rgba(16, 185, 129, 0.14);
+  --accent-primary-border: rgba(16, 185, 129, 0.30);
+  --accent-primary-text: #34d399;
+
+  --accent-warning: #f59e0b;
+  --accent-warning-fill: rgba(245, 158, 11, 0.14);
+  --accent-warning-border: rgba(245, 158, 11, 0.30);
+  --accent-warning-text: #fbbf24;
+
+  --accent-negative: #f43f5e;
+  --accent-negative-fill: rgba(244, 63, 94, 0.14);
+  --accent-negative-border: rgba(244, 63, 94, 0.30);
+  --accent-negative-text: #fb7185;
+
+  /* Radii — three tier */
+  --radius-data: 4px;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+
+  /* Motion — restrained */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 260ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+  ============================================================
+  Engineering rollback path — set data-theme="legacy" on <html>
+  ============================================================
+  Maps every NEW token back to LEGACY visual values so swept
+  components fall back to the prior photo-glass aesthetic
+  without code changes. One-attribute rollback.
+
+  Activation: in src/app/layout.tsx, set <html data-theme="legacy">
+  Default (no attribute) = new shiftly-next theme.
+
+  Remove this block + the data-theme attribute one week after
+  Commits C+D are stable in production.
+*/
+[data-theme="legacy"] {
+  --surface-base: #101827;
+  --surface-elevated: rgba(0, 0, 0, 0.34);
+  --surface-overlay: rgba(0, 0, 0, 0.46);
+  --surface-hover: rgba(0, 0, 0, 0.40);
+
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-default: rgba(255, 255, 255, 0.15);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  --text-primary: #f8fafc;
+  --text-secondary: rgba(248, 250, 252, 0.75);
+  --text-tertiary: rgba(248, 250, 252, 0.55);
+  --text-muted: rgba(248, 250, 252, 0.40);
+
+  --accent-primary: #059669;
+  --accent-primary-text: #6ee7b7;
+
+  --accent-warning: #d97706;
+  --accent-warning-text: #fbbf24;
+
+  --accent-negative: #be123c;
+  --accent-negative-text: #fda4af;
+
+  --radius-data: 6px;
+  --radius-control: 8px;
+  --radius-panel: 12px;
 }
 
 @theme inline {
