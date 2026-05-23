@@ -1036,7 +1036,7 @@ function WeekStripCell({
         </span>
       </div>
       <p
-        className={`mt-2 truncate text-lg font-bold tracking-tight sm:mt-3 sm:text-xl md:text-2xl lg:text-3xl ${cashflowDailyColor(
+        className={`mt-2 truncate text-sm font-bold tracking-tight sm:mt-3 sm:text-base md:text-lg lg:text-xl xl:text-2xl ${cashflowDailyColor(
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >
