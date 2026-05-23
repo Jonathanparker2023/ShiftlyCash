@@ -903,10 +903,10 @@ function TopMetric({
       <div
         className={
           dark
-            ? "mt-1 text-3xl font-bold tracking-tight text-[var(--text-primary)]"
+            ? "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
             : tone
-              ? `mt-1 text-3xl font-bold tracking-tight ${cashflowColorFromTone(tone)}`
-              : "mt-1 text-3xl font-bold tracking-tight text-[var(--text-primary)]"
+              ? `mt-1 text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl ${cashflowColorFromTone(tone)}`
+              : "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
         }
       >
         {value}

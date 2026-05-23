@@ -87,7 +87,11 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
             No closed weeks yet. Once you close your first week, it will appear here.
           </section>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-white/15 bg-black/15 shadow-sm backdrop-blur-md">
+          <div
+            className="overflow-x-auto rounded-md border border-white/15 bg-black/15 shadow-sm backdrop-blur-md"
+            data-no-page-swipe="true"
+            style={{ touchAction: "pan-x" }}
+          >
             <table className="min-w-[980px] w-full border-collapse text-left text-sm">
               <thead className="border-b border-white/15 bg-white/10 text-xs uppercase tracking-[0.12em] text-white/70">
                 <tr>
