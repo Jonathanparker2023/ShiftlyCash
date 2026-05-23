@@ -334,7 +334,7 @@ export function MealPlanGenerator({ date, targets }: MealPlanGeneratorProps) {
   }
 
   return (
-    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)] shadow-[0_20px_70px_rgba(0,0,0,0.26)] backdrop-blur-xl">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)]">
       <MealPlanAxiomBar
         axioms={axioms}
         disabled={disabled}

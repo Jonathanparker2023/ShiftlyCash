@@ -654,7 +654,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       ) : null}
 
       <main className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
+        <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
           <div className="h-2 bg-[var(--surface-elevated)]" />
           <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
@@ -667,7 +667,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                 <CalendarIcon />
               </h1>
               <div className="mt-3 flex flex-wrap gap-2">
-                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm">
+                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                   {initialData.week.payPeriodRole === "week_1"
                     ? "Week 1 of Pay Period"
                     : "Week 2 of Pay Period"}
@@ -682,7 +682,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
             <div>
               <div className="mb-3 flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-                <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm">
+                <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                   Active week
                 </span>
                 <button
@@ -694,7 +694,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                   {isSyncing ? "Syncing..." : "Sync now"}
                 </button>
                 {syncStatus ? (
-                  <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm">
+                  <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                     {syncStatus}
                   </span>
                 ) : null}
@@ -770,7 +770,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               prestigeNetCents={weekNetTotals.prestigeNetCents}
             />
             <button
-              className="h-10 w-full rounded-md bg-[var(--surface-base)] px-5 text-sm font-semibold text-[var(--text-primary)] shadow-[0_8px_18px_rgba(16,16,15,0.18)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:shadow-none sm:w-auto"
+              className="h-10 w-full rounded-md bg-[var(--surface-base)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:shadow-none sm:w-auto"
               disabled={!canCloseWeek || isClosing}
               onClick={closeWeek}
               title={canCloseWeek ? "Close this week" : "Available after Saturday"}
@@ -871,8 +871,8 @@ function TopMetric({
     <div
       className={
         dark
-          ? `rounded-md bg-[var(--surface-base)] px-2.5 py-3 text-[var(--text-primary)] shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
+          ? `rounded-md bg-[var(--surface-base)] px-2.5 py-3 text-[var(--text-primary)] sm:px-4 ${className}`
+          : `relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
       <div className="flex items-start justify-between gap-2">
@@ -987,25 +987,25 @@ function WeekStripCell({
         : "border-[var(--accent-negative-border)]";
   const toneGlow =
     dayTone === "positive"
-      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
       : dayTone === "amber"
-        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(245,158,11,0.45)]"
-        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]";
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]";
   const toneGlowFocused =
     dayTone === "positive"
-      ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(16,185,129,0.95),0_0_85px_rgba(16,185,129,0.55)]"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
       : dayTone === "amber"
-        ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(245,158,11,0.95),0_0_85px_rgba(245,158,11,0.55)]"
-        : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(244,63,94,0.95),0_0_85px_rgba(244,63,94,0.55)]";
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
 
   return (
     <button
         className={
           isFocused
-          ? `min-w-0 scale-105 rounded-md border-[3px] ${toneBorderFocused} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlowFocused} backdrop-blur-xl transition-all duration-200 focus:outline-none sm:p-3`
+          ? `min-w-0 rounded-md border-[3px] ${toneBorderFocused} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlowFocused} transition-colors duration-150 focus:outline-none sm:p-3`
           : day.spendLocked
-            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
-            : `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
+            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left opacity-75 ${toneGlow} transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
+            : `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlow} transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
       }
       onClick={() => onFocus(dayIndex)}
       type="button"
@@ -1089,7 +1089,7 @@ function FocusedDayEditor({
   ) => void;
 }) {
   return (
-    <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+    <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
         <ShiftList
           day={day}
@@ -1164,7 +1164,7 @@ function TransactionDrawer({
   }
 
   return (
-    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)] shadow-sm backdrop-blur-md">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)] shadow-sm">
       {error ? (
         <div className="mb-3 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-negative-text)]">
           {error}
@@ -1269,7 +1269,7 @@ function TransactionColumn({
   onToggle: (transaction: DashboardTransaction) => void;
 }) {
   return (
-    <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 backdrop-blur-md">
+    <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
           {heading}
@@ -1353,7 +1353,7 @@ function TransactionRowButton({
       </button>
 
       {isExpanded ? (
-        <div className="flex flex-wrap gap-2 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 backdrop-blur-md">
+        <div className="flex flex-wrap gap-2 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2">
           <button
             className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled}
@@ -1553,7 +1553,7 @@ function ShiftRow({
       </button>
 
       {expanded && !locked ? (
-        <div className="grid gap-3 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 backdrop-blur-md sm:grid-cols-2">
+        <div className="grid gap-3 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 sm:grid-cols-2">
           <SelectField
             label="Job"
             value={slot.jobType}
@@ -1731,7 +1731,7 @@ function TotalsPanel({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-sm backdrop-blur-md">
+      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-sm">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
           label="Spend"

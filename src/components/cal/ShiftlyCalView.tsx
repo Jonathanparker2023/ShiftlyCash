@@ -306,7 +306,7 @@ export function ShiftlyCalView({
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
+      <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
         <div className="h-2 bg-[var(--surface-elevated)]" />
         <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(520px,1.05fr)] lg:items-start">
@@ -316,7 +316,7 @@ export function ShiftlyCalView({
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <Link
-                  className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm transition hover:bg-[var(--surface-hover)]"
+                  className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--surface-hover)]"
                   href={`/cal?week=${prevWeekIso}`}
                 >
                   Prev
@@ -333,7 +333,7 @@ export function ShiftlyCalView({
                   </span>
                 ) : (
                   <Link
-                    className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm transition hover:bg-[var(--surface-hover)]"
+                    className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--surface-hover)]"
                     href={`/cal?week=${nextWeekIso}`}
                   >
                     Next
@@ -341,11 +341,11 @@ export function ShiftlyCalView({
                 )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm">
+                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                   Energy balance tracker
                 </p>
                 <Link
-                  className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-sm transition hover:bg-[var(--surface-hover)]"
+                  className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--surface-hover)]"
                   href={`/cal/trends?week=${weekStartIso}`}
                 >
                   Trends
@@ -383,7 +383,7 @@ export function ShiftlyCalView({
             </p>
           ) : null}
 
-          <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+          <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
             {/* Mobile-only quick log bar — first thing the user sees under
                 the calendar. Big Log food button + a discreet collapsed
                 dropdown for saved foods (presets). The big SavedFoodsList
@@ -576,7 +576,7 @@ function TopMetric({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
+      className={`relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
     >
       <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] sm:text-[10px] sm:tracking-[0.14em]">
         {label}
@@ -625,16 +625,16 @@ function WeekStripCell({
         : "bg-[var(--surface-elevated)]";
   const toneGlow =
     verdict === "good"
-      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
       : verdict === "bad"
-        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]"
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
         : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
   const toneGlowFocused =
     verdict === "good"
-      ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(16,185,129,0.95),0_0_85px_rgba(16,185,129,0.55)]"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
       : verdict === "bad"
-        ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(244,63,94,0.95),0_0_85px_rgba(244,63,94,0.55)]"
-        : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_28px_rgba(255,255,255,0.3)]";
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
   const calorieTextClass =
     verdict === "good"
       ? "text-[var(--accent-primary-text)]"
@@ -644,10 +644,10 @@ function WeekStripCell({
 
   return (
     <button
-      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-[var(--text-primary)] transition-all duration-200 focus:outline-none sm:p-3 ${
+      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 focus:outline-none sm:p-3 ${
         isFocused
-          ? `scale-105 border-[3px] ${toneBorderFocused} ${toneBg} ${toneGlowFocused} backdrop-blur-xl`
-          : `border-2 ${toneBorder} ${toneBg} ${toneGlow} backdrop-blur-xl hover:bg-[var(--surface-elevated)]`
+          ? `border-[3px] ${toneBorderFocused} ${toneBg} ${toneGlowFocused}`
+          : `border-2 ${toneBorder} ${toneBg} ${toneGlow} hover:bg-[var(--surface-elevated)]`
       }`}
       onClick={onClick}
       type="button"
@@ -799,7 +799,7 @@ function FoodEntryRow({
     entry.verdictSource === "pending" &&
     nowMs - new Date(entry.updatedAt).getTime() > 60_000;
   const rowClass = isStuck
-    ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-[var(--text-primary)] shadow-[0_8px_18px_rgba(8,15,28,0.16)]"
+    ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-[var(--text-primary)]"
     : verdictBarClass(entry);
 
   if (isEditing) {
@@ -973,7 +973,7 @@ function FoodEntryRow({
   if (!isExpanded) {
     return (
       <button
-        className={`${rowClass} flex w-full items-center justify-between gap-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
+        className={`${rowClass} flex w-full items-center justify-between gap-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-white/60`}
         onClick={() => setIsExpanded(true)}
         type="button"
       >
@@ -1004,7 +1004,7 @@ function FoodEntryRow({
   }
 
   return (
-    <div className={`${rowClass} transition-all`}>
+    <div className={`${rowClass} transition-colors`}>
       <button
         className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
         onClick={() => setIsExpanded(false)}
@@ -1047,7 +1047,7 @@ function FoodEntryRow({
           ) : null}
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-all">
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-colors">
         <span>{formatMacrosInline(entry) || "No macros logged"}</span>
         <div className="flex items-center gap-2">
           <button
@@ -1211,7 +1211,7 @@ function DayTotalHero({
       {target !== null ? (
         <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
-            className={`h-2.5 rounded-full transition-all ${fillClass}`}
+            className={`h-2.5 rounded-full transition-colors ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
           />
         </div>
@@ -1245,7 +1245,7 @@ function DayTotalMetric({
       {target !== null ? (
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
-            className={`h-1.5 rounded-full transition-all ${fillClass}`}
+            className={`h-1.5 rounded-full transition-colors ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
           />
         </div>
@@ -1294,7 +1294,7 @@ function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
   }
 
   return (
-    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <button
         className="w-full rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled || isGenerating}
@@ -1397,7 +1397,7 @@ function FindMealPromptBox({ disabled }: { disabled: boolean }) {
   }
 
   return (
-    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <button
         className="w-full rounded-md border border-sky-300/50 bg-sky-500 px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled || isGenerating}
@@ -1494,7 +1494,7 @@ function HomeRecipePromptBox({ disabled }: { disabled: boolean }) {
   }
 
   return (
-    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <button
         className="w-full rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-warning)] disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled || isGenerating}
@@ -1567,7 +1567,7 @@ function WaterPanel({
   const fillClass = metricFillClass(state.tone);
 
   return (
-    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex items-center justify-between gap-3">
         <p className={`text-sm font-bold ${textClass}`}>Water</p>
         <p className={`text-sm font-bold ${textClass}`}>
@@ -1577,7 +1577,7 @@ function WaterPanel({
       {targetOz !== null ? (
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
-            className={`h-1.5 rounded-full transition-all ${fillClass}`}
+            className={`h-1.5 rounded-full transition-colors ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
           />
         </div>
@@ -1615,7 +1615,7 @@ function WeightPanel({
   weightValue: string;
 }) {
   return (
-    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Weight
       </p>

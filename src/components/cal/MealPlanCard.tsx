@@ -34,7 +34,7 @@ export function MealPlanCard({
 
   return (
     <section
-      className={`overflow-hidden rounded-lg border bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-[0_24px_70px_rgba(0,0,0,0.32)] backdrop-blur-xl ${
+      className={`overflow-hidden rounded-lg border bg-[var(--surface-elevated)] text-[var(--text-primary)] ${
         isValid ? "border-[var(--accent-primary-border)]" : "border-[var(--accent-warning-border)]"
       }`}
     >

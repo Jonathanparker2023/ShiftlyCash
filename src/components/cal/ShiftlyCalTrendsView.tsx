@@ -131,10 +131,10 @@ export function ShiftlyCalTrendsView({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
+    <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
       <div className="h-2 bg-[var(--surface-elevated)]" />
       <div className="space-y-4 p-3 sm:p-4">
-        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
             Week
           </p>
@@ -193,7 +193,7 @@ function TargetsPanel({
   targets: CalTargets;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Targets
       </p>
@@ -288,7 +288,7 @@ function SavedFoodsManagement({
   savedFoods: SavedFood[];
 }) {
   return (
-    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Saved foods
       </p>
@@ -425,7 +425,7 @@ function TrendHistoryStrip({
   targets: CalTargets;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         28-day history
       </p>
@@ -534,7 +534,7 @@ function TrendMetric({
 
 function WeightLogWeek({ days }: { days: CalDay[] }) {
   return (
-    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Weight log
       </p>
