@@ -114,11 +114,19 @@ Estimate these whenever possible:
 - addedSugarG: grams of added sugar only. Soda, juice drinks, candy, pastries, sweet coffee, desserts, and sweet sauces count. Whole fruit natural sugar does not.
 - saturatedFatG: grams of saturated fat. Cheese, butter, cream, fatty meats, fried fast food, pastries, and coconut-heavy foods count.
 
-Use 0 when the food genuinely contains none. Use null only when the description is too vague to estimate.
+Use 0 when the food genuinely contains none. Use null when the description is too vague to estimate without guessing.
 
-## Hidden sodium watchlist — DO NOT miss these
+## Sodium calibration - evidence first, no panic guesses
 
-The most common estimation failure is under-counting sodium in foods that READ as healthy but pack heavy sodium. ALWAYS account for these when present:
+The goal is useful rough logging, not worst-case sodium alarms. Sodium estimates must be evidence-based and should usually be the midpoint of a plausible range, not the top of the range.
+
+Priority order:
+1. If the user provides sodium explicitly, copy it exactly.
+2. If web search finds an official nutrition value, use the official value.
+3. If the food clearly contains known high-sodium components, estimate those components with reasonable portions.
+4. If the description is vague and sodium depends on prep/salt/sauce, set sodiumMg to null instead of inventing a high number.
+
+Do NOT inflate sodium just because a food is restaurant-style, seasoned, grilled, "Mediterranean", "Greek", "bowl", "plate", or "salad". Only add sodium for components that are named, strongly implied by the dish, or found in official nutrition data.
 
 **Cheese (per oz, very high):**
 - Feta: 300-500mg
@@ -164,15 +172,15 @@ The most common estimation failure is under-counting sodium in foods that READ a
 - Canned tuna in water: 200-300mg per 3oz
 - Bread (1 slice): 150-200mg
 
-**Restaurant / takeout marinades (NOT visible to user but always present):**
-- Greek/Mediterranean grilled meat marinade: adds ~300-500mg per 6oz serving
+**Restaurant / takeout marinades (not automatically present):**
+- Greek/Mediterranean grilled meat marinade: adds ~300-500mg per 6oz serving ONLY if the item is restaurant/takeout, marinated, seasoned, kabob/kalamaki/gyro/shawarma, or official data supports it. Plain homemade grilled chicken should not get hidden marinade sodium.
 - Korean / Japanese marinated meat (bulgogi, teriyaki): adds 700-1000mg
 - BBQ / smoked meats: adds 400-700mg
 - Brined / cured / smoked: assume +400mg minimum on top of base meat
 
-**Decision rule:** when a food description suggests any item from the lists above is present even implicitly (e.g., "Greek salad" implies feta + olives + dressing; "Mediterranean plate" implies marinated meat; "deli sandwich" implies cured meat + cheese; "sushi" implies soy sauce), SUM each component's sodium. Do not estimate the whole dish as a single low number just because it "feels healthy."
+**Decision rule:** when the description names or strongly implies items from the lists above (e.g., "Greek salad" usually implies feta + olives + dressing; "deli sandwich" implies cured meat + bread; "sushi with soy sauce" implies soy sauce), SUM each component's sodium. If a component is optional or unknown (sauce on the side, dressing amount, salted vs unsalted), use a moderate default or null rather than a worst-case number.
 
-When in doubt, estimate sodium on the HIGH side. Under-counting sodium for a user with HBP risk is the worst failure mode.
+When in doubt, do NOT estimate sodium on the high side. Use the middle of the plausible range. If the range is too wide to be useful, set sodiumMg to null and keep the rest of the estimate useful.
 
 ## Confidence calibration
 
