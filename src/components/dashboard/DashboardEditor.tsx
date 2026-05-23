@@ -1680,28 +1680,33 @@ function ShiftRow({
   );
 }
 
+// DOMAIN COLORS — DO NOT THEME-SWEEP THESE.
+// Ability = deep blue, Prestige = yellow/amber, Other = neutral.
+// The colors carry shift-TYPE meaning, not theme semantics. They live
+// outside the design token system on purpose. If you want to retune
+// them, change the hex values here directly. Do not swap to var(--accent-*).
 function shiftBarClass(jobType: JobType): string {
   if (isAbilityShift(jobType) || jobType === "incentive") {
-    return "border-[var(--accent-primary-border)] bg-[var(--accent-primary)] text-[var(--text-primary)]";
+    return "border-[#1e3a8a] bg-[#1d4ed8] text-white";
   }
 
   if (jobType === "prestige" || jobType === "prestige_ilst") {
-    return "border-[var(--accent-warning-border)] bg-[var(--accent-warning)] text-[var(--surface-base)]";
+    return "border-[#d97706] bg-[#facc15] text-[#1f2937]";
   }
 
-  return "border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--text-primary)]";
+  return "border-[#d7dee8] bg-white text-[#0f172a]";
 }
 
 function shiftDotClass(jobType: JobType): string {
   if (isAbilityShift(jobType) || jobType === "incentive") {
-    return "h-2.5 w-2.5 rounded-full bg-[var(--text-primary)] shadow-[0_0_0_3px_var(--border-default)]";
+    return "h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]";
   }
 
   if (jobType === "prestige" || jobType === "prestige_ilst") {
-    return "h-2.5 w-2.5 rounded-full bg-[var(--accent-warning)] shadow-[0_0_0_3px_rgba(245,158,11,0.16)]";
+    return "h-2.5 w-2.5 rounded-full bg-[#92400e] shadow-[0_0_0_3px_rgba(146,64,14,0.16)]";
   }
 
-  return "h-2.5 w-2.5 rounded-full bg-[var(--accent-primary)] shadow-[0_0_0_3px_rgba(16,185,129,0.16)]";
+  return "h-2.5 w-2.5 rounded-full bg-[#0e7490] shadow-[0_0_0_3px_rgba(14,116,144,0.16)]";
 }
 
 function payTypeBadgeClass(payType: PayType | null | undefined): string {
