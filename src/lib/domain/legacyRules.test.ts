@@ -72,10 +72,15 @@ describe("legacy cashflow color tiers", () => {
   });
 
   describe("weekly spend tone - relative to median", () => {
-    it("classifies low spend as green, near median as amber, and hot spend as red", () => {
-      expect(spendWeeklyTone(84_999, 100_000)).toBe("positive");
+    it("classifies below-median spend as green and exact median as amber", () => {
+      expect(spendWeeklyTone(90_000, 100_000)).toBe("positive");
       expect(spendWeeklyTone(100_000, 100_000)).toBe("amber");
-      expect(spendWeeklyTone(115_001, 100_000)).toBe("negative");
+    });
+
+    it("uses a 10 percent amber band above median, then red", () => {
+      expect(spendWeeklyTone(100_001, 100_000)).toBe("amber");
+      expect(spendWeeklyTone(110_000, 100_000)).toBe("amber");
+      expect(spendWeeklyTone(110_001, 100_000)).toBe("negative");
     });
 
     it("uses amber when no median is available", () => {

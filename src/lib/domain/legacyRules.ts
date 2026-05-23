@@ -278,15 +278,15 @@ export function cashflowWeeklyTone(cents: number): CashflowTone {
 
 /**
  * Weekly spend tone relative to median:
- *   ≤ 85% of median → green  (spending well under)
- *   ≤ 115% of median → amber (near median)
- *   > 115% of median → red   (running hot)
+ *   < median → green  (under normal spend)
+ *   ≤ 110% of median → amber (at median or running warm)
+ *   > 110% of median → red   (running hot)
  *   no median → amber (neutral fallback)
  */
 export function spendWeeklyTone(cents: number, medianCents: number | null): CashflowTone {
   if (!medianCents) return "amber";
-  if (cents <= medianCents * 0.85) return "positive";
-  if (cents <= medianCents * 1.15) return "amber";
+  if (cents < medianCents) return "positive";
+  if (cents <= medianCents * 1.10) return "amber";
   return "negative";
 }
 
