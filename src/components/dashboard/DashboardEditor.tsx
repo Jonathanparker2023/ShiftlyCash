@@ -1726,7 +1726,7 @@ function payTypeBadgeClass(payType: PayType | null | undefined): string {
     return "rounded-full bg-[var(--accent-primary)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--text-primary)]";
   }
 
-  return "rounded-full bg-[var(--accent-primary-fill)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--accent-primary-text)]";
+  return "rounded-full bg-[var(--text-primary)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--surface-base)]";
 }
 
 function TotalsPanel({
