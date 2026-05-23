@@ -34,11 +34,11 @@ export function MetricValue({ value, label, tone = "neutral", className }: Props
 
   return (
     <div className={className}>
-      <div className="text-2xl font-bold" style={valueStyle}>
+      <div className="text-3xl font-bold tracking-tight" style={valueStyle}>
         {value}
       </div>
       {label ? (
-        <div className="mt-1 text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em]" style={labelStyle}>
           {label}
         </div>
       ) : null}

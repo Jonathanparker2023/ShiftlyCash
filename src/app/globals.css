@@ -56,9 +56,9 @@
   --text-muted: rgba(245, 247, 250, 0.35);
 
   /* Accents — emerald primary (signature), amber + rose secondary */
-  --accent-primary: #10b981;
-  --accent-primary-fill: rgba(16, 185, 129, 0.14);
-  --accent-primary-border: rgba(16, 185, 129, 0.30);
+  --accent-primary: #0a8156;
+  --accent-primary-fill: rgba(10, 129, 86, 0.12);
+  --accent-primary-border: rgba(10, 129, 86, 0.28);
   --accent-primary-text: #34d399;
 
   --accent-warning: #f59e0b;

@@ -879,8 +879,8 @@ function TopMetric({
         <div
           className={
             dark
-              ? "text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] sm:text-[10px] sm:tracking-[0.14em]"
-              : "text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] sm:text-[10px] sm:tracking-[0.14em]"
+              ? "text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
+              : "text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
           }
         >
           {label}
@@ -903,10 +903,10 @@ function TopMetric({
       <div
         className={
           dark
-            ? "mt-1 text-base font-semibold text-[var(--text-primary)] sm:text-lg"
+            ? "mt-1 text-3xl font-bold tracking-tight text-[var(--text-primary)]"
             : tone
-              ? `mt-1 text-base font-semibold sm:text-lg ${cashflowColorFromTone(tone)}`
-              : "mt-1 text-base font-semibold text-[var(--text-primary)] sm:text-lg"
+              ? `mt-1 text-3xl font-bold tracking-tight ${cashflowColorFromTone(tone)}`
+              : "mt-1 text-3xl font-bold tracking-tight text-[var(--text-primary)]"
         }
       >
         {value}
@@ -1010,7 +1010,7 @@ function WeekStripCell({
       onClick={() => onFocus(dayIndex)}
       type="button"
     >
-      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)] sm:text-[10px] sm:tracking-[0.14em]">
+      <div className="flex min-w-0 items-center justify-between gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
         <span className="truncate">
           {shortDayName(day.date)} {formatDayOnly(day.date)}
         </span>
@@ -1028,7 +1028,7 @@ function WeekStripCell({
         </span>
       </div>
       <p
-        className={`mt-2 truncate text-xs font-bold tracking-tight sm:mt-3 sm:text-xl ${cashflowDailyColor(
+        className={`mt-2 truncate text-3xl font-bold tracking-tight sm:mt-3 ${cashflowDailyColor(
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >

@@ -578,10 +578,10 @@ function TopMetric({
     <div
       className={`relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
     >
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] sm:text-[10px] sm:tracking-[0.14em]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
         {label}
       </p>
-      <p className={`mt-1 text-base font-semibold sm:text-lg ${magnitudeColorClass(tone)}`}>
+      <p className={`mt-1 text-3xl font-bold tracking-tight ${magnitudeColorClass(tone)}`}>
         {value}
       </p>
       {note ? <p className="mt-2 text-xs text-[var(--text-tertiary)]">{note}</p> : null}
@@ -1201,10 +1201,10 @@ function DayTotalHero({
   return (
     <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
           {label}
         </p>
-        <p className={`text-xl font-bold ${textClass}`}>
+        <p className={`text-3xl font-bold tracking-tight ${textClass}`}>
           {formatTargetProgress(value, target, unit)}
         </p>
       </div>
@@ -1237,8 +1237,8 @@ function DayTotalMetric({
   return (
     <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex items-start justify-between gap-2">
-        <p className={`text-sm font-bold ${textClass}`}>{label}</p>
-        <p className={`text-sm font-bold ${textClass}`}>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{label}</p>
+        <p className={`text-lg font-bold tracking-tight ${textClass}`}>
           {formatTargetProgress(value, target, unit)}
         </p>
       </div>
