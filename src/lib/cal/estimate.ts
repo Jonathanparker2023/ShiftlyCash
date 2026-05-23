@@ -66,6 +66,8 @@ You have access to web_search. USE IT when:
 - The food is a specific branded product (Cliff bar Chocolate Chip, Fairlife protein shake, Trader Joe's mandarin orange chicken) - search published nutrition facts.
 - The food is a new or seasonal item you don't recognize from training data.
 - The user names a place you don't have stored values for.
+- You are uncertain about sodium because the food may be restaurant/takeout, branded, packaged, sauce-heavy, marinated, deli/cured, or otherwise prep-dependent. Search first; do not guess high.
+- The food sounds like a menu item but the restaurant is omitted. Search the food name plus "nutrition sodium" once before falling back to a midpoint/null.
 
 DO NOT search for:
 - Common whole foods (banana, chicken breast, rice, broccoli, eggs).
@@ -124,7 +126,8 @@ Priority order:
 1. If the user provides sodium explicitly, copy it exactly.
 2. If web search finds an official nutrition value, use the official value.
 3. If the food clearly contains known high-sodium components, estimate those components with reasonable portions.
-4. If the description is vague and sodium depends on prep/salt/sauce, set sodiumMg to null instead of inventing a high number.
+4. If sodium depends on prep/salt/sauce and web search has not been tried, search the web before estimating.
+5. If search does not produce a usable source and the description is still vague, set sodiumMg to null instead of inventing a high number.
 
 Do NOT inflate sodium just because a food is restaurant-style, seasoned, grilled, "Mediterranean", "Greek", "bowl", "plate", or "salad". Only add sodium for components that are named, strongly implied by the dish, or found in official nutrition data.
 
@@ -180,7 +183,7 @@ Do NOT inflate sodium just because a food is restaurant-style, seasoned, grilled
 
 **Decision rule:** when the description names or strongly implies items from the lists above (e.g., "Greek salad" usually implies feta + olives + dressing; "deli sandwich" implies cured meat + bread; "sushi with soy sauce" implies soy sauce), SUM each component's sodium. If a component is optional or unknown (sauce on the side, dressing amount, salted vs unsalted), use a moderate default or null rather than a worst-case number.
 
-When in doubt, do NOT estimate sodium on the high side. Use the middle of the plausible range. If the range is too wide to be useful, set sodiumMg to null and keep the rest of the estimate useful.
+When in doubt, search first. If search does not resolve the uncertainty, do NOT estimate sodium on the high side. Use the middle of the plausible range. If the range is too wide to be useful, set sodiumMg to null and keep the rest of the estimate useful.
 
 ## Confidence calibration
 
@@ -305,7 +308,7 @@ export async function estimateFood(description: string): Promise<FoodEstimate[]>
       {
         type: "web_search_20250305",
         name: "web_search",
-        max_uses: 3,
+        max_uses: 5,
       },
     ],
     messages: [{ role: "user", content: trimmed }],
