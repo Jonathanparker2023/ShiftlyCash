@@ -665,7 +665,7 @@ function WeekStripCell({
       style={selectedStyle}
       type="button"
     >
-      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)] sm:text-[10px] sm:tracking-[0.14em]">
+      <p className="whitespace-nowrap text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--text-primary)] sm:text-[10px] sm:tracking-[0.14em]">
         {weekday}
       </p>
       <p className="mt-1 text-base font-semibold text-[var(--text-primary)] sm:text-lg">

@@ -1018,9 +1018,10 @@ function WeekStripCell({
       style={selectedStyle}
       type="button"
     >
-      <div className="flex min-w-0 items-center justify-between gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-        <span className="truncate">
-          {shortDayName(day.date)} {formatDayOnly(day.date)}
+      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] sm:text-[10px] sm:tracking-[0.18em]">
+        <span className="whitespace-nowrap">
+          {shortDayName(day.date)}
+          <span className="hidden sm:inline"> {formatDayOnly(day.date)}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {isToday ? (
