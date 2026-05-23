@@ -407,3 +407,21 @@ html {
     font-size: 16px;
   }
 }
+
+.tone-positive {
+  color: var(--accent-primary-text);
+  background-color: var(--accent-primary-fill);
+  border-color: var(--accent-primary-border);
+}
+
+.tone-warning {
+  color: var(--accent-warning-text);
+  background-color: var(--accent-warning-fill);
+  border-color: var(--accent-warning-border);
+}
+
+.tone-negative {
+  color: var(--accent-negative-text);
+  background-color: var(--accent-negative-fill);
+  border-color: var(--accent-negative-border);
+}
