@@ -39,15 +39,15 @@
   */
 
   /* Surfaces — two tiers + overlay for modals */
-  --surface-base: #0d1117;
-  --surface-elevated: #161b22;
-  --surface-overlay: #1c232c;
-  --surface-hover: #1a2029;
+  --surface-base: #0a0a0b;
+  --surface-elevated: #131316;
+  --surface-overlay: #1c1c20;
+  --surface-hover: #18181c;
 
   /* Borders — subtle/default/strong */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.24);
 
   /* Text — strict opacity tiers */
   --text-primary: #f5f7fa;
@@ -134,8 +134,8 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--surface-base);
+  color: var(--text-primary);
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   max-width: 100vw;
   overflow-x: hidden;
