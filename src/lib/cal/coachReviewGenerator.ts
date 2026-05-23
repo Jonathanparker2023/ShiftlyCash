@@ -120,6 +120,12 @@ export type CoachReviewRow = {
   created_at: string;
 };
 
+export type CoachReviewPeekResult = {
+  body: string;
+  suggestionKind: string | null;
+  suggestionText: string | null;
+};
+
 export async function readCachedReview(
   supabase: SupabaseClient,
   userId: string,
@@ -140,6 +146,32 @@ export async function readCachedReview(
     return null;
   }
   return (data as CoachReviewRow | null) ?? null;
+}
+
+export async function peekCoachReview(
+  supabase: SupabaseClient,
+  userId: string,
+  scope: "day" | "week",
+  periodKey: string,
+  observationsHash: string,
+): Promise<CoachReviewPeekResult | null> {
+  const cached = await readCachedReview(
+    supabase,
+    userId,
+    scope,
+    periodKey,
+    observationsHash,
+  );
+
+  if (!cached) {
+    return null;
+  }
+
+  return {
+    body: cached.body,
+    suggestionKind: cached.suggestion_kind,
+    suggestionText: cached.suggestion_text,
+  };
 }
 
 export async function writeCachedReview(

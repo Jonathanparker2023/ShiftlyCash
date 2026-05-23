@@ -59,6 +59,12 @@ type UpdateFoodEntryPatch = {
   saturatedFatG?: number | string | null;
 };
 
+type InitialCoachReview = {
+  body: string;
+  suggestionKind: string | null;
+  suggestionText: string | null;
+};
+
 const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
   { value: "meal", label: "Meal" },
   { value: "healthy_snack", label: "Healthy snack" },
@@ -69,9 +75,13 @@ const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
 
 export function ShiftlyCalView({
   initialData,
+  initialDayReview = null,
+  initialWeekReview = null,
   weekStartIso,
 }: {
   initialData: ShiftlyCalData;
+  initialDayReview?: InitialCoachReview | null;
+  initialWeekReview?: InitialCoachReview | null;
   weekStartIso: string;
 }) {
   const router = useRouter();
@@ -359,6 +369,7 @@ export function ShiftlyCalView({
           </div>
 
           <WeeklyCoachBand
+            initialBody={initialWeekReview?.body ?? null}
             key={weekSignature}
             weekStartIso={weekStartIso}
             weekEntriesSignature={weekSignature}
@@ -443,6 +454,11 @@ export function ShiftlyCalView({
                   key={`${focusedDay.date}:${focusedDaySignature}`}
                   focusedDate={focusedDay.date}
                   daySignature={focusedDaySignature}
+                  initialBody={
+                    focusedDay.date === initialData.todayIso
+                      ? initialDayReview?.body ?? null
+                      : null
+                  }
                 />
                 <div className="mt-4 space-y-3 hidden xl:block">
                   <AiFoodEstimator

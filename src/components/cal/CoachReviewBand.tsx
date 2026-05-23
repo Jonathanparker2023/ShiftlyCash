@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   generateFocusedDayCoachReviewAction,
@@ -17,18 +17,32 @@ import { AppPanel } from "@/components/shell";
 // only when entries change.
 
 export function WeeklyCoachBand({
+  initialBody = null,
   weekStartIso,
   weekEntriesSignature,
 }: {
+  initialBody?: string | null;
   weekStartIso: string;
   // Anything that should trigger a re-fetch — typically a stringified
   // hash of (entry ids + verdicts + totals) so we re-call when the
   // week's data shifts.
   weekEntriesSignature: string;
 }) {
-  const [state, setState] = useState<FetchState>(() => ({ status: "loading" }));
+  const initialSignature = useRef(`${weekStartIso}:${weekEntriesSignature}`);
+  const [state, setState] = useState<FetchState>(() =>
+    initialBody?.trim()
+      ? { status: "ready", body: initialBody, source: "ai" }
+      : { status: "loading" },
+  );
 
   useEffect(() => {
+    if (
+      initialBody?.trim() &&
+      initialSignature.current === `${weekStartIso}:${weekEntriesSignature}`
+    ) {
+      return;
+    }
+
     let cancelled = false;
 
     generateWeeklyCoachReviewAction()
@@ -47,7 +61,7 @@ export function WeeklyCoachBand({
     return () => {
       cancelled = true;
     };
-  }, [weekStartIso, weekEntriesSignature]);
+  }, [initialBody, weekStartIso, weekEntriesSignature]);
 
   if (state.status === "hidden") return null;
 
@@ -82,15 +96,29 @@ export function WeeklyCoachBand({
 // change. Stays hidden when there are no entries.
 
 export function FocusedDayCoachStrip({
+  initialBody = null,
   focusedDate,
   daySignature,
 }: {
+  initialBody?: string | null;
   focusedDate: string;
   daySignature: string;
 }) {
-  const [state, setState] = useState<FetchState>(() => ({ status: "loading" }));
+  const initialSignature = useRef(`${focusedDate}:${daySignature}`);
+  const [state, setState] = useState<FetchState>(() =>
+    initialBody?.trim()
+      ? { status: "ready", body: initialBody, source: "ai" }
+      : { status: "loading" },
+  );
 
   useEffect(() => {
+    if (
+      initialBody?.trim() &&
+      initialSignature.current === `${focusedDate}:${daySignature}`
+    ) {
+      return;
+    }
+
     let cancelled = false;
 
     generateFocusedDayCoachReviewAction(focusedDate)
@@ -109,7 +137,7 @@ export function FocusedDayCoachStrip({
     return () => {
       cancelled = true;
     };
-  }, [focusedDate, daySignature]);
+  }, [initialBody, focusedDate, daySignature]);
 
   if (state.status === "hidden") return null;
 
