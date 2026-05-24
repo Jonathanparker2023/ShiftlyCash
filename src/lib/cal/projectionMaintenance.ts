@@ -37,12 +37,14 @@ export async function applyShiftlyCalProjectionMaintenance(
     >;
   },
 ): Promise<ShiftlyCalProjectionMaintenanceResult> {
+  // Full reset of projected entries -- they're disposable autofill that gets
+  // rebuilt from current targets/data on every call. Catches the
+  // duplicate-stacking that the dated-cleanup missed.
   const { data: cleanedRows, error: cleanupError } = await supabase
     .from("food_entries")
     .delete()
     .eq("user_id", input.userId)
     .eq("is_projected_plan", true)
-    .lte("date", input.todayIso)
     .select("id");
 
   if (cleanupError) {
@@ -65,6 +67,7 @@ export async function applyShiftlyCalProjectionMaintenance(
     .from("food_entries")
     .select("date,is_projected_plan")
     .eq("user_id", input.userId)
+    .eq("is_projected_plan", false)
     .gte("date", firstFutureDate)
     .lte("date", input.weekEndIso);
 
