@@ -31,6 +31,7 @@ const DEFAULT_TARGETS: CalTargets = {
   currentPhase: null,
   goalsText: null,
   healthFlags: ["high_blood_pressure"],
+  bannedFoods: [],
 };
 
 function makeEntry(partial: Partial<FoodEntry> & { id: string }): FoodEntry {

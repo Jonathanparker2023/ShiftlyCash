@@ -10,13 +10,10 @@ import {
   FocusedDayCoachStrip,
   WeeklyCoachBand,
 } from "@/components/cal/CoachReviewBand";
-import { MealPlanGenerator } from "@/components/cal/MealPlanGenerator";
+import { PlanMyDayButton } from "@/components/cal/PlanMyDayButton";
 import {
   createFoodEntryAction,
   deleteFoodEntryAction,
-  generateFindMealPromptAction,
-  generateHomeRecipePromptAction,
-  generateMealOrderPromptAction,
   logWaterAction,
   logWeightAction,
   overrideVerdictAction,
@@ -29,7 +26,6 @@ import {
   magnitudeColorClass,
   verdictBarClass,
 } from "@/lib/cal/color";
-import type { RemainingTargets } from "@/lib/cal/mealPlan/types";
 import {
   type MagnitudeTone,
 } from "@/lib/cal/projection";
@@ -116,16 +112,12 @@ export function ShiftlyCalView({
     ),
     [focusedDay.entries, nowMs],
   );
-  const mealPlanDay = useMemo(
+  const planDay = useMemo(
     () =>
       initialData.currentWeek.days.find(
         (day) => day.date === initialData.todayIso,
       ) ?? focusedDay,
     [focusedDay, initialData.currentWeek.days, initialData.todayIso],
-  );
-  const remainingMealPlanTargets = useMemo(
-    () => buildRemainingTargets(initialData.targets, mealPlanDay.totals),
-    [mealPlanDay.totals, initialData.targets],
   );
 
   useEffect(() => {
@@ -431,8 +423,8 @@ export function ShiftlyCalView({
             </div>
 
             <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
-              {/* Left column. On mobile this stacks LAST so the meal-plan
-                  generator + accompanying prompts (and weight panel) are
+              {/* Left column. On mobile this stacks LAST so the planning
+                  handoff and weight panel are
                   at the bottom of the view, below the focused day and
                   today's entries. xl restores natural column position. */}
               <div className="order-last space-y-4 xl:order-none">
@@ -444,13 +436,11 @@ export function ShiftlyCalView({
                     savedFoods={initialData.savedFoods}
                   />
                 </div>
-                <MealPlanGenerator
-                  date={mealPlanDay.date}
-                  targets={remainingMealPlanTargets}
+                <PlanMyDayButton
+                  bannedFoods={initialData.targets.bannedFoods}
+                  targets={initialData.targets}
+                  totals={planDay.totals}
                 />
-                <MealOrderPromptBox disabled={isPending} />
-                <FindMealPromptBox disabled={isPending} />
-                <HomeRecipePromptBox disabled={isPending} />
                 <WeightPanel
                   day={focusedDay}
                   disabled={isPending}
@@ -555,33 +545,6 @@ function MetricStrip({
       />
     </div>
   );
-}
-
-function buildRemainingTargets(
-  targets: CalTargets,
-  totals: CalTotals,
-): RemainingTargets {
-  return {
-    calories: remainingValue(targets.tdeeCalories, totals.calories),
-    proteinG: remainingValue(targets.proteinTargetG, totals.proteinG),
-    carbsG: remainingValue(targets.carbsTargetG, totals.carbsG),
-    fiberG: remainingValue(targets.fiberTargetG, totals.fiberG),
-    fatG: remainingValue(targets.fatTargetG, totals.fatG),
-    sodiumMg: remainingValue(targets.sodiumTargetMg, totals.sodiumMg),
-    addedSugarG: remainingValue(
-      targets.addedSugarTargetG,
-      totals.addedSugarG,
-    ),
-    saturatedFatG: remainingValue(
-      targets.saturatedFatTargetG,
-      totals.saturatedFatG,
-    ),
-  };
-}
-
-function remainingValue(target: number | null, value: number): number {
-  if (target === null) return 0;
-  return Math.max(0, target - value);
 }
 
 function TopMetric({
@@ -1299,302 +1262,6 @@ function DayTotalMetric({
       ) : null}
       <p className={`mt-1 text-xs font-semibold ${textClass}`}>{state.note}</p>
     </div>
-  );
-}
-
-function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [zipCode, setZipCode] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : (window.localStorage.getItem("shiftlycal-order-zip") ?? ""),
-  );
-  const [prompt, setPrompt] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  async function generatePrompt() {
-    setStatus(null);
-    setIsGenerating(true);
-    try {
-      window.localStorage.setItem("shiftlycal-order-zip", zipCode);
-      const result = await generateMealOrderPromptAction({
-        locationHint: zipCode,
-      });
-      setPrompt(result.prompt);
-      setIsOpen(true);
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to generate prompt.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function copyPrompt() {
-    if (!prompt) return;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setStatus("Copied to clipboard.");
-    } catch {
-      setStatus("Copy failed. Select the text and copy it manually.");
-    }
-  }
-
-  return (
-    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
-      <button
-        className="w-full rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={disabled || isGenerating}
-        onClick={() => {
-          if (!isOpen || !prompt) {
-            void generatePrompt();
-            return;
-          }
-          setIsOpen((current) => !current);
-        }}
-        type="button"
-      >
-        {isGenerating ? "Building DoorDash prompt..." : "🛵 Order final meal"}
-      </button>
-
-      {isOpen ? (
-        <div className="mt-3 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!prompt}
-              onClick={copyPrompt}
-              type="button"
-            >
-              📋 Copy to clipboard
-            </button>
-            <button
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={disabled || isGenerating}
-              onClick={generatePrompt}
-              type="button"
-            >
-              Regenerate
-            </button>
-            <button
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            >
-              Close
-            </button>
-          </div>
-          {status ? <p className="text-xs font-semibold text-[var(--text-secondary)]">{status}</p> : null}
-          <label className="block text-xs font-semibold text-[var(--text-secondary)]">
-            Zip code
-            <input
-              className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
-              onChange={(event) => setZipCode(event.target.value)}
-              placeholder="10001"
-              value={zipCode}
-            />
-          </label>
-          <textarea
-            className="h-[400px] w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 font-mono text-xs leading-5 text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
-            onChange={(event) => setPrompt(event.target.value)}
-            value={prompt}
-          />
-        </div>
-      ) : status ? (
-        <p className="mt-2 text-xs font-semibold text-red-200">{status}</p>
-      ) : null}
-    </section>
-  );
-}
-
-function FindMealPromptBox({ disabled }: { disabled: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [zipCode, setZipCode] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : (window.localStorage.getItem("shiftlycal-order-zip") ?? ""),
-  );
-  const [prompt, setPrompt] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  async function generatePrompt() {
-    setStatus(null);
-    setIsGenerating(true);
-    try {
-      window.localStorage.setItem("shiftlycal-order-zip", zipCode);
-      const result = await generateFindMealPromptAction({ locationHint: zipCode });
-      setPrompt(result.prompt);
-      setIsOpen(true);
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to generate prompt.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function copyPrompt() {
-    if (!prompt) return;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setStatus("Copied to clipboard.");
-    } catch {
-      setStatus("Copy failed. Select the text and copy it manually.");
-    }
-  }
-
-  return (
-    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
-      <button
-        className="w-full rounded-md border border-sky-300/50 bg-sky-500 px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={disabled || isGenerating}
-        onClick={() => {
-          if (!isOpen || !prompt) {
-            void generatePrompt();
-            return;
-          }
-          setIsOpen((current) => !current);
-        }}
-        type="button"
-      >
-        {isGenerating ? "Finding nearby meals..." : "🔎 Find meal"}
-      </button>
-
-      {isOpen ? (
-        <div className="mt-3 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-md border border-sky-300/50 bg-sky-500 px-3 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!prompt}
-              onClick={copyPrompt}
-              type="button"
-            >
-              📋 Copy to clipboard
-            </button>
-            <button
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={disabled || isGenerating}
-              onClick={generatePrompt}
-              type="button"
-            >
-              Regenerate
-            </button>
-            <button
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            >
-              Close
-            </button>
-          </div>
-          {status ? <p className="text-xs font-semibold text-[var(--text-secondary)]">{status}</p> : null}
-          <label className="block text-xs font-semibold text-[var(--text-secondary)]">
-            Zip code or area
-            <input
-              className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
-              onChange={(event) => setZipCode(event.target.value)}
-              placeholder="10001 or New Milford CT"
-              value={zipCode}
-            />
-          </label>
-          <textarea
-            className="h-[400px] w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 font-mono text-xs leading-5 text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
-            onChange={(event) => setPrompt(event.target.value)}
-            value={prompt}
-          />
-        </div>
-      ) : status ? (
-        <p className="mt-2 text-xs font-semibold text-red-200">{status}</p>
-      ) : null}
-    </section>
-  );
-}
-
-function HomeRecipePromptBox({ disabled }: { disabled: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [prompt, setPrompt] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  async function generatePrompt() {
-    setStatus(null);
-    setIsGenerating(true);
-    try {
-      const result = await generateHomeRecipePromptAction();
-      setPrompt(result.prompt);
-      setIsOpen(true);
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to generate prompt.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function copyPrompt() {
-    if (!prompt) return;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setStatus("Copied to clipboard.");
-    } catch {
-      setStatus("Copy failed. Select the text and copy it manually.");
-    }
-  }
-
-  return (
-    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
-      <button
-        className="w-full rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-warning)] disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={disabled || isGenerating}
-        onClick={() => {
-          if (!isOpen || !prompt) {
-            void generatePrompt();
-            return;
-          }
-          setIsOpen((current) => !current);
-        }}
-        type="button"
-      >
-        {isGenerating ? "Building recipe prompt..." : "🍳 Cook at home"}
-      </button>
-
-      {isOpen ? (
-        <div className="mt-3 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-warning)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!prompt}
-              onClick={copyPrompt}
-              type="button"
-            >
-              📋 Copy to clipboard
-            </button>
-            <button
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={disabled || isGenerating}
-              onClick={generatePrompt}
-              type="button"
-            >
-              Regenerate
-            </button>
-            <button
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            >
-              Close
-            </button>
-          </div>
-          {status ? <p className="text-xs font-semibold text-[var(--text-secondary)]">{status}</p> : null}
-          <textarea
-            className="h-[400px] w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 font-mono text-xs leading-5 text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
-            onChange={(event) => setPrompt(event.target.value)}
-            value={prompt}
-          />
-        </div>
-      ) : status ? (
-        <p className="mt-2 text-xs font-semibold text-red-200">{status}</p>
-      ) : null}
-    </section>
   );
 }
 

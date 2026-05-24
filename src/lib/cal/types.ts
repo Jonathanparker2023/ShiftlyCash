@@ -100,6 +100,7 @@ export type CalTargets = {
   currentPhase: CalPhase | null;
   goalsText: string | null;
   healthFlags: string[];
+  bannedFoods: string[];
 };
 
 export type CalTotals = {

@@ -41,6 +41,7 @@ type TargetFormState = {
   addedSugarTargetG: string;
   saturatedFatTargetG: string;
   waterTargetOz: string;
+  bannedFoods: string;
 };
 
 const emptySavedFoodForm: SavedFoodFormState = {
@@ -84,6 +85,7 @@ export function ShiftlyCalTrendsView({
     addedSugarTargetG: initialData.targets.addedSugarTargetG?.toString() ?? "",
     saturatedFatTargetG: initialData.targets.saturatedFatTargetG?.toString() ?? "",
     waterTargetOz: initialData.targets.waterTargetOz?.toString() ?? "",
+    bannedFoods: initialData.targets.bannedFoods.join("\n"),
   });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -258,6 +260,17 @@ function TargetsPanel({
           suffix="oz"
           value={form.waterTargetOz}
         />
+        <label className="block text-sm font-semibold text-[var(--text-secondary)] sm:col-span-2">
+          Banned foods (one per line)
+          <textarea
+            className="mt-1 min-h-28 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
+            onChange={(event) =>
+              onChange({ ...form, bannedFoods: event.target.value })
+            }
+            placeholder="edamame"
+            value={form.bannedFoods}
+          />
+        </label>
         <div className="sm:col-span-2">
           <button
             className="rounded-md bg-[var(--surface-base)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"

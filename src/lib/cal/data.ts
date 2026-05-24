@@ -105,6 +105,7 @@ type SettingsTargetsRow = {
   current_phase: string | null;
   goals_text: string | null;
   health_flags: string[] | null;
+  banned_foods: string[] | null;
 };
 
 type DayFoodVerdictRow = {
@@ -214,7 +215,7 @@ async function loadShiftlyCalData(
 
   const settingsRes = await supabase
     .from("settings")
-    .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g,sodium_target_mg,added_sugar_target_g,saturated_fat_target_g,water_target_oz,age,sex,height_cm,activity_level,current_phase,goals_text,health_flags")
+    .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g,sodium_target_mg,added_sugar_target_g,saturated_fat_target_g,water_target_oz,age,sex,height_cm,activity_level,current_phase,goals_text,health_flags,banned_foods")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -724,6 +725,7 @@ function mapTargets(row: SettingsTargetsRow | null): CalTargets {
     currentPhase: mapPhase(row?.current_phase ?? null),
     goalsText: row?.goals_text ?? null,
     healthFlags: Array.isArray(row?.health_flags) ? row.health_flags : [],
+    bannedFoods: Array.isArray(row?.banned_foods) ? row.banned_foods : [],
   };
 }
 

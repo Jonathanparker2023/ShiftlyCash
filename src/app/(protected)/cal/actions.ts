@@ -852,6 +852,7 @@ export async function saveCalTargetsAction(input: {
   addedSugarTargetG?: NullableMacroInput;
   saturatedFatTargetG?: NullableMacroInput;
   waterTargetOz?: NullableMacroInput;
+  bannedFoods?: string | string[] | null;
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
 
@@ -867,6 +868,9 @@ export async function saveCalTargetsAction(input: {
       added_sugar_target_g: optionalPositiveInteger(input.addedSugarTargetG, "Added sugar target"),
       saturated_fat_target_g: optionalPositiveInteger(input.saturatedFatTargetG, "Saturated fat target"),
       water_target_oz: optionalPositiveInteger(input.waterTargetOz, "Water target"),
+      ...(input.bannedFoods === undefined
+        ? {}
+        : { banned_foods: normalizeTextList(input.bannedFoods) }),
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", user.id);
@@ -875,6 +879,13 @@ export async function saveCalTargetsAction(input: {
 
   revalidatePath("/cal");
   return { ok: true };
+}
+
+function normalizeTextList(value: string | string[] | null | undefined): string[] {
+  const rawItems = Array.isArray(value) ? value : String(value ?? "").split(/\r?\n/);
+  return Array.from(
+    new Set(rawItems.map((item) => item.trim()).filter(Boolean)),
+  );
 }
 
 function renderBudgetLine(
