@@ -1354,7 +1354,7 @@ function TransactionRowButton({
           className={
             variant === "exempt"
               ? "font-semibold text-[var(--text-tertiary)] line-through"
-              : "font-semibold text-[var(--accent-negative-text)]"
+              : "font-semibold text-red-600"
           }
         >
           {formatMoney(transaction.amountCents)}

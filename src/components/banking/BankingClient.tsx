@@ -6,6 +6,7 @@ import { usePlaidLink } from "react-plaid-link";
 
 import {
   applyPendingTransactionAction,
+  cleanUglyMerchantNamesAction,
   createLinkTokenAction,
   exchangePublicTokenAction,
   excludePendingTransactionAction,
@@ -113,6 +114,23 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
     }
   }
 
+  async function cleanMerchantNames() {
+    setStatus("loading");
+    setMessage("Cleaning ugly merchant names — this may take a minute for first run...");
+
+    try {
+      const result = await cleanUglyMerchantNamesAction();
+      setStatus("success");
+      setMessage(
+        `Scanned ${result.scannedCount} ugly names, cleaned ${result.cleanedCount}.`,
+      );
+      window.location.reload();
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Unable to clean merchant names.");
+    }
+  }
+
   async function excludePending(transaction: PendingTransaction) {
     setStatus("loading");
     setMessage("Excluding transaction...");
@@ -156,6 +174,14 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
             type="button"
           >
             Sync now
+          </button>
+          <button
+            className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium transition hover:border-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={status === "loading"}
+            onClick={cleanMerchantNames}
+            type="button"
+          >
+            Clean merchant names
           </button>
         </div>
       </header>
