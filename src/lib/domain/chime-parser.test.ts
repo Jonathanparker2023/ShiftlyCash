@@ -89,6 +89,23 @@ describe("chime-parser", () => {
     });
   });
 
+  it("classifies payment requests locally and never calls the model", async () => {
+    const result = await parseChimeNotification({
+      title: "Tamesha requested $28.00",
+      body: "Tamesha requested $28.00 from you on Chime.",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      kind: "payment_request",
+      amountDollars: 28,
+      merchantOrSource: "Tamesha",
+      direction: "neutral",
+      confidence: "high",
+    });
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
   it("falls back safely for malformed AI responses", async () => {
     createMock.mockResolvedValueOnce({
       content: [{ type: "text", text: "not json" }],

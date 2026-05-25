@@ -101,14 +101,21 @@ export async function POST(request: Request) {
       .eq("date", todayDate)
       .maybeSingle();
 
+    const shouldExclude = shouldAutoExclude(parsed.kind);
     const canApply = Boolean(day?.id) && !day?.spend_locked;
-    const status = canApply ? "applied" : "pending_review";
+    const status = shouldExclude
+      ? "excluded"
+      : canApply
+        ? "applied"
+        : "pending_review";
     const dayId = canApply ? (day!.id as string) : null;
-    const reviewReason = canApply
-      ? null
-      : day?.spend_locked
-        ? "day_locked"
-        : "no_matching_day";
+    const reviewReason = shouldExclude
+      ? reviewReasonForExcludedKind(parsed.kind)
+      : canApply
+        ? null
+        : day?.spend_locked
+          ? "day_locked"
+          : "no_matching_day";
 
     // Cross-source dedup: if a Plaid sync already landed this exact
     // transaction (same date + amount), don't double-write — just note
@@ -145,6 +152,7 @@ export async function POST(request: Request) {
           import_key: importKey,
           category: categoryForKind(parsed.kind),
           pending: parsed.kind === "pending_charge",
+          excluded_at: shouldExclude ? new Date().toISOString() : null,
           notes: chimeNotes(parsed),
         })
         .select("id")
@@ -231,11 +239,11 @@ function formatChimeMerchantName(
     case "transfer_out":
       return `Sent to ${source}`;
     case "transfer_in":
-      return `From ${source}`;
+      return `Transfer credit: ${source}`;
     case "deposit":
-      return `Deposit: ${source}`;
+      return `Deposit credit: ${source}`;
     case "refund":
-      return `Refund: ${source}`;
+      return `Refund credit: ${source}`;
     default:
       // purchase, pending_charge, etc. — keep the merchant name plain
       return source;
@@ -271,10 +279,28 @@ function categoryForKind(kind: ChimeParseKind): string {
       return "pending_charge";
     case "purchase":
       return "purchase";
+    case "payment_request":
     case "balance_alert":
     case "card_event":
     case "unknown_known_chime":
       return "chime";
+  }
+}
+
+function shouldAutoExclude(kind: ChimeParseKind): boolean {
+  return kind === "transfer_in" || kind === "deposit" || kind === "refund";
+}
+
+function reviewReasonForExcludedKind(kind: ChimeParseKind): string | null {
+  switch (kind) {
+    case "transfer_in":
+      return "transfer_credit";
+    case "deposit":
+      return "income_deposit";
+    case "refund":
+      return "refund_credit";
+    default:
+      return null;
   }
 }
 

@@ -1357,7 +1357,7 @@ function TransactionRowButton({
               : "font-semibold text-red-600"
           }
         >
-          {formatMoney(transaction.amountCents)}
+          {formatTransactionAmount(transaction.amountCents, variant)}
         </span>
       </button>
 
@@ -2386,6 +2386,17 @@ function formatMoney(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(centsToDollars(value)));
+}
+
+function formatTransactionAmount(
+  amountCents: number,
+  variant: "spending" | "exempt",
+): string {
+  if (variant === "exempt" && amountCents < 0) {
+    return `+${formatMoney(Math.abs(amountCents))}`;
+  }
+
+  return formatMoney(amountCents);
 }
 
 function roundCashflowToNearestFiveDollars(value: number): number {
