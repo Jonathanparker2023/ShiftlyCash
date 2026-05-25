@@ -12,7 +12,9 @@ import {
 } from "@/components/cal/CoachReviewBand";
 import { PlanMyDayButton } from "@/components/cal/PlanMyDayButton";
 import {
+  archiveSavedFoodAction,
   createFoodEntryAction,
+  createSavedFoodAction,
   deleteFoodEntryAction,
   logWaterAction,
   logWeightAction,
@@ -264,6 +266,41 @@ export function ShiftlyCalView({
     });
   }
 
+  async function saveEntryAsTemplate(entry: FoodEntry): Promise<boolean> {
+    setError(null);
+    try {
+      await createSavedFoodAction({
+        name: entry.mealName || categoryLabel(entry.category),
+        category: entry.category,
+        calories: entry.calories,
+        proteinG: entry.proteinG ?? "",
+        carbsG: entry.carbsG ?? "",
+        fatG: entry.fatG ?? "",
+        fiberG: entry.fiberG ?? "",
+        sodiumMg: entry.sodiumMg ?? "",
+        addedSugarG: entry.addedSugarG ?? "",
+        saturatedFatG: entry.saturatedFatG ?? "",
+      });
+      router.refresh();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save food.");
+      return false;
+    }
+  }
+
+  function deleteSavedFood(id: string) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await archiveSavedFoodAction({ id });
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to delete saved food.");
+      }
+    });
+  }
+
   async function updateEntry(id: string, patch: UpdateFoodEntryPatch): Promise<boolean> {
     setError(null);
     try {
@@ -417,6 +454,7 @@ export function ShiftlyCalView({
               <MobileSavedFoodsDropdown
                 disabled={isPending}
                 loggedFoodId={loggedFoodId}
+                onDelete={deleteSavedFood}
                 onInstantLog={instantLog}
                 savedFoods={initialData.savedFoods}
               />
@@ -432,6 +470,7 @@ export function ShiftlyCalView({
                   <SavedFoodsList
                     disabled={isPending}
                     loggedFoodId={loggedFoodId}
+                    onDelete={deleteSavedFood}
                     onInstantLog={instantLog}
                     savedFoods={initialData.savedFoods}
                   />
@@ -484,6 +523,7 @@ export function ShiftlyCalView({
                           onDelete={deleteEntry}
                           onOverrideVerdict={overrideVerdict}
                           onRegenerateVerdict={regenerateVerdict}
+                          onSaveAsTemplate={saveEntryAsTemplate}
                           onUpdate={updateEntry}
                         />
                       </div>
@@ -745,6 +785,7 @@ function FoodEntryRow({
   onDelete,
   onOverrideVerdict,
   onRegenerateVerdict,
+  onSaveAsTemplate,
   onUpdate,
 }: {
   disabled: boolean;
@@ -757,11 +798,24 @@ function FoodEntryRow({
     verdictReason: string,
   ) => Promise<boolean>;
   onRegenerateVerdict: (id: string) => Promise<boolean>;
+  onSaveAsTemplate: (entry: FoodEntry) => Promise<boolean>;
   onUpdate: (id: string, patch: UpdateFoodEntryPatch) => Promise<boolean>;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTemplating, setIsTemplating] = useState(false);
+  const [templateStatus, setTemplateStatus] = useState<"idle" | "saved">("idle");
+
+  async function saveAsTemplate() {
+    setIsTemplating(true);
+    const ok = await onSaveAsTemplate(entry);
+    setIsTemplating(false);
+    if (ok) {
+      setTemplateStatus("saved");
+      window.setTimeout(() => setTemplateStatus("idle"), 2000);
+    }
+  }
   const [isVerdictSaving, setIsVerdictSaving] = useState(false);
   const [overrideValue, setOverrideValue] = useState<FoodVerdict>(
     entry.verdict ?? "bad",
@@ -1089,11 +1143,24 @@ function FoodEntryRow({
             Edit
           </button>
           <button
+            className="rounded px-1 py-0.5 font-semibold text-[var(--accent-primary-text)] transition hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled || isTemplating}
+            onClick={(event) => {
+              event.stopPropagation();
+              void saveAsTemplate();
+            }}
+            type="button"
+          >
+            {templateStatus === "saved" ? "Saved" : isTemplating ? "Saving..." : "Save"}
+          </button>
+          <button
             className="rounded px-1 py-0.5 font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();
-              onDelete(entry.id);
+              if (window.confirm(`Delete "${entry.mealName || categoryLabel(entry.category)}"?`)) {
+                onDelete(entry.id);
+              }
             }}
             type="button"
           >
@@ -1364,11 +1431,13 @@ function WeightPanel({
 function MobileSavedFoodsDropdown({
   disabled,
   loggedFoodId,
+  onDelete,
   onInstantLog,
   savedFoods,
 }: {
   disabled: boolean;
   loggedFoodId: string | null;
+  onDelete: (id: string) => void;
   onInstantLog: (food: SavedFood) => void;
   savedFoods: SavedFood[];
 }) {
@@ -1395,25 +1464,39 @@ function MobileSavedFoodsDropdown({
       {isOpen ? (
         <div className="space-y-1 border-t border-[var(--border-subtle)] px-2 py-2">
           {savedFoods.map((food) => (
-            <button
-              className={`flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                loggedFoodId === food.id
-                  ? "bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]"
-                  : "text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]"
-              }`}
-              disabled={disabled}
-              key={food.id}
-              onClick={() => {
-                onInstantLog(food);
-                setIsOpen(false);
-              }}
-              type="button"
-            >
-              <span className="truncate font-semibold">{food.name}</span>
-              <span className="shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)]">
-                {food.calories} cal
-              </span>
-            </button>
+            <div className="flex items-center gap-1" key={food.id}>
+              <button
+                className={`flex flex-1 items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  loggedFoodId === food.id
+                    ? "bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]"
+                }`}
+                disabled={disabled}
+                onClick={() => {
+                  onInstantLog(food);
+                  setIsOpen(false);
+                }}
+                type="button"
+              >
+                <span className="truncate font-semibold">{food.name}</span>
+                <span className="shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)]">
+                  {food.calories} cal
+                </span>
+              </button>
+              <button
+                aria-label={`Delete ${food.name}`}
+                className="shrink-0 rounded px-1.5 py-1 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                onClick={() => {
+                  if (window.confirm(`Delete saved food "${food.name}"?`)) {
+                    onDelete(food.id);
+                  }
+                }}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
       ) : null}
@@ -1424,11 +1507,13 @@ function MobileSavedFoodsDropdown({
 function SavedFoodsList({
   disabled,
   loggedFoodId,
+  onDelete,
   onInstantLog,
   savedFoods,
 }: {
   disabled: boolean;
   loggedFoodId: string | null;
+  onDelete: (id: string) => void;
   onInstantLog: (food: SavedFood) => void;
   savedFoods: SavedFood[];
 }) {
@@ -1446,6 +1531,7 @@ function SavedFoodsList({
               food={food}
               isLogged={loggedFoodId === food.id}
               key={food.id}
+              onDelete={onDelete}
               onInstantLog={onInstantLog}
             />
           ))
@@ -1463,11 +1549,13 @@ function SavedFoodRow({
   disabled,
   food,
   isLogged,
+  onDelete,
   onInstantLog,
 }: {
   disabled: boolean;
   food: SavedFood;
   isLogged: boolean;
+  onDelete: (id: string) => void;
   onInstantLog: (food: SavedFood) => void;
 }) {
   return (
@@ -1480,14 +1568,29 @@ function SavedFoodRow({
             {formatMacros(food)}
           </p>
         </div>
-        <button
-          className="rounded-md bg-[var(--surface-base)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
-          disabled={disabled}
-          onClick={() => onInstantLog(food)}
-          type="button"
-        >
-          {isLogged ? "Logged" : "Log"}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            className="rounded-md bg-[var(--surface-base)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
+            disabled={disabled}
+            onClick={() => onInstantLog(food)}
+            type="button"
+          >
+            {isLogged ? "Logged" : "Log"}
+          </button>
+          <button
+            aria-label={`Delete ${food.name}`}
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-base)] px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
+            onClick={() => {
+              if (window.confirm(`Delete saved food "${food.name}"?`)) {
+                onDelete(food.id);
+              }
+            }}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
       </div>
     </div>
   );
