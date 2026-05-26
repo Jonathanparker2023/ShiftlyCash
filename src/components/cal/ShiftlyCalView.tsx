@@ -10,6 +10,7 @@ import {
   FocusedDayCoachStrip,
   WeeklyCoachBand,
 } from "@/components/cal/CoachReviewBand";
+import { PasteAndLogButton } from "@/components/cal/PasteAndLogButton";
 import { PlanMyDayButton } from "@/components/cal/PlanMyDayButton";
 import {
   archiveSavedFoodAction,
@@ -478,6 +479,11 @@ export function ShiftlyCalView({
                   bannedFoods={initialData.targets.bannedFoods}
                   targets={initialData.targets}
                   totals={planDay.totals}
+                />
+                <PasteAndLogButton
+                  date={focusedDay.date}
+                  disabled={isPending}
+                  onLogged={() => router.refresh()}
                 />
                 <WeightPanel
                   day={focusedDay}

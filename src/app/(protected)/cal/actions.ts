@@ -141,6 +141,98 @@ export async function estimateFoodAction(input: {
   return estimateFood(input.description);
 }
 
+export type BulkFoodEntryInput = {
+  loggedTime?: string | null;
+  mealName?: string | null;
+  category?: FoodCategory | string | null;
+  calories: number | string;
+  proteinG?: NullableMacroInput;
+  carbsG?: NullableMacroInput;
+  fatG?: NullableMacroInput;
+  fiberG?: NullableMacroInput;
+  sodiumMg?: NullableMacroInput;
+  addedSugarG?: NullableMacroInput;
+  saturatedFatG?: NullableMacroInput;
+};
+
+/**
+ * Insert multiple food entries for the same day in one round trip.
+ *
+ * Built for the "Paste & log" flow where the user drops a block of
+ * pre-calculated food lines (e.g. GPT-5 output) and each line becomes
+ * its own entry — no AI estimator call, no per-line round trip. Macros
+ * are stored exactly as provided.
+ */
+export async function bulkCreateFoodEntriesAction(input: {
+  date?: string;
+  entries: BulkFoodEntryInput[];
+}): Promise<{ ok: true; ids: string[]; insertedCount: number }> {
+  const { supabase, user } = await requireUser();
+  const date = normalizeIsoDate(input.date);
+
+  if (!Array.isArray(input.entries) || input.entries.length === 0) {
+    throw new Error("No entries to insert.");
+  }
+
+  // Clear projected-plan rows for the target day so the paste replaces
+  // any auto-projected entries (matches createFoodEntryAction behavior).
+  const { error: projectionDeleteError } = await supabase
+    .from("food_entries")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("date", date)
+    .eq("is_projected_plan", true);
+
+  if (projectionDeleteError) {
+    throw new Error(
+      `Unable to clear projected plan: ${projectionDeleteError.message}`,
+    );
+  }
+
+  const fallbackTime = getCurrentLocalTimeHm();
+  const rows = input.entries.map((entry) => ({
+    user_id: user.id,
+    date,
+    logged_time: normalizeTimeInput(entry.loggedTime) ?? fallbackTime,
+    meal_name: entry.mealName?.trim() ?? "",
+    category: parseCategory(entry.category),
+    calories: requireNonNegativeInteger(entry.calories, "Calories"),
+    protein_g: optionalNonNegativeInteger(entry.proteinG, "Protein"),
+    carbs_g: optionalNonNegativeInteger(entry.carbsG, "Carbs"),
+    fat_g: optionalNonNegativeInteger(entry.fatG, "Fat"),
+    fiber_g: optionalNonNegativeInteger(entry.fiberG, "Fiber"),
+    sodium_mg: optionalNonNegativeInteger(entry.sodiumMg, "Sodium"),
+    added_sugar_g: optionalNonNegativeInteger(entry.addedSugarG, "Added sugar"),
+    saturated_fat_g: optionalNonNegativeInteger(
+      entry.saturatedFatG,
+      "Saturated fat",
+    ),
+    saved_food_id: null,
+    verdict: null,
+    verdict_source: "pending",
+    verdict_reason: null,
+    verdict_context: null,
+    is_projected_plan: false,
+  }));
+
+  const { data, error } = await supabase
+    .from("food_entries")
+    .insert(rows)
+    .select("id");
+
+  if (error) throw new Error(error.message);
+
+  const ids = (data ?? []).map((row) => String(row.id));
+
+  revalidatePath("/cal");
+  scheduleDayFoodVerdict(user.id, date);
+  for (const id of ids) {
+    scheduleScoreFoodEntry(id, user.id);
+  }
+
+  return { ok: true, ids, insertedCount: ids.length };
+}
+
 export async function generateMealOrderPromptAction(input?: {
   locationHint?: string;
 }): Promise<{ ok: true; prompt: string }> {
