@@ -1309,14 +1309,24 @@ function DayTotalMetric({
   const state = metricState(value, target, kind, unit);
   const fillClass = metricFillClass(state.tone);
   const textClass = metricTextClass(state.tone);
+  const shouldStackValue = unit === "mg" && target !== null;
 
   return (
     <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{label}</p>
-        <p className={`text-lg font-bold tracking-tight ${textClass}`}>
-          {formatTargetProgress(value, target, unit)}
-        </p>
+        {shouldStackValue ? (
+          <p className={`text-right font-bold leading-none tracking-tight ${textClass}`}>
+            <span className="block text-base">{value.toLocaleString()}</span>
+            <span className="mt-1 block text-[10px] font-semibold leading-none text-[var(--text-tertiary)]">
+              /{target.toLocaleString()} {unit}
+            </span>
+          </p>
+        ) : (
+          <p className={`text-lg font-bold tracking-tight ${textClass}`}>
+            {formatTargetProgress(value, target, unit)}
+          </p>
+        )}
       </div>
       {target !== null ? (
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
