@@ -23,7 +23,6 @@ import {
   updateFoodEntryAction,
 } from "@/app/(protected)/cal/actions";
 import {
-  categoryBarClass,
   categoryLabel,
   magnitudeColorClass,
   verdictBarClass,
@@ -1517,15 +1516,40 @@ function SavedFoodsList({
   onInstantLog: (food: SavedFood) => void;
   savedFoods: SavedFood[];
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (savedFoods.length === 0) {
+    return (
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          Saved foods
+        </p>
+        <p className="mt-2 rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-secondary)]">
+          Save logged foods to quick-log them later.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-        Saved foods
-      </p>
-      <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Quick log</h2>
-      <div className="mt-4 grid gap-2">
-        {savedFoods.length > 0 ? (
-          savedFoods.map((food) => (
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+      <button
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>Quick log ({savedFoods.length})</span>
+        <span
+          aria-hidden="true"
+          className={`text-[10px] transition-transform ${isOpen ? "rotate-180" : ""}`}
+        >
+          ▾
+        </span>
+      </button>
+      {isOpen ? (
+        <div className="space-y-1 border-t border-[var(--border-subtle)] px-2 py-2">
+          {savedFoods.map((food) => (
             <SavedFoodRow
               disabled={disabled}
               food={food}
@@ -1534,13 +1558,9 @@ function SavedFoodsList({
               onDelete={onDelete}
               onInstantLog={onInstantLog}
             />
-          ))
-        ) : (
-          <p className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-secondary)]">
-            Create saved foods from Trends.
-          </p>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1559,39 +1579,37 @@ function SavedFoodRow({
   onInstantLog: (food: SavedFood) => void;
 }) {
   return (
-    <div className={categoryBarClass(food.category)}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold">{food.name}</p>
-          <p className="text-sm text-[var(--text-secondary)]">
-            {categoryLabel(food.category)} - {food.calories.toLocaleString()} cal
-            {formatMacros(food)}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            className="rounded-md bg-[var(--surface-base)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
-            disabled={disabled}
-            onClick={() => onInstantLog(food)}
-            type="button"
-          >
-            {isLogged ? "Logged" : "Log"}
-          </button>
-          <button
-            aria-label={`Delete ${food.name}`}
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-base)] px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={disabled}
-            onClick={() => {
-              if (window.confirm(`Delete saved food "${food.name}"?`)) {
-                onDelete(food.id);
-              }
-            }}
-            type="button"
-          >
-            ×
-          </button>
-        </div>
-      </div>
+    <div
+      className={`flex items-center gap-2 rounded px-2 py-1.5 transition ${
+        isLogged
+          ? "bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]"
+          : "text-[var(--text-secondary)] hover:bg-[var(--surface-base)]"
+      }`}
+    >
+      <button
+        className="flex flex-1 items-center justify-between gap-3 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled}
+        onClick={() => onInstantLog(food)}
+        type="button"
+      >
+        <span className="min-w-0 truncate font-semibold">{food.name}</span>
+        <span className="shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)]">
+          {food.calories} cal
+        </span>
+      </button>
+      <button
+        aria-label={`Delete ${food.name}`}
+        className="shrink-0 rounded px-1.5 py-1 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled}
+        onClick={() => {
+          if (window.confirm(`Delete saved food "${food.name}"?`)) {
+            onDelete(food.id);
+          }
+        }}
+        type="button"
+      >
+        ×
+      </button>
     </div>
   );
 }
