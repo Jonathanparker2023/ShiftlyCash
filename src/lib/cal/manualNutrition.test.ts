@@ -75,6 +75,30 @@ describe("manual nutrition overrides", () => {
     });
   });
 
+  it("preserves four-digit calorie values instead of matching inside them", () => {
+    expect(
+      extractExplicitNutritionOverrides("For logging: 1460 calories"),
+    ).toMatchObject({ calories: 1460 });
+    expect(
+      extractExplicitNutritionOverrides("Calculated total: 1800 cal"),
+    ).toMatchObject({ calories: 1800 });
+  });
+
+  it("treats one standalone large number as an explicit calorie total", () => {
+    expect(
+      applyExplicitNutritionOverrides(
+        {
+          calories: 460,
+          proteinG: 22,
+        },
+        "1460",
+      ),
+    ).toEqual({
+      calories: 1460,
+      proteinG: 22,
+    });
+  });
+
   it("applies per-item totals to multi-item estimate arrays by section order", () => {
     const result = applyExplicitNutritionOverridesToEstimates(
       [

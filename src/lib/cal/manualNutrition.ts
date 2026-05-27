@@ -21,42 +21,42 @@ const FIELD_PATTERNS: FieldPattern[] = [
   {
     field: "calories",
     prefix: /\b(?:calories|calorie|cals|cal)\b\s*[:=]?\s*(\d+(?:\.\d+)?)/i,
-    suffix: /(\d+(?:\.\d+)?)\s*(?:calories|calorie|cals|cal)\b/i,
+    suffix: /(?<![\d.])(\d+(?:\.\d+)?)\s*(?:calories|calorie|cals|cal)\b/i,
   },
   {
     field: "proteinG",
     prefix: /\bprotein\b(?:\s*g(?:rams?)?)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*g?\b/i,
-    suffix: /(\d+(?:\.\d+)?)\s*g\s*protein\b/i,
+    suffix: /(?<![\d.])(\d+(?:\.\d+)?)\s*g\s*protein\b/i,
   },
   {
     field: "carbsG",
     prefix: /\b(?:carbs|carbohydrates)\b(?:\s*g(?:rams?)?)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*g?\b/i,
-    suffix: /(\d+(?:\.\d+)?)\s*g\s*(?:carbs|carbohydrates)\b/i,
+    suffix: /(?<![\d.])(\d+(?:\.\d+)?)\s*g\s*(?:carbs|carbohydrates)\b/i,
   },
   {
     field: "fatG",
     prefix: /(?:^|[,;\n])\s*\bfat\b(?:\s*g(?:rams?)?)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*g?\b/i,
-    suffix: /(\d+(?:\.\d+)?)\s*g\s*fat\b/i,
+    suffix: /(?<![\d.])(\d+(?:\.\d+)?)\s*g\s*fat\b/i,
   },
   {
     field: "fiberG",
     prefix: /\bfiber\b(?:\s*g(?:rams?)?)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*g?\b/i,
-    suffix: /(\d+(?:\.\d+)?)\s*g\s*fiber\b/i,
+    suffix: /(?<![\d.])(\d+(?:\.\d+)?)\s*g\s*fiber\b/i,
   },
   {
     field: "sodiumMg",
     prefix: /\bsodium\b(?:\s*mg)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*mg?\b/i,
-    suffix: /(\d+(?:\.\d+)?)\s*mg\s*sodium\b/i,
+    suffix: /(?<![\d.])(\d+(?:\.\d+)?)\s*mg\s*sodium\b/i,
   },
   {
     field: "addedSugarG",
     prefix: /\badded\s+sugar\b(?:\s*g(?:rams?)?)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*g?\b/i,
-    suffix: /(\d+(?:\.\d+)?)\s*g\s*added\s+sugar\b/i,
+    suffix: /(?<![\d.])(\d+(?:\.\d+)?)\s*g\s*added\s+sugar\b/i,
   },
   {
     field: "saturatedFatG",
     prefix: /\b(?:saturated\s+fat|sat\.?\s+fat)\b(?:\s*g(?:rams?)?)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*g?\b/i,
-    suffix: /(\d+(?:\.\d+)?)\s*g\s*(?:saturated\s+fat|sat\.?\s+fat)\b/i,
+    suffix: /(?<![\d.])(\d+(?:\.\d+)?)\s*g\s*(?:saturated\s+fat|sat\.?\s+fat)\b/i,
   },
 ];
 
@@ -210,6 +210,13 @@ function extractFromText(text: string): ExplicitNutritionOverrides {
     }
   }
 
+  if (overrides.calories === undefined) {
+    const bareCalories = findBareCalorieTotal(text);
+    if (bareCalories !== null) {
+      overrides.calories = bareCalories;
+    }
+  }
+
   return overrides;
 }
 
@@ -240,6 +247,41 @@ function matchValues(
     .filter((match) => match.value);
 }
 
+function findBareCalorieTotal(text: string): number | null {
+  const matches = [...text.matchAll(/(?<![\d.])(\d{3,4})(?![\d.])/g)].filter(
+    (match) => !hasNearbyMacroUnit(text, match.index ?? 0, match[0].length),
+  );
+
+  if (matches.length !== 1) {
+    return null;
+  }
+
+  const value = Number(matches[0][1]);
+  if (!Number.isInteger(value) || value < 200 || value > 5000) {
+    return null;
+  }
+
+  return value;
+}
+
+function hasNearbyMacroUnit(text: string, index: number, length: number): boolean {
+  const windowStart = Math.max(0, index - 12);
+  const windowEnd = Math.min(text.length, index + length + 18);
+  const nearby = text.slice(windowStart, windowEnd).toLowerCase();
+  return /\b(?:g|gram|grams|mg|oz|lb|lbs|pound|pounds)\b/.test(nearby);
+}
+
+function isStandaloneCalorieTotal(
+  text: string,
+  overrides: ExplicitNutritionOverrides,
+): boolean {
+  if (Object.keys(overrides).length !== 1 || overrides.calories === undefined) {
+    return false;
+  }
+
+  return text.trim() === String(overrides.calories);
+}
+
 function scoreCandidate(
   text: string,
   overrides: ExplicitNutritionOverrides,
@@ -253,7 +295,12 @@ function scoreCandidate(
   const lower = text.toLowerCase();
   const totalCue = hasTotalCue(lower);
 
-  if (fieldCount === 1 && !totalCue && !options.allowSingleField) {
+  if (
+    fieldCount === 1 &&
+    !totalCue &&
+    !options.allowSingleField &&
+    !isStandaloneCalorieTotal(text, overrides)
+  ) {
     return 0;
   }
 
