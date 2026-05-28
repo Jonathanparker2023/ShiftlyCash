@@ -303,8 +303,10 @@ export async function estimateFood(description: string): Promise<FoodEstimate[]>
     model: ESTIMATOR_MODEL,
     // 1500 was being silently truncated on multi-component meals with
     // full reasoning, which the parser surfaced as
-    // "Estimator returned invalid JSON.". 3000 leaves headroom.
-    max_tokens: 3000,
+    // "Estimator returned invalid JSON.". 5000 leaves comfortable
+    // headroom for the most complex composite meals. Cost-neutral on
+    // simple meals — Sonnet only emits what it needs.
+    max_tokens: 5000,
     temperature: 0,
     system: SYSTEM_PROMPT,
     tools: [
