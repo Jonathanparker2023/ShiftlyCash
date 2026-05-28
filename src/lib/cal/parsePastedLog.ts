@@ -56,11 +56,33 @@ const LEADING_BULLET_RE =
   /^(?:[•\-*–—]|\d+\s*[).,:]|\d+\s+)\s*/;
 
 export function parsePastedLog(input: string): ParsedFoodLine[] {
-  const lines = input
+  const rawLines = input
     .replace(/\r/g, "")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+
+  // Pre-pass: join continuation lines that start with a number+unit
+  // (e.g. "340 cal / 5g protein / ...") onto the previous food-name
+  // line. Handles multi-line paste formats like
+  //   "1 small Moose Trail cone
+  //    340 cal / 5g protein / ..."
+  // which would otherwise drop both lines (line 1 has no calories,
+  // line 2 has no food name). Only merges when the previous line
+  // doesn't already carry its own macros — otherwise two complete
+  // food lines stay separate.
+  const lines: string[] = [];
+  for (const line of rawLines) {
+    const macroMatch = MACRO_HINT_RE.exec(line);
+    const startsWithMacro = macroMatch !== null && macroMatch.index <= 3;
+    const prevLine = lines[lines.length - 1];
+    const prevHasMacro = prevLine ? MACRO_HINT_RE.test(prevLine) : false;
+    if (prevLine && startsWithMacro && !prevHasMacro) {
+      lines[lines.length - 1] = `${prevLine} ${line}`;
+    } else {
+      lines.push(line);
+    }
+  }
 
   const results: ParsedFoodLine[] = [];
 
