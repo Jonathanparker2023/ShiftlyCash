@@ -50,16 +50,17 @@ const MACRO_HINT_RE =
 
 // Strip leading list / count markers. Covers:
 //   • / - / * / – / — bullets
-//   1. / 1) / 1: / 1, numbered prefixes
-//   1   (digit followed by whitespace)
-const LEADING_BULLET_RE =
-  /^(?:[•\-*–—]|\d+\s*[).,:]|\d+\s+)\s*/;
+//   1. / 1) / 1: / 1, numbered list prefixes
+// Does NOT strip "1 ", "5 servings", "2 cups" etc — a bare digit
+// followed by whitespace is treated as a serving count and kept in
+// the meal name.
+const LEADING_BULLET_RE = /^(?:[•\-*–—]|\d+\s*[).,:])\s*/;
 
 export function parsePastedLog(input: string): ParsedFoodLine[] {
   const rawLines = input
     .replace(/\r/g, "")
     .split("\n")
-    .map((line) => line.trim())
+    .map((line) => stripThousandsCommas(line.trim()))
     .filter(Boolean);
 
   // Pre-pass: join continuation lines that start with a number+unit
@@ -167,4 +168,21 @@ function macroOrNull(
 ): number | null {
   if (value === undefined || value === null) return null;
   return value;
+}
+
+// Strip thousands-separator commas inside numbers ("1,095" -> "1095",
+// "1,234,567" -> "1234567"). Leaves separator commas between distinct
+// values intact ("5g protein, 77g carbs" stays as written) because
+// those commas have a non-digit on at least one side.
+function stripThousandsCommas(text: string): string {
+  // Loop until no more digit-comma-digit patterns remain — a single
+  // /g pass leaves "1,234,567" as "12,34567" because the regex
+  // engine advances past matches and can't reuse the consumed digit.
+  let prev = text;
+  let next = text.replace(/(\d),(\d)/g, "$1$2");
+  while (next !== prev) {
+    prev = next;
+    next = next.replace(/(\d),(\d)/g, "$1$2");
+  }
+  return next;
 }
