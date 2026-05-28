@@ -115,8 +115,14 @@ export function AiFoodEstimator({
       try {
         const result = await estimateFoodAction({ description: trimmed });
         if (requestSeqRef.current !== requestSeq) return;
-        setEstimate(result.map(toEstimateForm));
-        setEstimateStatus("ready");
+        // Auto-log every returned estimate without a second confirm
+        // tap. User explicitly didn't want the preview-then-Log
+        // two-step. If a macro looks off they can edit the entry
+        // row afterward.
+        const forms = result.map(toEstimateForm);
+        forms.forEach((item) => void confirmEstimate(item));
+        reset();
+        setIsOpen(false);
       } catch (err) {
         if (requestSeqRef.current !== requestSeq) return;
         setError(err instanceof Error ? err.message : "Unable to estimate food.");
