@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   addManualTransactionAction,
+  amortizeTransactionAction,
   closeWeekAction,
   deleteTransactionAction,
   moveTransactionToYesterdayAction,
@@ -428,6 +429,54 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     }
   }
 
+  async function amortizeTransaction(
+    transaction: DashboardTransaction,
+    months: 1 | 3,
+  ) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const previousDays = days;
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+    setDays((currentDays) =>
+      currentDays.map((day) =>
+        day.id === transaction.dayId
+          ? moveTransactionBetweenBuckets(day, transaction, "excluded")
+          : day,
+      ),
+    );
+
+    try {
+      await amortizeTransactionAction({
+        transactionId: transaction.id,
+        months,
+      });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      router.refresh();
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to amortize transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
   async function addManualTransaction(
     day: DashboardDay,
     merchantName: string,
@@ -739,6 +788,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               totals={focusedDayTotals}
               onAddShift={addShift}
               onAddManualTransaction={addManualTransaction}
+              onAmortizeTransaction={amortizeTransaction}
               onDeleteTransaction={deleteTransaction}
               onMoveTransactionToYesterday={moveTransactionToYesterday}
               onRemoveSlot={removeSlot}
@@ -1061,6 +1111,7 @@ function FocusedDayEditor({
   onAddManualTransaction,
   onDeleteTransaction,
   onMoveTransactionToYesterday,
+  onAmortizeTransaction,
   onAddShift,
   onRemoveSlot,
   onReorderSlots,
@@ -1089,6 +1140,10 @@ function FocusedDayEditor({
   ) => void;
   onDeleteTransaction: (transaction: DashboardTransaction) => void;
   onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
+  onAmortizeTransaction: (
+    transaction: DashboardTransaction,
+    months: 1 | 3,
+  ) => void;
   onAddShift: (day: DashboardDay) => void;
   onRemoveSlot: (slot: DashboardSlot) => void;
   onReorderSlots: (
@@ -1117,6 +1172,7 @@ function FocusedDayEditor({
           isManualTransactionPending={isManualTransactionPending}
           pendingTransactionIds={pendingTransactionIds}
           onAddManualTransaction={onAddManualTransaction}
+          onAmortizeTransaction={onAmortizeTransaction}
           onDeleteTransaction={onDeleteTransaction}
           onMoveTransactionToYesterday={onMoveTransactionToYesterday}
           onToggleTransactionStatus={onToggleTransactionStatus}
@@ -1134,6 +1190,7 @@ function TransactionDrawer({
   onToggleTransactionStatus,
   onDeleteTransaction,
   onMoveTransactionToYesterday,
+  onAmortizeTransaction,
   onAddManualTransaction,
 }: {
   day: DashboardDay;
@@ -1146,6 +1203,10 @@ function TransactionDrawer({
   ) => void;
   onDeleteTransaction: (transaction: DashboardTransaction) => void;
   onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
+  onAmortizeTransaction: (
+    transaction: DashboardTransaction,
+    months: 1 | 3,
+  ) => void;
   onAddManualTransaction: (
     day: DashboardDay,
     merchantName: string,
@@ -1188,6 +1249,7 @@ function TransactionDrawer({
           variant="spending"
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
+          onAmortize={onAmortizeTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "excluded")
           }
@@ -1268,6 +1330,7 @@ function TransactionColumn({
   onDelete,
   onMoveToYesterday,
   onToggle,
+  onAmortize,
 }: {
   heading: string;
   pendingTransactionIds: Set<string>;
@@ -1276,6 +1339,7 @@ function TransactionColumn({
   onDelete: (transaction: DashboardTransaction) => void;
   onMoveToYesterday: (transaction: DashboardTransaction) => void;
   onToggle: (transaction: DashboardTransaction) => void;
+  onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
   return (
     <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
@@ -1298,6 +1362,7 @@ function TransactionColumn({
             onDelete={onDelete}
             onMoveToYesterday={onMoveToYesterday}
             onToggle={onToggle}
+            onAmortize={onAmortize}
           />
         ))}
       </div>
@@ -1312,6 +1377,7 @@ function TransactionRowButton({
   onDelete,
   onMoveToYesterday,
   onToggle,
+  onAmortize,
 }: {
   transaction: DashboardTransaction;
   disabled: boolean;
@@ -1319,6 +1385,7 @@ function TransactionRowButton({
   onDelete: (transaction: DashboardTransaction) => void;
   onMoveToYesterday: (transaction: DashboardTransaction) => void;
   onToggle: (transaction: DashboardTransaction) => void;
+  onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -1379,6 +1446,28 @@ function TransactionRowButton({
           >
             Move to yesterday
           </button>
+          {variant === "spending" && onAmortize ? (
+            <>
+              <button
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                onClick={() => onAmortize(transaction, 1)}
+                title="Spread this cost across baseline over 1 month, then expire."
+                type="button"
+              >
+                Amort 1mo
+              </button>
+              <button
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                onClick={() => onAmortize(transaction, 3)}
+                title="Spread this cost across baseline over 3 months, then expire."
+                type="button"
+              >
+                Amort 3mo
+              </button>
+            </>
+          ) : null}
           <button
             className="rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-negative-text)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled}
