@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 import {
   createSavedFoodAction,
@@ -101,6 +101,16 @@ export function AiFoodEstimator({
   const speechSupported =
     typeof window !== "undefined" &&
     Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+
+  // Live preview: how many lines would the paste-bypass parser pick
+  // up if the user hit the action button right now? When > 0, the
+  // primary button switches to "Run" (no AI call); when 0, it stays
+  // "Estimate" (AI).
+  const parsedLineCount = useMemo(
+    () => (description.trim() ? parsePastedLog(description).length : 0),
+    [description],
+  );
+  const willBypassAi = parsedLineCount > 0;
 
   function runEstimate() {
     const trimmed = description.trim();
@@ -381,6 +391,21 @@ export function AiFoodEstimator({
                   value={description}
                 />
               </label>
+              {description.trim() ? (
+                <p
+                  className={
+                    willBypassAi
+                      ? "rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-3 py-2 text-xs font-semibold text-[var(--accent-primary-text)]"
+                      : "rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]"
+                  }
+                >
+                  {willBypassAi
+                    ? `Your numbers detected · ${parsedLineCount} ${
+                        parsedLineCount === 1 ? "entry" : "entries"
+                      } · will log exactly as typed, no AI call`
+                    : "No explicit macros detected · AI will estimate"}
+                </p>
+              ) : null}
               {error ? (
                 <p className="rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-200">
                   {error}
@@ -410,7 +435,13 @@ export function AiFoodEstimator({
                   onClick={runEstimate}
                   type="button"
                 >
-                  {isPending ? "Estimating..." : "Estimate"}
+                  {isPending
+                    ? "Estimating..."
+                    : willBypassAi
+                      ? `Run ${parsedLineCount} ${
+                          parsedLineCount === 1 ? "entry" : "entries"
+                        }`
+                      : "Estimate"}
                 </button>
                 <button
                   className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] sm:py-2"

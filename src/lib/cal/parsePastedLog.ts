@@ -48,8 +48,12 @@ const VERDICT_MARK_RE = /[✅❌]/u;
 const MACRO_HINT_RE =
   /\b(\d+(?:\.\d+)?)\s*(cal|kcal|calories?|g\b|gp?\b|gc\b|gf\b|gfi\b|mg)\b/i;
 
+// Strip leading list / count markers. Covers:
+//   • / - / * / – / — bullets
+//   1. / 1) / 1: / 1, numbered prefixes
+//   1   (digit followed by whitespace)
 const LEADING_BULLET_RE =
-  /^(?:[•\-*–—]|\d+[).]|\d+\s+)\s*/;
+  /^(?:[•\-*–—]|\d+\s*[).,:]|\d+\s+)\s*/;
 
 export function parsePastedLog(input: string): ParsedFoodLine[] {
   const lines = input
@@ -109,8 +113,8 @@ function extractMealName(line: string): string {
   let head = macroMatch ? line.slice(0, macroMatch.index) : line;
 
   head = head.replace(LEADING_BULLET_RE, "");
-  // Trim trailing separators like " — ", " - ", " : ", " · "
-  head = head.replace(/[\s—–:·\-]+$/u, "").trim();
+  // Trim trailing separators like " — ", " - ", " : ", " · ", trailing comma
+  head = head.replace(/[\s—–:·\-,]+$/u, "").trim();
 
   // If the head ends with a trailing parenthetical like "(2)" leave it,
   // but drop stray quote characters.
