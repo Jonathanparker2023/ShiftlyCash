@@ -63,10 +63,29 @@ export function parseEstimateResponse(raw: string): FoodEstimate[] {
         throw new Error("Estimator returned invalid JSON.");
       }
     } else {
-      console.warn(
-        `[estimateParser] invalid JSON, no value found. Raw (first 500): ${raw.slice(0, 500)}`,
-      );
-      throw new Error("Estimator returned invalid JSON.");
+      // Last-ditch recovery: response was probably truncated by
+      // max_tokens mid-object. Close the array at the last complete
+      // top-level item and parse just that. Loses the final
+      // partially-emitted item but rescues every fully-emitted one.
+      const repaired = repairTruncatedArray(cleaned);
+      if (repaired) {
+        try {
+          json = JSON.parse(repaired);
+          console.warn(
+            `[estimateParser] recovered from truncated response. Raw (first 500): ${raw.slice(0, 500)}`,
+          );
+        } catch {
+          console.warn(
+            `[estimateParser] invalid JSON, no value found. Raw (first 500): ${raw.slice(0, 500)}`,
+          );
+          throw new Error("Estimator returned invalid JSON.");
+        }
+      } else {
+        console.warn(
+          `[estimateParser] invalid JSON, no value found. Raw (first 500): ${raw.slice(0, 500)}`,
+        );
+        throw new Error("Estimator returned invalid JSON.");
+      }
     }
   }
 
@@ -80,6 +99,50 @@ export function parseEstimateResponse(raw: string): FoodEstimate[] {
   }
 
   return items.map(parseEstimateItem);
+}
+
+// If the response is a top-level array that was cut off mid-object,
+// scan for the last fully-closed top-level item inside it and emit
+// a valid array containing every complete item. Returns null if the
+// shape isn't a recoverable array.
+function repairTruncatedArray(text: string): string | null {
+  const startIdx = text.indexOf("[");
+  if (startIdx < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let lastCompleteTopLevelClose = -1;
+
+  for (let i = startIdx; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "[" || ch === "{") depth++;
+    else if (ch === "]" || ch === "}") {
+      depth--;
+      // A `}` that returns depth to 1 means we just closed a top-level
+      // array element (depth 1 = inside the array, 0 = outside).
+      if (ch === "}" && depth === 1) {
+        lastCompleteTopLevelClose = i;
+      }
+    }
+  }
+
+  if (lastCompleteTopLevelClose < 0) return null;
+
+  return `${text.slice(startIdx, lastCompleteTopLevelClose + 1)}]`;
 }
 
 // Scan `text` for the first balanced JSON array or object and return

@@ -301,7 +301,10 @@ export async function estimateFood(description: string): Promise<FoodEstimate[]>
   const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
     model: ESTIMATOR_MODEL,
-    max_tokens: 1500,
+    // 1500 was being silently truncated on multi-component meals with
+    // full reasoning, which the parser surfaced as
+    // "Estimator returned invalid JSON.". 3000 leaves headroom.
+    max_tokens: 3000,
     temperature: 0,
     system: SYSTEM_PROMPT,
     tools: [
