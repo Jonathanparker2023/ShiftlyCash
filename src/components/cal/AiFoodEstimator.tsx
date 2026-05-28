@@ -8,6 +8,7 @@ import {
 } from "@/app/(protected)/cal/actions";
 import { categoryLabel } from "@/lib/cal/color";
 import type { FoodEstimate } from "@/lib/cal/estimate";
+import { parsePastedLog } from "@/lib/cal/parsePastedLog";
 import type { FoodCategory } from "@/lib/cal/types";
 
 type EstimateForm = {
@@ -104,6 +105,36 @@ export function AiFoodEstimator({
   function runEstimate() {
     const trimmed = description.trim();
     if (!trimmed) return;
+
+    // Paste bypass: if the user already typed/pasted explicit macros,
+    // log them verbatim. No AI estimator call, no AI reinterpretation,
+    // no risk of the model "normalizing" the user's numbers into
+    // different numbers. Falls through to AI only when no explicit
+    // calories were found on any line.
+    const parsedFromPaste = parsePastedLog(trimmed);
+    if (parsedFromPaste.length > 0) {
+      parsedFromPaste.forEach((item) => {
+        const form: EstimateForm = {
+          mealName: item.mealName,
+          category: item.category,
+          calories: String(item.calories),
+          proteinG: item.proteinG?.toString() ?? "",
+          carbsG: item.carbsG?.toString() ?? "",
+          fatG: item.fatG?.toString() ?? "",
+          fiberG: item.fiberG?.toString() ?? "",
+          sodiumMg: item.sodiumMg?.toString() ?? "",
+          addedSugarG: item.addedSugarG?.toString() ?? "",
+          saturatedFatG: item.saturatedFatG?.toString() ?? "",
+          reasoning: "",
+          confidence: "high",
+          saveForNextTime: false,
+        };
+        void confirmEstimate(form);
+      });
+      reset();
+      setIsOpen(false);
+      return;
+    }
 
     const requestSeq = requestSeqRef.current + 1;
     requestSeqRef.current = requestSeq;
