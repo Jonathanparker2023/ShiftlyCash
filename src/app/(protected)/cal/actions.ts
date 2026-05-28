@@ -1141,7 +1141,17 @@ async function refreshDayFoodVerdict(userId: string, date: string) {
     });
   }
 
-  revalidatePath("/cal");
+  // Same guard as scoreEntryAndUpdate: post-response revalidates throw
+  // under Next.js 16. DB is up-to-date; UI catches up on next refresh.
+  try {
+    revalidatePath("/cal");
+  } catch (err) {
+    console.info("[day-verdict] revalidatePath skipped (post-response)", {
+      userId,
+      date,
+      reason: err instanceof Error ? err.message : "unknown",
+    });
+  }
 }
 
 async function scoreEntryAndUpdate(entryId: string, userId: string) {
@@ -1199,7 +1209,21 @@ async function scoreEntryAndUpdate(entryId: string, userId: string) {
     });
   }
 
-  revalidatePath("/cal");
+  // Next.js 16 throws "revalidatePath during render is unsupported" when
+  // this fires from a waitUntil() background task that outlives the
+  // response. Swallow the error — the DB row is already updated, so the
+  // verdict will land on the next navigation/refresh. Without the
+  // catch, a single thrown revalidate can poison every concurrent
+  // scoring task in the same batch.
+  try {
+    revalidatePath("/cal");
+  } catch (err) {
+    console.info("[verdict] revalidatePath skipped (post-response)", {
+      entryId,
+      userId,
+      reason: err instanceof Error ? err.message : "unknown",
+    });
+  }
 }
 
 function withTimeout<T>(
