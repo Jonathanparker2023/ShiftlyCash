@@ -131,10 +131,28 @@ export async function POST(request: Request) {
       .limit(1)
       .maybeSingle();
 
+    // Same-source dedup: if a prior Chime capture (e.g. from Make.com)
+    // already created a transaction for the same date + amount, don't
+    // double-write when Tasker fires for the same real-world event.
+    const { data: existingChime } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("source", "chime")
+      .eq("date", todayDate)
+      .eq("amount", amount)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
     if (existingPlaid?.id) {
       parsedTransactionId = existingPlaid.id as string;
       parsedAt = new Date().toISOString();
       parseFailureReason = "Cross-source match: Plaid row already exists";
+    } else if (existingChime?.id) {
+      parsedTransactionId = existingChime.id as string;
+      parsedAt = new Date().toISOString();
+      parseFailureReason = "Duplicate: Chime row already exists (Make.com + Tasker overlap)";
     } else {
       const { data: txInserted, error: txError } = await supabase
         .from("transactions")
@@ -225,25 +243,22 @@ export async function POST(request: Request) {
   });
 }
 
-// Build a merchant-name string that makes the kind obvious at-a-glance
-// in the dashboard transaction list. Without this, a transfer_out to
-// "kayla b" rendered as just "kayla b" — visually indistinguishable
-// from a card purchase at a merchant named kayla b. Prefix transfers,
-// deposits, and refunds with a direction word so the row label is
-// self-describing.
+// Build a merchant-name string for the transaction row.
+// Transfers show as generic "Transfer" — the recipient name is stored
+// in notes for traceability but should not appear as the merchant in
+// the dashboard (looks like a purchase, breaks budgeting categories).
 function formatChimeMerchantName(
   parsed: Extract<ChimeParseResult, { ok: true }>,
 ): string {
   const source = parsed.merchantOrSource?.trim() || `Chime ${parsed.kind}`;
   switch (parsed.kind) {
     case "transfer_out":
-      return `Sent to ${source}`;
     case "transfer_in":
-      return `Transfer credit: ${source}`;
+      return "Transfer";
     case "deposit":
-      return `Deposit credit: ${source}`;
+      return "Deposit";
     case "refund":
-      return `Refund credit: ${source}`;
+      return `Refund: ${source}`;
     default:
       // purchase, pending_charge, etc. — keep the merchant name plain
       return source;

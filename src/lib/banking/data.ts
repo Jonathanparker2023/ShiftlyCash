@@ -7,6 +7,7 @@ import type {
   BankingData,
   BankingDayOption,
   BankingPlaidItem,
+  ChimeCapture,
   PendingTransaction,
 } from "@/lib/banking/types";
 
@@ -39,6 +40,16 @@ type DayRow = {
   day_index: number;
 };
 
+type ChimeCaptureRow = {
+  id: string;
+  raw_title: string | null;
+  raw_text: string;
+  received_at: string;
+  parsed_at: string | null;
+  parsed_transaction_id: string | null;
+  parse_failure_reason: string | null;
+};
+
 export async function getBankingData(): Promise<BankingData> {
   const { supabase, user } = await requireUserWithBootstrapStatus();
   const configResult = getOptionalPlaidServerEnv();
@@ -46,6 +57,7 @@ export async function getBankingData(): Promise<BankingData> {
     { data: itemData, error: itemError },
     { data: pendingData, error: pendingError },
     { data: dayData, error: dayError },
+    { data: chimeData, error: chimeError },
   ] = await Promise.all([
     supabase
       .from("plaid_item_metadata")
@@ -68,6 +80,11 @@ export async function getBankingData(): Promise<BankingData> {
       .select("id,date,day_index")
       .eq("user_id", user.id)
       .order("date", { ascending: false }),
+    supabase
+      .from("chime_raw_captures")
+      .select("id,raw_title,raw_text,received_at,parsed_at,parsed_transaction_id,parse_failure_reason")
+      .eq("user_id", user.id)
+      .order("received_at", { ascending: false }),
   ]);
 
   if (itemError) {
@@ -78,6 +95,9 @@ export async function getBankingData(): Promise<BankingData> {
   }
   if (dayError) {
     throw new Error(`Unable to load day options: ${dayError.message}`);
+  }
+  if (chimeError) {
+    throw new Error(`Unable to load Chime captures: ${chimeError.message}`);
   }
 
   return {
@@ -90,6 +110,7 @@ export async function getBankingData(): Promise<BankingData> {
       ((pendingData ?? []) as PendingTransactionRow[]).map(mapPendingTransaction),
     ),
     dayOptions: ((dayData ?? []) as DayRow[]).map(mapDayOption),
+    chimeCaptures: ((chimeData ?? []) as ChimeCaptureRow[]).map(mapChimeCapture),
   };
 }
 
@@ -123,6 +144,18 @@ function mapDayOption(row: DayRow): BankingDayOption {
     id: row.id,
     date: row.date,
     label: formatDayLabel(row.date),
+  };
+}
+
+function mapChimeCapture(row: ChimeCaptureRow): ChimeCapture {
+  return {
+    id: row.id,
+    rawTitle: row.raw_title,
+    rawText: row.raw_text,
+    receivedAt: row.received_at,
+    parsedAt: row.parsed_at,
+    parsedTransactionId: row.parsed_transaction_id,
+    parseFailureReason: row.parse_failure_reason,
   };
 }
 

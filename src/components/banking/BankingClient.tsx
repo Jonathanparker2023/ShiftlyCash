@@ -13,6 +13,7 @@ import {
   syncTransactionsAction,
 } from "@/app/(protected)/banking/actions";
 import { centsToDollars } from "@/lib/domain/money";
+import { ChimeCapturesSection } from "@/components/banking/ChimeCapturesSection";
 import type {
   BankingData,
   BankingDayOption,
@@ -249,6 +250,8 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
             setSelectedDays((current) => ({ ...current, [transactionId]: dayId }))
           }
         />
+
+        <ChimeCapturesSection captures={initialData.chimeCaptures} />
       </main>
     </div>
   );
