@@ -95,6 +95,7 @@ type TransactionRow = {
   category: string | null;
   source: DashboardTransactionSource;
   status: DashboardTransactionStatus | "pending_review";
+  review_reason: string | null;
 };
 
 type WeekTotalRow = {
@@ -268,7 +269,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           supabase
             .from("transactions")
             .select(
-              "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,category,source,status",
+              "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,category,source,status,review_reason",
             )
             .in("day_id", dayIds)
             .in("status", ["applied", "excluded"])
@@ -698,6 +699,7 @@ function mapDashboardTransaction(row: TransactionRow): DashboardTransaction {
     category: row.category,
     source: row.source,
     status: row.status === "excluded" ? "excluded" : "applied",
+    isAmortized: row.review_reason === "amortized_expense",
     date: row.date,
     time: row.datetime ?? row.legacy_time,
     createdAt: row.created_at,

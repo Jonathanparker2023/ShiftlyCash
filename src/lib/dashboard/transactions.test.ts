@@ -58,6 +58,7 @@ function transaction(
     category: null,
     source: "plaid",
     status: "applied",
+    isAmortized: false,
     date: "2026-05-02",
     time: "12:00",
     createdAt: "2026-05-02T12:00:00.000Z",

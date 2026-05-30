@@ -493,7 +493,11 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     setDays((currentDays) =>
       currentDays.map((day) =>
         day.id === transaction.dayId
-          ? moveTransactionBetweenBuckets(day, transaction, "excluded")
+          ? moveTransactionBetweenBuckets(
+              day,
+              { ...transaction, isAmortized: true },
+              "excluded",
+            )
           : day,
       ),
     );
@@ -544,6 +548,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       category: null,
       source: "manual",
       status: "applied",
+      isAmortized: false,
       date: day.date,
       time: null,
       createdAt: new Date().toISOString(),
@@ -1458,6 +1463,13 @@ function TransactionRowButton({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(transaction.merchantName);
+  const isAmortizedExempt = variant === "exempt" && transaction.isAmortized;
+  const rowStyle = isAmortizedExempt
+    ? {
+        backgroundColor: "rgba(37, 99, 235, 0.12)",
+        borderColor: "rgba(96, 165, 250, 0.48)",
+      }
+    : undefined;
 
   function submitRename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1468,7 +1480,10 @@ function TransactionRowButton({
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-sm shadow-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]">
+    <div
+      className="overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-sm shadow-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
+      style={rowStyle}
+    >
       <button
         className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
@@ -1478,7 +1493,9 @@ function TransactionRowButton({
         <span className="min-w-0">
           <span
             className={
-              variant === "exempt"
+              isAmortizedExempt
+                ? "block truncate font-semibold text-sky-200 line-through"
+                : variant === "exempt"
                 ? "block truncate font-semibold text-[var(--text-muted)] line-through"
                 : "block truncate font-semibold text-[var(--text-primary)]"
             }
@@ -1497,7 +1514,9 @@ function TransactionRowButton({
         </span>
         <span
           className={
-            variant === "exempt"
+            isAmortizedExempt
+              ? "font-semibold text-sky-200 line-through"
+              : variant === "exempt"
               ? "font-semibold text-[var(--text-tertiary)] line-through"
               : "font-semibold text-red-600"
           }

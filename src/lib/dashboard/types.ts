@@ -18,6 +18,7 @@ export type DashboardTransaction = {
   category: string | null;
   source: DashboardTransactionSource;
   status: DashboardTransactionStatus;
+  isAmortized: boolean;
   date: string;
   time: string | null;
   createdAt: string;

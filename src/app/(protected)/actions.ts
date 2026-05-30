@@ -96,6 +96,7 @@ export type ManualTransactionResult = {
     category: string | null;
     source: "manual";
     status: "applied";
+    isAmortized: boolean;
     date: string;
     time: string | null;
     createdAt: string;
@@ -508,7 +509,7 @@ export async function amortizeTransactionAction(
     .from("transactions")
     .update({
       status: "excluded",
-      review_reason: null,
+      review_reason: "amortized_expense",
       excluded_at: new Date().toISOString(),
     })
     .eq("id", transactionId);
@@ -592,6 +593,7 @@ export async function addManualTransactionAction(
       category: row.category,
       source: "manual",
       status: "applied",
+      isAmortized: false,
       date: row.date,
       time: null,
       createdAt: row.created_at,
