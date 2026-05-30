@@ -127,9 +127,55 @@ export function PaycheckAuditPage({
               />
             ))}
           </div>
+
+          <PeriodTotals periods={periods} />
         </div>
       </section>
     </main>
+  );
+}
+
+function PeriodTotals({ periods }: { periods: PaycheckPeriod[] }) {
+  return (
+    <div className="mt-6 border-t border-white/15 pt-5">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/85">
+        Pay-period totals (Ability + Prestige)
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {periods.map((period) => (
+          <PeriodTotalCard key={period.id} period={period} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PeriodTotalCard({ period }: { period: PaycheckPeriod }) {
+  const ability = period.jobs.ability;
+  const prestige = period.jobs.prestige;
+  const estimatedTotalCents = ability.estimatedNetCents + prestige.estimatedNetCents;
+  const hasActuals =
+    ability.actualNetCents !== null && prestige.actualNetCents !== null;
+  const actualTotalCents = hasActuals
+    ? (ability.actualNetCents ?? 0) + (prestige.actualNetCents ?? 0)
+    : null;
+  const heading = period.id === "previous" ? "Total prev" : "Total current";
+
+  return (
+    <article className="rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-4 shadow-sm">
+      <div className="flex items-baseline justify-between">
+        <h3 className="text-base font-semibold text-white">{heading}</h3>
+        <span className="text-xs font-semibold text-white/70">{period.label}</span>
+      </div>
+      <div className="mt-3 grid gap-2 text-sm">
+        <MoneyLine label="Ability net" value={ability.estimatedNetCents} />
+        <MoneyLine label="Prestige net" value={prestige.estimatedNetCents} />
+        <MoneyLine strong label="Expected total" tone="positive" value={estimatedTotalCents} />
+        {actualTotalCents !== null ? (
+          <MoneyLine strong label="Actual total" value={actualTotalCents} />
+        ) : null}
+      </div>
+    </article>
   );
 }
 
