@@ -693,7 +693,7 @@ function buildHistory({
       ),
     },
     recent_closed_weeks: closedWeeks
-      .slice(-8)
+      .slice(-52)
       .map((week) => mapHistoryWeek(week, exclusionsByWeek.get(week.week_id))),
   };
 }
