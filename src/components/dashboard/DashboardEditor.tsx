@@ -11,6 +11,7 @@ import {
   deleteTransactionAction,
   moveTransactionToYesterdayAction,
   refreshDashboardProjectionMaintenanceAction,
+  renameTransactionAction,
   saveEarnSlotAction,
   toggleTransactionStatusAction,
   type SaveEarnSlotInput,
@@ -429,6 +430,54 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     }
   }
 
+  async function renameTransaction(
+    transaction: DashboardTransaction,
+    merchantName: string,
+  ) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const trimmed = merchantName.trim();
+    if (!trimmed || trimmed === transaction.merchantName) {
+      return;
+    }
+
+    const previousDays = days;
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+    setDays((currentDays) =>
+      currentDays.map((day) => renameTransactionInDay(day, transaction.id, trimmed)),
+    );
+
+    try {
+      await renameTransactionAction({
+        transactionId: transaction.id,
+        merchantName: trimmed,
+      });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to rename transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
   async function amortizeTransaction(
     transaction: DashboardTransaction,
     months: 1 | 3,
@@ -791,6 +840,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               onAmortizeTransaction={amortizeTransaction}
               onDeleteTransaction={deleteTransaction}
               onMoveTransactionToYesterday={moveTransactionToYesterday}
+              onRenameTransaction={renameTransaction}
               onRemoveSlot={removeSlot}
               onReorderSlots={reorderSlots}
               onSlotChange={updateSlot}
@@ -1111,6 +1161,7 @@ function FocusedDayEditor({
   onAddManualTransaction,
   onDeleteTransaction,
   onMoveTransactionToYesterday,
+  onRenameTransaction,
   onAmortizeTransaction,
   onAddShift,
   onRemoveSlot,
@@ -1140,6 +1191,10 @@ function FocusedDayEditor({
   ) => void;
   onDeleteTransaction: (transaction: DashboardTransaction) => void;
   onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
+  onRenameTransaction: (
+    transaction: DashboardTransaction,
+    merchantName: string,
+  ) => void;
   onAmortizeTransaction: (
     transaction: DashboardTransaction,
     months: 1 | 3,
@@ -1175,6 +1230,7 @@ function FocusedDayEditor({
           onAmortizeTransaction={onAmortizeTransaction}
           onDeleteTransaction={onDeleteTransaction}
           onMoveTransactionToYesterday={onMoveTransactionToYesterday}
+          onRenameTransaction={onRenameTransaction}
           onToggleTransactionStatus={onToggleTransactionStatus}
         />
       </div>
@@ -1190,6 +1246,7 @@ function TransactionDrawer({
   onToggleTransactionStatus,
   onDeleteTransaction,
   onMoveTransactionToYesterday,
+  onRenameTransaction,
   onAmortizeTransaction,
   onAddManualTransaction,
 }: {
@@ -1203,6 +1260,10 @@ function TransactionDrawer({
   ) => void;
   onDeleteTransaction: (transaction: DashboardTransaction) => void;
   onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
+  onRenameTransaction: (
+    transaction: DashboardTransaction,
+    merchantName: string,
+  ) => void;
   onAmortizeTransaction: (
     transaction: DashboardTransaction,
     months: 1 | 3,
@@ -1249,6 +1310,7 @@ function TransactionDrawer({
           variant="spending"
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
+          onRename={onRenameTransaction}
           onAmortize={onAmortizeTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "excluded")
@@ -1261,6 +1323,7 @@ function TransactionDrawer({
           variant="exempt"
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
+          onRename={onRenameTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "applied")
           }
@@ -1329,6 +1392,7 @@ function TransactionColumn({
   variant,
   onDelete,
   onMoveToYesterday,
+  onRename,
   onToggle,
   onAmortize,
 }: {
@@ -1338,6 +1402,7 @@ function TransactionColumn({
   variant: "spending" | "exempt";
   onDelete: (transaction: DashboardTransaction) => void;
   onMoveToYesterday: (transaction: DashboardTransaction) => void;
+  onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
@@ -1361,6 +1426,7 @@ function TransactionColumn({
             variant={variant}
             onDelete={onDelete}
             onMoveToYesterday={onMoveToYesterday}
+            onRename={onRename}
             onToggle={onToggle}
             onAmortize={onAmortize}
           />
@@ -1376,6 +1442,7 @@ function TransactionRowButton({
   variant,
   onDelete,
   onMoveToYesterday,
+  onRename,
   onToggle,
   onAmortize,
 }: {
@@ -1384,10 +1451,21 @@ function TransactionRowButton({
   variant: "spending" | "exempt";
   onDelete: (transaction: DashboardTransaction) => void;
   onMoveToYesterday: (transaction: DashboardTransaction) => void;
+  onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(transaction.merchantName);
+
+  function submitRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = renameValue.trim();
+    if (!trimmed) return;
+    onRename(transaction, trimmed);
+    setIsRenaming(false);
+  }
 
   return (
     <div className="overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-sm shadow-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]">
@@ -1429,8 +1507,47 @@ function TransactionRowButton({
       </button>
 
       {isExpanded ? (
-        <div className="flex flex-wrap gap-2 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2">
-          <button
+        <div className="border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2">
+          {isRenaming ? (
+            <form className="mb-2 flex gap-2" onSubmit={submitRename}>
+              <input
+                className="min-w-0 flex-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-base)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/30"
+                disabled={disabled}
+                onChange={(event) => setRenameValue(event.target.value)}
+                value={renameValue}
+              />
+              <button
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled || !renameValue.trim()}
+                type="submit"
+              >
+                Save
+              </button>
+              <button
+                className="rounded-md px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+                onClick={() => {
+                  setRenameValue(transaction.merchantName);
+                  setIsRenaming(false);
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+            </form>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={disabled}
+              onClick={() => {
+                setRenameValue(transaction.merchantName);
+                setIsRenaming(true);
+              }}
+              type="button"
+            >
+              Rename
+            </button>
+            <button
             className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled}
             onClick={() => onToggle(transaction)}
@@ -1480,6 +1597,7 @@ function TransactionRowButton({
           >
             Delete
           </button>
+          </div>
         </div>
       ) : null}
     </div>
@@ -2096,6 +2214,26 @@ function removeTransactionFromDay(
     ),
     excludedTransactions: day.excludedTransactions.filter(
       (transaction) => transaction.id !== transactionId,
+    ),
+  };
+}
+
+function renameTransactionInDay(
+  day: DashboardDay,
+  transactionId: string,
+  merchantName: string,
+): DashboardDay {
+  return {
+    ...day,
+    appliedTransactions: day.appliedTransactions.map((transaction) =>
+      transaction.id === transactionId
+        ? { ...transaction, merchantName }
+        : transaction,
+    ),
+    excludedTransactions: day.excludedTransactions.map((transaction) =>
+      transaction.id === transactionId
+        ? { ...transaction, merchantName }
+        : transaction,
     ),
   };
 }

@@ -65,6 +65,11 @@ export type TransactionIdInput = {
   transactionId: string;
 };
 
+export type RenameTransactionInput = {
+  transactionId: string;
+  merchantName: string;
+};
+
 export type AddManualTransactionInput = {
   dayId: string;
   merchantName: string;
@@ -384,6 +389,26 @@ export async function moveTransactionToYesterdayAction(
 
   revalidatePath("/");
   return { ok: true, dayId: String(day.id), date: String(day.date) };
+}
+
+export async function renameTransactionAction(
+  input: RenameTransactionInput,
+): Promise<{ ok: true; merchantName: string }> {
+  const { supabase } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+  const merchantName = requireNonEmptyString(input.merchantName, "merchantName");
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({ merchant_name: merchantName })
+    .eq("id", transactionId);
+
+  if (error) {
+    throw new Error(`Unable to rename transaction: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  return { ok: true, merchantName };
 }
 
 export async function amortizeTransactionAction(
