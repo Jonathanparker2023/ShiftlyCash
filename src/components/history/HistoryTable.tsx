@@ -99,7 +99,7 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                   <th className="px-4 py-3 font-semibold">Date range</th>
                   <th className="px-4 py-3 text-right font-semibold">Earnings</th>
                   <th className="px-4 py-3 text-right font-semibold">Spend</th>
-                  <th className="px-4 py-3 text-right font-semibold">Base</th>
+                  <th className="px-4 py-3 text-right font-semibold">Fixed</th>
                   <th className="px-4 py-3 text-right font-semibold">Cashflow</th>
                   <th className="px-4 py-3 text-right font-semibold">
                     Running balance

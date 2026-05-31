@@ -187,10 +187,10 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
               ShiftlyCash
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Baseline Expenses
+              Fixed Expenses
             </h1>
             <p className="mt-1 text-sm text-white/75">
-              Monthly recurring costs converted into weekly and daily base.
+              Monthly recurring costs converted into weekly and daily fixed cost.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -224,7 +224,7 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
 
           {expenses.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-white/75">
-              No baseline expenses yet.
+              No fixed expenses yet.
             </div>
           ) : (
             <div className="divide-y divide-zinc-200">
@@ -263,7 +263,7 @@ function TotalsPanel({
       <TotalCard label="Monthly total" value={formatMoney(monthlyTotalCents)} />
       <TotalCard label="Weekly average" value={formatMoney(weeklyAverageCents)} />
       <TotalCard
-        label="Projected daily base"
+        label="Projected daily fixed"
         sublabel="Auto-applied to today + future days"
         value={formatMoney(projectedDailyBaseCents)}
       />

@@ -1588,7 +1588,7 @@ function TransactionRowButton({
                 className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled}
                 onClick={() => onAmortize(transaction, 1)}
-                title="Spread this cost across baseline over 1 month, then expire."
+                title="Spread this cost across fixed costs over 1 month, then expire."
                 type="button"
               >
                 Amort 1mo
@@ -1597,7 +1597,7 @@ function TransactionRowButton({
                 className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled}
                 onClick={() => onAmortize(transaction, 3)}
-                title="Spread this cost across baseline over 3 months, then expire."
+                title="Spread this cost across fixed costs over 3 months, then expire."
                 type="button"
               >
                 Amort 3mo
@@ -1978,7 +1978,7 @@ function TotalsPanel({
           tone="negative"
           value={formatMoney(spendCents)}
         />
-        <TotalLine label="Base" value={formatMoney(baseCents)} />
+        <TotalLine label="Fixed" value={formatMoney(baseCents)} />
         <div className="my-2 border-t border-[var(--border-default)]" />
         <TotalLine
           strong

@@ -47,7 +47,7 @@ export default async function ProtectedLayout({
             <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
               <div className="flex w-max min-w-full items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] backdrop-blur-md">
                 <NavLink href="/">Dashboard</NavLink>
-                <NavLink href="/baseline">Baseline</NavLink>
+                <NavLink href="/baseline">Fixed</NavLink>
                 <NavLink href="/history">History</NavLink>
                 <NavLink href="/paychecks">Paychecks</NavLink>
                 <NavLink href="/projects">Projects</NavLink>
