@@ -12,6 +12,12 @@ export type { FoodEstimate } from "@/lib/cal/estimateParser";
 
 const ESTIMATOR_MODEL = "claude-sonnet-4-5";
 const MAX_DESCRIPTION_LENGTH = 4000;
+const MAX_LABEL_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_LABEL_IMAGE_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
 const SYSTEM_PROMPT = `You are a precise nutrition estimator. Your job is to estimate calories, macros, sodium, added sugar, and saturated fat for food a user has eaten.
 
 ## Authoritative user-entered numbers
@@ -286,6 +292,29 @@ Category rules:
 - "drink" - coffee, juice, soda, smoothies, alcohol, milk, water.
 - "other" - anything that genuinely doesn't fit above.`;
 
+const LABEL_PHOTO_PROMPT = `${SYSTEM_PROMPT}
+
+## Nutrition label photo mode
+
+The user is uploading a photo of a Nutrition Facts label, package front, barcode area, or ingredient/product label. Read the visible label text and return a food estimate from the label.
+
+Rules:
+- Nutrition Facts numbers visible in the image are AUTHORITATIVE. Copy calories, protein, carbs, fat, fiber, sodium, added sugar, and saturated fat exactly when visible.
+- Preserve the label serving size in reasoning if visible.
+- If the user typed a quantity ("2 servings", "half package", "one bar"), scale the label numbers by that quantity in code-like arithmetic. If no quantity is typed, use one labeled serving.
+- If the photo shows multiple labels/products, return one entry per product.
+- If a field is not visible/readable, use null instead of guessing unless it can be safely inferred from the label (for example, added sugar listed under total sugar).
+- Prefer product/brand name from the package as mealName, but keep it short.
+- Confidence should be "high" when the nutrition panel is readable, "medium" when partly readable, and "low" only if the image is blurry or incomplete.
+- Do not use web_search unless the photo has a clear product name but the Nutrition Facts panel is unreadable.
+- The reasoning field must stay the normal component-list format, but include the serving basis in one short line, e.g. "• Label serving 1 bar 210 cal".`;
+
+export type LabelPhotoInput = {
+  imageBase64: string;
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+  note?: string;
+};
+
 export async function estimateFood(description: string): Promise<FoodEstimate[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -323,6 +352,74 @@ export async function estimateFood(description: string): Promise<FoodEstimate[]>
     parseEstimateResponse(extractFinalText(response.content)),
     fullDescription,
   );
+}
+
+export async function estimateFoodFromLabelPhoto(
+  input: LabelPhotoInput,
+): Promise<FoodEstimate[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("Estimator unavailable: ANTHROPIC_API_KEY not set.");
+  }
+
+  if (!ALLOWED_LABEL_IMAGE_MEDIA_TYPES.includes(input.mediaType)) {
+    throw new Error("Use a JPEG, PNG, or WebP label photo.");
+  }
+
+  const imageBase64 = normalizeBase64(input.imageBase64);
+  if (!imageBase64) {
+    throw new Error("Take or choose a label photo first.");
+  }
+
+  const imageBytes = Buffer.byteLength(imageBase64, "base64");
+  if (imageBytes > MAX_LABEL_IMAGE_BYTES) {
+    throw new Error("Label photo is too large. Try cropping closer to the label.");
+  }
+
+  const note = input.note?.trim().slice(0, 1000) ?? "";
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: ESTIMATOR_MODEL,
+    max_tokens: 5000,
+    temperature: 0,
+    system: LABEL_PHOTO_PROMPT,
+    tools: [
+      {
+        type: "web_search_20250305",
+        name: "web_search",
+        max_uses: 2,
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: note
+              ? `Read this nutrition label photo. User note: ${note}`
+              : "Read this nutrition label photo. Use one labeled serving unless the image or note says otherwise.",
+          },
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: input.mediaType,
+              data: imageBase64,
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  return parseEstimateResponse(extractFinalText(response.content));
+}
+
+function normalizeBase64(value: string): string {
+  const trimmed = value.trim();
+  const commaIndex = trimmed.indexOf(",");
+  return commaIndex >= 0 ? trimmed.slice(commaIndex + 1).trim() : trimmed;
 }
 
 function extractFinalText(content: Anthropic.Messages.ContentBlock[]): string {

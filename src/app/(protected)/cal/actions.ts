@@ -6,7 +6,11 @@ import { waitUntil } from "@vercel/functions";
 
 import { requireUser } from "@/lib/auth";
 import { upsertDayFoodVerdict } from "@/lib/cal/dayVerdict";
-import { estimateFood, type FoodEstimate } from "@/lib/cal/estimate";
+import {
+  estimateFood,
+  estimateFoodFromLabelPhoto,
+  type FoodEstimate,
+} from "@/lib/cal/estimate";
 import { getShiftlyCalData } from "@/lib/cal/data";
 import type { FoodCategory, FoodVerdict } from "@/lib/cal/types";
 import { scoreEntry, type VerdictInput } from "@/lib/cal/verdict";
@@ -139,6 +143,15 @@ export async function estimateFoodAction(input: {
 }): Promise<FoodEstimate[]> {
   await requireUser();
   return estimateFood(input.description);
+}
+
+export async function estimateFoodLabelPhotoAction(input: {
+  imageBase64: string;
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+  note?: string;
+}): Promise<FoodEstimate[]> {
+  await requireUser();
+  return estimateFoodFromLabelPhoto(input);
 }
 
 export type BulkFoodEntryInput = {

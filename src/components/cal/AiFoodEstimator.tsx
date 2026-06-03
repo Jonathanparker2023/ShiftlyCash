@@ -5,6 +5,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import {
   createSavedFoodAction,
   estimateFoodAction,
+  estimateFoodLabelPhotoAction,
 } from "@/app/(protected)/cal/actions";
 import { categoryLabel } from "@/lib/cal/color";
 import type { FoodEstimate } from "@/lib/cal/estimate";
@@ -95,7 +96,9 @@ export function AiFoodEstimator({
   >("idle");
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [labelPhotoName, setLabelPhotoName] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const labelPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const requestSeqRef = useRef(0);
   const speechSupported =
@@ -172,6 +175,48 @@ export function AiFoodEstimator({
     });
   }
 
+  function estimateLabelPhoto(file: File | null) {
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Use a JPEG, PNG, or WebP label photo.");
+      if (labelPhotoInputRef.current) labelPhotoInputRef.current.value = "";
+      return;
+    }
+
+    setLabelPhotoName(file.name || "Label photo");
+    setError(null);
+    setEstimate(null);
+    setEstimateStatus("loading");
+
+    const requestSeq = requestSeqRef.current + 1;
+    requestSeqRef.current = requestSeq;
+
+    startTransition(async () => {
+      try {
+        const imageBase64 = await readFileAsBase64(file);
+        const result = await estimateFoodLabelPhotoAction({
+          imageBase64,
+          mediaType: file.type as "image/jpeg" | "image/png" | "image/webp",
+          note: description.trim() || undefined,
+        });
+        if (requestSeqRef.current !== requestSeq) return;
+        const forms = result.map(toEstimateForm);
+        forms.forEach((item) => void confirmEstimate(item));
+        reset();
+        setIsOpen(false);
+      } catch (err) {
+        if (requestSeqRef.current !== requestSeq) return;
+        setError(
+          err instanceof Error ? err.message : "Unable to read the label photo.",
+        );
+        setEstimateStatus("error");
+      } finally {
+        if (labelPhotoInputRef.current) labelPhotoInputRef.current.value = "";
+      }
+    });
+  }
+
   function toggleListening() {
     setError(null);
 
@@ -209,6 +254,8 @@ export function AiFoodEstimator({
     setEstimate(null);
     setEstimateStatus("idle");
     setError(null);
+    setLabelPhotoName(null);
+    if (labelPhotoInputRef.current) labelPhotoInputRef.current.value = "";
   }
 
   async function confirmEstimate(item: EstimateForm) {
@@ -387,10 +434,20 @@ export function AiFoodEstimator({
                   className="mt-1 min-h-32 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-3 text-base text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40 sm:min-h-24 sm:text-sm"
                   maxLength={4000}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="What did you eat? Be as specific or as casual as you want."
+                  placeholder="What did you eat? For labels, add serving count if needed."
                   value={description}
                 />
               </label>
+              <input
+                ref={labelPhotoInputRef}
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                className="sr-only"
+                onChange={(event) =>
+                  estimateLabelPhoto(event.currentTarget.files?.[0] ?? null)
+                }
+                type="file"
+              />
               {description.trim() ? (
                 <p
                   className={
@@ -404,6 +461,11 @@ export function AiFoodEstimator({
                         parsedLineCount === 1 ? "entry" : "entries"
                       } · will log exactly as typed, no AI call`
                     : "No explicit macros detected · AI will estimate"}
+                </p>
+              ) : null}
+              {labelPhotoName ? (
+                <p className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]">
+                  Reading label - {labelPhotoName}
                 </p>
               ) : null}
               {error ? (
@@ -429,6 +491,14 @@ export function AiFoodEstimator({
                     )}
                   </button>
                 ) : null}
+                <button
+                  className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={disabled || isPending}
+                  onClick={() => labelPhotoInputRef.current?.click()}
+                  type="button"
+                >
+                  Label photo
+                </button>
                 <button
                   className="flex-1 rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-3 text-base font-bold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:py-2 sm:text-sm sm:font-semibold"
                   disabled={disabled || isPending || !description.trim()}
@@ -467,6 +537,23 @@ function currentTimeInput(): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(
     now.getMinutes(),
   ).padStart(2, "0")}`;
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Unable to read the label photo."));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("Unable to read the label photo."));
+        return;
+      }
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function EstimateLoadingPanel({ onCancel }: { onCancel: () => void }) {
