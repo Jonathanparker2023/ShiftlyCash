@@ -363,7 +363,7 @@ function ExpenseRow({
   const rowClassName = [
     "px-5 py-3.5 transition md:grid md:grid-cols-[minmax(200px,1fr)_140px_120px_170px_84px_84px] md:items-center md:gap-3 md:py-3.5 hover:bg-white/[0.025]",
     expired ? "opacity-45" : "",
-    isDatedActive ? "bg-amber-500/10 ring-1 ring-inset ring-amber-300/40" : "",
+    isDatedActive ? "bg-sky-500/10 ring-1 ring-inset ring-sky-300/40" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -461,7 +461,7 @@ function ExpenseRow({
           <input
             className={
               isDatedActive
-                ? "h-11 w-full rounded-xl border border-amber-300/50 bg-amber-500/15 px-3.5 text-sm text-amber-100 outline-none transition focus:border-amber-300/80 focus:ring-2 focus:ring-amber-300/20"
+                ? "h-11 w-full rounded-xl border border-sky-300/50 bg-sky-500/15 px-3.5 text-sm text-sky-100 outline-none transition focus:border-sky-300/80 focus:ring-2 focus:ring-sky-300/20"
                 : FIELD_CLASS
             }
             onChange={(event) =>
@@ -517,7 +517,7 @@ function ExpiredBadge() {
 
 function ExpiresBadge() {
   return (
-    <span className="rounded-full border border-amber-300/50 bg-amber-500/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-amber-200">
+    <span className="rounded-full border border-sky-300/50 bg-sky-500/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-sky-200">
       Expires
     </span>
   );
