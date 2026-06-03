@@ -290,6 +290,20 @@ export function spendWeeklyTone(cents: number, medianCents: number | null): Cash
   return "amber";
 }
 
+/**
+ * Weekly earnings tone relative to median (mirror of spend — higher is good):
+ *   > median + 10% → green  (over-earning — the goal)
+ *   median to median + 10% → amber (on-target buffer, above median only)
+ *   < median → red   (under-earning)
+ *   no median → amber (neutral fallback)
+ */
+export function earningsWeeklyTone(cents: number, medianCents: number | null): CashflowTone {
+  if (!medianCents) return "amber";
+  if (cents < medianCents) return "negative";
+  if (cents > medianCents * 1.10) return "positive";
+  return "amber";
+}
+
 export function cashflowColorFromTone(tone: CashflowTone): string {
   // NOTE on class choice:
   //   `text-amber-500` is intentional. `globals.css` overrides

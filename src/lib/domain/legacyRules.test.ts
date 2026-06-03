@@ -6,6 +6,7 @@ import {
   cashflowDailyTone,
   cashflowWeeklyColor,
   cashflowWeeklyTone,
+  earningsWeeklyTone,
   normalizeTxName,
   spendWeeklyTone,
 } from "./legacyRules";
@@ -90,6 +91,28 @@ describe("legacy cashflow color tiers", () => {
 
     it("uses amber when no median is available", () => {
       expect(spendWeeklyTone(10_000, null)).toBe("amber");
+    });
+  });
+
+  describe("weekly earnings tone - relative to median (higher is good)", () => {
+    it("classifies earnings above median plus 10 percent as green", () => {
+      expect(earningsWeeklyTone(110_001, 100_000)).toBe("positive");
+      expect(earningsWeeklyTone(150_000, 100_000)).toBe("positive");
+    });
+
+    it("uses an above-median amber buffer from median up to median plus 10 percent", () => {
+      expect(earningsWeeklyTone(100_000, 100_000)).toBe("amber");
+      expect(earningsWeeklyTone(105_000, 100_000)).toBe("amber");
+      expect(earningsWeeklyTone(110_000, 100_000)).toBe("amber");
+    });
+
+    it("classifies any earnings below median as red", () => {
+      expect(earningsWeeklyTone(99_999, 100_000)).toBe("negative");
+      expect(earningsWeeklyTone(50_000, 100_000)).toBe("negative");
+    });
+
+    it("uses amber when no median is available", () => {
+      expect(earningsWeeklyTone(10_000, null)).toBe("amber");
     });
   });
 
