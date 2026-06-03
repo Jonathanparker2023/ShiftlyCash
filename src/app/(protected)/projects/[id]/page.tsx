@@ -1,15 +1,23 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { CompletionHeatmap } from "@/components/projects/CompletionHeatmap";
 import { TaskList } from "@/components/projects/TaskList";
+import { CAPABILITIES } from "@/lib/edition";
 import { getProjectDetailData } from "@/lib/projects/data";
 import type { ProjectEventItem } from "@/lib/projects/types";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!CAPABILITIES.showProjects) {
+    redirect("/");
+  }
+
   const { id } = await params;
   const { project, events } = await getProjectDetailData(id);
 

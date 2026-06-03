@@ -8,6 +8,8 @@ export type EditionCapabilities = {
   showBanking: boolean;
   showNetWorth: boolean;
   showIncomeSources: boolean;
+  showProjects: boolean;
+  showSetup: boolean;
   showPaycheckAudit: boolean;
   showCal: boolean;
   showWealthProjection: boolean;
@@ -24,6 +26,8 @@ export const EDITION_CAPABILITIES = {
     showBanking: true,
     showNetWorth: true,
     showIncomeSources: true,
+    showProjects: true,
+    showSetup: false,
     showPaycheckAudit: true,
     showCal: true,
     showWealthProjection: true,
@@ -38,6 +42,8 @@ export const EDITION_CAPABILITIES = {
     showBanking: true,
     showNetWorth: true,
     showIncomeSources: true,
+    showProjects: false,
+    showSetup: true,
     showPaycheckAudit: false,
     showCal: false,
     showWealthProjection: false,

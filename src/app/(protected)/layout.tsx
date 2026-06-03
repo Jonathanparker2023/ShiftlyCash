@@ -10,11 +10,12 @@ import { SwipeNavigation } from "./SwipeNavigation";
 export const dynamic = "force-dynamic";
 
 const NAV_LINKS = [
+  { href: "/setup", label: "Setup", capability: "showSetup" },
   { href: "/", label: "Dashboard", capability: "showDashboard" },
   { href: "/baseline", label: "Fixed", capability: "showFixed" },
   { href: "/history", label: "History", capability: "showHistory" },
   { href: "/paychecks", label: "Paychecks", capability: "showPaycheckAudit" },
-  { href: "/projects", label: "Projects", capability: null },
+  { href: "/projects", label: "Projects", capability: "showProjects" },
   { href: "/debt", label: "Debt", capability: "showDebt" },
   { href: "/net-worth", label: "Net Worth", capability: "showNetWorth" },
   { href: "/cal", label: "ShiftlyCal", capability: "showCal" },
