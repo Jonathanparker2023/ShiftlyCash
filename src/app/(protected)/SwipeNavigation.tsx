@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode, TouchEvent } from "react";
 import { useRef } from "react";
 
-const SWIPE_ROUTES = [
+const DEFAULT_SWIPE_ROUTES = [
   "/",
   "/baseline",
   "/history",
@@ -23,7 +23,13 @@ type SwipeStart = {
   y: number;
 };
 
-export function SwipeNavigation({ children }: { children: ReactNode }) {
+export function SwipeNavigation({
+  children,
+  routes = DEFAULT_SWIPE_ROUTES,
+}: {
+  children: ReactNode;
+  routes?: readonly string[];
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const swipeStart = useRef<SwipeStart | null>(null);
@@ -66,13 +72,13 @@ export function SwipeNavigation({ children }: { children: ReactNode }) {
       return;
     }
 
-    const currentIndex = getRouteIndex(pathname);
+    const currentIndex = getRouteIndex(pathname, routes);
     if (currentIndex === -1) {
       return;
     }
 
     const nextIndex = deltaX < 0 ? currentIndex + 1 : currentIndex - 1;
-    const nextRoute = SWIPE_ROUTES[nextIndex];
+    const nextRoute = routes[nextIndex];
 
     if (nextRoute) {
       router.push(nextRoute);
@@ -93,16 +99,16 @@ export function SwipeNavigation({ children }: { children: ReactNode }) {
   );
 }
 
-function getRouteIndex(pathname: string): number {
+function getRouteIndex(pathname: string, routes: readonly string[]): number {
   if (pathname === "/") {
     return 0;
   }
 
-  const matchedRoute = SWIPE_ROUTES.findLast(
+  const matchedRoute = routes.findLast(
     (route) => route !== "/" && pathname.startsWith(route),
   );
 
-  return matchedRoute ? SWIPE_ROUTES.indexOf(matchedRoute) : -1;
+  return matchedRoute ? routes.indexOf(matchedRoute) : -1;
 }
 
 function isInteractiveElement(target: EventTarget): boolean {

@@ -1,9 +1,12 @@
+import { redirect } from "next/navigation";
+
 import {
   peekFocusedDayCoachReviewAction,
   peekWeeklyCoachReviewAction,
 } from "@/app/(protected)/cal/coachReviewActions";
 import { ShiftlyCalView } from "@/components/cal/ShiftlyCalView";
 import { getShiftlyCalData } from "@/lib/cal/data";
+import { CAPABILITIES } from "@/lib/edition";
 
 export const maxDuration = 120;
 
@@ -12,6 +15,10 @@ export default async function ShiftlyCalPage({
 }: {
   searchParams: Promise<{ week?: string }>;
 }) {
+  if (!CAPABILITIES.showCal) {
+    redirect("/");
+  }
+
   const { week } = await searchParams;
   const data = await getShiftlyCalData({ weekStartIso: week });
   const [initialDayReview, initialWeekReview] = await Promise.all([

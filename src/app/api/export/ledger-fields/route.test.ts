@@ -146,7 +146,7 @@ describe("/api/export/ledger-fields", () => {
         transactions: {
           data: [
             {
-              date: "2026-05-04",
+              date: "2026-05-05",
               amount: 50,
               category: "Food",
               status: "applied",
