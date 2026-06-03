@@ -456,23 +456,34 @@ function ExpenseRow({
           />
         </label>
 
-        <label className="block">
-          <MobileLabel>Expiration</MobileLabel>
-          <input
-            className={
-              isDatedActive
-                ? "h-11 w-full rounded-xl border border-sky-300/50 bg-sky-500/15 px-3.5 text-sm text-sky-100 outline-none transition focus:border-sky-300/80 focus:ring-2 focus:ring-sky-300/20"
-                : FIELD_CLASS
-            }
-            onChange={(event) =>
-              onUpdate(expense.id, {
-                expirationDate: event.target.value || null,
-              })
-            }
-            type="date"
-            value={expense.expirationDate ?? ""}
-          />
-        </label>
+        <div className="block">
+          <label className="block">
+            <MobileLabel>Expiration</MobileLabel>
+            <input
+              className={
+                isDatedActive
+                  ? "h-11 w-full rounded-xl border border-sky-300/50 bg-sky-500/15 px-3.5 text-sm text-sky-100 outline-none transition focus:border-sky-300/80 focus:ring-2 focus:ring-sky-300/20"
+                  : FIELD_CLASS
+              }
+              onChange={(event) =>
+                onUpdate(expense.id, {
+                  expirationDate: event.target.value || null,
+                })
+              }
+              type="date"
+              value={expense.expirationDate ?? ""}
+            />
+          </label>
+          {hasDatedExpiration ? (
+            <button
+              className="mt-1.5 text-xs font-semibold text-sky-300 underline-offset-2 transition hover:text-sky-200 hover:underline"
+              onClick={() => onUpdate(expense.id, { expirationDate: null })}
+              type="button"
+            >
+              Make permanent
+            </button>
+          ) : null}
+        </div>
 
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
