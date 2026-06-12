@@ -15,8 +15,9 @@ const RANGES: { key: RangeKey; label: string }[] = [
 ];
 
 const TARGET_LINE_CENTS = 100_000; // $1,000 reference line
+const CONFETTI_CENTS = 150_000; // $1,500+ weeks get confetti
 
-// Continuous hue: full green at >= $950, yellow at $500, full red at <= $0.
+// Continuous hue: full green at >= $950, yellow at $650, full red at <= $0.
 const GREEN = [22, 163, 74];
 const YELLOW = [245, 158, 11];
 const RED = [220, 38, 38];
@@ -24,9 +25,62 @@ const RED = [220, 38, 38];
 function cashflowHue(cents: number): string {
   const v = cents / 100;
   if (v >= 950) return rgb(GREEN);
-  if (v >= 500) return rgb(mix(GREEN, YELLOW, (950 - v) / 450));
-  if (v >= 0) return rgb(mix(YELLOW, RED, (500 - v) / 500));
+  if (v >= 650) return rgb(mix(GREEN, YELLOW, (950 - v) / 300));
+  if (v >= 0) return rgb(mix(YELLOW, RED, (650 - v) / 650));
   return rgb(RED);
+}
+
+const CONFETTI_COLORS = [
+  "#f472b6",
+  "#38bdf8",
+  "#a78bfa",
+  "#fbbf24",
+  "#34d399",
+  "#f87171",
+];
+
+// Deterministic pseudo-random so confetti doesn't shimmer between renders.
+function pseudo(i: number, k: number): number {
+  const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function ConfettiBurst({
+  cx,
+  topY,
+  seed,
+  spread,
+}: {
+  cx: number;
+  topY: number;
+  seed: number;
+  spread: number;
+}) {
+  const pieces = Array.from({ length: 14 }, (_, k) => {
+    const x = cx + (pseudo(seed, k) - 0.5) * spread * 2.2;
+    const y = topY - 6 - pseudo(seed, k + 20) * 22;
+    const rot = Math.round(pseudo(seed, k + 40) * 360);
+    const color = CONFETTI_COLORS[k % CONFETTI_COLORS.length];
+    return { x, y, rot, color, key: k };
+  });
+
+  return (
+    <g>
+      {pieces.map((p) => (
+        <rect
+          fill={p.color}
+          height={5.5}
+          key={p.key}
+          opacity={0.9}
+          rx={1}
+          transform={`rotate(${p.rot} ${p.x} ${p.y})`}
+          width={2.6}
+          x={p.x}
+          y={p.y}
+        />
+      ))}
+    </g>
+  );
 }
 
 function mix(a: number[], b: number[], t: number): number[] {
@@ -165,7 +219,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const VBW = 1000;
 const VBH = 280;
-const PAD_TOP = 16;
+const PAD_TOP = 34;
 const PAD_BOTTOM = 28;
 
 function WeeklyCashflowChart({
@@ -255,6 +309,9 @@ function WeeklyCashflowChart({
               >
                 <title>{`${week.startDate} · ${formatMoney(week.cashflowCents)}`}</title>
               </rect>
+              {week.cashflowCents >= CONFETTI_CENTS ? (
+                <ConfettiBurst cx={cx} seed={i + 1} spread={barW} topY={valueY} />
+              ) : null}
               {i % labelEvery === 0 ? (
                 <text
                   fill="rgba(255,255,255,0.5)"
@@ -276,13 +333,13 @@ function WeeklyCashflowChart({
             className="h-2.5 w-16 rounded-sm"
             style={{
               background:
-                "linear-gradient(90deg, rgb(220,38,38) 0%, rgb(245,158,11) 52%, rgb(22,163,74) 100%)",
+                "linear-gradient(90deg, rgb(220,38,38) 0%, rgb(245,158,11) 65%, rgb(22,163,74) 100%)",
             }}
           />
-          $0 → $500 → $950+
+          $0 → $650 → $950+
         </span>
         <span className="text-white/40">
-          Solid line = $1,000 · dashed = median · faded bar = current week
+          Solid line = $1,000 · dashed = median · faded = current week · confetti = $1,500+
         </span>
       </div>
     </div>
