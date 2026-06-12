@@ -3,30 +3,47 @@
 import { useMemo, useState } from "react";
 
 import { centsToDollars } from "@/lib/domain/money";
-import { cashflowWeeklyTone } from "@/lib/domain/legacyRules";
 import type { TrendsData, TrendsWeek } from "@/lib/trends/data";
 
-type RangeKey = "12w" | "26w" | "ytd" | "all";
+type RangeKey = "12w" | "ytd" | "all" | "custom";
 
 const RANGES: { key: RangeKey; label: string }[] = [
   { key: "12w", label: "12W" },
-  { key: "26w", label: "26W" },
   { key: "ytd", label: "YTD" },
   { key: "all", label: "All" },
+  { key: "custom", label: "Custom" },
 ];
 
-const TONE_FILL: Record<string, string> = {
-  positive: "#16a34a",
-  amber: "#f59e0b",
-  negative: "#dc2626",
-};
+const TARGET_LINE_CENTS = 100_000; // $1,000 reference line
+
+// Continuous hue: full green at >= $950, yellow at $500, full red at <= $0.
+const GREEN = [22, 163, 74];
+const YELLOW = [245, 158, 11];
+const RED = [220, 38, 38];
+
+function cashflowHue(cents: number): string {
+  const v = cents / 100;
+  if (v >= 950) return rgb(GREEN);
+  if (v >= 500) return rgb(mix(GREEN, YELLOW, (950 - v) / 450));
+  if (v >= 0) return rgb(mix(YELLOW, RED, (500 - v) / 500));
+  return rgb(RED);
+}
+
+function mix(a: number[], b: number[], t: number): number[] {
+  return a.map((c, i) => Math.round(c + (b[i] - c) * t));
+}
+
+function rgb(c: number[]): string {
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
 
 export function TrendsView({ initialData }: { initialData: TrendsData }) {
   const [range, setRange] = useState<RangeKey>("ytd");
+  const [customWeeks, setCustomWeeks] = useState(10);
 
   const weeks = useMemo(
-    () => filterByRange(initialData.weeks, range),
-    [initialData.weeks, range],
+    () => filterByRange(initialData.weeks, range, customWeeks),
+    [initialData.weeks, range, customWeeks],
   );
 
   const stats = useMemo(() => {
@@ -53,7 +70,28 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
               How your weekly cashflow moves over time.
             </p>
           </div>
-          <RangeSelector range={range} onChange={setRange} />
+          <div className="flex items-center gap-2">
+            <RangeSelector range={range} onChange={setRange} />
+            {range === "custom" ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  className="h-9 w-16 rounded-lg border border-white/15 bg-white/[0.06] px-2 text-center text-sm font-semibold text-white outline-none backdrop-blur-md focus:border-white/40"
+                  inputMode="numeric"
+                  max={53}
+                  min={2}
+                  onChange={(event) => {
+                    const parsed = Number(event.target.value);
+                    if (Number.isInteger(parsed)) {
+                      setCustomWeeks(Math.min(53, Math.max(2, parsed)));
+                    }
+                  }}
+                  type="number"
+                  value={customWeeks}
+                />
+                <span className="text-xs font-semibold text-white/55">wks</span>
+              </div>
+            ) : null}
+          </div>
         </header>
 
         <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
@@ -137,7 +175,10 @@ function WeeklyCashflowChart({
   weeks: TrendsWeek[];
   medianCents: number;
 }) {
-  const maxPos = Math.max(0, ...weeks.map((w) => w.cashflowCents));
+  const maxPos = Math.max(
+    TARGET_LINE_CENTS,
+    ...weeks.map((w) => w.cashflowCents),
+  );
   const maxNeg = Math.max(0, ...weeks.map((w) => -w.cashflowCents));
   const total = maxPos + maxNeg || 1;
   const plotH = VBH - PAD_TOP - PAD_BOTTOM;
@@ -145,6 +186,7 @@ function WeeklyCashflowChart({
   const slot = VBW / weeks.length;
   const barW = Math.min(slot * 0.6, 46);
   const labelEvery = Math.ceil(weeks.length / 12);
+  const targetY = yFor(TARGET_LINE_CENTS, zeroY, maxPos, maxNeg, plotH);
 
   return (
     <div className="w-full">
@@ -163,6 +205,23 @@ function WeeklyCashflowChart({
           y1={zeroY}
           y2={zeroY}
         />
+        {/* $1,000 target line */}
+        <line
+          stroke="rgba(255,255,255,0.45)"
+          strokeWidth={1.25}
+          x1={0}
+          x2={VBW}
+          y1={targetY}
+          y2={targetY}
+        />
+        <text
+          fill="rgba(255,255,255,0.55)"
+          fontSize={11}
+          x={6}
+          y={targetY - 5}
+        >
+          $1,000
+        </text>
         {/* median guide */}
         {medianCents !== 0 ? (
           <line
@@ -178,7 +237,7 @@ function WeeklyCashflowChart({
 
         {weeks.map((week, i) => {
           const cx = i * slot + slot / 2;
-          const fill = TONE_FILL[cashflowWeeklyTone(week.cashflowCents)];
+          const fill = cashflowHue(week.cashflowCents);
           const valueY = yFor(week.cashflowCents, zeroY, maxPos, maxNeg, plotH);
           const barH = Math.max(1, Math.abs(valueY - zeroY));
           const barY = week.cashflowCents >= 0 ? valueY : zeroY;
@@ -211,25 +270,22 @@ function WeeklyCashflowChart({
           );
         })}
       </svg>
-      <div className="mt-3 flex flex-wrap gap-4 text-xs text-white/55">
-        <LegendDot color={TONE_FILL.positive} label="On plan" />
-        <LegendDot color={TONE_FILL.amber} label="Light" />
-        <LegendDot color={TONE_FILL.negative} label="Short" />
-        <span className="text-white/40">Dashed line = median · faded bar = current week</span>
+      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-white/55">
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-2.5 w-16 rounded-sm"
+            style={{
+              background:
+                "linear-gradient(90deg, rgb(220,38,38) 0%, rgb(245,158,11) 52%, rgb(22,163,74) 100%)",
+            }}
+          />
+          $0 → $500 → $950+
+        </span>
+        <span className="text-white/40">
+          Solid line = $1,000 · dashed = median · faded bar = current week
+        </span>
       </div>
     </div>
-  );
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className="h-2.5 w-2.5 rounded-sm"
-        style={{ backgroundColor: color }}
-      />
-      {label}
-    </span>
   );
 }
 
@@ -248,7 +304,11 @@ function yFor(
   return zeroY + (maxNeg ? (-cents / maxNeg) * span : 0);
 }
 
-function filterByRange(weeks: TrendsWeek[], range: RangeKey): TrendsWeek[] {
+function filterByRange(
+  weeks: TrendsWeek[],
+  range: RangeKey,
+  customWeeks: number,
+): TrendsWeek[] {
   if (range === "all") {
     return weeks;
   }
@@ -257,7 +317,7 @@ function filterByRange(weeks: TrendsWeek[], range: RangeKey): TrendsWeek[] {
     const year = latest ? latest.slice(0, 4) : "2026";
     return weeks.filter((w) => w.startDate >= `${year}-01-01`);
   }
-  const n = range === "12w" ? 12 : 26;
+  const n = range === "12w" ? 12 : customWeeks;
   return weeks.slice(-n);
 }
 
