@@ -231,8 +231,7 @@ function formatSignedPercent(value: number | null): string {
     return "--";
   }
 
-  const percent = Math.abs(value) <= 1 ? value * 100 : value;
-  const sign = percent > 0 ? "+" : "";
+  const sign = value > 0 ? "+" : "";
 
-  return `${sign}${percent.toFixed(1)}%`;
+  return `${sign}${value.toFixed(1)}%`;
 }
