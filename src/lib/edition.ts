@@ -13,6 +13,7 @@ export type EditionCapabilities = {
   showSetup: boolean;
   showPaycheckAudit: boolean;
   showCal: boolean;
+  showScreener: boolean;
   showWealthProjection: boolean;
   showTaxSetAside: boolean;
   showWeeklyTemplate: boolean;
@@ -32,6 +33,7 @@ export const EDITION_CAPABILITIES = {
     showSetup: false,
     showPaycheckAudit: true,
     showCal: true,
+    showScreener: true,
     showWealthProjection: true,
     showTaxSetAside: true,
     showWeeklyTemplate: true,
@@ -49,6 +51,7 @@ export const EDITION_CAPABILITIES = {
     showSetup: true,
     showPaycheckAudit: false,
     showCal: false,
+    showScreener: false,
     showWealthProjection: false,
     showTaxSetAside: false,
     showWeeklyTemplate: false,

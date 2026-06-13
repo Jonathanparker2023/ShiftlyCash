@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { href: "/projects", label: "Projects", capability: "showProjects" },
   { href: "/debt", label: "Debt", capability: "showDebt" },
   { href: "/net-worth", label: "Net Worth", capability: "showNetWorth" },
+  { href: "/screener", label: "Screener", capability: "showScreener" },
   { href: "/cal", label: "ShiftlyCal", capability: "showCal" },
 ] as const satisfies ReadonlyArray<{
   href: string;

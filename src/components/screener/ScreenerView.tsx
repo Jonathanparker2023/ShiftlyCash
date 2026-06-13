@@ -1,0 +1,238 @@
+import {
+  AppPanel,
+  DataCard,
+  MetricValue,
+  SemanticChip,
+} from "@/components/shell";
+import type { ScreenerSnapshotState } from "@/lib/screener/snapshot";
+
+type Props = {
+  state: ScreenerSnapshotState;
+};
+
+export function ScreenerView({ state }: Props) {
+  if (state.status === "empty") {
+    return (
+      <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
+        <AppPanel elevated>
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                Screener
+              </p>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+                Paper twin
+              </h1>
+            </div>
+            <p className="text-sm text-zinc-300">
+              Twin starts publishing on the next daily run.
+            </p>
+          </div>
+        </AppPanel>
+      </main>
+    );
+  }
+
+  const { payload, stale } = state;
+  const heroTone = toneForPercent(payload.hero.pnlPct);
+
+  return (
+    <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
+      <AppPanel elevated>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                Screener
+              </p>
+              {payload.hero.unvalidated ? (
+                <SemanticChip tone="warning">unvalidated</SemanticChip>
+              ) : null}
+              {stale ? <SemanticChip tone="warning">stale</SemanticChip> : null}
+            </div>
+            <MetricValue
+              className="mt-3"
+              label="Paper twin vs cash"
+              tone={heroTone}
+              value={`Paper twin: ${formatSignedPercent(payload.hero.pnlPct)} vs cash`}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[420px]">
+            <DataCard>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                Clock
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                Day {formatInteger(payload.clock.day)} of {formatInteger(payload.clock.of)}
+              </p>
+            </DataCard>
+            <DataCard>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                Value
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                {formatMoney(payload.hero.portfolioValue)}
+              </p>
+            </DataCard>
+            <DataCard>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                Cost
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                {formatMoney(payload.hero.costBasis)}
+              </p>
+            </DataCard>
+          </div>
+        </div>
+        {stale ? (
+          <p className="mt-4 text-sm text-amber-200">
+            Stale: daily run may not have published.
+          </p>
+        ) : null}
+      </AppPanel>
+
+      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <AppPanel>
+          <SectionHeader title="Open positions" meta={`${payload.positions.length} open`} />
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+                <tr>
+                  <th className="pb-2 pr-4 font-semibold">Ticker</th>
+                  <th className="pb-2 pr-4 font-semibold">Entry</th>
+                  <th className="pb-2 pr-4 font-semibold">Current</th>
+                  <th className="pb-2 text-right font-semibold">P&amp;L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {payload.positions.length ? (
+                  payload.positions.map((position) => (
+                    <tr key={position.ticker}>
+                      <td className="py-3 pr-4 font-semibold">{position.ticker}</td>
+                      <td className="py-3 pr-4 text-zinc-300">{formatMoney(position.entry)}</td>
+                      <td className="py-3 pr-4 text-zinc-300">{formatMoney(position.current)}</td>
+                      <td className={["py-3 text-right font-semibold", toneClass(position.pnlPct)].join(" ")}>
+                        {formatSignedPercent(position.pnlPct)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="py-4 text-zinc-400" colSpan={4}>
+                      No open paper positions.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </AppPanel>
+
+        <AppPanel>
+          <SectionHeader title="In fear now" meta={`${payload.fear.length} active`} />
+          <div className="mt-4 flex flex-col gap-2">
+            {payload.fear.length ? (
+              payload.fear.map((item) => (
+                <DataCard className="flex items-center justify-between gap-3" key={`${item.ticker}-${item.variant}-${item.kind}`}>
+                  <div>
+                    <p className="font-semibold">{item.ticker}</p>
+                    <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+                      {[item.variant, item.kind].filter(Boolean).join(" / ")}
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold text-amber-200">
+                    {formatSignedPercent(item.drawdownPct)}
+                  </p>
+                </DataCard>
+              ))
+            ) : (
+              <p className="text-sm text-zinc-400">No active fear triggers.</p>
+            )}
+          </div>
+        </AppPanel>
+      </section>
+
+      <AppPanel>
+        <SectionHeader title="Queue" meta={`${payload.queue.length} names`} />
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {payload.queue.length ? (
+            payload.queue.map((item) => (
+              <DataCard key={item.ticker}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{item.ticker}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.14em] text-zinc-500">
+                      {item.band ?? "queue"} / rank {formatInteger(item.queueRank)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="text-sm font-semibold">Score {formatInteger(item.score)}</span>
+                    {item.shadowFlagged ? (
+                      <SemanticChip tone="warning">shadow</SemanticChip>
+                    ) : null}
+                  </div>
+                </div>
+              </DataCard>
+            ))
+          ) : (
+            <p className="text-sm text-zinc-400">Queue is empty.</p>
+          )}
+        </div>
+      </AppPanel>
+    </main>
+  );
+}
+
+function SectionHeader({ title, meta }: { title: string; meta: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+        {meta}
+      </span>
+    </div>
+  );
+}
+
+function toneForPercent(value: number | null): "positive" | "negative" | "neutral" {
+  if (value === null || value === 0) {
+    return "neutral";
+  }
+
+  return value > 0 ? "positive" : "negative";
+}
+
+function toneClass(value: number | null): string {
+  if (value === null || value === 0) {
+    return "text-zinc-300";
+  }
+
+  return value > 0 ? "text-emerald-300" : "text-rose-300";
+}
+
+function formatMoney(value: number | null): string {
+  if (value === null) {
+    return "--";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatInteger(value: number | null): string {
+  return value === null ? "--" : new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatSignedPercent(value: number | null): string {
+  if (value === null) {
+    return "--";
+  }
+
+  const percent = Math.abs(value) <= 1 ? value * 100 : value;
+  const sign = percent > 0 ? "+" : "";
+
+  return `${sign}${percent.toFixed(1)}%`;
+}
