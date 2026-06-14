@@ -153,31 +153,44 @@ export function ScreenerView({ state }: Props) {
       </section>
 
       <AppPanel>
-        <SectionHeader title="Queue" meta={`${payload.queue.length} names`} />
-        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {payload.queue.length ? (
-            payload.queue.map((item) => (
-              <DataCard key={item.ticker}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{item.ticker}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.14em] text-zinc-500">
-                      {item.band ?? "queue"} / rank {formatInteger(item.queueRank)}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className="text-sm font-semibold">Score {formatInteger(item.score)}</span>
-                    {item.shadowFlagged ? (
-                      <SemanticChip tone="warning">shadow</SemanticChip>
-                    ) : null}
-                  </div>
-                </div>
-              </DataCard>
-            ))
-          ) : (
-            <p className="text-sm text-zinc-400">Queue is empty.</p>
-          )}
-        </div>
+        {(() => {
+          const queueBand = payload.queue.filter((item) => item.band === "queue");
+          const nearMiss = payload.queue.filter((item) => item.band === "near_miss");
+          return (
+            <>
+              <SectionHeader title="Queue" meta={`${queueBand.length} in queue`} />
+              <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {queueBand.length ? (
+                  queueBand.map((item) => (
+                    <DataCard key={item.ticker}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">{item.ticker}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-zinc-500">
+                            rank {formatInteger(item.queueRank)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className="text-sm font-semibold">Score {formatInteger(item.score)}</span>
+                          {item.shadowFlagged ? (
+                            <SemanticChip tone="warning">shadow</SemanticChip>
+                          ) : null}
+                        </div>
+                      </div>
+                    </DataCard>
+                  ))
+                ) : (
+                  <p className="text-sm text-zinc-400">No names in the queue band.</p>
+                )}
+              </div>
+              {nearMiss.length ? (
+                <p className="mt-4 text-sm text-zinc-400">
+                  Near-miss (score 3): {nearMiss.length} names
+                </p>
+              ) : null}
+            </>
+          );
+        })()}
       </AppPanel>
     </main>
   );
