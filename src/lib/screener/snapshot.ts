@@ -46,6 +46,13 @@ export type ScreenerSnapshotPayload = {
   positions: ScreenerPosition[];
   queue: ScreenerQueueItem[];
   fear: ScreenerFearItem[];
+  research: Record<string, ScreenerResearch>;
+};
+
+export type ScreenerResearch = {
+  verdict: string;
+  confidence: number | null;
+  summary: string | null;
 };
 
 export type ScreenerSnapshotState =
@@ -171,7 +178,30 @@ function normalizePayload(payload: unknown, row: SnapshotRow): ScreenerSnapshotP
     positions: normalizePositions(source.positions),
     queue: normalizeQueue(source.queue),
     fear: normalizeFear(source.fear),
+    research: normalizeResearch(source.research),
   };
+}
+
+function normalizeResearch(value: unknown): Record<string, ScreenerResearch> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const out: Record<string, ScreenerResearch> = {};
+  for (const [ticker, raw] of Object.entries(value)) {
+    if (!isRecord(raw)) {
+      continue;
+    }
+    const verdict = optionalString(raw.verdict);
+    if (!verdict) {
+      continue;
+    }
+    out[ticker] = {
+      verdict,
+      confidence: optionalNumber(raw.confidence),
+      summary: optionalString(raw.one_paragraph_summary),
+    };
+  }
+  return out;
 }
 
 function normalizePositions(value: unknown): ScreenerPosition[] {

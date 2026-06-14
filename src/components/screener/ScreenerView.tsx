@@ -171,7 +171,9 @@ export function ScreenerView({ state }: Props) {
               <SectionHeader title="Queue" meta={`${queueBand.length} in queue`} />
               <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {queueBand.length ? (
-                  queueBand.map((item) => (
+                  queueBand.map((item) => {
+                    const research = payload.research[item.ticker];
+                    return (
                     <DataCard key={item.ticker}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -182,13 +184,29 @@ export function ScreenerView({ state }: Props) {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="text-sm font-semibold">Score {formatInteger(item.score)}</span>
+                          {research ? (
+                            <SemanticChip tone={verdictTone(research.verdict)}>
+                              {research.confidence !== null
+                                ? `${research.verdict} ${Math.round(research.confidence * 100)}%`
+                                : research.verdict}
+                            </SemanticChip>
+                          ) : null}
                           {item.shadowFlagged ? (
                             <SemanticChip tone="warning">shadow</SemanticChip>
                           ) : null}
                         </div>
                       </div>
+                      {research?.summary ? (
+                        <details className="mt-3">
+                          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                            Research note
+                          </summary>
+                          <p className="mt-2 text-sm leading-relaxed text-zinc-300">{research.summary}</p>
+                        </details>
+                      ) : null}
                     </DataCard>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="text-sm text-zinc-400">No names in the queue band.</p>
                 )}
@@ -215,6 +233,16 @@ function SectionHeader({ title, meta }: { title: string; meta: string }) {
       </span>
     </div>
   );
+}
+
+function verdictTone(verdict: string): "positive" | "warning" | "negative" {
+  if (verdict === "compelling") {
+    return "positive";
+  }
+  if (verdict === "pass") {
+    return "negative";
+  }
+  return "warning";
 }
 
 function toneForPercent(value: number | null): "positive" | "negative" | "neutral" {
