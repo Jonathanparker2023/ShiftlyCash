@@ -9,7 +9,6 @@ const DEFAULT_SWIPE_ROUTES = [
   "/baseline",
   "/history",
   "/paychecks",
-  "/projects",
   "/debt",
   "/net-worth",
 ] as const;

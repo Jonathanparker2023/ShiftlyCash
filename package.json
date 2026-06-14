@@ -6,7 +6,6 @@
     "dev": "next dev",
     "build": "next build",
     "import:firebase": "node scripts/import-firebase.mjs",
-    "import:notion-projects": "node scripts/import-notion-projects.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run"

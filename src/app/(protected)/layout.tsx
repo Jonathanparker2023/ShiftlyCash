@@ -16,7 +16,6 @@ const NAV_LINKS = [
   { href: "/history", label: "History", capability: "showHistory" },
   { href: "/trends", label: "Trends", capability: "showTrends" },
   { href: "/paychecks", label: "Paychecks", capability: "showPaycheckAudit" },
-  { href: "/projects", label: "Projects", capability: "showProjects" },
   { href: "/debt", label: "Debt", capability: "showDebt" },
   { href: "/net-worth", label: "Net Worth", capability: "showNetWorth" },
   { href: "/screener", label: "Screener", capability: "showScreener" },
