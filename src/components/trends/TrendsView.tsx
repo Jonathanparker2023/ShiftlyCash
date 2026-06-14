@@ -102,12 +102,12 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
 
   const stats = useMemo(() => {
     const values = weeks.map((w) => w.cashflowCents);
+    const total = values.reduce((a, b) => a + b, 0);
     return {
       count: values.length,
+      total,
       median: median(values),
-      average: values.length
-        ? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
-        : 0,
+      average: values.length ? Math.round(total / values.length) : 0,
     };
   }, [weeks]);
 
@@ -159,6 +159,7 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
               </p>
             </div>
             <div className="flex gap-5">
+              <Stat label="Total" value={formatMoney(stats.total)} />
               <Stat label="Median" value={formatMoney(stats.median)} />
               <Stat label="Average" value={formatMoney(stats.average)} />
               <Stat label="Weeks" value={String(stats.count)} />
