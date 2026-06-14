@@ -52,6 +52,12 @@ export type ScreenerSnapshotPayload = {
     costBasis: number | null;
     pnlPct: number | null;
     realizedPnl: number | null;
+    twinTotalReturnPct: number | null;
+    sp500TotalReturnPct: number | null;
+    vsSp500Pct: number | null;
+    vsCashPct: number | null;
+    maxDrawdownPct: number | null;
+    volatilityPct: number | null;
     unvalidated: boolean;
   };
   positions: ScreenerPosition[];
@@ -186,6 +192,12 @@ function normalizePayload(payload: unknown, row: SnapshotRow): ScreenerSnapshotP
       costBasis: optionalNumber(hero.cost_basis),
       pnlPct: optionalNumber(hero.pnl_pct),
       realizedPnl: optionalNumber(hero.realized_pnl),
+      twinTotalReturnPct: optionalNumber(hero.twin_total_return_pct),
+      sp500TotalReturnPct: optionalNumber(hero.sp500_total_return_pct),
+      vsSp500Pct: optionalNumber(hero.vs_sp500_pct),
+      vsCashPct: optionalNumber(hero.vs_cash_pct),
+      maxDrawdownPct: optionalNumber(hero.max_drawdown_pct),
+      volatilityPct: optionalNumber(hero.volatility_pct) ?? optionalNumber(hero.volatility),
       unvalidated: hero.unvalidated !== false,
     },
     positions: normalizePositions(source.positions),

@@ -34,7 +34,10 @@ export function ScreenerView({ state }: Props) {
   }
 
   const { payload, stale } = state;
-  const heroTone = toneForPercent(payload.hero.pnlPct);
+  const twinReturn = payload.hero.twinTotalReturnPct ?? payload.hero.pnlPct;
+  const sp500Return = payload.hero.sp500TotalReturnPct;
+  const vsSp500 = payload.hero.vsSp500Pct;
+  const heroTone = toneForPercent(vsSp500 ?? twinReturn);
 
   return (
     <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
@@ -52,10 +55,13 @@ export function ScreenerView({ state }: Props) {
             </div>
             <MetricValue
               className="mt-3"
-              label="Paper twin vs cash"
+              label="Paper twin total return"
               tone={heroTone}
-              value={`Paper twin: ${formatSignedPercent(payload.hero.pnlPct)} vs cash`}
+              value={`Twin ${formatSignedPercent(twinReturn)} · S&P 500 ${formatSignedPercent(sp500Return)} · vs S&P ${formatSignedPercent(vsSp500)}`}
             />
+            <p className="mt-2 text-sm text-zinc-400">
+              Max drawdown {formatPlainPercent(payload.hero.maxDrawdownPct)} · volatility {formatPlainPercent(payload.hero.volatilityPct)}
+            </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[560px] xl:grid-cols-4">
             <DataCard>
@@ -354,4 +360,12 @@ function formatSignedPercent(value: number | null): string {
   const sign = value > 0 ? "+" : "";
 
   return `${sign}${value.toFixed(1)}%`;
+}
+
+function formatPlainPercent(value: number | null): string {
+  if (value === null) {
+    return "--";
+  }
+
+  return `${value.toFixed(1)}%`;
 }
