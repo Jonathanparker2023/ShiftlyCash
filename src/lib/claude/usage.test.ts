@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { estimateRequestCostCents } from "@/lib/claude/usage";
+import { estimateRequestCostCents } from "@/lib/claude/pricing";
 
 describe("estimateRequestCostCents", () => {
   it("estimates Opus 4.7 input and output costs with current published rates", () => {
