@@ -57,7 +57,7 @@ export function ScreenerView({ state }: Props) {
               value={`Paper twin: ${formatSignedPercent(payload.hero.pnlPct)} vs cash`}
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[420px]">
+          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[560px] xl:grid-cols-4">
             <DataCard>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
                 Clock
@@ -80,6 +80,14 @@ export function ScreenerView({ state }: Props) {
               </p>
               <p className="mt-2 text-lg font-semibold">
                 {formatMoney(payload.hero.costBasis)}
+              </p>
+            </DataCard>
+            <DataCard>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                Realized
+              </p>
+              <p className={["mt-2 text-lg font-semibold", toneClass(payload.hero.realizedPnl)].join(" ")}>
+                {formatMoney(payload.hero.realizedPnl)}
               </p>
             </DataCard>
           </div>
@@ -161,6 +169,46 @@ export function ScreenerView({ state }: Props) {
           })()}
         </AppPanel>
       </section>
+
+      <AppPanel>
+        <SectionHeader title="Closed trades" meta={`${payload.closed.length} closed`} />
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+              <tr>
+                <th className="pb-2 pr-4 font-semibold">Ticker</th>
+                <th className="pb-2 pr-4 font-semibold">Entry</th>
+                <th className="pb-2 pr-4 font-semibold">Exit</th>
+                <th className="pb-2 pr-4 font-semibold">Reason</th>
+                <th className="pb-2 pr-4 font-semibold">Closed</th>
+                <th className="pb-2 text-right font-semibold">Realized</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {payload.closed.length ? (
+                payload.closed.map((trade) => (
+                  <tr key={`${trade.ticker}-${trade.closedAt ?? "unknown"}`}>
+                    <td className="py-3 pr-4 font-semibold">{trade.ticker}</td>
+                    <td className="py-3 pr-4 text-zinc-300">{formatMoney(trade.entry)}</td>
+                    <td className="py-3 pr-4 text-zinc-300">{formatMoney(trade.exit)}</td>
+                    <td className="py-3 pr-4 text-zinc-300">{formatReason(trade.reason)}</td>
+                    <td className="py-3 pr-4 text-zinc-300">{formatDate(trade.closedAt)}</td>
+                    <td className={["py-3 text-right font-semibold", toneClass(trade.realizedPnlPct)].join(" ")}>
+                      {formatSignedPercent(trade.realizedPnlPct)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="py-4 text-zinc-400" colSpan={6}>
+                    No closed paper trades.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </AppPanel>
 
       <AppPanel>
         {(() => {
@@ -275,6 +323,27 @@ function formatMoney(value: number | null): string {
 
 function formatInteger(value: number | null): string {
   return value === null ? "--" : new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatReason(value: string | null): string {
+  return value ? value.replaceAll("_", " ") : "--";
+}
+
+function formatDate(value: string | null): string {
+  if (!value) {
+    return "--";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
 }
 
 function formatSignedPercent(value: number | null): string {

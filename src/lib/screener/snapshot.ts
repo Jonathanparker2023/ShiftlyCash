@@ -28,6 +28,16 @@ export type ScreenerFearItem = {
   drawdownPct: number | null;
 };
 
+export type ScreenerClosedTrade = {
+  ticker: string;
+  entry: number | null;
+  exit: number | null;
+  realizedPnl: number | null;
+  realizedPnlPct: number | null;
+  reason: string | null;
+  closedAt: string | null;
+};
+
 export type ScreenerSnapshotPayload = {
   snapshotId: string;
   asOf: string | null;
@@ -41,9 +51,11 @@ export type ScreenerSnapshotPayload = {
     portfolioValue: number | null;
     costBasis: number | null;
     pnlPct: number | null;
+    realizedPnl: number | null;
     unvalidated: boolean;
   };
   positions: ScreenerPosition[];
+  closed: ScreenerClosedTrade[];
   queue: ScreenerQueueItem[];
   fear: ScreenerFearItem[];
   research: Record<string, ScreenerResearch>;
@@ -173,9 +185,11 @@ function normalizePayload(payload: unknown, row: SnapshotRow): ScreenerSnapshotP
       portfolioValue: optionalNumber(hero.portfolio_value),
       costBasis: optionalNumber(hero.cost_basis),
       pnlPct: optionalNumber(hero.pnl_pct),
+      realizedPnl: optionalNumber(hero.realized_pnl),
       unvalidated: hero.unvalidated !== false,
     },
     positions: normalizePositions(source.positions),
+    closed: normalizeClosedTrades(source.closed),
     queue: normalizeQueue(source.queue),
     fear: normalizeFear(source.fear),
     research: normalizeResearch(source.research),
@@ -210,6 +224,18 @@ function normalizePositions(value: unknown): ScreenerPosition[] {
     entry: optionalNumber(item.entry),
     current: optionalNumber(item.current),
     pnlPct: optionalNumber(item.pnl_pct),
+  })).filter((item) => item.ticker);
+}
+
+function normalizeClosedTrades(value: unknown): ScreenerClosedTrade[] {
+  return asRecords(value).map((item) => ({
+    ticker: nonEmptyString(item.ticker) ?? "",
+    entry: optionalNumber(item.entry),
+    exit: optionalNumber(item.exit),
+    realizedPnl: optionalNumber(item.realized_pnl),
+    realizedPnlPct: optionalNumber(item.realized_pnl_pct),
+    reason: optionalString(item.reason),
+    closedAt: optionalString(item.closed_at),
   })).filter((item) => item.ticker);
 }
 
