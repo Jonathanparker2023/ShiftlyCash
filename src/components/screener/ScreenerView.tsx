@@ -129,10 +129,17 @@ export function ScreenerView({ state }: Props) {
         </AppPanel>
 
         <AppPanel>
-          <SectionHeader title="In fear now" meta={`${payload.fear.length} active`} />
+          {(() => {
+            const shadowTickers = new Set(
+              payload.queue.filter((q) => q.shadowFlagged).map((q) => q.ticker),
+            );
+            const fearVisible = payload.fear.filter((item) => !shadowTickers.has(item.ticker));
+            return (
+              <>
+          <SectionHeader title="In fear now" meta={`${fearVisible.length} active`} />
           <div className="mt-4 flex flex-col gap-2">
-            {payload.fear.length ? (
-              payload.fear.map((item) => (
+            {fearVisible.length ? (
+              fearVisible.map((item) => (
                 <DataCard className="flex items-center justify-between gap-3" key={`${item.ticker}-${item.variant}-${item.kind}`}>
                   <div>
                     <p className="font-semibold">{item.ticker}</p>
@@ -149,6 +156,9 @@ export function ScreenerView({ state }: Props) {
               <p className="text-sm text-zinc-400">No active fear triggers.</p>
             )}
           </div>
+              </>
+            );
+          })()}
         </AppPanel>
       </section>
 
