@@ -66,6 +66,7 @@ export type ScreenerSnapshotPayload = {
   snapshotId: string;
   asOf: string | null;
   generatedAt: string;
+  scope: string | null;
   clock: {
     started: string | null;
     day: number | null;
@@ -219,6 +220,7 @@ function normalizePayload(payload: unknown, row: SnapshotRow): ScreenerSnapshotP
     snapshotId: nonEmptyString(source.snapshot_id) ?? row.snapshot_id,
     asOf: optionalString(source.as_of) ?? row.as_of,
     generatedAt: optionalString(source.generated_at) ?? row.generated_at,
+    scope: optionalString(source.scope),
     clock: {
       started: optionalString(clock.started),
       day: optionalNumber(clock.day),

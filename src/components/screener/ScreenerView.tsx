@@ -93,6 +93,9 @@ export function ScreenerView({ state }: Props) {
         {asOfLabel ? (
           <p className="mt-2 text-xs text-zinc-500">{asOfLabel}</p>
         ) : null}
+        {payload.scope ? (
+          <p className="mt-1 text-xs text-zinc-600">Testing: {payload.scope}</p>
+        ) : null}
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <FriendlyStat label="Your picks" value={friendlyPct(twin)} tone={tone(twin)} />
