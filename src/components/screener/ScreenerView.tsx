@@ -186,7 +186,14 @@ export function ScreenerView({ state }: Props) {
                   className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
                 >
                   <div>
-                    <p className="text-base font-semibold">{position.ticker}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-semibold">{position.ticker}</p>
+                      {position.stale ? (
+                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">
+                          price stale — check
+                        </span>
+                      ) : null}
+                    </div>
                     {subline ? (
                       <p className="mt-0.5 text-xs text-zinc-500">{subline}</p>
                     ) : null}

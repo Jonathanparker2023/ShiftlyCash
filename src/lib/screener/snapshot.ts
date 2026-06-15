@@ -14,6 +14,7 @@ export type ScreenerPosition = {
   costBasis: number | null;
   marketValue: number | null;
   pnlPct: number | null;
+  stale: boolean;
 };
 
 export type ScreenerQueueItem = {
@@ -324,6 +325,7 @@ function normalizePositions(value: unknown): ScreenerPosition[] {
     costBasis: optionalNumber(item.cost_basis),
     marketValue: optionalNumber(item.market_value),
     pnlPct: optionalNumber(item.pnl_pct),
+    stale: item.stale === true,
   })).filter((item) => item.ticker);
 }
 
