@@ -1,5 +1,5 @@
 import { AppPanel, SemanticChip } from "@/components/shell";
-import type { ScreenerSnapshotState } from "@/lib/screener/snapshot";
+import type { ScreenerNavPoint, ScreenerSnapshotState } from "@/lib/screener/snapshot";
 
 type Props = {
   state: ScreenerSnapshotState;
@@ -55,9 +55,19 @@ export function ScreenerView({ state }: Props) {
       (a.queueRank ?? 9999) - (b.queueRank ?? 9999),
   );
   const nearMiss = payload.queue.filter((item) => item.band === "near_miss");
+  const navSeries = payload.navSeries;
+  const health = payload.health;
+  const excluded = payload.excluded;
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
+      {health.ingestErrors7d !== null && health.ingestErrors7d > 0 ? (
+        <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          Heads up — {formatInteger(health.ingestErrors7d)} data hiccup
+          {health.ingestErrors7d === 1 ? "" : "s"} in the last 7 days. A few figures may be a little behind.
+        </div>
+      ) : null}
+
       <section className="rounded-3xl bg-white/5 p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-zinc-400">Your practice portfolio</p>
@@ -135,6 +145,27 @@ export function ScreenerView({ state }: Props) {
         </div>
       </section>
 
+      {navSeries.length >= 2 ? (
+        <section>
+          <SectionHeader title="Picks vs. the market" meta={`${navSeries.length} days in`} />
+          <div className="mt-3 rounded-2xl bg-white/5 p-4">
+            <div className="h-32 w-full">
+              <NavChart series={navSeries} />
+            </div>
+            <div className="mt-3 flex items-center gap-4 text-xs text-zinc-400">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-sky-400" />
+                Your picks
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-zinc-500" />
+                The market
+              </span>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section>
         <SectionHeader icon="wallet" title="What you're holding" meta={`${payload.positions.length} names · buy-and-hold`} />
         <div className="mt-3 flex flex-col gap-2">
@@ -178,23 +209,28 @@ export function ScreenerView({ state }: Props) {
       </section>
 
       <section>
-        <SectionHeader icon="discount" title="On sale right now" meta="good companies that just dropped" tone="danger" />
-        <div className="mt-3 flex flex-wrap gap-2">
+        <SectionHeader icon="discount" title="On sale right now" meta="dropped hard AND historically cheap" tone="danger" />
+        <div className="mt-3 flex flex-col gap-2">
           {onSale.length ? (
             onSale.map((item) => {
               const dd = item.drawdownPct;
               const deep = dd !== null && Math.abs(dd) >= 25;
+              const cheap = cheapnessLabel(item.valuationPctile);
               return (
-                <span
+                <div
                   key={`${item.ticker}-${item.variant}-${item.kind}`}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-sm",
-                    deep ? "bg-rose-500/15 text-rose-300" : "bg-white/5 text-zinc-300",
-                  ].join(" ")}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
                 >
-                  {item.ticker}
-                  {dd !== null ? ` · down ${Math.abs(Math.round(dd))}%` : ""}
-                </span>
+                  <span className="text-base font-semibold">{item.ticker}</span>
+                  <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5 text-sm">
+                    {dd !== null ? (
+                      <span className={deep ? "text-rose-300" : "text-zinc-300"}>
+                        down {Math.abs(Math.round(dd))}%
+                      </span>
+                    ) : null}
+                    {cheap ? <span className="text-emerald-300/90">{cheap}</span> : null}
+                  </div>
+                </div>
               );
             })
           ) : (
@@ -211,11 +247,24 @@ export function ScreenerView({ state }: Props) {
           {queueBand.length ? (
             queueBand.slice(0, 8).map((item) => {
               const research = payload.research[item.ticker];
+              const passes = passedCount(item.criteria);
+              const moat = research ? moatLabel(research.moatRating) : null;
+              const hasThesis =
+                research &&
+                (moat ||
+                  research.redFlags.length > 0 ||
+                  research.bullCase.length > 0 ||
+                  research.bearCase.length > 0);
               return (
                 <div key={item.ticker} className="rounded-2xl bg-white/5 px-4 py-3.5">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-base font-semibold">{item.ticker}</span>
+                      {passes === 4 ? (
+                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300/90">
+                          passes all 4 tests
+                        </span>
+                      ) : null}
                       {item.shadowFlagged ? (
                         <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">
                           flagged · not buyable
@@ -234,6 +283,28 @@ export function ScreenerView({ state }: Props) {
                       {shortTake(research.summary)}
                     </p>
                   ) : null}
+                  {hasThesis ? (
+                    <div className="mt-2.5 space-y-1.5 text-xs">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {moat ? <span className="text-zinc-300">{moat}</span> : null}
+                        {research && research.bullCase[0] ? (
+                          <span className="line-clamp-1 max-w-[18rem] text-emerald-300/80">
+                            + {research.bullCase[0]}
+                          </span>
+                        ) : null}
+                        {research && research.bearCase[0] ? (
+                          <span className="line-clamp-1 max-w-[18rem] text-amber-300/80">
+                            – {research.bearCase[0]}
+                          </span>
+                        ) : null}
+                      </div>
+                      {research && research.redFlags.length > 0 ? (
+                        <p className="line-clamp-2 text-rose-300/80">
+                          ⚠ {research.redFlags.slice(0, 2).join(" · ")}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               );
             })
@@ -244,11 +315,57 @@ export function ScreenerView({ state }: Props) {
           )}
         </div>
         {nearMiss.length ? (
-          <p className="mt-3 text-sm text-zinc-500">
-            Plus {nearMiss.length} more that just barely missed the cut.
-          </p>
+          <div className="mt-4">
+            <p className="text-sm text-zinc-500">Just missed the cut ({nearMiss.length}):</p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {nearMiss.slice(0, 5).map((item) => {
+                const missed = missedTests(item.criteria);
+                return (
+                  <div
+                    key={item.ticker}
+                    className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2"
+                  >
+                    <span className="text-sm font-medium">{item.ticker}</span>
+                    <span className="text-xs text-zinc-500">
+                      {missed.length ? `missed: ${missed.join(", ")}` : "scored 3 of 4"}
+                    </span>
+                  </div>
+                );
+              })}
+              {nearMiss.length > 5 ? (
+                <p className="text-xs text-zinc-500">+{nearMiss.length - 5} more</p>
+              ) : null}
+            </div>
+          </div>
         ) : null}
       </section>
+
+      {excluded.length ? (
+        <section>
+          <SectionHeader title="Filtered out" meta="strong names blocked by the rules" />
+          <div className="mt-3 flex flex-col gap-2">
+            {excluded.slice(0, 6).map((item) => (
+              <div
+                key={`${item.ticker}-${item.ruleId ?? ""}`}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
+              >
+                <div>
+                  <p className="text-base font-semibold">{item.ticker}</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    {excludedReason(item.reason, item.ruleId)}
+                  </p>
+                </div>
+                {item.score !== null ? (
+                  <span className="text-xs text-zinc-500">scored {item.score}/4</span>
+                ) : null}
+              </div>
+            ))}
+            {excluded.length > 6 ? (
+              <p className="text-xs text-zinc-500">+{excluded.length - 6} more</p>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {payload.closed.length ? (
         <section>
@@ -320,6 +437,126 @@ function FriendlyStat({
       <p className={["mt-1 text-xl font-semibold", color].join(" ")}>{value}</p>
     </div>
   );
+}
+
+function NavChart({ series }: { series: ScreenerNavPoint[] }) {
+  const width = 320;
+  const height = 120;
+  const padX = 4;
+  const padY = 10;
+  const values = series
+    .flatMap((p) => [p.twinPct, p.sp500Pct])
+    .filter((v): v is number => v !== null);
+  if (values.length < 2) {
+    return null;
+  }
+  const min = Math.min(0, ...values);
+  const max = Math.max(0, ...values);
+  const range = max - min || 1;
+  const lastIndex = Math.max(1, series.length - 1);
+  const xAt = (i: number) => padX + (i / lastIndex) * (width - 2 * padX);
+  const yAt = (v: number) => padY + (1 - (v - min) / range) * (height - 2 * padY);
+  const toPoints = (key: "twinPct" | "sp500Pct") =>
+    series
+      .map((p, i) => {
+        const v = p[key];
+        return v === null ? null : `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`;
+      })
+      .filter((s): s is string => s !== null)
+      .join(" ");
+  const zeroY = yAt(0).toFixed(1);
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      className="h-full w-full"
+      role="img"
+      aria-label="Your picks versus the market over time"
+    >
+      <line
+        x1={padX}
+        y1={zeroY}
+        x2={width - padX}
+        y2={zeroY}
+        stroke="currentColor"
+        strokeWidth="1"
+        strokeDasharray="3 3"
+        className="text-white/15"
+      />
+      <polyline
+        points={toPoints("sp500Pct")}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        className="text-zinc-500"
+      />
+      <polyline
+        points={toPoints("twinPct")}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        className="text-sky-400"
+      />
+    </svg>
+  );
+}
+
+const CRITERION_LABELS: Record<string, string> = {
+  real_eps_growth: "earnings growth",
+  manageable_debt: "debt load",
+  light_capex: "low capex",
+  pricing_power: "pricing power",
+};
+
+function missedTests(criteria: Record<string, boolean> | null): string[] {
+  if (!criteria) {
+    return [];
+  }
+  return Object.entries(criteria)
+    .filter(([, passed]) => !passed)
+    .map(([key]) => CRITERION_LABELS[key] ?? key.replaceAll("_", " "));
+}
+
+function passedCount(criteria: Record<string, boolean> | null): number | null {
+  if (!criteria) {
+    return null;
+  }
+  return Object.values(criteria).filter(Boolean).length;
+}
+
+function cheapnessLabel(pctile: number | null): string | null {
+  if (pctile === null) {
+    return null;
+  }
+  const cheapest = Math.min(99, Math.max(1, Math.round(100 - pctile)));
+  return `in its cheapest ${cheapest}%`;
+}
+
+function moatLabel(rating: string | null): string | null {
+  if (!rating) {
+    return null;
+  }
+  const normalized = rating.toLowerCase();
+  if (normalized === "wide") {
+    return "wide moat";
+  }
+  if (normalized === "narrow") {
+    return "narrow moat";
+  }
+  if (normalized === "none") {
+    return "no moat";
+  }
+  return `${rating} moat`;
+}
+
+function excludedReason(reason: string | null, ruleId: string | null): string {
+  if (reason && reason.trim()) {
+    return reason.trim();
+  }
+  if (ruleId) {
+    return ruleId.replaceAll("_", " ");
+  }
+  return "filtered out";
 }
 
 function statusHeadline(vs: number | null): string {

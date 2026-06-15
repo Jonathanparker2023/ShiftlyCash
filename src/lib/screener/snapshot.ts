@@ -22,6 +22,7 @@ export type ScreenerQueueItem = {
   band: string | null;
   queueRank: number | null;
   shadowFlagged: boolean;
+  criteria: Record<string, boolean> | null;
 };
 
 export type ScreenerFearItem = {
@@ -29,6 +30,25 @@ export type ScreenerFearItem = {
   variant: string | null;
   kind: string | null;
   drawdownPct: number | null;
+  valuationPctile: number | null;
+};
+
+export type ScreenerExcluded = {
+  ticker: string;
+  score: number | null;
+  ruleId: string | null;
+  reason: string | null;
+  killedAt: string | null;
+};
+
+export type ScreenerNavPoint = {
+  asOf: string;
+  twinPct: number | null;
+  sp500Pct: number | null;
+};
+
+export type ScreenerHealth = {
+  ingestErrors7d: number | null;
 };
 
 export type ScreenerClosedTrade = {
@@ -70,12 +90,20 @@ export type ScreenerSnapshotPayload = {
   queue: ScreenerQueueItem[];
   fear: ScreenerFearItem[];
   research: Record<string, ScreenerResearch>;
+  excluded: ScreenerExcluded[];
+  navSeries: ScreenerNavPoint[];
+  health: ScreenerHealth;
 };
 
 export type ScreenerResearch = {
   verdict: string;
   confidence: number | null;
   summary: string | null;
+  moatRating: string | null;
+  moatReasoning: string | null;
+  redFlags: string[];
+  bullCase: string[];
+  bearCase: string[];
 };
 
 export type ScreenerSnapshotState =
@@ -212,7 +240,52 @@ function normalizePayload(payload: unknown, row: SnapshotRow): ScreenerSnapshotP
     queue: normalizeQueue(source.queue),
     fear: normalizeFear(source.fear),
     research: normalizeResearch(source.research),
+    excluded: normalizeExcluded(source.excluded),
+    navSeries: normalizeNavSeries(source.nav_series),
+    health: normalizeHealth(source.health),
   };
+}
+
+function normalizeExcluded(value: unknown): ScreenerExcluded[] {
+  return asRecords(value).map((item) => ({
+    ticker: nonEmptyString(item.ticker) ?? "",
+    score: optionalNumber(item.score),
+    ruleId: optionalString(item.rule_id),
+    reason: optionalString(item.reason),
+    killedAt: optionalString(item.killed_at),
+  })).filter((item) => item.ticker);
+}
+
+function normalizeNavSeries(value: unknown): ScreenerNavPoint[] {
+  return asRecords(value).map((item) => ({
+    asOf: nonEmptyString(item.as_of) ?? "",
+    twinPct: optionalNumber(item.twin_pct),
+    sp500Pct: optionalNumber(item.sp500_pct),
+  })).filter((item) => item.asOf);
+}
+
+function normalizeHealth(value: unknown): ScreenerHealth {
+  const source = isRecord(value) ? value : {};
+  return { ingestErrors7d: optionalNumber(source.ingest_errors_7d) };
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value
+        .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+        .map((v) => v.trim())
+    : [];
+}
+
+function normalizeCriteria(value: unknown): Record<string, boolean> | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const out: Record<string, boolean> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    out[key] = raw === true;
+  }
+  return out;
 }
 
 function normalizeResearch(value: unknown): Record<string, ScreenerResearch> {
@@ -232,6 +305,11 @@ function normalizeResearch(value: unknown): Record<string, ScreenerResearch> {
       verdict,
       confidence: optionalNumber(raw.confidence),
       summary: optionalString(raw.one_paragraph_summary),
+      moatRating: optionalString(raw.moat_rating),
+      moatReasoning: optionalString(raw.moat_reasoning),
+      redFlags: normalizeStringArray(raw.red_flags),
+      bullCase: normalizeStringArray(raw.bull_case),
+      bearCase: normalizeStringArray(raw.bear_case),
     };
   }
   return out;
@@ -268,6 +346,7 @@ function normalizeQueue(value: unknown): ScreenerQueueItem[] {
     band: optionalString(item.band),
     queueRank: optionalNumber(item.queue_rank),
     shadowFlagged: item.shadow_flagged === true,
+    criteria: normalizeCriteria(item.criteria),
   })).filter((item) => item.ticker);
 }
 
@@ -277,6 +356,7 @@ function normalizeFear(value: unknown): ScreenerFearItem[] {
     variant: optionalString(item.variant),
     kind: optionalString(item.kind),
     drawdownPct: optionalNumber(item.drawdown_pct),
+    valuationPctile: optionalNumber(item.valuation_pctile),
   })).filter((item) => item.ticker);
 }
 
