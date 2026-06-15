@@ -1,9 +1,4 @@
-import {
-  AppPanel,
-  DataCard,
-  MetricValue,
-  SemanticChip,
-} from "@/components/shell";
+import { AppPanel, SemanticChip } from "@/components/shell";
 import type { ScreenerSnapshotState } from "@/lib/screener/snapshot";
 
 type Props = {
@@ -13,280 +8,302 @@ type Props = {
 export function ScreenerView({ state }: Props) {
   if (state.status === "empty") {
     return (
-      <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
+      <main className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
         <AppPanel elevated>
-          <div className="flex flex-col gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
-                Screener
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-                Paper twin
-              </h1>
-            </div>
-            <p className="text-sm text-zinc-300">
-              Twin starts publishing on the next daily run.
-            </p>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+            Screener
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+            Your practice portfolio
+          </h1>
+          <p className="mt-2 text-sm text-zinc-300">
+            Nothing here yet — your picks show up after the next daily run.
+          </p>
         </AppPanel>
       </main>
     );
   }
 
   const { payload, stale } = state;
-  const twinReturn = payload.hero.twinTotalReturnPct ?? payload.hero.pnlPct;
-  const sp500Return = payload.hero.sp500TotalReturnPct;
-  const vsSp500 = payload.hero.vsSp500Pct;
-  const heroTone = toneForPercent(vsSp500 ?? twinReturn);
+  const hero = payload.hero;
+  const twin = hero.twinTotalReturnPct ?? hero.pnlPct;
+  const market = hero.sp500TotalReturnPct;
+  const vs = hero.vsSp500Pct;
+  const progress = Math.min(
+    100,
+    Math.max(0, ((payload.clock.day ?? 0) / (payload.clock.of ?? 180)) * 100),
+  );
+
+  const shadowTickers = new Set(
+    payload.queue.filter((q) => q.shadowFlagged).map((q) => q.ticker),
+  );
+  const onSale = payload.fear.filter((item) => !shadowTickers.has(item.ticker));
+
+  const queueBand = [...payload.queue.filter((item) => item.band === "queue")].sort(
+    (a, b) =>
+      Number(a.shadowFlagged) - Number(b.shadowFlagged) ||
+      (a.queueRank ?? 9999) - (b.queueRank ?? 9999),
+  );
+  const nearMiss = payload.queue.filter((item) => item.band === "near_miss");
 
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
-      <AppPanel elevated>
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
-                Screener
-              </p>
-              {payload.hero.unvalidated ? (
-                <SemanticChip tone="warning">unvalidated</SemanticChip>
-              ) : null}
-              {stale ? <SemanticChip tone="warning">stale</SemanticChip> : null}
-            </div>
-            <MetricValue
-              className="mt-3"
-              label="Paper twin total return"
-              tone={heroTone}
-              value={`Twin ${formatSignedPercent(twinReturn)} · S&P 500 ${formatSignedPercent(sp500Return)} · vs S&P ${formatSignedPercent(vsSp500)}`}
-            />
-            <p className="mt-2 text-sm text-zinc-400">
-              Max drawdown {formatPlainPercent(payload.hero.maxDrawdownPct)} · volatility {formatPlainPercent(payload.hero.volatilityPct)}
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[560px] xl:grid-cols-4">
-            <DataCard>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
-                Clock
-              </p>
-              <p className="mt-2 text-lg font-semibold">
-                Day {formatInteger(payload.clock.day)} of {formatInteger(payload.clock.of)}
-              </p>
-            </DataCard>
-            <DataCard>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
-                Value
-              </p>
-              <p className="mt-2 text-lg font-semibold">
-                {formatMoney(payload.hero.portfolioValue)}
-              </p>
-            </DataCard>
-            <DataCard>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
-                Cost
-              </p>
-              <p className="mt-2 text-lg font-semibold">
-                {formatMoney(payload.hero.costBasis)}
-              </p>
-            </DataCard>
-            <DataCard>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
-                Realized
-              </p>
-              <p className={["mt-2 text-lg font-semibold", toneClass(payload.hero.realizedPnl)].join(" ")}>
-                {formatMoney(payload.hero.realizedPnl)}
-              </p>
-            </DataCard>
+    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
+      <section className="rounded-3xl bg-white/5 p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-zinc-400">Your practice portfolio</p>
+          <div className="flex items-center gap-2">
+            {hero.unvalidated ? (
+              <span className="rounded-full bg-sky-500/15 px-3 py-1 text-xs font-medium text-sky-300">
+                practice run
+              </span>
+            ) : null}
+            {stale ? (
+              <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-300">
+                a bit stale
+              </span>
+            ) : null}
           </div>
         </div>
-        {stale ? (
-          <p className="mt-4 text-sm text-amber-200">
-            Stale: daily run may not have published.
+
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+          {statusHeadline(vs)}
+        </h1>
+        <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+          {statusSub(vs, payload.clock.day)}
+        </p>
+
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          <FriendlyStat label="Your picks" value={friendlyPct(twin)} tone={tone(twin)} />
+          <FriendlyStat label="The market" value={friendlyPct(market)} tone="neutral" />
+          <FriendlyStat label="Ahead by" value={friendlyPct(vs)} tone={tone(vs)} />
+        </div>
+
+        <div className="mt-5">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-sky-400" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">
+            Day {formatInteger(payload.clock.day)} of {formatInteger(payload.clock.of)} · the 6-month trial just started
           </p>
-        ) : null}
-      </AppPanel>
-
-      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <AppPanel>
-          <SectionHeader title="Open positions" meta={`${payload.positions.length} open`} />
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-[0.14em] text-zinc-500">
-                <tr>
-                  <th className="pb-2 pr-4 font-semibold">Ticker</th>
-                  <th className="pb-2 pr-4 font-semibold">Entry</th>
-                  <th className="pb-2 pr-4 font-semibold">Current</th>
-                  <th className="pb-2 text-right font-semibold">P&amp;L</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {payload.positions.length ? (
-                  payload.positions.map((position) => (
-                    <tr key={position.ticker}>
-                      <td className="py-3 pr-4 font-semibold">{position.ticker}</td>
-                      <td className="py-3 pr-4 text-zinc-300">{formatMoney(position.entry)}</td>
-                      <td className="py-3 pr-4 text-zinc-300">{formatMoney(position.current)}</td>
-                      <td className={["py-3 text-right font-semibold", toneClass(position.pnlPct)].join(" ")}>
-                        {formatSignedPercent(position.pnlPct)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="py-4 text-zinc-400" colSpan={4}>
-                      No open paper positions.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </AppPanel>
-
-        <AppPanel>
-          {(() => {
-            const shadowTickers = new Set(
-              payload.queue.filter((q) => q.shadowFlagged).map((q) => q.ticker),
-            );
-            const fearVisible = payload.fear.filter((item) => !shadowTickers.has(item.ticker));
-            return (
-              <>
-          <SectionHeader title="In fear now" meta={`${fearVisible.length} active`} />
-          <div className="mt-4 flex flex-col gap-2">
-            {fearVisible.length ? (
-              fearVisible.map((item) => (
-                <DataCard className="flex items-center justify-between gap-3" key={`${item.ticker}-${item.variant}-${item.kind}`}>
-                  <div>
-                    <p className="font-semibold">{item.ticker}</p>
-                    <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">
-                      {[item.variant, item.kind].filter(Boolean).join(" / ")}
-                    </p>
-                  </div>
-                  <p className="text-sm font-semibold text-amber-200">
-                    {formatSignedPercent(item.drawdownPct)}
-                  </p>
-                </DataCard>
-              ))
-            ) : (
-              <p className="text-sm text-zinc-400">No active fear triggers.</p>
-            )}
-          </div>
-              </>
-            );
-          })()}
-        </AppPanel>
+        </div>
       </section>
 
-      <AppPanel>
-        <SectionHeader title="Closed trades" meta={`${payload.closed.length} closed`} />
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-[0.14em] text-zinc-500">
-              <tr>
-                <th className="pb-2 pr-4 font-semibold">Ticker</th>
-                <th className="pb-2 pr-4 font-semibold">Entry</th>
-                <th className="pb-2 pr-4 font-semibold">Exit</th>
-                <th className="pb-2 pr-4 font-semibold">Reason</th>
-                <th className="pb-2 pr-4 font-semibold">Closed</th>
-                <th className="pb-2 text-right font-semibold">Realized</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {payload.closed.length ? (
-                payload.closed.map((trade) => (
-                  <tr key={`${trade.ticker}-${trade.closedAt ?? "unknown"}`}>
-                    <td className="py-3 pr-4 font-semibold">{trade.ticker}</td>
-                    <td className="py-3 pr-4 text-zinc-300">{formatMoney(trade.entry)}</td>
-                    <td className="py-3 pr-4 text-zinc-300">{formatMoney(trade.exit)}</td>
-                    <td className="py-3 pr-4 text-zinc-300">{formatReason(trade.reason)}</td>
-                    <td className="py-3 pr-4 text-zinc-300">{formatDate(trade.closedAt)}</td>
-                    <td className={["py-3 text-right font-semibold", toneClass(trade.realizedPnlPct)].join(" ")}>
-                      {formatSignedPercent(trade.realizedPnlPct)}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="py-4 text-zinc-400" colSpan={6}>
-                    No closed paper trades.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </AppPanel>
-
-      <AppPanel>
-        {(() => {
-          const queueBand = payload.queue.filter((item) => item.band === "queue");
-          const nearMiss = payload.queue.filter((item) => item.band === "near_miss");
-          return (
-            <>
-              <SectionHeader title="Queue" meta={`${queueBand.length} in queue`} />
-              <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {queueBand.length ? (
-                  queueBand.map((item) => {
-                    const research = payload.research[item.ticker];
-                    return (
-                    <DataCard key={item.ticker}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-semibold">{item.ticker}</p>
-                          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-zinc-500">
-                            rank {formatInteger(item.queueRank)}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <span className="text-sm font-semibold">Score {formatInteger(item.score)}</span>
-                          {research ? (
-                            <SemanticChip tone={verdictTone(research.verdict)}>
-                              {research.confidence !== null
-                                ? `${research.verdict} ${Math.round(research.confidence * 100)}%`
-                                : research.verdict}
-                            </SemanticChip>
-                          ) : null}
-                          {item.shadowFlagged ? (
-                            <SemanticChip tone="warning">shadow</SemanticChip>
-                          ) : null}
-                        </div>
-                      </div>
-                      {research?.summary ? (
-                        <details className="mt-3">
-                          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                            Research note
-                          </summary>
-                          <p className="mt-2 text-sm leading-relaxed text-zinc-300">{research.summary}</p>
-                        </details>
-                      ) : null}
-                    </DataCard>
-                    );
-                  })
-                ) : (
-                  <p className="text-sm text-zinc-400">No names in the queue band.</p>
-                )}
+      <section>
+        <SectionHeader icon="wallet" title="What you're holding" meta={`${payload.positions.length} names · buy-and-hold`} />
+        <div className="mt-3 flex flex-col gap-2">
+          {payload.positions.length ? (
+            payload.positions.map((position) => (
+              <div
+                key={position.ticker}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
+              >
+                <p className="text-base font-semibold">{position.ticker}</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-zinc-500">{formatMoney(position.current)}</span>
+                  <span className={["min-w-[56px] text-right text-sm font-semibold", toneClass(position.pnlPct)].join(" ")}>
+                    {friendlyPct(position.pnlPct)}
+                  </span>
+                </div>
               </div>
-              {nearMiss.length ? (
-                <p className="mt-4 text-sm text-zinc-400">
-                  Near-miss (score 3): {nearMiss.length} names
-                </p>
-              ) : null}
-            </>
-          );
-        })()}
-      </AppPanel>
+            ))
+          ) : (
+            <p className="rounded-2xl bg-white/5 px-4 py-3 text-sm text-zinc-400">
+              Holding nothing right now — waiting for a good company to go on sale.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <SectionHeader icon="discount" title="On sale right now" meta="good companies that just dropped" tone="danger" />
+        <div className="mt-3 flex flex-wrap gap-2">
+          {onSale.length ? (
+            onSale.map((item) => {
+              const dd = item.drawdownPct;
+              const deep = dd !== null && Math.abs(dd) >= 25;
+              return (
+                <span
+                  key={`${item.ticker}-${item.variant}-${item.kind}`}
+                  className={[
+                    "rounded-full px-3 py-1.5 text-sm",
+                    deep ? "bg-rose-500/15 text-rose-300" : "bg-white/5 text-zinc-300",
+                  ].join(" ")}
+                >
+                  {item.ticker}
+                  {dd !== null ? ` · down ${Math.abs(Math.round(dd))}%` : ""}
+                </span>
+              );
+            })
+          ) : (
+            <p className="rounded-2xl bg-white/5 px-4 py-3 text-sm text-zinc-400">
+              Nothing&apos;s cheap enough today. Quiet markets — it just waits.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <SectionHeader icon="eye" title="Worth keeping an eye on" meta={`${queueBand.length} on the list, top few here`} />
+        <div className="mt-3 flex flex-col gap-2.5">
+          {queueBand.length ? (
+            queueBand.slice(0, 8).map((item) => {
+              const research = payload.research[item.ticker];
+              return (
+                <div key={item.ticker} className="rounded-2xl bg-white/5 px-4 py-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-semibold">{item.ticker}</span>
+                      {item.shadowFlagged ? (
+                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">
+                          flagged · not buyable
+                        </span>
+                      ) : null}
+                    </div>
+                    {research ? (
+                      <SemanticChip tone={verdictTone(research.verdict)}>
+                        {verdictWord(research.verdict)}
+                        {research.confidence !== null ? ` · ${Math.round(research.confidence)}%` : ""}
+                      </SemanticChip>
+                    ) : null}
+                  </div>
+                  {research?.summary ? (
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                      {shortTake(research.summary)}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })
+          ) : (
+            <p className="rounded-2xl bg-white/5 px-4 py-3 text-sm text-zinc-400">
+              The watchlist is empty right now.
+            </p>
+          )}
+        </div>
+        {nearMiss.length ? (
+          <p className="mt-3 text-sm text-zinc-500">
+            Plus {nearMiss.length} more that just barely missed the cut.
+          </p>
+        ) : null}
+      </section>
+
+      {payload.closed.length ? (
+        <section>
+          <SectionHeader icon="check" title="Already sold" meta={`${payload.closed.length} closed`} />
+          <div className="mt-3 flex flex-col gap-2">
+            {payload.closed.map((trade) => (
+              <div
+                key={`${trade.ticker}-${trade.closedAt ?? "unknown"}`}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
+              >
+                <div>
+                  <p className="text-base font-semibold">{trade.ticker}</p>
+                  <p className="text-xs text-zinc-500">
+                    {soldReason(trade.reason)} · {formatDate(trade.closedAt)}
+                  </p>
+                </div>
+                <span className={["text-sm font-semibold", toneClass(trade.realizedPnlPct)].join(" ")}>
+                  {friendlyPct(trade.realizedPnlPct)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
 
-function SectionHeader({ title, meta }: { title: string; meta: string }) {
+function SectionHeader({
+  title,
+  meta,
+  tone,
+}: {
+  icon?: string;
+  title: string;
+  meta: string;
+  tone?: "danger";
+}) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span
+        className={`inline-block h-2 w-2 rounded-full ${tone === "danger" ? "bg-rose-400" : "bg-zinc-500"}`}
+        aria-hidden="true"
+      />
       <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-        {meta}
-      </span>
+      <span className="text-xs text-zinc-500">— {meta}</span>
     </div>
   );
+}
+
+function FriendlyStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "positive" | "negative" | "neutral";
+}) {
+  const color =
+    tone === "positive"
+      ? "text-emerald-300"
+      : tone === "negative"
+        ? "text-rose-300"
+        : "text-zinc-100";
+  return (
+    <div className="rounded-2xl bg-white/5 px-3 py-3">
+      <p className="text-xs text-zinc-400">{label}</p>
+      <p className={["mt-1 text-xl font-semibold", color].join(" ")}>{value}</p>
+    </div>
+  );
+}
+
+function statusHeadline(vs: number | null): string {
+  if (vs === null || Math.abs(vs) < 0.1) {
+    return "Neck and neck with the market";
+  }
+  return vs > 0 ? "Beating the market" : "Trailing the market";
+}
+
+function statusSub(vs: number | null, day: number | null): string {
+  if (day !== null && day <= 1) {
+    return "You just bought in today, so everything's flat for now. Give it room to run.";
+  }
+  if (vs === null || Math.abs(vs) < 0.1) {
+    return "Right in step with the S&P 500 so far.";
+  }
+  return vs > 0
+    ? "Your picks are ahead of the S&P 500 so far."
+    : "Behind the S&P 500 so far — early days.";
+}
+
+function verdictWord(verdict: string): string {
+  if (verdict === "compelling") {
+    return "strong";
+  }
+  if (verdict === "pass") {
+    return "skip";
+  }
+  return "worth watching";
+}
+
+function shortTake(summary: string): string {
+  const firstSentence = summary.split(/(?<=[.!?])\s/)[0] ?? summary;
+  if (firstSentence.length <= 170) {
+    return firstSentence;
+  }
+  return `${firstSentence.slice(0, 167).trimEnd()}…`;
+}
+
+function soldReason(reason: string | null): string {
+  if (reason === "recovered") {
+    return "recovered — took profit";
+  }
+  if (reason === "thesis_break") {
+    return "quality slipped — cut it";
+  }
+  return reason ? reason.replaceAll("_", " ") : "closed";
 }
 
 function verdictTone(verdict: string): "positive" | "warning" | "negative" {
@@ -299,27 +316,35 @@ function verdictTone(verdict: string): "positive" | "warning" | "negative" {
   return "warning";
 }
 
-function toneForPercent(value: number | null): "positive" | "negative" | "neutral" {
-  if (value === null || value === 0) {
+function tone(value: number | null): "positive" | "negative" | "neutral" {
+  if (value === null || Math.abs(value) < 0.05) {
     return "neutral";
   }
-
   return value > 0 ? "positive" : "negative";
 }
 
 function toneClass(value: number | null): string {
-  if (value === null || value === 0) {
-    return "text-zinc-300";
+  if (value === null || Math.abs(value) < 0.05) {
+    return "text-zinc-400";
   }
-
   return value > 0 ? "text-emerald-300" : "text-rose-300";
+}
+
+function friendlyPct(value: number | null): string {
+  if (value === null) {
+    return "—";
+  }
+  if (Math.abs(value) < 0.05) {
+    return "even";
+  }
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
 }
 
 function formatMoney(value: number | null): string {
   if (value === null) {
-    return "--";
+    return "—";
   }
-
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -328,44 +353,19 @@ function formatMoney(value: number | null): string {
 }
 
 function formatInteger(value: number | null): string {
-  return value === null ? "--" : new Intl.NumberFormat("en-US").format(value);
-}
-
-function formatReason(value: string | null): string {
-  return value ? value.replaceAll("_", " ") : "--";
+  return value === null ? "—" : new Intl.NumberFormat("en-US").format(value);
 }
 
 function formatDate(value: string | null): string {
   if (!value) {
-    return "--";
+    return "—";
   }
-
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "--";
+    return "—";
   }
-
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
   }).format(date);
-}
-
-function formatSignedPercent(value: number | null): string {
-  if (value === null) {
-    return "--";
-  }
-
-  const sign = value > 0 ? "+" : "";
-
-  return `${sign}${value.toFixed(1)}%`;
-}
-
-function formatPlainPercent(value: number | null): string {
-  if (value === null) {
-    return "--";
-  }
-
-  return `${value.toFixed(1)}%`;
 }
