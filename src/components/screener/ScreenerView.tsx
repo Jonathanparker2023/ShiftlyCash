@@ -34,6 +34,16 @@ export function ScreenerView({ state }: Props) {
     Math.max(0, ((payload.clock.day ?? 0) / (payload.clock.of ?? 180)) * 100),
   );
 
+  const drawdown = hero.maxDrawdownPct;
+  const volatility = hero.volatilityPct;
+  const budget = hero.referenceCapital;
+  const deployed = hero.costBasis;
+  const idleCash =
+    budget !== null && deployed !== null ? Math.max(0, budget - deployed) : null;
+  const deployedPct =
+    budget !== null && budget > 0 && deployed !== null ? (deployed / budget) * 100 : null;
+  const asOfLabel = formatAsOf(payload.asOf, payload.generatedAt);
+
   const shadowTickers = new Set(
     payload.queue.filter((q) => q.shadowFlagged).map((q) => q.ticker),
   );
@@ -71,12 +81,49 @@ export function ScreenerView({ state }: Props) {
         <p className="mt-1 text-sm leading-relaxed text-zinc-400">
           {statusSub(vs, payload.clock.day)}
         </p>
+        {asOfLabel ? (
+          <p className="mt-2 text-xs text-zinc-500">{asOfLabel}</p>
+        ) : null}
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <FriendlyStat label="Your picks" value={friendlyPct(twin)} tone={tone(twin)} />
           <FriendlyStat label="The market" value={friendlyPct(market)} tone="neutral" />
           <FriendlyStat label="Ahead by" value={friendlyPct(vs)} tone={tone(vs)} />
         </div>
+
+        {budget !== null || drawdown !== null || volatility !== null ? (
+          <div className="mt-3 space-y-1.5 text-xs text-zinc-400">
+            {budget !== null && deployed !== null ? (
+              <p>
+                Invested <span className="text-zinc-200">{formatMoney(deployed)}</span> of{" "}
+                <span className="text-zinc-200">{formatMoney(budget)}</span>
+                {deployedPct !== null ? ` (${Math.round(deployedPct)}% in)` : ""}
+                {idleCash !== null && idleCash >= 1 ? (
+                  <>
+                    {" · "}
+                    <span className="text-zinc-200">{formatMoney(idleCash)}</span> waiting in cash
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+            {drawdown !== null || volatility !== null ? (
+              <p className="flex flex-wrap gap-x-5 gap-y-1">
+                {drawdown !== null ? (
+                  <span>
+                    Worst dip so far:{" "}
+                    <span className="text-zinc-200">{formatDip(drawdown)}</span>
+                  </span>
+                ) : null}
+                {volatility !== null ? (
+                  <span>
+                    How bumpy:{" "}
+                    <span className="text-zinc-200">{formatBumpiness(volatility)}</span>
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-5">
           <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
@@ -92,20 +139,36 @@ export function ScreenerView({ state }: Props) {
         <SectionHeader icon="wallet" title="What you're holding" meta={`${payload.positions.length} names · buy-and-hold`} />
         <div className="mt-3 flex flex-col gap-2">
           {payload.positions.length ? (
-            payload.positions.map((position) => (
-              <div
-                key={position.ticker}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
-              >
-                <p className="text-base font-semibold">{position.ticker}</p>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-zinc-500">{formatMoney(position.current)}</span>
-                  <span className={["min-w-[56px] text-right text-sm font-semibold", toneClass(position.pnlPct)].join(" ")}>
-                    {friendlyPct(position.pnlPct)}
-                  </span>
+            payload.positions.map((position) => {
+              const hasDollars =
+                position.costBasis !== null || position.marketValue !== null;
+              const value = hasDollars
+                ? position.marketValue ?? position.costBasis
+                : position.current;
+              const subline =
+                hasDollars && position.shares !== null
+                  ? `${formatShares(position.shares)} sh · ${formatMoney(position.current)}/sh`
+                  : null;
+              return (
+                <div
+                  key={position.ticker}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-base font-semibold">{position.ticker}</p>
+                    {subline ? (
+                      <p className="mt-0.5 text-xs text-zinc-500">{subline}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-zinc-300">{formatMoney(value)}</span>
+                    <span className={["min-w-[56px] text-right text-sm font-semibold", toneClass(position.pnlPct)].join(" ")}>
+                      {friendlyPct(position.pnlPct)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <p className="rounded-2xl bg-white/5 px-4 py-3 text-sm text-zinc-400">
               Holding nothing right now — waiting for a good company to go on sale.
@@ -350,6 +413,63 @@ function formatMoney(value: number | null): string {
     currency: "USD",
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function formatShares(value: number | null): string {
+  if (value === null) {
+    return "—";
+  }
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: value >= 10 ? 0 : 2,
+  }).format(value);
+}
+
+function formatDip(value: number | null): string {
+  if (value === null) {
+    return "—";
+  }
+  const mag = Math.abs(value);
+  return mag < 0.05 ? "none yet" : `down ${mag.toFixed(1)}%`;
+}
+
+function formatBumpiness(value: number | null): string {
+  if (value === null) {
+    return "—";
+  }
+  return Math.abs(value) < 0.05 ? "steady so far" : `${Math.abs(value).toFixed(1)}%`;
+}
+
+function formatAsOf(asOf: string | null, generatedAt: string | null): string | null {
+  const datePart = asOf ? formatDate(asOf) : null;
+  const rel = generatedAt ? relativeTime(generatedAt) : null;
+  if (datePart && rel) {
+    return `Prices as of ${datePart} · checked ${rel}`;
+  }
+  if (datePart) {
+    return `Prices as of ${datePart}`;
+  }
+  return rel ? `Updated ${rel}` : null;
+}
+
+function relativeTime(iso: string): string | null {
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) {
+    return null;
+  }
+  const diffMs = Date.now() - then;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) {
+    return "just now";
+  }
+  if (mins < 60) {
+    return `${mins}m ago`;
+  }
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) {
+    return `${hrs}h ago`;
+  }
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }
 
 function formatInteger(value: number | null): string {

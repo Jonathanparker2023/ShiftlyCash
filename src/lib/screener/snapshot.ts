@@ -10,6 +10,9 @@ export type ScreenerPosition = {
   ticker: string;
   entry: number | null;
   current: number | null;
+  shares: number | null;
+  costBasis: number | null;
+  marketValue: number | null;
   pnlPct: number | null;
 };
 
@@ -50,6 +53,8 @@ export type ScreenerSnapshotPayload = {
   hero: {
     portfolioValue: number | null;
     costBasis: number | null;
+    referenceCapital: number | null;
+    slicePct: number | null;
     pnlPct: number | null;
     realizedPnl: number | null;
     twinTotalReturnPct: number | null;
@@ -190,6 +195,8 @@ function normalizePayload(payload: unknown, row: SnapshotRow): ScreenerSnapshotP
     hero: {
       portfolioValue: optionalNumber(hero.portfolio_value),
       costBasis: optionalNumber(hero.cost_basis),
+      referenceCapital: optionalNumber(hero.reference_capital),
+      slicePct: optionalNumber(hero.slice_pct),
       pnlPct: optionalNumber(hero.pnl_pct),
       realizedPnl: optionalNumber(hero.realized_pnl),
       twinTotalReturnPct: optionalNumber(hero.twin_total_return_pct),
@@ -235,6 +242,9 @@ function normalizePositions(value: unknown): ScreenerPosition[] {
     ticker: nonEmptyString(item.ticker) ?? "",
     entry: optionalNumber(item.entry),
     current: optionalNumber(item.current),
+    shares: optionalNumber(item.shares),
+    costBasis: optionalNumber(item.cost_basis),
+    marketValue: optionalNumber(item.market_value),
     pnlPct: optionalNumber(item.pnl_pct),
   })).filter((item) => item.ticker);
 }
