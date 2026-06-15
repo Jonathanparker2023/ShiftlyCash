@@ -70,6 +70,7 @@ export type ScreenerSnapshotPayload = {
     started: string | null;
     day: number | null;
     of: number | null;
+    cohort: number | null;
   };
   hero: {
     portfolioValue: number | null;
@@ -84,6 +85,8 @@ export type ScreenerSnapshotPayload = {
     vsCashPct: number | null;
     maxDrawdownPct: number | null;
     volatilityPct: number | null;
+    verdict: string | null;
+    fearEvents: number | null;
     unvalidated: boolean;
   };
   positions: ScreenerPosition[];
@@ -220,6 +223,7 @@ function normalizePayload(payload: unknown, row: SnapshotRow): ScreenerSnapshotP
       started: optionalString(clock.started),
       day: optionalNumber(clock.day),
       of: optionalNumber(clock.of),
+      cohort: optionalNumber(clock.cohort),
     },
     hero: {
       portfolioValue: optionalNumber(hero.portfolio_value),
@@ -234,6 +238,8 @@ function normalizePayload(payload: unknown, row: SnapshotRow): ScreenerSnapshotP
       vsCashPct: optionalNumber(hero.vs_cash_pct),
       maxDrawdownPct: optionalNumber(hero.max_drawdown_pct),
       volatilityPct: optionalNumber(hero.volatility_pct) ?? optionalNumber(hero.volatility),
+      verdict: optionalString(hero.verdict),
+      fearEvents: optionalNumber(hero.fear_events),
       unvalidated: hero.unvalidated !== false,
     },
     positions: normalizePositions(source.positions),

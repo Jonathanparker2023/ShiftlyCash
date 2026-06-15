@@ -29,6 +29,9 @@ export function ScreenerView({ state }: Props) {
   const twin = hero.twinTotalReturnPct ?? hero.pnlPct;
   const market = hero.sp500TotalReturnPct;
   const vs = hero.vsSp500Pct;
+  const verdict = hero.verdict;
+  const fearEvents = hero.fearEvents;
+  const cohort = payload.clock.cohort;
   const progress = Math.min(
     100,
     Math.max(0, ((payload.clock.day ?? 0) / (payload.clock.of ?? 180)) * 100),
@@ -72,11 +75,7 @@ export function ScreenerView({ state }: Props) {
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-zinc-400">Your practice portfolio</p>
           <div className="flex items-center gap-2">
-            {hero.unvalidated ? (
-              <span className="rounded-full bg-sky-500/15 px-3 py-1 text-xs font-medium text-sky-300">
-                practice run
-              </span>
-            ) : null}
+            <span className={verdictChipClass(verdict)}>{verdictLabel(verdict)}</span>
             {stale ? (
               <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-300">
                 a bit stale
@@ -86,10 +85,10 @@ export function ScreenerView({ state }: Props) {
         </div>
 
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          {statusHeadline(vs)}
+          {statusHeadline(vs, verdict)}
         </h1>
         <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-          {statusSub(vs, payload.clock.day)}
+          {statusSub(vs, payload.clock.day, verdict, fearEvents)}
         </p>
         {asOfLabel ? (
           <p className="mt-2 text-xs text-zinc-500">{asOfLabel}</p>
@@ -140,7 +139,8 @@ export function ScreenerView({ state }: Props) {
             <div className="h-full rounded-full bg-sky-400" style={{ width: `${progress}%` }} />
           </div>
           <p className="mt-2 text-xs text-zinc-500">
-            Day {formatInteger(payload.clock.day)} of {formatInteger(payload.clock.of)} · the 6-month trial just started
+            Day {formatInteger(payload.clock.day)} of {formatInteger(payload.clock.of)} · {trialNote(verdict)}
+            {cohort !== null && cohort > 1 ? ` · cohort ${formatInteger(cohort)} (clock was reset)` : ""}
           </p>
         </div>
       </section>
@@ -566,23 +566,95 @@ function excludedReason(reason: string | null, ruleId: string | null): string {
   return "filtered out";
 }
 
-function statusHeadline(vs: number | null): string {
+function verdictLabel(verdict: string | null): string {
+  if (verdict === "pass") {
+    return "validated";
+  }
+  if (verdict === "fail") {
+    return "did not pass";
+  }
+  if (verdict === "inconclusive") {
+    return "inconclusive";
+  }
+  return "practice run";
+}
+
+function verdictChipClass(verdict: string | null): string {
+  const base = "rounded-full px-3 py-1 text-xs font-medium ";
+  if (verdict === "pass") {
+    return base + "bg-emerald-500/15 text-emerald-300";
+  }
+  if (verdict === "fail") {
+    return base + "bg-rose-500/15 text-rose-300";
+  }
+  if (verdict === "inconclusive") {
+    return base + "bg-amber-500/15 text-amber-300";
+  }
+  return base + "bg-sky-500/15 text-sky-300";
+}
+
+function trialNote(verdict: string | null): string {
+  if (verdict === "pass") {
+    return "validated";
+  }
+  if (verdict === "fail") {
+    return "did not pass";
+  }
+  if (verdict === "inconclusive") {
+    return "trial complete — inconclusive";
+  }
+  return "6-month trial in progress";
+}
+
+function eventsPhrase(fearEvents: number | null): string | null {
+  if (fearEvents === null) {
+    return null;
+  }
+  return `${fearEvents} fear signal${fearEvents === 1 ? "" : "s"} so far`;
+}
+
+function statusHeadline(vs: number | null, verdict: string | null): string {
+  if (verdict === "pass") {
+    return "Validated — it beat the market";
+  }
+  if (verdict === "fail") {
+    return "It didn't beat the market";
+  }
+  if (verdict === "inconclusive") {
+    return "Inconclusive — too little happened to judge";
+  }
   if (vs === null || Math.abs(vs) < 0.1) {
     return "Neck and neck with the market";
   }
-  return vs > 0 ? "Beating the market" : "Trailing the market";
+  return vs > 0 ? "Ahead of the market so far" : "Behind the market so far";
 }
 
-function statusSub(vs: number | null, day: number | null): string {
+function statusSub(
+  vs: number | null,
+  day: number | null,
+  verdict: string | null,
+  fearEvents: number | null,
+): string {
+  const events = eventsPhrase(fearEvents);
+  if (verdict === "inconclusive") {
+    return `The 6 months are up, but ${events ?? "too few signals"} — not enough happened to call it either way.`;
+  }
+  if (verdict === "pass") {
+    return "Cleared the bar set at the start: beat the S&P 500 with enough signal to count.";
+  }
+  if (verdict === "fail") {
+    return "Fell short of the bar set at the start against the S&P 500.";
+  }
   if (day !== null && day <= 1) {
     return "You just bought in today, so everything's flat for now. Give it room to run.";
   }
+  const tail = events ? ` ${events} — too early to call.` : " Too early to call.";
   if (vs === null || Math.abs(vs) < 0.1) {
-    return "Right in step with the S&P 500 so far.";
+    return "Right in step with the S&P 500 so far." + tail;
   }
-  return vs > 0
-    ? "Your picks are ahead of the S&P 500 so far."
-    : "Behind the S&P 500 so far — early days.";
+  return (
+    (vs > 0 ? "Your picks are ahead of the S&P 500 so far." : "Behind the S&P 500 so far.") + tail
+  );
 }
 
 function verdictWord(verdict: string): string {
