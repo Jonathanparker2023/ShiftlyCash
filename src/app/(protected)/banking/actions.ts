@@ -9,7 +9,7 @@ import { getOptionalSupabaseServiceRoleKey, getPlaidServerEnv } from "@/lib/env"
 import { getPlaidClient, toPlaidCountryCodes, toPlaidProducts } from "@/lib/plaid/client";
 import { decryptAccessToken, encryptAccessToken } from "@/lib/plaid/crypto";
 import { isPlaidLoginRequiredError } from "@/lib/plaid/errors";
-import { resolveMerchantName } from "@/lib/domain/merchant-ai";
+import { isLikelyUglyMerchantName, resolveMerchantName } from "@/lib/domain/merchant-ai";
 import { isLegacyExempt } from "@/lib/domain/legacyRules";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -48,6 +48,12 @@ export type ExcludePendingTransactionInput = {
 export type ExcludeOldNoMatchResult = {
   ok: true;
   excludedCount: number;
+};
+
+export type CleanUglyMerchantNamesResult = {
+  ok: true;
+  scannedCount: number;
+  cleanedCount: number;
 };
 
 type ServerPlaidItem = {
@@ -849,6 +855,73 @@ export async function excludeOldNoMatchingTransactionsAction(): Promise<ExcludeO
     ok: true,
     excludedCount: (data ?? []).length,
   };
+}
+
+/**
+ * One-shot backfill: scan every transaction for this user whose merchant_name
+ * still trips `isLikelyUglyMerchantName` and re-run the cleaner with
+ * `refreshUglyCache: true` so each one gets a fresh AI pass. Updates the
+ * stored merchant_name on the row.
+ *
+ * Safe to run repeatedly — only rows that are still ugly cost an AI call.
+ */
+export async function cleanUglyMerchantNamesAction(): Promise<CleanUglyMerchantNamesResult> {
+  const { supabase, user } = await requireUser();
+  const merchantCacheClient = getOptionalSupabaseServiceRoleKey()
+    ? createAdminClient()
+    : supabase;
+
+  const { data: transactions, error: transactionsError } = await supabase
+    .from("transactions")
+    .select("id,merchant_name,raw_name")
+    .eq("user_id", user.id);
+
+  if (transactionsError) {
+    throw new Error(
+      `Unable to load transactions for cleanup: ${transactionsError.message}`,
+    );
+  }
+
+  const rows = (transactions ?? []) as CurrentWeekTransaction[];
+  let scannedCount = 0;
+  let cleanedCount = 0;
+
+  for (const transaction of rows) {
+    const current = transaction.merchant_name ?? "";
+    if (!current || !isLikelyUglyMerchantName(current)) {
+      continue;
+    }
+
+    scannedCount++;
+
+    const rawName = transaction.raw_name ?? transaction.merchant_name;
+    const merchantName = await resolveMerchantName(rawName, merchantCacheClient, {
+      refreshUglyCache: true,
+    });
+
+    if (!merchantName || merchantName === transaction.merchant_name) {
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from("transactions")
+      .update({ merchant_name: merchantName })
+      .eq("id", transaction.id)
+      .eq("user_id", user.id);
+
+    if (updateError) {
+      throw new Error(
+        `Unable to update merchant name during cleanup: ${updateError.message}`,
+      );
+    }
+
+    cleanedCount++;
+  }
+
+  revalidatePath("/");
+  revalidatePath("/banking");
+
+  return { ok: true, scannedCount, cleanedCount };
 }
 
 function formatCategory(transaction: Transaction): string | null {

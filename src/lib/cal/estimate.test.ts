@@ -74,5 +74,254 @@ describe("food estimate response parsing", () => {
       mealName: "Chipotle Bowl",
       calories: 760,
     });
+    expect(result[0].components).toEqual([]);
+  });
+
+  it("re-sums macros from components when 2+ components are present (Oikos+chia regression)", () => {
+    // Simulates the production bug: LLM lists both yogurt and chia in
+    // components, but its top-level macros only reflect the yogurt.
+    // Parser must overwrite top-level with the component sum.
+    const result = parseEstimateResponse(
+      JSON.stringify([
+        {
+          mealName: "Oikos Chia Combo",
+          category: "healthy_snack",
+          calories: 180,
+          proteinG: 30,
+          carbsG: 14,
+          fatG: 0,
+          fiberG: 0,
+          sodiumMg: 120,
+          addedSugarG: 0,
+          saturatedFatG: 0,
+          reasoning: "• Oikos yogurt 180 cal\n• Chia seeds 120 cal",
+          confidence: "high",
+          components: [
+            {
+              name: "Oikos Triple Zero yogurt (2)",
+              calories: 180,
+              proteinG: 30,
+              carbsG: 14,
+              fatG: 0,
+              fiberG: 0,
+              sodiumMg: 120,
+              addedSugarG: 0,
+              saturatedFatG: 0,
+            },
+            {
+              name: "Chia seeds (2 tbsp)",
+              calories: 120,
+              proteinG: 6,
+              carbsG: 2,
+              fatG: 7,
+              fiberG: 8,
+              sodiumMg: 0,
+              addedSugarG: 0,
+              saturatedFatG: 1,
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      mealName: "Oikos Chia Combo",
+      calories: 300,
+      proteinG: 36,
+      carbsG: 16,
+      fatG: 7,
+      fiberG: 8,
+      sodiumMg: 120,
+      addedSugarG: 0,
+      saturatedFatG: 1,
+    });
+    expect(result[0].components).toHaveLength(2);
+  });
+
+  it("leaves top-level macros unchanged when components has exactly 1 entry", () => {
+    const result = parseEstimateResponse(
+      JSON.stringify([
+        {
+          ...BASE_ITEM,
+          components: [
+            {
+              name: "Medium apple",
+              calories: 95,
+              proteinG: 1,
+              carbsG: 25,
+              fatG: 0,
+              fiberG: 4,
+              sodiumMg: 1,
+              addedSugarG: 0,
+              saturatedFatG: 0,
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(result[0]).toMatchObject({
+      mealName: "Apple Snack",
+      calories: 95,
+      proteinG: 1,
+      carbsG: 25,
+    });
+  });
+
+  it("leaves top-level macros unchanged when components field is missing", () => {
+    const result = parseEstimateResponse(JSON.stringify(BASE_ITEM));
+
+    expect(result[0]).toMatchObject({
+      calories: 95,
+      proteinG: 1,
+      carbsG: 25,
+    });
+    expect(result[0].components).toEqual([]);
+  });
+
+  it("returns null for a macro when every component reports null for it", () => {
+    const result = parseEstimateResponse(
+      JSON.stringify([
+        {
+          ...BASE_ITEM,
+          mealName: "Vague Combo",
+          calories: 200,
+          sodiumMg: null,
+          components: [
+            {
+              name: "Item A",
+              calories: 100,
+              proteinG: 5,
+              carbsG: null,
+              fatG: null,
+              fiberG: null,
+              sodiumMg: null,
+              addedSugarG: null,
+              saturatedFatG: null,
+            },
+            {
+              name: "Item B",
+              calories: 100,
+              proteinG: 5,
+              carbsG: null,
+              fatG: null,
+              fiberG: null,
+              sodiumMg: null,
+              addedSugarG: null,
+              saturatedFatG: null,
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(result[0].calories).toBe(200);
+    expect(result[0].proteinG).toBe(10);
+    expect(result[0].carbsG).toBeNull();
+    expect(result[0].sodiumMg).toBeNull();
+  });
+
+  it("treats null components as 0 in sum when at least one component has a value", () => {
+    const result = parseEstimateResponse(
+      JSON.stringify([
+        {
+          ...BASE_ITEM,
+          mealName: "Mixed Confidence",
+          calories: 200,
+          components: [
+            {
+              name: "Item A",
+              calories: 100,
+              proteinG: 10,
+              carbsG: 5,
+              fatG: 2,
+              fiberG: 1,
+              sodiumMg: 100,
+              addedSugarG: 0,
+              saturatedFatG: 0,
+            },
+            {
+              name: "Item B",
+              calories: 100,
+              proteinG: null,
+              carbsG: null,
+              fatG: null,
+              fiberG: null,
+              sodiumMg: null,
+              addedSugarG: null,
+              saturatedFatG: null,
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(result[0]).toMatchObject({
+      calories: 200,
+      proteinG: 10,
+      carbsG: 5,
+      sodiumMg: 100,
+    });
+  });
+
+  it("extracts JSON when the model wraps the array in prose", () => {
+    const result = parseEstimateResponse(
+      `Here's the estimate:\n${JSON.stringify([BASE_ITEM])}\nHope that helps.`,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].mealName).toBe("Apple Snack");
+  });
+
+  it("extracts nested component arrays with brackets inside strings", () => {
+    const result = parseEstimateResponse(
+      `Result: ${JSON.stringify([
+        {
+          ...BASE_ITEM,
+          mealName: "Bracket Bowl",
+          reasoning: "Component name has [brackets] and escaped \"quotes\".",
+          components: [
+            {
+              name: "Sauce [light]",
+              calories: 40,
+              proteinG: 0,
+              carbsG: 6,
+              fatG: 2,
+              fiberG: 0,
+              sodiumMg: 120,
+              addedSugarG: 3,
+              saturatedFatG: 0,
+            },
+            {
+              name: "Chicken \"grilled\"",
+              calories: 160,
+              proteinG: 30,
+              carbsG: 0,
+              fatG: 4,
+              fiberG: 0,
+              sodiumMg: 320,
+              addedSugarG: 0,
+              saturatedFatG: 1,
+            },
+          ],
+        },
+      ])}`,
+    );
+
+    expect(result[0]).toMatchObject({
+      calories: 200,
+      proteinG: 30,
+      sodiumMg: 440,
+    });
+    expect(result[0].components).toHaveLength(2);
+  });
+
+  it("throws when wrapped JSON is truncated before the balanced close", () => {
+    expect(() =>
+      parseEstimateResponse(
+        `Here: [{"mealName":"Bad","category":"meal","calories":100`,
+      ),
+    ).toThrow("Estimator returned invalid JSON.");
   });
 });

@@ -87,7 +87,11 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
             No closed weeks yet. Once you close your first week, it will appear here.
           </section>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-white/15 bg-black/15 shadow-sm backdrop-blur-md">
+          <div
+            className="overflow-x-auto rounded-md border border-white/15 bg-black/15 shadow-sm backdrop-blur-md"
+            data-no-page-swipe="true"
+            style={{ touchAction: "pan-x" }}
+          >
             <table className="min-w-[980px] w-full border-collapse text-left text-sm">
               <thead className="border-b border-white/15 bg-white/10 text-xs uppercase tracking-[0.12em] text-white/70">
                 <tr>
@@ -95,7 +99,7 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                   <th className="px-4 py-3 font-semibold">Date range</th>
                   <th className="px-4 py-3 text-right font-semibold">Earnings</th>
                   <th className="px-4 py-3 text-right font-semibold">Spend</th>
-                  <th className="px-4 py-3 text-right font-semibold">Base</th>
+                  <th className="px-4 py-3 text-right font-semibold">Fixed</th>
                   <th className="px-4 py-3 text-right font-semibold">Cashflow</th>
                   <th className="px-4 py-3 text-right font-semibold">
                     Running balance

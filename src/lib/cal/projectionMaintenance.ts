@@ -9,7 +9,11 @@ type ProjectionMaintenanceSupabase = ReturnType<typeof createAdminClient>;
 
 type ExistingEntryRow = {
   date: string;
-  is_projected_plan: boolean | null;
+};
+
+type ResetProjectedEntriesRow = {
+  cleaned: number;
+  projected: number;
 };
 
 export type ShiftlyCalProjectionMaintenanceResult = {
@@ -37,34 +41,23 @@ export async function applyShiftlyCalProjectionMaintenance(
     >;
   },
 ): Promise<ShiftlyCalProjectionMaintenanceResult> {
-  const { data: cleanedRows, error: cleanupError } = await supabase
-    .from("food_entries")
-    .delete()
-    .eq("user_id", input.userId)
-    .eq("is_projected_plan", true)
-    .lte("date", input.todayIso)
-    .select("id");
-
-  if (cleanupError) {
-    throw new Error(`Unable to clean ShiftlyCal projections: ${cleanupError.message}`);
-  }
-
   if (
     input.todayIso < input.weekStartIso ||
     input.todayIso > input.weekEndIso
   ) {
-    return { cleaned: cleanedRows?.length ?? 0, projected: 0 };
+    return resetProjectedEntries(supabase, input.userId, []);
   }
 
   const firstFutureDate = addDaysIso(input.todayIso, 1);
   if (firstFutureDate > input.weekEndIso) {
-    return { cleaned: cleanedRows?.length ?? 0, projected: 0 };
+    return resetProjectedEntries(supabase, input.userId, []);
   }
 
   const { data: existingRows, error: existingError } = await supabase
     .from("food_entries")
-    .select("date,is_projected_plan")
+    .select("date")
     .eq("user_id", input.userId)
+    .eq("is_projected_plan", false)
     .gte("date", firstFutureDate)
     .lte("date", input.weekEndIso);
 
@@ -87,7 +80,6 @@ export async function applyShiftlyCalProjectionMaintenance(
 
     for (const entry of planEntries) {
       rowsToInsert.push({
-        user_id: input.userId,
         date,
         logged_time: entry.loggedTime,
         meal_name: entry.mealName,
@@ -101,25 +93,36 @@ export async function applyShiftlyCalProjectionMaintenance(
         added_sugar_g: entry.addedSugarG,
         saturated_fat_g: entry.saturatedFatG,
         is_projected_plan: true,
-        verdict: "good",
-        verdict_source: "unscored",
-        verdict_reason: "Projected plan entry.",
-        verdict_context: null,
       });
     }
   }
 
-  if (rowsToInsert.length === 0) {
-    return { cleaned: cleanedRows?.length ?? 0, projected: 0 };
+  return resetProjectedEntries(supabase, input.userId, rowsToInsert);
+}
+
+async function resetProjectedEntries(
+  supabase: ProjectionMaintenanceSupabase,
+  userId: string,
+  rowsToInsert: Array<Record<string, string | number | boolean | null>>,
+): Promise<ShiftlyCalProjectionMaintenanceResult> {
+  const { data, error } = await supabase.rpc(
+    "reset_shiftlycal_projected_entries",
+    {
+      p_user_id: userId,
+      p_rows: rowsToInsert,
+    },
+  );
+
+  if (error) {
+    throw new Error(`Unable to reset ShiftlyCal projections: ${error.message}`);
   }
 
-  const { error: insertError } = await supabase
-    .from("food_entries")
-    .insert(rowsToInsert);
+  const result = Array.isArray(data)
+    ? (data[0] as ResetProjectedEntriesRow | undefined)
+    : (data as ResetProjectedEntriesRow | null);
 
-  if (insertError) {
-    throw new Error(`Unable to apply ShiftlyCal projections: ${insertError.message}`);
-  }
-
-  return { cleaned: cleanedRows?.length ?? 0, projected: rowsToInsert.length };
+  return {
+    cleaned: Number(result?.cleaned ?? 0),
+    projected: Number(result?.projected ?? 0),
+  };
 }

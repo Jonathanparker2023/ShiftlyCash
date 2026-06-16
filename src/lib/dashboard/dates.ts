@@ -5,6 +5,21 @@ export function getTodayIso(timeZone = getAppTimeZone()): string {
   return getLocalIsoParts(new Date(), timeZone).iso;
 }
 
+// Convert any Date or ISO timestamp to the YYYY-MM-DD string in the app's
+// configured timezone. Use this when matching incoming external timestamps
+// (Plaid, Chime emails, etc.) against day rows, which are keyed by the
+// user's LOCAL date, not UTC.
+export function toLocalIsoDate(
+  input: Date | string,
+  timeZone = getAppTimeZone(),
+): string {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date input: ${String(input)}`);
+  }
+  return getLocalIsoParts(date, timeZone).iso;
+}
+
 export function getSundayOnOrBeforeTodayIso(timeZone = getAppTimeZone()): string {
   const parts = getLocalIsoParts(new Date(), timeZone);
   const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));

@@ -1,10 +1,15 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
-import { estimateFoodAction } from "@/app/(protected)/cal/actions";
+import {
+  createSavedFoodAction,
+  estimateFoodAction,
+  estimateFoodLabelPhotoAction,
+} from "@/app/(protected)/cal/actions";
 import { categoryLabel } from "@/lib/cal/color";
 import type { FoodEstimate } from "@/lib/cal/estimate";
+import { parsePastedLog } from "@/lib/cal/parsePastedLog";
 import type { FoodCategory } from "@/lib/cal/types";
 
 type EstimateForm = {
@@ -20,6 +25,11 @@ type EstimateForm = {
   saturatedFatG: string;
   reasoning: string;
   confidence: "high" | "medium" | "low";
+  // When true, log AND save this food to saved_foods so it appears as a
+  // quick-tap chip next time. Only surfaced for the primary "Log food"
+  // entry point; embedded "AI add food" inside the entry editor doesn't
+  // create presets.
+  saveForNextTime: boolean;
 };
 
 type Props = {
@@ -81,23 +91,128 @@ export function AiFoodEstimator({
   const [isOpen, setIsOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [estimate, setEstimate] = useState<EstimateForm[] | null>(null);
+  const [estimateStatus, setEstimateStatus] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [labelPhotoName, setLabelPhotoName] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const labelPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const requestSeqRef = useRef(0);
   const speechSupported =
     typeof window !== "undefined" &&
     Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
 
+  // Live preview: how many lines would the paste-bypass parser pick
+  // up if the user hit the action button right now? When > 0, the
+  // primary button switches to "Run" (no AI call); when 0, it stays
+  // "Estimate" (AI).
+  const parsedLineCount = useMemo(
+    () => (description.trim() ? parsePastedLog(description).length : 0),
+    [description],
+  );
+  const willBypassAi = parsedLineCount > 0;
+
   function runEstimate() {
+    const trimmed = description.trim();
+    if (!trimmed) return;
+
+    // Paste bypass: if the user already typed/pasted explicit macros,
+    // log them verbatim. No AI estimator call, no AI reinterpretation,
+    // no risk of the model "normalizing" the user's numbers into
+    // different numbers. Falls through to AI only when no explicit
+    // calories were found on any line.
+    const parsedFromPaste = parsePastedLog(trimmed);
+    if (parsedFromPaste.length > 0) {
+      parsedFromPaste.forEach((item) => {
+        const form: EstimateForm = {
+          mealName: item.mealName,
+          category: item.category,
+          calories: String(item.calories),
+          proteinG: item.proteinG?.toString() ?? "",
+          carbsG: item.carbsG?.toString() ?? "",
+          fatG: item.fatG?.toString() ?? "",
+          fiberG: item.fiberG?.toString() ?? "",
+          sodiumMg: item.sodiumMg?.toString() ?? "",
+          addedSugarG: item.addedSugarG?.toString() ?? "",
+          saturatedFatG: item.saturatedFatG?.toString() ?? "",
+          reasoning: "",
+          confidence: "high",
+          saveForNextTime: false,
+        };
+        void confirmEstimate(form);
+      });
+      reset();
+      setIsOpen(false);
+      return;
+    }
+
+    const requestSeq = requestSeqRef.current + 1;
+    requestSeqRef.current = requestSeq;
     setError(null);
+    setEstimate(null);
+    setEstimateStatus("loading");
 
     startTransition(async () => {
       try {
-        const result = await estimateFoodAction({ description });
-        setEstimate(result.map(toEstimateForm));
+        const result = await estimateFoodAction({ description: trimmed });
+        if (requestSeqRef.current !== requestSeq) return;
+        // Auto-log every returned estimate without a second confirm
+        // tap. User explicitly didn't want the preview-then-Log
+        // two-step. If a macro looks off they can edit the entry
+        // row afterward.
+        const forms = result.map(toEstimateForm);
+        forms.forEach((item) => void confirmEstimate(item));
+        reset();
+        setIsOpen(false);
       } catch (err) {
+        if (requestSeqRef.current !== requestSeq) return;
         setError(err instanceof Error ? err.message : "Unable to estimate food.");
+        setEstimateStatus("error");
+      }
+    });
+  }
+
+  function estimateLabelPhoto(file: File | null) {
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Use a JPEG, PNG, or WebP label photo.");
+      if (labelPhotoInputRef.current) labelPhotoInputRef.current.value = "";
+      return;
+    }
+
+    setLabelPhotoName(file.name || "Label photo");
+    setError(null);
+    setEstimate(null);
+    setEstimateStatus("loading");
+
+    const requestSeq = requestSeqRef.current + 1;
+    requestSeqRef.current = requestSeq;
+
+    startTransition(async () => {
+      try {
+        const imageBase64 = await readFileAsBase64(file);
+        const result = await estimateFoodLabelPhotoAction({
+          imageBase64,
+          mediaType: file.type as "image/jpeg" | "image/png" | "image/webp",
+          note: description.trim() || undefined,
+        });
+        if (requestSeqRef.current !== requestSeq) return;
+        const forms = result.map(toEstimateForm);
+        forms.forEach((item) => void confirmEstimate(item));
+        reset();
+        setIsOpen(false);
+      } catch (err) {
+        if (requestSeqRef.current !== requestSeq) return;
+        setError(
+          err instanceof Error ? err.message : "Unable to read the label photo.",
+        );
+        setEstimateStatus("error");
+      } finally {
+        if (labelPhotoInputRef.current) labelPhotoInputRef.current.value = "";
       }
     });
   }
@@ -134,12 +249,41 @@ export function AiFoodEstimator({
   }
 
   function reset() {
+    requestSeqRef.current += 1;
     setDescription("");
     setEstimate(null);
+    setEstimateStatus("idle");
     setError(null);
+    setLabelPhotoName(null);
+    if (labelPhotoInputRef.current) labelPhotoInputRef.current.value = "";
   }
 
-  function confirmEstimate(item: EstimateForm) {
+  async function confirmEstimate(item: EstimateForm) {
+    if (item.saveForNextTime) {
+      // Fire-and-forget — if it fails, the food still gets logged. We only
+      // surface the error if BOTH the log and the save fail; not blocking
+      // here keeps the log path snappy.
+      try {
+        await createSavedFoodAction({
+          name: item.mealName,
+          category: item.category,
+          calories: item.calories,
+          proteinG: item.proteinG || null,
+          carbsG: item.carbsG || null,
+          fatG: item.fatG || null,
+          fiberG: item.fiberG || null,
+          sodiumMg: item.sodiumMg || null,
+          addedSugarG: item.addedSugarG || null,
+          saturatedFatG: item.saturatedFatG || null,
+        });
+      } catch (err) {
+        // Non-fatal; log proceeds.
+        console.warn(
+          "[AiFoodEstimator] Save-as-preset failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
     onConfirm({
       mealName: item.mealName,
       category: item.category,
@@ -157,7 +301,7 @@ export function AiFoodEstimator({
 
   function confirmSingle() {
     if (!estimate?.[0]) return;
-    confirmEstimate(estimate[0]);
+    void confirmEstimate(estimate[0]);
     reset();
     setIsOpen(false);
   }
@@ -165,13 +309,13 @@ export function AiFoodEstimator({
   function confirmBatchItem(index: number) {
     const item = estimate?.[index];
     if (!item) return;
-    confirmEstimate(item);
+    void confirmEstimate(item);
     removeEstimateItem(index, { closeWhenEmpty: true });
   }
 
   function confirmBatchAll() {
     if (!estimate) return;
-    estimate.forEach(confirmEstimate);
+    estimate.forEach((item) => void confirmEstimate(item));
     reset();
     setIsOpen(false);
   }
@@ -212,22 +356,56 @@ export function AiFoodEstimator({
     }
   }
 
+  // The default "Log food" button is the primary mobile entry point — make
+  // it large, full-width, and high-contrast so it's the obvious next tap
+  // when the user lands on the day view. Embedded usages (e.g. "AI add
+  // food" inside the entry editor) keep the compact style via a smaller
+  // visual variant.
+  const isPrimary = buttonLabel === "Log food";
+  const buttonClass = isPrimary
+    ? "flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-5 py-4 text-base font-bold text-[var(--text-primary)] shadow-md transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-6 sm:py-3"
+    : "rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60";
+
   return (
     <div>
       <button
-        className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+        className={buttonClass}
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
-        {buttonLabel}
+        {isPrimary ? (
+          <>
+            <span aria-hidden="true" className="text-lg leading-none">+</span>
+            {buttonLabel}
+          </>
+        ) : (
+          buttonLabel
+        )}
       </button>
 
       {isOpen ? (
-        <div className="mt-3 rounded-md border border-white/15 bg-black/20 p-3 text-white">
-          {estimate ? (
+        <div className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)]">
+          {estimateStatus === "loading" ? (
+            <EstimateLoadingPanel
+              onCancel={() => {
+                reset();
+                setIsOpen(false);
+              }}
+            />
+          ) : estimateStatus === "error" ? (
+            <EstimateErrorPanel
+              error={error ?? "Unable to estimate food."}
+              onCancel={() => {
+                reset();
+                setIsOpen(false);
+              }}
+              onRetry={runEstimate}
+            />
+          ) : estimate ? (
             estimate.length === 1 ? (
               <EstimateResult
+                allowSavePreset={isPrimary}
                 confirmLabel={confirmLabel}
                 disabled={disabled}
                 estimate={estimate[0]}
@@ -237,6 +415,7 @@ export function AiFoodEstimator({
               />
             ) : (
               <BatchEstimateResult
+                allowSavePreset={isPrimary}
                 confirmLabel={confirmLabel}
                 disabled={disabled}
                 estimates={estimate}
@@ -249,16 +428,46 @@ export function AiFoodEstimator({
             )
           ) : (
             <div className="mt-3 space-y-3">
-              <label className="block text-sm font-semibold text-white/80">
+              <label className="block text-sm font-semibold text-[var(--text-secondary)]">
                 What did you eat?
                 <textarea
-                  className="mt-1 min-h-24 w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+                  className="mt-1 min-h-32 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-3 text-base text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40 sm:min-h-24 sm:text-sm"
                   maxLength={4000}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="What did you eat? Be as specific or as casual as you want."
+                  placeholder="What did you eat? For labels, add serving count if needed."
                   value={description}
                 />
               </label>
+              <input
+                ref={labelPhotoInputRef}
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                className="sr-only"
+                onChange={(event) =>
+                  estimateLabelPhoto(event.currentTarget.files?.[0] ?? null)
+                }
+                type="file"
+              />
+              {description.trim() ? (
+                <p
+                  className={
+                    willBypassAi
+                      ? "rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-3 py-2 text-xs font-semibold text-[var(--accent-primary-text)]"
+                      : "rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]"
+                  }
+                >
+                  {willBypassAi
+                    ? `Your numbers detected · ${parsedLineCount} ${
+                        parsedLineCount === 1 ? "entry" : "entries"
+                      } · will log exactly as typed, no AI call`
+                    : "No explicit macros detected · AI will estimate"}
+                </p>
+              ) : null}
+              {labelPhotoName ? (
+                <p className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]">
+                  Reading label - {labelPhotoName}
+                </p>
+              ) : null}
               {error ? (
                 <p className="rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-200">
                   {error}
@@ -267,7 +476,7 @@ export function AiFoodEstimator({
               <div className="flex flex-wrap gap-2">
                 {speechSupported ? (
                   <button
-                    className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={disabled || isPending}
                     onClick={toggleListening}
                     type="button"
@@ -283,15 +492,29 @@ export function AiFoodEstimator({
                   </button>
                 ) : null}
                 <button
-                  className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={disabled || isPending}
+                  onClick={() => labelPhotoInputRef.current?.click()}
+                  type="button"
+                >
+                  Label photo
+                </button>
+                <button
+                  className="flex-1 rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-3 text-base font-bold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:py-2 sm:text-sm sm:font-semibold"
                   disabled={disabled || isPending || !description.trim()}
                   onClick={runEstimate}
                   type="button"
                 >
-                  {isPending ? "Looking up nutrition data..." : "Estimate"}
+                  {isPending
+                    ? "Estimating..."
+                    : willBypassAi
+                      ? `Run ${parsedLineCount} ${
+                          parsedLineCount === 1 ? "entry" : "entries"
+                        }`
+                      : "Estimate"}
                 </button>
                 <button
-                  className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                  className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] sm:py-2"
                   onClick={() => {
                     reset();
                     setIsOpen(false);
@@ -316,7 +539,151 @@ function currentTimeInput(): string {
   ).padStart(2, "0")}`;
 }
 
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Unable to read the label photo."));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("Unable to read the label photo."));
+        return;
+      }
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function EstimateLoadingPanel({ onCancel }: { onCancel: () => void }) {
+  return (
+    <div className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-3 py-1 text-xs font-semibold text-[var(--accent-primary-text)]">
+          Working...
+        </span>
+        <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+          Looking up nutrition data
+        </span>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <SkeletonField className="sm:col-span-2" label="Name" />
+        <SkeletonField label="Category" />
+        <SkeletonField label="Calories" badge="Working..." />
+        <SkeletonField label="Protein" suffix="g" />
+        <SkeletonField label="Carbs" suffix="g" />
+        <SkeletonField label="Fat" suffix="g" />
+        <SkeletonField label="Fiber" suffix="g" />
+        <SkeletonField label="Sodium" suffix="mg" />
+        <SkeletonField label="Added sugar" suffix="g" />
+        <SkeletonField label="Sat fat" suffix="g" />
+      </div>
+      <EstimateProgressBar />
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
+          onClick={onCancel}
+          type="button"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EstimateErrorPanel({
+  error,
+  onCancel,
+  onRetry,
+}: {
+  error: string;
+  onCancel: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="mt-3 rounded-md border border-red-300/50 bg-red-500/10 p-3">
+      <span className="rounded-full border border-red-300/50 bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-100">
+        Estimate failed
+      </span>
+      <p className="mt-3 text-sm font-medium text-red-100">{error}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)]"
+          onClick={onRetry}
+          type="button"
+        >
+          Retry
+        </button>
+        <button
+          className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
+          onClick={onCancel}
+          type="button"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EstimateProgressBar() {
+  return (
+    <div className="mt-4 space-y-2">
+      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-[var(--text-secondary)]">
+        <span>Estimating nutrition...</span>
+        <span className="text-[var(--text-tertiary)]">A few seconds</span>
+      </div>
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
+        <div className="estimate-progress-stripe absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-transparent via-[var(--accent-primary-text)] to-transparent" />
+      </div>
+      <style>{`
+        @keyframes estimate-progress-slide {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(400%); }
+        }
+        .estimate-progress-stripe {
+          animation: estimate-progress-slide 1.4s ease-in-out infinite;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function SkeletonField({
+  badge,
+  className = "",
+  label,
+  suffix,
+}: {
+  badge?: string;
+  className?: string;
+  label: string;
+  suffix?: string;
+}) {
+  return (
+    <div className={`block text-sm font-semibold text-[var(--text-secondary)] ${className}`}>
+      {label}
+      <div className="relative mt-1 h-10 w-full overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+        <div className="absolute inset-y-0 left-0 w-1/2 animate-pulse bg-[var(--surface-elevated)]" />
+        {badge ? (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+            {badge}
+          </span>
+        ) : null}
+        {suffix ? (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-muted)]">
+            {suffix}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function EstimateResult({
+  allowSavePreset,
   confirmLabel,
   disabled,
   estimate,
@@ -324,6 +691,7 @@ function EstimateResult({
   onConfirm,
   onDiscard,
 }: {
+  allowSavePreset: boolean;
   confirmLabel: string;
   disabled: boolean;
   estimate: EstimateForm;
@@ -332,14 +700,14 @@ function EstimateResult({
   onDiscard: () => void;
 }) {
   return (
-    <div className="mt-3 rounded-md border border-white/15 bg-black/25 p-3">
+    <div className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span
           className={`rounded-full border px-3 py-1 text-xs font-semibold ${confidenceClass(estimate.confidence)}`}
         >
           {estimate.confidence} confidence
         </span>
-        <span className="text-xs font-semibold text-white/60">
+        <span className="text-xs font-semibold text-[var(--text-tertiary)]">
           {categoryLabel(estimate.category)}
         </span>
       </div>
@@ -404,9 +772,15 @@ function EstimateResult({
           value={estimate.saturatedFatG}
         />
       </div>
+      {allowSavePreset ? (
+        <SavePresetCheckbox
+          checked={estimate.saveForNextTime}
+          onChange={(next) => onChange({ ...estimate, saveForNextTime: next })}
+        />
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
+          className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
           disabled={disabled || !estimate.calories.trim()}
           onClick={onConfirm}
           type="button"
@@ -414,7 +788,7 @@ function EstimateResult({
           {confirmLabel}
         </button>
         <button
-          className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
           onClick={onDiscard}
           type="button"
         >
@@ -425,7 +799,31 @@ function EstimateResult({
   );
 }
 
+function SavePresetCheckbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-elevated)]">
+      <input
+        checked={checked}
+        className="h-4 w-4 cursor-pointer accent-[var(--accent-primary)]"
+        onChange={(event) => onChange(event.target.checked)}
+        type="checkbox"
+      />
+      <span>Save for next time</span>
+      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+        Quick log chip
+      </span>
+    </label>
+  );
+}
+
 function BatchEstimateResult({
+  allowSavePreset,
   confirmLabel,
   disabled,
   estimates,
@@ -435,6 +833,7 @@ function BatchEstimateResult({
   onDiscardAll,
   onDiscardItem,
 }: {
+  allowSavePreset: boolean;
   confirmLabel: string;
   disabled: boolean;
   estimates: EstimateForm[];
@@ -452,16 +851,16 @@ function BatchEstimateResult({
     <div className="mt-3 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-white">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">
             {estimates.length} foods detected
           </p>
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-[var(--text-tertiary)]">
             Review each item, then log them together or one at a time.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className="rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
+            className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
             disabled={disabled || !canConfirmAll}
             onClick={onConfirmAll}
             type="button"
@@ -469,7 +868,7 @@ function BatchEstimateResult({
             {allLabel}
           </button>
           <button
-            className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
             onClick={onDiscardAll}
             type="button"
           >
@@ -481,6 +880,7 @@ function BatchEstimateResult({
       <div className="space-y-2">
         {estimates.map((estimate, index) => (
           <MiniEstimateCard
+            allowSavePreset={allowSavePreset}
             disabled={disabled}
             estimate={estimate}
             itemLabel={itemLabel}
@@ -496,6 +896,7 @@ function BatchEstimateResult({
 }
 
 function MiniEstimateCard({
+  allowSavePreset,
   disabled,
   estimate,
   itemLabel,
@@ -503,6 +904,7 @@ function MiniEstimateCard({
   onConfirm,
   onDiscard,
 }: {
+  allowSavePreset: boolean;
   disabled: boolean;
   estimate: EstimateForm;
   itemLabel: string;
@@ -511,14 +913,14 @@ function MiniEstimateCard({
   onDiscard: () => void;
 }) {
   return (
-    <div className="rounded-md border border-white/15 bg-black/25 p-3">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span
           className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${confidenceClass(estimate.confidence)}`}
         >
           {estimate.confidence} confidence
         </span>
-        <span className="text-xs font-semibold text-white/60">
+        <span className="text-xs font-semibold text-[var(--text-tertiary)]">
           {categoryLabel(estimate.category)}
         </span>
       </div>
@@ -588,17 +990,24 @@ function MiniEstimateCard({
       </div>
 
       {estimate.reasoning ? (
-        <details className="mt-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/70">
-          <summary className="cursor-pointer font-semibold text-white/75">
+        <details className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+          <summary className="cursor-pointer font-semibold text-[var(--text-secondary)]">
             Reasoning
           </summary>
           <p className="mt-2 whitespace-pre-line">{estimate.reasoning}</p>
         </details>
       ) : null}
 
+      {allowSavePreset ? (
+        <SavePresetCheckbox
+          checked={estimate.saveForNextTime}
+          onChange={(next) => onChange({ ...estimate, saveForNextTime: next })}
+        />
+      ) : null}
+
       <div className="mt-3 flex flex-wrap gap-2">
         <button
-          className="rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-white/20"
+          className="rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
           disabled={disabled || !estimate.calories.trim()}
           onClick={onConfirm}
           type="button"
@@ -606,7 +1015,7 @@ function MiniEstimateCard({
           {itemLabel}
         </button>
         <button
-          className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
           onClick={onDiscard}
           type="button"
         >
@@ -627,10 +1036,10 @@ function CategorySelect({
   value: FoodCategory;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <select
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-[#111827] px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value as FoodCategory)}
         value={value}
       >
@@ -656,10 +1065,10 @@ function TextInput({
   value: string;
 }) {
   return (
-    <label className={`block text-sm font-semibold text-white/80 ${className}`}>
+    <label className={`block text-sm font-semibold text-[var(--text-secondary)] ${className}`}>
       {label}
       <input
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value)}
         type="text"
         value={value}
@@ -682,11 +1091,11 @@ function NumberInput({
   value: string;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <span className="relative mt-1 block">
         <input
-          className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+          className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
           min={0}
           onChange={(event) => onChange(event.target.value)}
           required={required}
@@ -695,7 +1104,7 @@ function NumberInput({
           value={value}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/50">
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-tertiary)]">
             {suffix}
           </span>
         ) : null}
@@ -707,9 +1116,9 @@ function NumberInput({
 function confidenceClass(confidence: EstimateForm["confidence"]): string {
   switch (confidence) {
     case "high":
-      return "border-emerald-300/50 bg-emerald-500/15 text-emerald-300";
+      return "border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]";
     case "medium":
-      return "border-amber-300/50 bg-amber-500/15 text-amber-300";
+      return "border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] text-[var(--accent-warning-text)]";
     case "low":
       return "border-red-300/50 bg-red-500/15 text-red-300";
   }
@@ -729,5 +1138,6 @@ function toEstimateForm(estimate: FoodEstimate): EstimateForm {
     saturatedFatG: estimate.saturatedFatG?.toString() ?? "",
     reasoning: estimate.reasoning,
     confidence: estimate.confidence,
+    saveForNextTime: false,
   };
 }

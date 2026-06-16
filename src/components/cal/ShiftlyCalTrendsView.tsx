@@ -41,6 +41,7 @@ type TargetFormState = {
   addedSugarTargetG: string;
   saturatedFatTargetG: string;
   waterTargetOz: string;
+  bannedFoods: string;
 };
 
 const emptySavedFoodForm: SavedFoodFormState = {
@@ -84,6 +85,7 @@ export function ShiftlyCalTrendsView({
     addedSugarTargetG: initialData.targets.addedSugarTargetG?.toString() ?? "",
     saturatedFatTargetG: initialData.targets.saturatedFatTargetG?.toString() ?? "",
     waterTargetOz: initialData.targets.waterTargetOz?.toString() ?? "",
+    bannedFoods: initialData.targets.bannedFoods.join("\n"),
   });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -131,14 +133,14 @@ export function ShiftlyCalTrendsView({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
-      <div className="h-2 bg-white/10" />
+    <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+      <div className="h-2 bg-[var(--surface-elevated)]" />
       <div className="space-y-4 p-3 sm:p-4">
-        <div className="rounded-lg border border-white/15 bg-black/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
             Week
           </p>
-          <h2 className="mt-1 text-xl font-semibold text-white">
+          <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
             {formatDayLabel(weekStartIso)} - {formatDayLabel(initialData.currentWeek.weekEndIso)}
           </h2>
         </div>
@@ -193,14 +195,14 @@ function TargetsPanel({
   targets: CalTargets;
 }) {
   return (
-    <section className="rounded-lg border border-white/15 bg-black/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Targets
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">
+      <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
         Daily energy and macros
       </h2>
-      <p className="mt-1 text-sm text-white/65">
+      <p className="mt-1 text-sm text-[var(--text-tertiary)]">
         Current TDEE: {targets.tdeeCalories?.toLocaleString() ?? "--"} cal
       </p>
       <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={onSubmit}>
@@ -258,9 +260,20 @@ function TargetsPanel({
           suffix="oz"
           value={form.waterTargetOz}
         />
+        <label className="block text-sm font-semibold text-[var(--text-secondary)] sm:col-span-2">
+          Banned foods (one per line)
+          <textarea
+            className="mt-1 min-h-28 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
+            onChange={(event) =>
+              onChange({ ...form, bannedFoods: event.target.value })
+            }
+            placeholder="edamame"
+            value={form.bannedFoods}
+          />
+        </label>
         <div className="sm:col-span-2">
           <button
-            className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+            className="rounded-md bg-[var(--surface-base)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
             disabled={disabled}
             type="submit"
           >
@@ -288,11 +301,11 @@ function SavedFoodsManagement({
   savedFoods: SavedFood[];
 }) {
   return (
-    <section className="rounded-lg border border-white/15 bg-black/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Saved foods
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">Manage quick logs</h2>
+      <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Manage quick logs</h2>
       <form className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" onSubmit={onSubmit}>
         <TextInput
           className="sm:col-span-2 xl:col-span-1"
@@ -356,7 +369,7 @@ function SavedFoodsManagement({
         />
         <div className="sm:col-span-2 xl:col-span-3">
           <button
-            className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+            className="rounded-md bg-[var(--surface-base)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
             disabled={disabled || !form.name.trim() || !form.calories.trim()}
             type="submit"
           >
@@ -376,7 +389,7 @@ function SavedFoodsManagement({
             />
           ))
         ) : (
-          <p className="rounded-md border border-dashed border-white/20 bg-black/15 p-4 text-sm text-white/70">
+          <p className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-secondary)]">
             No saved foods yet.
           </p>
         )}
@@ -399,7 +412,7 @@ function SavedFoodManageRow({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold">{food.name}</p>
-          <p className="text-sm text-white/70">
+          <p className="text-sm text-[var(--text-secondary)]">
             {categoryLabel(food.category)} - {food.calories.toLocaleString()} cal
             {formatMacros(food)}
           </p>
@@ -425,11 +438,11 @@ function TrendHistoryStrip({
   targets: CalTargets;
 }) {
   return (
-    <section className="rounded-lg border border-white/15 bg-black/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         28-day history
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">Daily trend rows</h2>
+      <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Daily trend rows</h2>
       <div className="mt-4 max-h-[34rem] overflow-y-auto pr-1">
         <div className="grid gap-2">
         {[...trendDays].reverse().map((day) => (
@@ -449,10 +462,10 @@ function TrendHistoryRow({
   targets: CalTargets;
 }) {
   return (
-    <div className="grid gap-3 rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white">
+    <div className="grid gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-sm text-[var(--text-primary)]">
       <div>
         <p className="font-semibold">{formatDayLabel(day.date)}</p>
-        <p className="text-xs text-white/60">{day.date}</p>
+        <p className="text-xs text-[var(--text-tertiary)]">{day.date}</p>
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <TrendMetric
@@ -484,7 +497,7 @@ function TrendHistoryRow({
           value={day.waterOz}
         />
       </div>
-      <p className="text-white/80">
+      <p className="text-[var(--text-secondary)]">
         {day.weightLbs === null ? "No weight" : `${day.weightLbs.toFixed(1)} lbs`}
       </p>
     </div>
@@ -521,7 +534,7 @@ function TrendMetric({
         </span>
       </div>
       {target !== null ? (
-        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
             className={`h-1.5 rounded-full ${trendFillClass(state.tone)}`}
             style={{ width: `${state.barPct}%` }}
@@ -534,19 +547,19 @@ function TrendMetric({
 
 function WeightLogWeek({ days }: { days: CalDay[] }) {
   return (
-    <section className="rounded-lg border border-white/15 bg-black/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Weight log
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">This week</h2>
+      <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">This week</h2>
       <div className="mt-4 grid gap-2">
         {days.map((day) => (
           <div
-            className="flex items-center justify-between rounded-md border border-white/15 bg-black/20 p-3 text-sm text-white"
+            className="flex items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-sm text-[var(--text-primary)]"
             key={day.date}
           >
             <span className="font-semibold">{formatDayLabel(day.date)}</span>
-            <span className="text-white/80">
+            <span className="text-[var(--text-secondary)]">
               {day.weight ? `${day.weight.weightLbs.toFixed(1)} lbs` : "--"}
             </span>
           </div>
@@ -566,10 +579,10 @@ function CategorySelect({
   value: FoodCategory;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <select
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-[#111827] px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value as FoodCategory)}
         value={value}
       >
@@ -597,10 +610,10 @@ function TextInput({
   value: string;
 }) {
   return (
-    <label className={`block text-sm font-semibold text-white/80 ${className}`}>
+    <label className={`block text-sm font-semibold text-[var(--text-secondary)] ${className}`}>
       {label}
       <input
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type="text"
@@ -624,11 +637,11 @@ function NumberInput({
   value: string;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <span className="relative mt-1 block">
         <input
-          className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+          className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
           min={0}
           onChange={(event) => onChange(event.target.value)}
           required={required}
@@ -637,7 +650,7 @@ function NumberInput({
           value={value}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/50">
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-tertiary)]">
             {suffix}
           </span>
         ) : null}
@@ -705,25 +718,25 @@ function trendMetricState(
 function trendTextClass(tone: "green" | "amber" | "red" | "neutral"): string {
   switch (tone) {
     case "green":
-      return "text-emerald-300";
+      return "text-[var(--accent-primary-text)]";
     case "amber":
-      return "text-amber-300";
+      return "text-[var(--accent-warning-text)]";
     case "red":
       return "text-red-300";
     case "neutral":
-      return "text-white/70";
+      return "text-[var(--text-secondary)]";
   }
 }
 
 function trendFillClass(tone: "green" | "amber" | "red" | "neutral"): string {
   switch (tone) {
     case "green":
-      return "bg-emerald-300";
+      return "bg-[var(--accent-primary-text)]";
     case "amber":
-      return "bg-amber-300";
+      return "bg-[var(--accent-warning-text)]";
     case "red":
       return "bg-red-300";
     case "neutral":
-      return "bg-white/40";
+      return "bg-[var(--surface-hover)]";
   }
 }

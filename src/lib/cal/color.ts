@@ -55,8 +55,6 @@ export function verdictBarClass(
   switch (entry.verdict) {
     case "good":
       return `${base} border-emerald-700 bg-emerald-600 text-white`;
-    case "fine":
-      return `${base} border-amber-600 bg-amber-500 text-white`;
     case "bad":
       return `${base} border-rose-700 bg-rose-600 text-white`;
   }

@@ -5,7 +5,12 @@ import { after } from "next/server";
 import { waitUntil } from "@vercel/functions";
 
 import { requireUser } from "@/lib/auth";
-import { estimateFood, type FoodEstimate } from "@/lib/cal/estimate";
+import { upsertDayFoodVerdict } from "@/lib/cal/dayVerdict";
+import {
+  estimateFood,
+  estimateFoodFromLabelPhoto,
+  type FoodEstimate,
+} from "@/lib/cal/estimate";
 import { getShiftlyCalData } from "@/lib/cal/data";
 import type { FoodCategory, FoodVerdict } from "@/lib/cal/types";
 import { scoreEntry, type VerdictInput } from "@/lib/cal/verdict";
@@ -20,7 +25,7 @@ const FOOD_CATEGORIES = new Set<FoodCategory>([
   "drink",
   "other",
 ]);
-const FOOD_VERDICTS = new Set<FoodVerdict>(["good", "fine", "bad"]);
+const FOOD_VERDICTS = new Set<FoodVerdict>(["good", "bad"]);
 const JON_FALLBACK_WEIGHT_LBS = 201.9;
 const VERDICT_SCORING_TIMEOUT_MS = 45_000;
 
@@ -128,6 +133,7 @@ export async function createFoodEntryAction(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/cal");
+  scheduleDayFoodVerdict(user.id, date);
   scheduleScoreFoodEntry(data.id, user.id);
   return { ok: true, id: data.id };
 }
@@ -137,6 +143,107 @@ export async function estimateFoodAction(input: {
 }): Promise<FoodEstimate[]> {
   await requireUser();
   return estimateFood(input.description);
+}
+
+export async function estimateFoodLabelPhotoAction(input: {
+  imageBase64: string;
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+  note?: string;
+}): Promise<FoodEstimate[]> {
+  await requireUser();
+  return estimateFoodFromLabelPhoto(input);
+}
+
+export type BulkFoodEntryInput = {
+  loggedTime?: string | null;
+  mealName?: string | null;
+  category?: FoodCategory | string | null;
+  calories: number | string;
+  proteinG?: NullableMacroInput;
+  carbsG?: NullableMacroInput;
+  fatG?: NullableMacroInput;
+  fiberG?: NullableMacroInput;
+  sodiumMg?: NullableMacroInput;
+  addedSugarG?: NullableMacroInput;
+  saturatedFatG?: NullableMacroInput;
+};
+
+/**
+ * Insert multiple food entries for the same day in one round trip.
+ *
+ * Built for the "Paste & log" flow where the user drops a block of
+ * pre-calculated food lines (e.g. GPT-5 output) and each line becomes
+ * its own entry — no AI estimator call, no per-line round trip. Macros
+ * are stored exactly as provided.
+ */
+export async function bulkCreateFoodEntriesAction(input: {
+  date?: string;
+  entries: BulkFoodEntryInput[];
+}): Promise<{ ok: true; ids: string[]; insertedCount: number }> {
+  const { supabase, user } = await requireUser();
+  const date = normalizeIsoDate(input.date);
+
+  if (!Array.isArray(input.entries) || input.entries.length === 0) {
+    throw new Error("No entries to insert.");
+  }
+
+  // Clear projected-plan rows for the target day so the paste replaces
+  // any auto-projected entries (matches createFoodEntryAction behavior).
+  const { error: projectionDeleteError } = await supabase
+    .from("food_entries")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("date", date)
+    .eq("is_projected_plan", true);
+
+  if (projectionDeleteError) {
+    throw new Error(
+      `Unable to clear projected plan: ${projectionDeleteError.message}`,
+    );
+  }
+
+  const fallbackTime = getCurrentLocalTimeHm();
+  const rows = input.entries.map((entry) => ({
+    user_id: user.id,
+    date,
+    logged_time: normalizeTimeInput(entry.loggedTime) ?? fallbackTime,
+    meal_name: entry.mealName?.trim() ?? "",
+    category: parseCategory(entry.category),
+    calories: requireNonNegativeInteger(entry.calories, "Calories"),
+    protein_g: optionalNonNegativeInteger(entry.proteinG, "Protein"),
+    carbs_g: optionalNonNegativeInteger(entry.carbsG, "Carbs"),
+    fat_g: optionalNonNegativeInteger(entry.fatG, "Fat"),
+    fiber_g: optionalNonNegativeInteger(entry.fiberG, "Fiber"),
+    sodium_mg: optionalNonNegativeInteger(entry.sodiumMg, "Sodium"),
+    added_sugar_g: optionalNonNegativeInteger(entry.addedSugarG, "Added sugar"),
+    saturated_fat_g: optionalNonNegativeInteger(
+      entry.saturatedFatG,
+      "Saturated fat",
+    ),
+    saved_food_id: null,
+    verdict: null,
+    verdict_source: "pending",
+    verdict_reason: null,
+    verdict_context: null,
+    is_projected_plan: false,
+  }));
+
+  const { data, error } = await supabase
+    .from("food_entries")
+    .insert(rows)
+    .select("id");
+
+  if (error) throw new Error(error.message);
+
+  const ids = (data ?? []).map((row) => String(row.id));
+
+  revalidatePath("/cal");
+  scheduleDayFoodVerdict(user.id, date);
+  for (const id of ids) {
+    scheduleScoreFoodEntry(id, user.id);
+  }
+
+  return { ok: true, ids, insertedCount: ids.length };
 }
 
 export async function generateMealOrderPromptAction(input?: {
@@ -590,6 +697,15 @@ export async function deleteFoodEntryAction(input: {
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
 
+  const { data: current, error: currentError } = await supabase
+    .from("food_entries")
+    .select("date")
+    .eq("user_id", user.id)
+    .eq("id", input.id)
+    .single();
+
+  if (currentError) throw new Error(currentError.message);
+
   const { error } = await supabase
     .from("food_entries")
     .delete()
@@ -599,6 +715,7 @@ export async function deleteFoodEntryAction(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/cal");
+  scheduleDayFoodVerdict(user.id, String(current.date));
   return { ok: true };
 }
 
@@ -621,7 +738,7 @@ export async function updateFoodEntryAction(input: {
 
   const { data: current, error: currentError } = await supabase
     .from("food_entries")
-    .select("verdict_source")
+    .select("date,verdict_source")
     .eq("user_id", user.id)
     .eq("id", input.id)
     .single();
@@ -659,6 +776,7 @@ export async function updateFoodEntryAction(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/cal");
+  scheduleDayFoodVerdict(user.id, String(current.date));
   if (current?.verdict_source !== "manual_override") {
     scheduleScoreFoodEntry(input.id, user.id);
   }
@@ -839,6 +957,7 @@ export async function saveCalTargetsAction(input: {
   addedSugarTargetG?: NullableMacroInput;
   saturatedFatTargetG?: NullableMacroInput;
   waterTargetOz?: NullableMacroInput;
+  bannedFoods?: string | string[] | null;
 }): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
 
@@ -854,6 +973,9 @@ export async function saveCalTargetsAction(input: {
       added_sugar_target_g: optionalPositiveInteger(input.addedSugarTargetG, "Added sugar target"),
       saturated_fat_target_g: optionalPositiveInteger(input.saturatedFatTargetG, "Saturated fat target"),
       water_target_oz: optionalPositiveInteger(input.waterTargetOz, "Water target"),
+      ...(input.bannedFoods === undefined
+        ? {}
+        : { banned_foods: normalizeTextList(input.bannedFoods) }),
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", user.id);
@@ -862,6 +984,13 @@ export async function saveCalTargetsAction(input: {
 
   revalidatePath("/cal");
   return { ok: true };
+}
+
+function normalizeTextList(value: string | string[] | null | undefined): string[] {
+  const rawItems = Array.isArray(value) ? value : String(value ?? "").split(/\r?\n/);
+  return Array.from(
+    new Set(rawItems.map((item) => item.trim()).filter(Boolean)),
+  );
 }
 
 function renderBudgetLine(
@@ -1000,6 +1129,44 @@ function scheduleScoreFoodEntry(entryId: string, userId: string) {
   });
 }
 
+function scheduleDayFoodVerdict(userId: string, date: string) {
+  console.info("[day-verdict] refresh scheduled", { userId, date, ts: Date.now() });
+  if (typeof waitUntil === "function") {
+    waitUntil(refreshDayFoodVerdict(userId, date));
+    return;
+  }
+
+  after(async () => {
+    await refreshDayFoodVerdict(userId, date);
+  });
+}
+
+async function refreshDayFoodVerdict(userId: string, date: string) {
+  try {
+    await upsertDayFoodVerdict(createAdminClient(), userId, date);
+    console.info("[day-verdict] refresh success", { userId, date, ts: Date.now() });
+  } catch (err) {
+    console.info("[day-verdict] refresh failure", {
+      userId,
+      date,
+      ts: Date.now(),
+      error: err instanceof Error ? err.message : "Unknown day verdict error.",
+    });
+  }
+
+  // Same guard as scoreEntryAndUpdate: post-response revalidates throw
+  // under Next.js 16. DB is up-to-date; UI catches up on next refresh.
+  try {
+    revalidatePath("/cal");
+  } catch (err) {
+    console.info("[day-verdict] revalidatePath skipped (post-response)", {
+      userId,
+      date,
+      reason: err instanceof Error ? err.message : "unknown",
+    });
+  }
+}
+
 async function scoreEntryAndUpdate(entryId: string, userId: string) {
   const supabase = createAdminClient();
   const startedAt = Date.now();
@@ -1055,7 +1222,21 @@ async function scoreEntryAndUpdate(entryId: string, userId: string) {
     });
   }
 
-  revalidatePath("/cal");
+  // Next.js 16 throws "revalidatePath during render is unsupported" when
+  // this fires from a waitUntil() background task that outlives the
+  // response. Swallow the error — the DB row is already updated, so the
+  // verdict will land on the next navigation/refresh. Without the
+  // catch, a single thrown revalidate can poison every concurrent
+  // scoring task in the same batch.
+  try {
+    revalidatePath("/cal");
+  } catch (err) {
+    console.info("[verdict] revalidatePath skipped (post-response)", {
+      entryId,
+      userId,
+      reason: err instanceof Error ? err.message : "unknown",
+    });
+  }
 }
 
 function withTimeout<T>(

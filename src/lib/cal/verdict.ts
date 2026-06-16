@@ -3,6 +3,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 
 import type { FoodCategory, FoodVerdict } from "@/lib/cal/types";
+import { stripQuantitativeClaims } from "@/lib/cal/verdictSanitize";
 
 const VERDICT_MODEL = "claude-sonnet-4-5";
 
@@ -18,23 +19,22 @@ const VERDICT_SYSTEM_PROMPT = `You are a nutrition coach scoring a single logged
 Use entry.sodiumMg, entry.addedSugarG, and entry.saturatedFatG when present. Only estimate missing values. Do not overwrite real row values with fresh guesses.
 
 ## Verdict enum
-- "good" — aligns with phase goals AND clean week pattern OR a course-correction after a bad streak
-- "fine" — neutral, expected, or an in-budget indulgence on a clean-week 80/20 window
-- "bad" — hurting the week. Either the food itself crosses a hard cap, OR cumulative pattern is harmful
+- "good" — supports today's target range and food-quality guardrails
+- "bad" — pushes the day outside the target range or misses the food-quality guardrails
 
 ## Week-pattern weighting rules (apply in order)
 
-1. EXTREME BINGE CAP: if this single entry exceeds 40% of TDEE in calories, verdict is at most "fine" (never "good"), regardless of how clean the week was. Reason cites the binge cap. This prevents "I was clean all week, so a 3000-cal binge is fine" rationalization.
+1. EXTREME BINGE CAP: if this single entry exceeds 40% of TDEE in calories, verdict is "bad", regardless of how clean the week was. Reason cites the heavy single-entry load.
 
-2. PHASE TARGET: targets.tdee_cal is the user's literal daily phase target. If phase is cut, calories above the daily cut target push toward "bad"; calories within ±15% of target are "fine"; well below target with low protein could be "bad" because under-eating undermines the cut. If bulk, below the daily bulk target pushes toward "bad". Maintain has ±100 tolerance.
+2. PHASE TARGET: targets.tdee_cal is the user's literal daily phase target. An entry can be "good" only when today's running total after the entry stays at or below 105% of TDEE and does not leave the day structurally weak. Above 105% of TDEE is "bad". Very low total intake with low protein can also be "bad" because under-eating undermines the phase.
 
-3. 80/20 WINDOW: if 80%+ of the week's logged days were clean (calories within or below TDEE), and this entry is a moderate indulgence (<40% TDEE), verdict can be "fine" with reason citing the week pattern.
+3. LOWER BOUND: by end-of-day context, the good daily calorie range is 95% to 105% of TDEE. For early-day single entries, use judgment: do not punish normal meals just because the day is not complete yet.
 
-4. RECOVERY: if the past 2 days had indulgent overshoots and this entry is genuinely healthy (high protein, high fiber, in-budget), verdict is "good" with reason "recovery / course correction."
+4. GUARDRAILS: "good" needs meaningful protein contribution, useful fiber or whole-food structure when relevant, and sodium/added sugar/saturated fat that do not create an obvious health-flag problem. A protein contribution around 5%+ of the daily target is enough for a normal entry; use pro-rata judgment for snacks and drinks.
 
-5. COMPOUNDING: if multiple indulgent items already logged this week AND this entry adds to that pattern (high sugar, low protein, low fiber, calorie-dense), verdict is "bad" with reason "compounding pattern this week."
+5. RECOVERY: if the past 2 days had overshoots and this entry is genuinely healthy (high protein, high fiber, in-budget), verdict is "good" with reason "course correction."
 
-6. PROTEIN FLOOR: if today's protein is well below daily floor (less than 60% of target) and this entry is low-protein (under 10g), the verdict softens to "fine" only if the food otherwise serves a need (fiber, micronutrients). Otherwise "bad."
+6. COMPOUNDING: if multiple indulgent items already logged this week AND this entry adds to that pattern (high sugar, low protein, low fiber, calorie-dense), verdict is "bad".
 
 ## Health flag mappings (apply only if flag is present in profile.health_flags)
 
@@ -69,7 +69,7 @@ Treat the following as sugar-pattern issues even when added_sugar is 0:
 Rules:
 - If the entry is a liquid-sugar beverage (drink category + carbs > 15g + fiber == 0 + protein < 5g), add "liquid_sugar_pattern" to rules_triggered.
 - Verdict leans "bad" if this is the user's 2nd+ liquid-sugar beverage this week, OR week is already sugar-heavy.
-- Verdict can be "fine" for an isolated juice in an otherwise clean week, but reason should note "no fiber to slow the sugar — eat fruit whole when possible."
+- An isolated juice can be "bad" when it does not help protein/fiber structure or pushes sugar pattern risk; reason should note "no fiber to slow the sugar — eat fruit whole when possible."
 - If user has high_blood_pressure flag, ALWAYS lean toward "bad" for these (rapid glucose → water retention → BP spike).
 - Reason text uses observational frame: "34g liquid sugar — no fiber buffer", NOT "you shouldn't drink juice."
 
@@ -96,12 +96,25 @@ Skip:
 - Calorie-budget framing in the reason ("calories already over target") — the day totals show that already
 - Cumulative-context-only reasons. Always start with what the food IS.
 
+## ABSOLUTE RULE — no quantitative claims in verdict_reason
+
+verdict_reason MUST NOT contain ANY of the following:
+- Percentages of any kind ("110% of target", "217% of DASH ceiling", "45%")
+- Ratios ("3x the limit", "double the budget")
+- Specific mg/g/cal numbers about totals ("3,070mg sodium today", "1,510 calories")
+- Comparisons to numeric targets ("over the 1,500mg ceiling", "above the 1,650 budget")
+
+The day-totals UI shows percentages and totals to the user directly. If you state a percentage in verdict_reason, you WILL get it wrong (you do not have a calculator), and the user will see the lie. Use ONLY qualitative descriptors: "high sodium", "low fiber", "protein-light", "calorie-dense", "sugar-heavy". Describe the FOOD, not the math.
+
+Wrong: "Protein shake. Pushes daily calories to 110% of target and sodium to 217% of DASH ceiling."
+Right: "Protein shake — heavy on protein, but the sodium load is high for the day already."
+
 The reason should read like a one-line review from a friend who actually looked at your plate, not a spreadsheet alert.
 
 ## Output JSON shape (strict, no markdown)
 
 {
-  "verdict": "good" | "fine" | "bad",
+  "verdict": "good" | "bad",
   "verdict_reason": string (max 200 chars, observational frames only),
   "verdict_context": {
     "estimated_facets": {
@@ -122,7 +135,7 @@ The reason should read like a one-line review from a friend who actually looked 
 
 Source tag rules: use "official" if the entry came from a known restaurant/brand with published nutrition values; "ai_estimate" if you computed values from food description; "unknown" if there's no reliable basis.`;
 
-const BANNED_REASON_WORDS = [
+export const BANNED_REASON_WORDS = [
   "cheat",
   "guilt",
   "deserve",
@@ -276,8 +289,8 @@ function parseVerdict(raw: string): VerdictResult {
 }
 
 function parseVerdictValue(value: unknown): FoodVerdict {
-  if (value === "good" || value === "fine" || value === "bad") return value;
-  throw new Error("Verdict scorer returned invalid verdict.");
+  if (value === "good" || value === "bad") return value;
+  return "bad";
 }
 
 function sanitizeReason(value: string): string {
@@ -285,6 +298,7 @@ function sanitizeReason(value: string): string {
   for (const banned of BANNED_REASON_WORDS) {
     sanitized = sanitized.replace(new RegExp(escapeRegExp(banned), "gi"), "pattern");
   }
+  sanitized = stripQuantitativeClaims(sanitized);
   return sanitized;
 }
 

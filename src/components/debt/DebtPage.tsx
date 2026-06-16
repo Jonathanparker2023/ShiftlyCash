@@ -896,6 +896,16 @@ function DebtBreakdown({ debts }: { debts: DebtRow[] }) {
     .sort((a, b) => b.balanceCents - a.balanceCents);
   const max = Math.max(...activeDebts.map((debt) => debt.balanceCents), 1);
 
+  const totalCents = activeDebts.reduce(
+    (sum, debt) => sum + debt.balanceCents,
+    0,
+  );
+  const autoLoanCents = activeDebts
+    .filter((debt) => isAutoLoanName(debt.name))
+    .reduce((sum, debt) => sum + debt.balanceCents, 0);
+  const totalMinusAutoCents = totalCents - autoLoanCents;
+  const hasAutoLoan = autoLoanCents > 0;
+
   return (
     <div className="grid gap-3">
       {activeDebts.map((debt, index) => (
@@ -915,8 +925,32 @@ function DebtBreakdown({ debts }: { debts: DebtRow[] }) {
           </div>
         </div>
       ))}
+      <div className="mt-2 grid gap-1.5 border-t border-white/10 pt-3 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-semibold text-white/80">Total</span>
+          <span className="font-bold text-white">{formatMoney(totalCents)}</span>
+        </div>
+        {hasAutoLoan ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-semibold text-white/65">
+              Total minus auto loan
+            </span>
+            <span className="font-bold text-emerald-300">
+              {formatMoney(totalMinusAutoCents)}
+            </span>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
+}
+
+// Matches the inferDebtType heuristic used by the ledger export so the
+// "minus auto loan" math here lines up with what the Foundation system
+// considers an auto-loan bucket.
+function isAutoLoanName(name: string): boolean {
+  const normalized = name.toLowerCase();
+  return normalized.includes("auto") || normalized.includes("loan");
 }
 
 function formatMoney(cents: number): string {

@@ -18,6 +18,7 @@ import type {
   CalSex,
   CalTargets,
   CalTotals,
+  DayFoodVerdict,
   FoodCategory,
   FoodEntry,
   FoodVerdict,
@@ -104,6 +105,19 @@ type SettingsTargetsRow = {
   current_phase: string | null;
   goals_text: string | null;
   health_flags: string[] | null;
+  banned_foods: string[] | null;
+};
+
+type DayFoodVerdictRow = {
+  id: string;
+  date: string;
+  verdict: string;
+  reason: string;
+  calorie_total: number;
+  protein_total: number;
+  within_calorie_tolerance: boolean;
+  within_protein_target: boolean;
+  generated_at: string;
 };
 
 type TrendFoodEntryRow = {
@@ -145,7 +159,6 @@ export type CalTrendDay = {
 
 export type CalVerdictCounts = {
   good: number;
-  fine: number;
   bad: number;
   unscored: number;
   manualOverride: number;
@@ -202,7 +215,7 @@ async function loadShiftlyCalData(
 
   const settingsRes = await supabase
     .from("settings")
-    .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g,sodium_target_mg,added_sugar_target_g,saturated_fat_target_g,water_target_oz,age,sex,height_cm,activity_level,current_phase,goals_text,health_flags")
+    .select("tdee_calories,protein_target_g,carbs_target_g,fat_target_g,fiber_target_g,sodium_target_mg,added_sugar_target_g,saturated_fat_target_g,water_target_oz,age,sex,height_cm,activity_level,current_phase,goals_text,health_flags,banned_foods")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -218,7 +231,8 @@ async function loadShiftlyCalData(
     targets,
   });
 
-  const [entriesRes, savedFoodsRes, weightRes, waterRes] = await Promise.all([
+  const [entriesRes, savedFoodsRes, weightRes, waterRes, dayVerdictsRes] =
+    await Promise.all([
     supabase
       .from("food_entries")
       .select(
@@ -251,12 +265,23 @@ async function loadShiftlyCalData(
       .eq("user_id", userId)
       .gte("date", weekStartIso)
       .lte("date", weekEndIso),
+    supabase
+      .from("day_food_verdicts")
+      .select(
+        "id,date,verdict,reason,calorie_total,protein_total,within_calorie_tolerance,within_protein_target,generated_at",
+      )
+      .eq("user_id", userId)
+      .gte("date", weekStartIso)
+      .lte("date", weekEndIso),
   ]);
 
   if (entriesRes.error) throw new Error(`Food entries: ${entriesRes.error.message}`);
   if (savedFoodsRes.error) throw new Error(`Saved foods: ${savedFoodsRes.error.message}`);
   if (weightRes.error) throw new Error(`Weight log: ${weightRes.error.message}`);
   if (waterRes.error) throw new Error(`Water log: ${waterRes.error.message}`);
+  if (dayVerdictsRes.error) {
+    throw new Error(`Day food verdicts: ${dayVerdictsRes.error.message}`);
+  }
 
   const entries = ((entriesRes.data ?? []) as FoodEntryRow[]).map(mapFoodEntry);
   const weights = ((weightRes.data ?? []) as WeightLogRow[]).map(mapWeightLog);
@@ -266,6 +291,8 @@ async function loadShiftlyCalData(
     entries,
     weights,
     (waterRes.data ?? []) as WaterLogRow[],
+    ((dayVerdictsRes.data ?? []) as DayFoodVerdictRow[]).map(mapDayFoodVerdict),
+    targets,
   );
   const weeklyDeficitCalories = computeWeeklyDeficit(
     currentWeek,
@@ -490,9 +517,14 @@ function buildCalWeek(
   entries: FoodEntry[],
   weights: WeightLog[],
   waterLogs: WaterLogRow[],
+  dayVerdicts: DayFoodVerdict[],
+  targets: CalTargets,
 ) {
   const entriesByDate = groupByDate(entries);
   const weightsByDate = new Map(weights.map((weight) => [weight.date, weight]));
+  const dayVerdictsByDate = new Map(
+    dayVerdicts.map((verdict) => [verdict.date, verdict]),
+  );
   const waterByDate = new Map<string, number>();
   for (const log of waterLogs) {
     waterByDate.set(log.date, (waterByDate.get(log.date) ?? 0) + Number(log.amount_oz));
@@ -500,12 +532,18 @@ function buildCalWeek(
   const days: CalDay[] = Array.from({ length: 7 }, (_, dayIndex) => {
     const date = addDaysIso(weekStartIso, dayIndex);
     const dayEntries = entriesByDate.get(date) ?? [];
+    const totals = sumTotals(dayEntries);
 
     return {
       date,
       dayIndex,
       entries: dayEntries,
-      totals: sumTotals(dayEntries),
+      totals,
+      dayVerdict: normalizeDayVerdictForCurrentTargets(
+        dayVerdictsByDate.get(date) ?? null,
+        totals,
+        targets,
+      ),
       weight: weightsByDate.get(date) ?? null,
       waterOz: waterByDate.get(date) ?? 0,
     };
@@ -563,6 +601,32 @@ function addTotals(left: CalTotals, right: CalTotals): CalTotals {
   };
 }
 
+function normalizeDayVerdictForCurrentTargets(
+  verdict: DayFoodVerdict | null,
+  totals: CalTotals,
+  targets: CalTargets,
+): DayFoodVerdict | null {
+  if (!verdict || targets.tdeeCalories === null || targets.proteinTargetG === null) {
+    return verdict;
+  }
+
+  const withinCalorieTolerance =
+    totals.calories >= targets.tdeeCalories * 0.9 &&
+    totals.calories <= targets.tdeeCalories * 1.1;
+  const withinProteinTarget = totals.proteinG >= targets.proteinTargetG * 0.9;
+  const nextVerdict =
+    withinCalorieTolerance && withinProteinTarget ? "good" : "bad";
+
+  return {
+    ...verdict,
+    verdict: nextVerdict,
+    calorieTotal: Math.round(totals.calories),
+    proteinTotal: Math.round(totals.proteinG),
+    withinCalorieTolerance,
+    withinProteinTarget,
+  };
+}
+
 function emptyTotals(): CalTotals {
   return {
     calories: 0,
@@ -577,7 +641,7 @@ function emptyTotals(): CalTotals {
 }
 
 function emptyVerdictCounts(): CalVerdictCounts {
-  return { good: 0, fine: 0, bad: 0, unscored: 0, manualOverride: 0 };
+  return { good: 0, bad: 0, unscored: 0, manualOverride: 0 };
 }
 
 function emptyTrendEstimatedFacets(): CalTrendEstimatedFacets {
@@ -597,7 +661,7 @@ function addVerdictToCounts(
 ) {
   if (verdictSource === "manual_override") counts.manualOverride += 1;
 
-  if (verdict === "good" || verdict === "fine" || verdict === "bad") {
+  if (verdict === "good" || verdict === "bad") {
     counts[verdict] += 1;
     return;
   }
@@ -661,6 +725,7 @@ function mapTargets(row: SettingsTargetsRow | null): CalTargets {
     currentPhase: mapPhase(row?.current_phase ?? null),
     goalsText: row?.goals_text ?? null,
     healthFlags: Array.isArray(row?.health_flags) ? row.health_flags : [],
+    bannedFoods: Array.isArray(row?.banned_foods) ? row.banned_foods : [],
   };
 }
 
@@ -688,6 +753,20 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
     isProjectedPlan: row.is_projected_plan === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapDayFoodVerdict(row: DayFoodVerdictRow): DayFoodVerdict {
+  return {
+    id: row.id,
+    date: row.date,
+    verdict: row.verdict === "good" ? "good" : "bad",
+    reason: row.reason,
+    calorieTotal: Number(row.calorie_total),
+    proteinTotal: Number(row.protein_total),
+    withinCalorieTolerance: row.within_calorie_tolerance === true,
+    withinProteinTarget: row.within_protein_target === true,
+    generatedAt: row.generated_at,
   };
 }
 
@@ -727,8 +806,8 @@ function nullableNumber(value: number | null): number | null {
 
 function buildDailyTargetBand(tdeeCalories: number | null) {
   return {
-    low: tdeeCalories === null ? null : Math.round(tdeeCalories * 0.85),
-    high: tdeeCalories === null ? null : Math.round(tdeeCalories * 1.15),
+    low: tdeeCalories === null ? null : Math.round(tdeeCalories * 0.95),
+    high: tdeeCalories === null ? null : Math.round(tdeeCalories * 1.05),
   };
 }
 
@@ -746,7 +825,8 @@ function mapCategory(value: string | null): FoodCategory {
 }
 
 function mapVerdict(value: string | null): FoodVerdict | null {
-  if (value === "good" || value === "fine" || value === "bad") return value;
+  if (value === "good" || value === "bad") return value;
+  if (value === "fine") return "bad";
   return null;
 }
 

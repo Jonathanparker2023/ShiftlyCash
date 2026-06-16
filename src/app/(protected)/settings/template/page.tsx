@@ -1,7 +1,14 @@
+import { redirect } from "next/navigation";
+
 import { TemplateEditor } from "@/components/template/TemplateEditor";
+import { CAPABILITIES } from "@/lib/edition";
 import { getTemplateEditorData } from "@/lib/template/data";
 
 export default async function TemplateSettingsPage() {
+  if (!CAPABILITIES.showWeeklyTemplate) {
+    redirect("/");
+  }
+
   const data = await getTemplateEditorData();
   const editorKey = [
     data.templateId,

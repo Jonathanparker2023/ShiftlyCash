@@ -95,6 +95,7 @@ type TransactionRow = {
   category: string | null;
   source: DashboardTransactionSource;
   status: DashboardTransactionStatus | "pending_review";
+  review_reason: string | null;
 };
 
 type WeekTotalRow = {
@@ -268,7 +269,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           supabase
             .from("transactions")
             .select(
-              "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,category,source,status",
+              "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,category,source,status,review_reason",
             )
             .in("day_id", dayIds)
             .in("status", ["applied", "excluded"])
@@ -402,15 +403,17 @@ function mapDashboardData(input: {
 function deriveSpendProjection(
   closedWeekMetrics: ClosedWeekMetricRow[],
 ): { previousWeekSpendCents: number; projectedDailySpendCents: number } {
-  // closedWeekMetrics is ordered by start_date ASC, so the last entry is the
-  // most recent closed week. If there is no closed week yet, the projection is
-  // zero — UI will simply not render the placeholder.
-  if (closedWeekMetrics.length === 0) {
+  // closedWeekMetrics is ordered by start_date ASC. Use the most recent six
+  // closed weeks so one unusually high or low week doesn't drive autofill.
+  const recentSpendValues = closedWeekMetrics
+    .slice(-6)
+    .map((row) => row.spend_total);
+
+  if (recentSpendValues.length === 0) {
     return { previousWeekSpendCents: 0, projectedDailySpendCents: 0 };
   }
 
-  const previous = closedWeekMetrics[closedWeekMetrics.length - 1];
-  const previousWeekSpendCents = dollarsToCents(toNumber(previous.spend_total));
+  const previousWeekSpendCents = medianCents(recentSpendValues);
   const projectedDailySpendCents = Math.round(previousWeekSpendCents / 7);
 
   return { previousWeekSpendCents, projectedDailySpendCents };
@@ -696,6 +699,7 @@ function mapDashboardTransaction(row: TransactionRow): DashboardTransaction {
     category: row.category,
     source: row.source,
     status: row.status === "excluded" ? "excluded" : "applied",
+    isAmortized: row.review_reason === "amortized_expense",
     date: row.date,
     time: row.datetime ?? row.legacy_time,
     createdAt: row.created_at,

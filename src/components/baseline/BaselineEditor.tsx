@@ -25,6 +25,9 @@ type BaselineEditorProps = {
   initialData: BaselineData;
 };
 
+const FIELD_CLASS =
+  "h-11 w-full rounded-xl border border-white/10 bg-white/[0.05] px-3.5 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:bg-white/[0.08] focus:ring-2 focus:ring-white/10";
+
 export function BaselineEditor({ initialData }: BaselineEditorProps) {
   const [expenses, setExpenses] = useState(initialData.expenses);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -53,6 +56,16 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
         })),
         initialData.todayIso,
       ),
+    [expenses, initialData.todayIso],
+  );
+
+  const activeCount = useMemo(
+    () =>
+      expenses.filter(
+        (expense) =>
+          expense.isActive &&
+          !isExpenseExpired(expense.expirationDate, initialData.todayIso),
+      ).length,
     [expenses, initialData.todayIso],
   );
 
@@ -179,70 +192,89 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
   }
 
   return (
-    <main className="min-h-screen px-4 py-5 text-white sm:px-6 lg:px-8">
+    <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-8">
       <section className="mx-auto max-w-7xl">
-        <header className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-white/70">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
               ShiftlyCash
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Baseline Expenses
+            <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">
+              Fixed Expenses
             </h1>
-            <p className="mt-1 text-sm text-white/75">
-              Monthly recurring costs converted into weekly and daily base.
+            <p className="mt-1.5 text-sm text-white/65">
+              Monthly recurring costs converted into weekly and daily fixed cost.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <SaveIndicator state={saveState} error={saveError} />
             <button
-              className="h-10 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white shadow-sm backdrop-blur-md transition hover:border-white/30 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isAdding}
               onClick={addExpense}
               type="button"
             >
+              <span className="text-base leading-none">+</span>
               {isAdding ? "Adding..." : "Add expense"}
             </button>
           </div>
         </header>
 
         <TotalsPanel
+          activeCount={activeCount}
           monthlyTotalCents={totals.monthlyTotalCents}
           projectedDailyBaseCents={totals.projectedDailyBaseCents}
           weeklyAverageCents={totals.weeklyAverageCents}
         />
 
-        <section className="mt-5 overflow-hidden rounded-md border border-white/10 bg-black/20 backdrop-blur-md shadow-sm">
-          <div className="hidden grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] gap-3 border-b border-white/10 bg-white/10 px-4 py-3 text-xs font-medium uppercase tracking-[0.12em] text-white/70 md:grid">
-            <div>Name</div>
-            <div>Monthly</div>
-            <div>Withdraws</div>
-            <div>Expiration</div>
-            <div>Active</div>
-            <div className="text-right">Delete</div>
+        <section className="mt-6">
+          <div className="mb-3 flex items-center justify-between px-1">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+              Expenses
+            </h2>
+            <span className="text-xs font-medium text-white/45">
+              {activeCount} active
+            </span>
           </div>
 
-          {expenses.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-white/75">
-              No baseline expenses yet.
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_30px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+            <div className="hidden grid-cols-[minmax(200px,1fr)_140px_120px_170px_84px_84px] gap-3 border-b border-white/10 bg-white/[0.04] px-5 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.13em] text-white/50 md:grid">
+              <div>Name</div>
+              <div>Monthly</div>
+              <div>Withdraws</div>
+              <div>Expiration</div>
+              <div>Active</div>
+              <div className="text-right">Delete</div>
             </div>
-          ) : (
-            <div className="divide-y divide-zinc-200">
-              {expenses.map((expense) => (
-                <ExpenseRow
-                  deleting={deletingIds.has(expense.id)}
-                  expense={expense}
-                  expired={isExpenseExpired(
-                    expense.expirationDate,
-                    initialData.todayIso,
-                  )}
-                  key={expense.id}
-                  onDelete={deleteExpense}
-                  onUpdate={updateExpense}
-                />
-              ))}
-            </div>
-          )}
+
+            {expenses.length === 0 ? (
+              <div className="px-5 py-16 text-center">
+                <p className="text-sm font-medium text-white/70">
+                  No fixed expenses yet.
+                </p>
+                <p className="mt-1 text-xs text-white/45">
+                  Add your rent, utilities, and subscriptions to build your daily
+                  fixed cost.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/[0.07]">
+                {expenses.map((expense) => (
+                  <ExpenseRow
+                    deleting={deletingIds.has(expense.id)}
+                    expense={expense}
+                    expired={isExpenseExpired(
+                      expense.expirationDate,
+                      initialData.todayIso,
+                    )}
+                    key={expense.id}
+                    onDelete={deleteExpense}
+                    onUpdate={updateExpense}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       </section>
     </main>
@@ -253,18 +285,21 @@ function TotalsPanel({
   monthlyTotalCents,
   weeklyAverageCents,
   projectedDailyBaseCents,
+  activeCount,
 }: {
   monthlyTotalCents: number;
   weeklyAverageCents: number;
   projectedDailyBaseCents: number;
+  activeCount: number;
 }) {
   return (
-    <section className="grid gap-3 md:grid-cols-3">
+    <section className="grid gap-4 md:grid-cols-3">
       <TotalCard label="Monthly total" value={formatMoney(monthlyTotalCents)} />
       <TotalCard label="Weekly average" value={formatMoney(weeklyAverageCents)} />
       <TotalCard
-        label="Projected daily base"
-        sublabel="Auto-applied to today + future days"
+        hero
+        label="Projected daily fixed"
+        sublabel={`Auto-applied to today + future days · ${activeCount} active`}
         value={formatMoney(projectedDailyBaseCents)}
       />
     </section>
@@ -275,20 +310,36 @@ function TotalCard({
   label,
   value,
   sublabel,
+  hero = false,
 }: {
   label: string;
   value: string;
   sublabel?: string;
+  hero?: boolean;
 }) {
   return (
-    <div className="rounded-md border border-white/10 bg-black/20 backdrop-blur-md p-4 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-[0.12em] text-white/70">
-        {label}
-      </div>
-      <div className="mt-2 text-3xl font-semibold tracking-tight">{value}</div>
-      {sublabel ? (
-        <div className="mt-1 text-xs font-medium text-white/70">{sublabel}</div>
+    <div
+      className={[
+        "relative overflow-hidden rounded-2xl border p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl transition",
+        hero
+          ? "border-white/20 bg-gradient-to-br from-white/[0.12] to-white/[0.04]"
+          : "border-white/10 bg-white/[0.04]",
+      ].join(" ")}
+    >
+      {hero ? (
+        <span className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
       ) : null}
+      <div className="relative">
+        <div className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-white/55">
+          {label}
+        </div>
+        <div className="mt-2.5 text-[2rem] font-semibold leading-none tracking-tight tabular-nums">
+          {value}
+        </div>
+        {sublabel ? (
+          <div className="mt-2 text-xs font-medium text-white/55">{sublabel}</div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -310,9 +361,9 @@ function ExpenseRow({
   const hasDatedExpiration = Boolean(expense.expirationDate);
   const isDatedActive = hasDatedExpiration && !expired;
   const rowClassName = [
-    "px-4 py-3 transition md:grid md:grid-cols-[minmax(180px,1fr)_130px_140px_160px_90px_88px] md:items-center md:gap-3 md:py-4",
-    expired ? "opacity-50" : "",
-    isDatedActive ? "bg-amber-500/15 ring-1 ring-inset ring-amber-300/60" : "",
+    "px-5 py-3.5 transition md:grid md:grid-cols-[minmax(200px,1fr)_140px_120px_170px_84px_84px] md:items-center md:gap-3 md:py-3.5 hover:bg-white/[0.025]",
+    expired ? "opacity-45" : "",
+    isDatedActive ? "bg-sky-500/10 ring-1 ring-inset ring-sky-300/40" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -328,14 +379,14 @@ function ExpenseRow({
             {expired ? <ExpiredBadge /> : null}
             {isDatedActive ? <ExpiresBadge /> : null}
           </div>
-          <p className="mt-1 text-xs font-medium text-white/70">
+          <p className="mt-1 text-xs font-medium text-white/60">
             {formatMoney(expense.amountCents)}
             {expense.withdrawalDay ? ` · Day ${expense.withdrawalDay}` : ""}
             {!expense.isActive ? " · inactive" : ""}
           </p>
         </div>
         <button
-          className="h-9 shrink-0 rounded-md border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/20"
+          className="h-9 shrink-0 rounded-lg border border-white/15 bg-white/10 px-3.5 text-xs font-semibold text-white transition hover:bg-white/20"
           onClick={() => setIsMobileExpanded((current) => !current)}
           type="button"
         >
@@ -346,7 +397,7 @@ function ExpenseRow({
       <div
         className={
           isMobileExpanded
-            ? "mt-3 grid gap-3 md:mt-0 md:contents"
+            ? "mt-4 grid gap-3.5 md:mt-0 md:contents"
             : "hidden md:contents"
         }
       >
@@ -354,7 +405,7 @@ function ExpenseRow({
           <MobileLabel>Name</MobileLabel>
           <div className="flex items-center gap-2">
             <input
-              className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
+              className={FIELD_CLASS}
               onChange={(event) =>
                 onUpdate(expense.id, { name: event.target.value })
               }
@@ -372,7 +423,7 @@ function ExpenseRow({
         <label className="block">
           <MobileLabel>Monthly</MobileLabel>
           <input
-            className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
+            className={FIELD_CLASS}
             min="0"
             onChange={(event) =>
               onUpdate(expense.id, {
@@ -390,7 +441,7 @@ function ExpenseRow({
         <label className="block">
           <MobileLabel>Withdraws</MobileLabel>
           <input
-            className="h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
+            className={FIELD_CLASS}
             max="31"
             min="1"
             onChange={(event) =>
@@ -405,38 +456,49 @@ function ExpenseRow({
           />
         </label>
 
-        <label className="block">
-          <MobileLabel>Expiration</MobileLabel>
-          <input
-            className={
-              isDatedActive
-                ? "h-10 w-full rounded-md border border-amber-300/60 bg-amber-500/15 px-3 text-sm text-amber-100"
-                : "h-10 w-full rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm"
-            }
-            onChange={(event) =>
-              onUpdate(expense.id, {
-                expirationDate: event.target.value || null,
-              })
-            }
-            type="date"
-            value={expense.expirationDate ?? ""}
-          />
-        </label>
+        <div className="block">
+          <label className="block">
+            <MobileLabel>Expiration</MobileLabel>
+            <input
+              className={
+                isDatedActive
+                  ? "h-11 w-full rounded-xl border border-sky-300/50 bg-sky-500/15 px-3.5 text-sm text-sky-100 outline-none transition focus:border-sky-300/80 focus:ring-2 focus:ring-sky-300/20"
+                  : FIELD_CLASS
+              }
+              onChange={(event) =>
+                onUpdate(expense.id, {
+                  expirationDate: event.target.value || null,
+                })
+              }
+              type="date"
+              value={expense.expirationDate ?? ""}
+            />
+          </label>
+          {hasDatedExpiration ? (
+            <button
+              className="mt-1.5 text-xs font-semibold text-sky-300 underline-offset-2 transition hover:text-sky-200 hover:underline"
+              onClick={() => onUpdate(expense.id, { expirationDate: null })}
+              type="button"
+            >
+              Make permanent
+            </button>
+          ) : null}
+        </div>
 
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
             checked={expense.isActive}
-            className="h-4 w-4"
+            className="h-4 w-4 accent-emerald-400"
             onChange={(event) =>
               onUpdate(expense.id, { isActive: event.target.checked })
             }
             type="checkbox"
           />
-          Active
+          <span className="md:sr-only">Active</span>
         </label>
 
         <button
-          className="h-10 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm font-medium transition hover:border-red-300 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60 md:justify-self-end"
+          className="h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-sm font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60 md:h-9 md:justify-self-end md:px-3"
           disabled={deleting}
           onClick={() => onDelete(expense.id)}
           type="button"
@@ -450,7 +512,7 @@ function ExpenseRow({
 
 function MobileLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-white/70 md:hidden">
+    <span className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-[0.13em] text-white/50 md:hidden">
       {children}
     </span>
   );
@@ -458,7 +520,7 @@ function MobileLabel({ children }: { children: ReactNode }) {
 
 function ExpiredBadge() {
   return (
-    <span className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs font-medium text-white/75">
+    <span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-white/65">
       Expired
     </span>
   );
@@ -466,7 +528,7 @@ function ExpiredBadge() {
 
 function ExpiresBadge() {
   return (
-    <span className="rounded-full border border-amber-300/60 bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-200">
+    <span className="rounded-full border border-sky-300/50 bg-sky-500/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-sky-200">
       Expires
     </span>
   );
@@ -479,27 +541,35 @@ function SaveIndicator({
   state: SaveState;
   error: string | null;
 }) {
+  if (state === "idle") {
+    return null;
+  }
+
+  const dotClass =
+    state === "error"
+      ? "bg-red-400"
+      : state === "saving"
+        ? "bg-amber-300 animate-pulse"
+        : "bg-emerald-400";
   const label =
-    state === "saving"
-      ? "Saving..."
-      : state === "saved"
-        ? "Saved"
-        : state === "error"
-          ? "Save failed"
-          : "Idle";
+    state === "saving" ? "Saving..." : state === "saved" ? "Saved" : "Save failed";
 
   return (
     <div className="text-right">
       <div
-        className={
+        className={[
+          "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold backdrop-blur-md",
           state === "error"
-            ? "text-sm font-medium text-red-300"
-            : "text-sm font-medium text-white/75"
-        }
+            ? "border-red-400/40 bg-red-500/10 text-red-200"
+            : "border-white/15 bg-white/[0.06] text-white/75",
+        ].join(" ")}
       >
+        <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
         {label}
       </div>
-      {error ? <div className="max-w-64 text-xs text-red-300">{error}</div> : null}
+      {error ? (
+        <div className="mt-1 max-w-64 text-xs text-red-300">{error}</div>
+      ) : null}
     </div>
   );
 }

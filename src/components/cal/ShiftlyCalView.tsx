@@ -7,11 +7,16 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { AiFoodEstimator } from "@/components/cal/AiFoodEstimator";
 import {
+  FocusedDayCoachStrip,
+  WeeklyCoachBand,
+} from "@/components/cal/CoachReviewBand";
+import { PasteAndLogButton } from "@/components/cal/PasteAndLogButton";
+import { PlanMyDayButton } from "@/components/cal/PlanMyDayButton";
+import {
+  archiveSavedFoodAction,
   createFoodEntryAction,
+  createSavedFoodAction,
   deleteFoodEntryAction,
-  generateFindMealPromptAction,
-  generateHomeRecipePromptAction,
-  generateMealOrderPromptAction,
   logWaterAction,
   logWeightAction,
   overrideVerdictAction,
@@ -19,15 +24,11 @@ import {
   updateFoodEntryAction,
 } from "@/app/(protected)/cal/actions";
 import {
-  categoryBarClass,
   categoryLabel,
   magnitudeColorClass,
   verdictBarClass,
 } from "@/lib/cal/color";
 import {
-  colorToneFromMagnitude,
-  dailyCalorieThresholdsForTarget,
-  dailyDeviation,
   type MagnitudeTone,
 } from "@/lib/cal/projection";
 import { addDaysIso } from "@/lib/dashboard/dates";
@@ -41,21 +42,6 @@ import type {
   SavedFood,
   ShiftlyCalData,
 } from "@/lib/cal/types";
-
-type MealFormState = {
-  mealName: string;
-  category: FoodCategory;
-  loggedTime: string;
-  calories: string;
-  proteinG: string;
-  carbsG: string;
-  fatG: string;
-  fiberG: string;
-  sodiumMg: string;
-  addedSugarG: string;
-  saturatedFatG: string;
-  savedFoodId: string | null;
-};
 
 type UpdateFoodEntryPatch = {
   mealName?: string | null;
@@ -71,22 +57,11 @@ type UpdateFoodEntryPatch = {
   saturatedFatG?: number | string | null;
 };
 
-function emptyMealForm(): MealFormState {
-  return {
-    mealName: "",
-    category: "meal",
-    loggedTime: currentTimeInput(),
-    calories: "",
-    proteinG: "",
-    carbsG: "",
-    fatG: "",
-    fiberG: "",
-    sodiumMg: "",
-    addedSugarG: "",
-    saturatedFatG: "",
-    savedFoodId: null,
-  };
-}
+type InitialCoachReview = {
+  body: string;
+  suggestionKind: string | null;
+  suggestionText: string | null;
+};
 
 const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
   { value: "meal", label: "Meal" },
@@ -98,9 +73,13 @@ const FOOD_CATEGORY_OPTIONS: Array<{ value: FoodCategory; label: string }> = [
 
 export function ShiftlyCalView({
   initialData,
+  initialDayReview = null,
+  initialWeekReview = null,
   weekStartIso,
 }: {
   initialData: ShiftlyCalData;
+  initialDayReview?: InitialCoachReview | null;
+  initialWeekReview?: InitialCoachReview | null;
   weekStartIso: string;
 }) {
   const router = useRouter();
@@ -111,12 +90,11 @@ export function ShiftlyCalView({
     ),
   );
   const [focusedDayIndex, setFocusedDayIndex] = useState(todayIndex);
-  const [mealForm, setMealForm] = useState<MealFormState>(() => emptyMealForm());
-  const [isMealFormOpen, setIsMealFormOpen] = useState(false);
   const [weightValue, setWeightValue] = useState(
     initialData.currentWeek.days[todayIndex]?.weight?.weightLbs.toString() ?? "",
   );
   const [loggedFoodId, setLoggedFoodId] = useState<string | null>(null);
+  const [pendingScrollEntryId, setPendingScrollEntryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isPending, startTransition] = useTransition();
@@ -133,8 +111,15 @@ export function ShiftlyCalView({
         (entry) =>
           entry.verdictSource === "pending" &&
           nowMs - new Date(entry.updatedAt).getTime() < 60_000,
-      ),
+    ),
     [focusedDay.entries, nowMs],
+  );
+  const planDay = useMemo(
+    () =>
+      initialData.currentWeek.days.find(
+        (day) => day.date === initialData.todayIso,
+      ) ?? focusedDay,
+    [focusedDay, initialData.currentWeek.days, initialData.todayIso],
   );
 
   useEffect(() => {
@@ -150,35 +135,38 @@ export function ShiftlyCalView({
     return () => window.clearInterval(id);
   }, [hasRecentPendingVerdicts, router]);
 
-  function submitMeal(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
+  useEffect(() => {
+    if (!pendingScrollEntryId) return;
+    const hasEntry = focusedDay.entries.some(
+      (entry) => entry.id === pendingScrollEntryId,
+    );
+    if (!hasEntry) return;
 
-    startTransition(async () => {
-      try {
-        await createFoodEntryAction({
-          date: focusedDay.date,
-          loggedTime: mealForm.loggedTime,
-          mealName: mealForm.mealName,
-          category: mealForm.category,
-          calories: mealForm.calories,
-          proteinG: mealForm.proteinG,
-          carbsG: mealForm.carbsG,
-          fatG: mealForm.fatG,
-          fiberG: mealForm.fiberG,
-          sodiumMg: mealForm.sodiumMg,
-          addedSugarG: mealForm.addedSugarG,
-          saturatedFatG: mealForm.saturatedFatG,
-          savedFoodId: mealForm.savedFoodId,
-        });
-        setMealForm(emptyMealForm());
-        setIsMealFormOpen(false);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to log meal.");
-      }
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-food-entry-id="${pendingScrollEntryId}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      setPendingScrollEntryId(null);
     });
-  }
+  }, [focusedDay.entries, pendingScrollEntryId]);
+
+  // Coach-review signatures. Re-fetch when the underlying data
+  // composition shifts. Cheap to recompute, cheap to send up to the
+  // server actions (which dedup via observation hash anyway).
+  const focusedDaySignature = useMemo(() => {
+    const ids = focusedDay.entries
+      .map((entry) => `${entry.id}:${entry.verdict ?? "_"}`)
+      .sort()
+      .join("|");
+    return `${focusedDay.totals.calories}|${focusedDay.totals.sodiumMg}|${ids}`;
+  }, [focusedDay.entries, focusedDay.totals]);
+
+  const weekSignature = useMemo(() => {
+    const dayKeys = initialData.currentWeek.days
+      .map((day) => `${day.date}:${day.entries.length}:${day.totals.calories}`)
+      .join("|");
+    return dayKeys;
+  }, [initialData.currentWeek.days]);
 
   function instantLog(food: SavedFood) {
     setError(null);
@@ -224,7 +212,7 @@ export function ShiftlyCalView({
     setError(null);
     startTransition(async () => {
       try {
-        await createFoodEntryAction({
+        const result = await createFoodEntryAction({
           date: focusedDay.date,
           loggedTime: input.loggedTime,
           mealName: input.mealName,
@@ -239,6 +227,7 @@ export function ShiftlyCalView({
           saturatedFatG: input.saturatedFatG,
           savedFoodId: null,
         });
+        setPendingScrollEntryId(result.id);
         router.refresh();
       } catch (err) {
         setError(
@@ -273,6 +262,41 @@ export function ShiftlyCalView({
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to delete entry.");
+      }
+    });
+  }
+
+  async function saveEntryAsTemplate(entry: FoodEntry): Promise<boolean> {
+    setError(null);
+    try {
+      await createSavedFoodAction({
+        name: entry.mealName || categoryLabel(entry.category),
+        category: entry.category,
+        calories: entry.calories,
+        proteinG: entry.proteinG ?? "",
+        carbsG: entry.carbsG ?? "",
+        fatG: entry.fatG ?? "",
+        fiberG: entry.fiberG ?? "",
+        sodiumMg: entry.sodiumMg ?? "",
+        addedSugarG: entry.addedSugarG ?? "",
+        saturatedFatG: entry.saturatedFatG ?? "",
+      });
+      router.refresh();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save food.");
+      return false;
+    }
+  }
+
+  function deleteSavedFood(id: string) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await archiveSavedFoodAction({ id });
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to delete saved food.");
       }
     });
   }
@@ -329,24 +353,6 @@ export function ShiftlyCalView({
     }
   }
 
-  function fillFromSavedFood(food: SavedFood) {
-    setMealForm({
-      mealName: food.name,
-      category: food.category,
-      loggedTime: currentTimeInput(),
-      calories: food.calories.toString(),
-      proteinG: food.proteinG?.toString() ?? "",
-      carbsG: food.carbsG?.toString() ?? "",
-      fatG: food.fatG?.toString() ?? "",
-      fiberG: food.fiberG?.toString() ?? "",
-      sodiumMg: food.sodiumMg?.toString() ?? "",
-      addedSugarG: food.addedSugarG?.toString() ?? "",
-      saturatedFatG: food.saturatedFatG?.toString() ?? "",
-      savedFoodId: food.id,
-    });
-    setIsMealFormOpen(true);
-  }
-
   function focusDay(index: number) {
     setFocusedDayIndex(index);
     setWeightValue(
@@ -356,34 +362,34 @@ export function ShiftlyCalView({
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
-        <div className="h-2 bg-white/10" />
+      <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+        <div className="h-2 bg-[var(--surface-elevated)]" />
         <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(520px,1.05fr)] lg:items-start">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                 ShiftlyCal
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <Link
-                  className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                  className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--surface-hover)]"
                   href={`/cal?week=${prevWeekIso}`}
                 >
                   Prev
                 </Link>
-                <h2 className="text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+                <h2 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] drop-shadow-sm sm:text-3xl">
                   {formatWeekRange(
                     initialData.currentWeek.weekStartIso,
                     initialData.currentWeek.weekEndIso,
                   )}
                 </h2>
                 {isCurrentWeek ? (
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-white/40">
+                  <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-muted)]">
                     Next
                   </span>
                 ) : (
                   <Link
-                    className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                    className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--surface-hover)]"
                     href={`/cal?week=${nextWeekIso}`}
                   >
                     Next
@@ -391,11 +397,11 @@ export function ShiftlyCalView({
                 )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <p className="inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                   Energy balance tracker
                 </p>
                 <Link
-                  className="inline-flex rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/20"
+                  className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--surface-hover)]"
                   href={`/cal/trends?week=${weekStartIso}`}
                 >
                   Trends
@@ -408,7 +414,14 @@ export function ShiftlyCalView({
             />
           </div>
 
-          <div className="pb-2">
+          <WeeklyCoachBand
+            initialBody={initialWeekReview?.body ?? null}
+            key={weekSignature}
+            weekStartIso={weekStartIso}
+            weekEntriesSignature={weekSignature}
+          />
+
+          <div className="mt-4 pb-2">
             <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
               {initialData.currentWeek.days.map((day, index) => (
                 <WeekStripCell
@@ -416,7 +429,6 @@ export function ShiftlyCalView({
                   isFocused={index === focusedDayIndex}
                   key={day.date}
                   onClick={() => focusDay(index)}
-                  targets={initialData.targets}
                 />
               ))}
             </div>
@@ -428,19 +440,51 @@ export function ShiftlyCalView({
             </p>
           ) : null}
 
-          <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+          <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+            {/* Mobile-only quick log bar — first thing the user sees under
+                the calendar. Big Log food button + a discreet collapsed
+                dropdown for saved foods (presets). The big SavedFoodsList
+                card is hidden on mobile and only the dropdown shows. xl
+                gets the full desktop layout below. */}
+            <div className="mb-4 space-y-2 xl:hidden">
+              <AiFoodEstimator
+                disabled={isPending}
+                onConfirm={logFromEstimate}
+              />
+              <MobileSavedFoodsDropdown
+                disabled={isPending}
+                loggedFoodId={loggedFoodId}
+                onDelete={deleteSavedFood}
+                onInstantLog={instantLog}
+                savedFoods={initialData.savedFoods}
+              />
+            </div>
+
             <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.08fr)_minmax(260px,0.72fr)]">
-              <div className="space-y-4">
-                <SavedFoodsList
-                  disabled={isPending}
-                  loggedFoodId={loggedFoodId}
-                  onFill={fillFromSavedFood}
-                  onInstantLog={instantLog}
-                  savedFoods={initialData.savedFoods}
+              {/* Left column. On mobile this stacks LAST so the planning
+                  handoff and weight panel are
+                  at the bottom of the view, below the focused day and
+                  today's entries. xl restores natural column position. */}
+              <div className="order-last space-y-4 xl:order-none">
+                <div className="hidden xl:block">
+                  <SavedFoodsList
+                    disabled={isPending}
+                    loggedFoodId={loggedFoodId}
+                    onDelete={deleteSavedFood}
+                    onInstantLog={instantLog}
+                    savedFoods={initialData.savedFoods}
+                  />
+                </div>
+                <PlanMyDayButton
+                  bannedFoods={initialData.targets.bannedFoods}
+                  targets={initialData.targets}
+                  totals={planDay.totals}
                 />
-                <MealOrderPromptBox disabled={isPending} />
-                <FindMealPromptBox disabled={isPending} />
-                <HomeRecipePromptBox disabled={isPending} />
+                <PasteAndLogButton
+                  date={focusedDay.date}
+                  disabled={isPending}
+                  onLogged={() => router.refresh()}
+                />
                 <WeightPanel
                   day={focusedDay}
                   disabled={isPending}
@@ -457,36 +501,40 @@ export function ShiftlyCalView({
                   dayTotals={focusedDay.totals}
                   targets={initialData.targets}
                 />
-                <div className="mt-4 space-y-3">
-        <AiFoodEstimator
+                <FocusedDayCoachStrip
+                  key={`${focusedDay.date}:${focusedDaySignature}`}
+                  focusedDate={focusedDay.date}
+                  daySignature={focusedDaySignature}
+                  initialBody={
+                    focusedDay.date === initialData.todayIso
+                      ? initialDayReview?.body ?? null
+                      : null
+                  }
+                />
+                <div className="mt-4 space-y-3 hidden xl:block">
+                  <AiFoodEstimator
                     disabled={isPending}
                     onConfirm={logFromEstimate}
                   />
                 </div>
-                {isMealFormOpen ? (
-                  <MealEntryForm
-                    disabled={isPending}
-                    mealForm={mealForm}
-                    onMealFormChange={setMealForm}
-                    onSubmit={submitMeal}
-                  />
-                ) : null}
                 <div className="mt-4 space-y-2">
                   {focusedDay.entries.length > 0 ? (
                     focusedDay.entries.map((entry) => (
-                      <FoodEntryRow
-                        disabled={isPending}
-                        entry={entry}
-                        key={entry.id}
-                        nowMs={nowMs}
-                        onDelete={deleteEntry}
-                        onOverrideVerdict={overrideVerdict}
-                        onRegenerateVerdict={regenerateVerdict}
-                        onUpdate={updateEntry}
-                      />
+                      <div data-food-entry-id={entry.id} key={entry.id}>
+                        <FoodEntryRow
+                          disabled={isPending}
+                          entry={entry}
+                          nowMs={nowMs}
+                          onDelete={deleteEntry}
+                          onOverrideVerdict={overrideVerdict}
+                          onRegenerateVerdict={regenerateVerdict}
+                          onSaveAsTemplate={saveEntryAsTemplate}
+                          onUpdate={updateEntry}
+                        />
+                      </div>
                     ))
                   ) : (
-                    <div className="rounded-md border border-dashed border-white/20 bg-black/15 p-6 text-center text-sm text-white/70">
+                    <div className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-6 text-center text-sm text-[var(--text-secondary)]">
                       No food logged for this day.
                     </div>
                   )}
@@ -561,24 +609,24 @@ function TopMetric({
     accent === "green"
       ? "before:bg-green-600"
       : accent === "blue"
-        ? "before:bg-[#7e22ce]"
+        ? "before:bg-[var(--accent-primary)]"
         : accent === "amber"
-          ? "before:bg-amber-500"
+          ? "before:bg-[var(--accent-warning)]"
           : accent === "negative"
             ? "before:bg-red-600"
-            : "before:bg-[#cbd5e1]";
+            : "before:bg-[var(--border-strong)]";
 
   return (
     <div
-      className={`relative overflow-hidden rounded-md border-2 border-white/45 bg-white/10 px-2.5 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
+      className={`relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass}`}
     >
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/85 sm:text-[10px] sm:tracking-[0.14em]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
         {label}
       </p>
-      <p className={`mt-1 text-base font-semibold sm:text-lg ${magnitudeColorClass(tone)}`}>
+      <p className={`mt-1 text-3xl font-bold tracking-tight ${magnitudeColorClass(tone)}`}>
         {value}
       </p>
-      {note ? <p className="mt-2 text-xs text-white/60">{note}</p> : null}
+      {note ? <p className="mt-2 text-xs text-[var(--text-tertiary)]">{note}</p> : null}
     </div>
   );
 }
@@ -587,18 +635,12 @@ function WeekStripCell({
   day,
   isFocused,
   onClick,
-  targets,
 }: {
   day: CalDay;
   isFocused: boolean;
   onClick: () => void;
-  targets: CalTargets;
 }) {
-  const deviation = dailyDeviation(day.totals.calories, targets.tdeeCalories);
-  const tone = colorToneFromMagnitude(
-    deviation,
-    dailyCalorieThresholdsForTarget(targets.tdeeCalories),
-  );
+  const verdict = day.dayVerdict?.verdict ?? null;
   const date = new Date(`${day.date}T00:00:00.000Z`);
   const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
@@ -606,56 +648,73 @@ function WeekStripCell({
   }).format(date);
 
   const toneBorder =
-    tone === "green"
-      ? "border-emerald-400/80"
-      : tone === "amber"
-        ? "border-amber-400/80"
-        : tone === "red"
-          ? "border-rose-400/80"
-          : "border-white/45";
+    verdict === "good"
+      ? "border-[var(--accent-primary-border)]"
+      : verdict === "bad"
+        ? "border-[var(--accent-negative-border)]"
+        : "border-[var(--border-strong)]";
   const toneBorderFocused =
-    tone === "green"
-      ? "border-emerald-300"
-      : tone === "amber"
-        ? "border-amber-300"
-        : tone === "red"
-          ? "border-rose-300"
-          : "border-white/90";
+    verdict === "good"
+      ? "border-[var(--accent-primary-border)]"
+      : verdict === "bad"
+        ? "border-[var(--accent-negative-border)]"
+        : "border-[var(--border-strong)]";
+  const toneBg =
+    verdict === "good"
+      ? "bg-[var(--accent-primary-fill)]"
+      : verdict === "bad"
+        ? "bg-[var(--accent-negative-fill)]"
+        : "bg-[var(--surface-elevated)]";
   const toneGlow =
-    tone === "green"
-      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
-      : tone === "amber"
-        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(245,158,11,0.45)]"
-        : tone === "red"
-          ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]"
-          : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
+    verdict === "good"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
+      : verdict === "bad"
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
   const toneGlowFocused =
-    tone === "green"
-      ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(16,185,129,0.95),0_0_85px_rgba(16,185,129,0.55)]"
-      : tone === "amber"
-        ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(245,158,11,0.95),0_0_85px_rgba(245,158,11,0.55)]"
-        : tone === "red"
-          ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(244,63,94,0.95),0_0_85px_rgba(244,63,94,0.55)]"
-          : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_28px_rgba(255,255,255,0.3)]";
+    verdict === "good"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+      : verdict === "bad"
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
+  const calorieTextClass =
+    verdict === "good"
+      ? "text-[var(--accent-primary-text)]"
+      : verdict === "bad"
+        ? "text-[var(--accent-negative-text)]"
+        : "text-[var(--text-secondary)]";
+  const hasEntries = day.entries.length > 0;
+  const selectedStyle = isFocused
+    ? {
+        borderColor: "var(--accent-primary)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px var(--accent-primary), 0 0 24px -6px rgba(10, 129, 86, 0.45)",
+      }
+    : undefined;
+  const hoverGlowClass =
+    !isFocused && hasEntries
+      ? "hover:border-[var(--border-default)] hover:shadow-[0_0_16px_-6px_rgba(10,129,86,0.30)]"
+      : "";
 
   return (
     <button
-      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-white transition-all duration-200 focus:outline-none sm:p-3 ${
+      className={`min-w-0 rounded-md px-1.5 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 focus:outline-none sm:p-3 ${
         isFocused
-          ? `scale-105 border-[3px] ${toneBorderFocused} bg-black/30 ${toneGlowFocused} backdrop-blur-xl`
-          : `border-2 ${toneBorder} bg-black/10 ${toneGlow} backdrop-blur-xl hover:bg-black/20`
+          ? `border-[3px] ${toneBorderFocused} ${toneBg} ${toneGlowFocused}`
+          : `border-2 ${toneBorder} ${toneBg} ${toneGlow} ${hoverGlowClass}`
       }`}
       onClick={onClick}
+      style={selectedStyle}
       type="button"
     >
-      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.14em]">
+      <p className="whitespace-nowrap text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--text-primary)] sm:text-[10px] sm:tracking-[0.14em]">
         {weekday}
       </p>
-      <p className="mt-1 text-base font-semibold text-white sm:text-lg">
+      <p className="mt-1 text-base font-semibold text-[var(--text-primary)] sm:text-lg">
         {date.getUTCDate()}
       </p>
       <p
-        className={`mt-3 truncate text-xs font-semibold sm:mt-6 sm:text-sm ${magnitudeColorClass(tone)}`}
+        className={`mt-2 truncate text-xs font-semibold sm:mt-4 sm:text-sm ${calorieTextClass}`}
       >
         {day.totals.calories.toLocaleString()}
       </p>
@@ -685,13 +744,13 @@ function FocusedDayHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
           Focused day
         </p>
-        <h2 className="mt-1 text-xl font-semibold text-white">{label}</h2>
+        <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{label}</h2>
       </div>
       <div className="flex flex-wrap gap-2">
-        <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-sm font-semibold text-white/80">
+        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-secondary)]">
           {day.entries.length} entries
         </span>
         {remaining !== null ? <RemainingBadge remaining={remaining} /> : null}
@@ -703,7 +762,7 @@ function FocusedDayHeader({
 function RemainingBadge({ remaining }: { remaining: number }) {
   if (remaining > 0) {
     return (
-      <span className="rounded-full border border-emerald-300/50 bg-white/10 px-3 py-1 text-sm font-semibold text-emerald-300">
+      <span className="rounded-full border border-[var(--accent-primary-border)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--accent-primary-text)]">
         {remaining.toLocaleString()} cal left
       </span>
     );
@@ -711,110 +770,16 @@ function RemainingBadge({ remaining }: { remaining: number }) {
 
   if (remaining < 0) {
     return (
-      <span className="rounded-full border border-red-300/50 bg-white/10 px-3 py-1 text-sm font-semibold text-red-300">
+      <span className="rounded-full border border-red-300/50 bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-red-300">
         {Math.abs(remaining).toLocaleString()} cal over
       </span>
     );
   }
 
   return (
-    <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-sm font-semibold text-white">
+    <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--text-primary)]">
       Right on target
     </span>
-  );
-}
-
-function MealEntryForm({
-  disabled,
-  mealForm,
-  onMealFormChange,
-  onSubmit,
-}: {
-  disabled: boolean;
-  mealForm: MealFormState;
-  onMealFormChange: (form: MealFormState) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <form className="mt-4 rounded-md border border-white/15 bg-black/20 p-3" onSubmit={onSubmit}>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
-        <TextInput
-          className="lg:col-span-2"
-        label="Meal"
-          onChange={(value) => onMealFormChange({ ...mealForm, mealName: value })}
-          placeholder="Chicken bowl"
-          value={mealForm.mealName}
-        />
-        <TextInput
-          label="Time"
-          onChange={(value) => onMealFormChange({ ...mealForm, loggedTime: value })}
-          type="time"
-          value={mealForm.loggedTime}
-        />
-        <CategorySelect
-          label="Category"
-          onChange={(category) => onMealFormChange({ ...mealForm, category })}
-          value={mealForm.category}
-        />
-        <NumberInput
-          label="Calories"
-          onChange={(value) => onMealFormChange({ ...mealForm, calories: value })}
-          required
-          value={mealForm.calories}
-        />
-        <NumberInput
-          label="Protein"
-          onChange={(value) => onMealFormChange({ ...mealForm, proteinG: value })}
-          suffix="g"
-          value={mealForm.proteinG}
-        />
-        <NumberInput
-          label="Carbs"
-          onChange={(value) => onMealFormChange({ ...mealForm, carbsG: value })}
-          suffix="g"
-          value={mealForm.carbsG}
-        />
-        <NumberInput
-          label="Fat"
-          onChange={(value) => onMealFormChange({ ...mealForm, fatG: value })}
-          suffix="g"
-          value={mealForm.fatG}
-        />
-        <NumberInput
-          label="Fiber"
-          onChange={(value) => onMealFormChange({ ...mealForm, fiberG: value })}
-          suffix="g"
-          value={mealForm.fiberG}
-        />
-        <NumberInput
-          label="Sodium"
-          onChange={(value) => onMealFormChange({ ...mealForm, sodiumMg: value })}
-          suffix="mg"
-          value={mealForm.sodiumMg}
-        />
-        <NumberInput
-          label="Added sugar"
-          onChange={(value) => onMealFormChange({ ...mealForm, addedSugarG: value })}
-          suffix="g"
-          value={mealForm.addedSugarG}
-        />
-        <NumberInput
-          label="Sat fat"
-          onChange={(value) => onMealFormChange({ ...mealForm, saturatedFatG: value })}
-          suffix="g"
-          value={mealForm.saturatedFatG}
-        />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
-          disabled={disabled || !mealForm.calories.trim()}
-          type="submit"
-        >
-          Log entry
-        </button>
-      </div>
-    </form>
   );
 }
 
@@ -825,6 +790,7 @@ function FoodEntryRow({
   onDelete,
   onOverrideVerdict,
   onRegenerateVerdict,
+  onSaveAsTemplate,
   onUpdate,
 }: {
   disabled: boolean;
@@ -837,14 +803,27 @@ function FoodEntryRow({
     verdictReason: string,
   ) => Promise<boolean>;
   onRegenerateVerdict: (id: string) => Promise<boolean>;
+  onSaveAsTemplate: (entry: FoodEntry) => Promise<boolean>;
   onUpdate: (id: string, patch: UpdateFoodEntryPatch) => Promise<boolean>;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTemplating, setIsTemplating] = useState(false);
+  const [templateStatus, setTemplateStatus] = useState<"idle" | "saved">("idle");
+
+  async function saveAsTemplate() {
+    setIsTemplating(true);
+    const ok = await onSaveAsTemplate(entry);
+    setIsTemplating(false);
+    if (ok) {
+      setTemplateStatus("saved");
+      window.setTimeout(() => setTemplateStatus("idle"), 2000);
+    }
+  }
   const [isVerdictSaving, setIsVerdictSaving] = useState(false);
   const [overrideValue, setOverrideValue] = useState<FoodVerdict>(
-    entry.verdict ?? "fine",
+    entry.verdict ?? "bad",
   );
   const [overrideReason, setOverrideReason] = useState(entry.verdictReason ?? "");
   const [editForm, setEditForm] = useState({
@@ -889,26 +868,26 @@ function FoodEntryRow({
     entry.verdictSource === "pending" &&
     nowMs - new Date(entry.updatedAt).getTime() > 60_000;
   const rowClass = isStuck
-    ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-white shadow-[0_8px_18px_rgba(8,15,28,0.16)]"
+    ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-[var(--text-primary)]"
     : verdictBarClass(entry);
 
   if (isEditing) {
     return (
       <form className={rowClass} onSubmit={submitEdit}>
         <button
-          className="mb-3 w-full rounded-md border border-white/20 bg-black/20 p-3 text-left transition hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-white/60"
+          className="mb-3 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 text-left transition hover:bg-[var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-white/60"
           onClick={() => setIsEditing(false)}
           type="button"
         >
           <div className="flex items-start justify-between gap-3">
-            <p className="text-sm italic text-white/85">
+            <p className="text-sm italic text-[var(--text-secondary)]">
               {entry.verdictReason
                 ? `${entry.verdictReason}${
                     entry.verdictSource === "manual_override" ? " (your override)" : ""
                   }`
                 : verdictStatus}
             </p>
-            <span aria-hidden="true" className="shrink-0 text-xs text-white/60">
+            <span aria-hidden="true" className="shrink-0 text-xs text-[var(--text-tertiary)]">
               tap to close
             </span>
           </div>
@@ -917,7 +896,7 @@ function FoodEntryRow({
               Scoring failed: {entry.verdictError}
             </p>
           ) : null}
-          <span className="mt-2 inline-flex rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-xs font-semibold text-white/65">
+          <span className="mt-2 inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
             {categoryLabel(entry.category)}
           </span>
         </button>
@@ -989,14 +968,14 @@ function FoodEntryRow({
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
-            className="rounded border border-white/30 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled || isSaving || !editForm.calories.trim()}
             type="submit"
           >
             Save
           </button>
           <button
-            className="rounded border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled || isSaving}
             onClick={() => setIsEditing(false)}
             type="button"
@@ -1004,7 +983,7 @@ function FoodEntryRow({
             Cancel
           </button>
           <button
-            className="rounded border border-white/20 bg-black/10 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled || isSaving || isVerdictSaving}
             onClick={regenerateVerdict}
             type="button"
@@ -1012,30 +991,29 @@ function FoodEntryRow({
             Regenerate verdict
           </button>
         </div>
-        <div className="mt-3 rounded-md border border-white/20 bg-black/20 p-3">
-          <p className="mb-2 text-xs font-semibold text-white/75">
+        <div className="mt-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
+          <p className="mb-2 text-xs font-semibold text-[var(--text-secondary)]">
             Lock verdict override
           </p>
           <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
             <select
-              className="rounded-md border border-white/20 bg-[#111827] px-3 py-2 text-sm font-semibold text-white focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white/30"
               disabled={disabled || isVerdictSaving}
               onChange={(event) => setOverrideValue(event.target.value as FoodVerdict)}
               value={overrideValue}
             >
               <option value="good">Good</option>
-              <option value="fine">Fine</option>
               <option value="bad">Bad</option>
             </select>
             <input
-              className="rounded-md border border-white/20 bg-black/25 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white/30"
               disabled={disabled || isVerdictSaving}
               onChange={(event) => setOverrideReason(event.target.value)}
               placeholder="Reason"
               value={overrideReason}
             />
             <button
-              className="rounded border border-white/30 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={disabled || isVerdictSaving}
               onClick={submitOverride}
               type="button"
@@ -1044,8 +1022,8 @@ function FoodEntryRow({
             </button>
           </div>
         </div>
-        <div className="mt-3 rounded-md border border-white/20 bg-black/20 p-3">
-          <p className="mb-2 text-xs font-semibold text-white/75">
+        <div className="mt-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
+          <p className="mb-2 text-xs font-semibold text-[var(--text-secondary)]">
             Forgot something?
           </p>
           <AiFoodEstimator
@@ -1064,18 +1042,18 @@ function FoodEntryRow({
   if (!isExpanded) {
     return (
       <button
-        className={`${rowClass} flex w-full items-center justify-between gap-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-white/60`}
+        className={`${rowClass} flex w-full items-center justify-between gap-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-white/60`}
         onClick={() => setIsExpanded(true)}
         type="button"
       >
         <span className="min-w-0 truncate font-semibold">{title}</span>
         {entry.isProjectedPlan ? (
-          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+          <span className="shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             Plan
           </span>
         ) : null}
         {entry.verdictSource === "manual_override" ? (
-          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+          <span className="shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             Override
           </span>
         ) : null}
@@ -1083,7 +1061,7 @@ function FoodEntryRow({
           {entry.calories.toLocaleString()} cal
         </span>
         {isStuck ? (
-          <span className="shrink-0 rounded border border-white/30 bg-black/20 px-2 py-1 text-xs font-semibold text-white">
+          <span className="shrink-0 rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)]">
             Scoring stuck - retry
           </span>
         ) : null}
@@ -1095,7 +1073,7 @@ function FoodEntryRow({
   }
 
   return (
-    <div className={`${rowClass} transition-all`}>
+    <div className={`${rowClass} transition-colors`}>
       <button
         className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
         onClick={() => setIsExpanded(false)}
@@ -1104,7 +1082,7 @@ function FoodEntryRow({
       >
         <span className="min-w-0 truncate font-semibold">{title}</span>
         {entry.isProjectedPlan ? (
-          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/75">
+          <span className="shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             Plan
           </span>
         ) : null}
@@ -1115,7 +1093,7 @@ function FoodEntryRow({
           ^
         </span>
       </button>
-      <div className="mt-2 rounded-md border border-white/20 bg-black/20 p-2 text-xs text-white/85">
+      <div className="mt-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-2 text-xs text-[var(--text-secondary)]">
         <p className="line-clamp-2 italic">{entry.verdictReason ?? verdictStatus}</p>
         {entry.verdictSource === "unscored" && entry.verdictError ? (
           <p className="mt-2 rounded-md border border-red-300/50 bg-red-500/15 px-2 py-1 font-semibold text-red-200">
@@ -1123,26 +1101,26 @@ function FoodEntryRow({
           </p>
         ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
+          <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 font-semibold text-[var(--text-secondary)]">
             {categoryLabel(entry.category)}
           </span>
           {entry.isProjectedPlan ? (
-            <span className="rounded-full border border-emerald-200/30 bg-emerald-900/30 px-2 py-0.5 font-semibold text-emerald-100">
+            <span className="rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-2 py-0.5 font-semibold text-[var(--accent-primary-text)]">
               Projected plan
             </span>
           ) : null}
           {entry.verdictSource === "manual_override" ? (
-            <span className="rounded-full border border-white/20 bg-black/20 px-2 py-0.5 font-semibold text-white/70">
+            <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-0.5 font-semibold text-[var(--text-secondary)]">
               Override
             </span>
           ) : null}
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-all">
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-85 transition-colors">
         <span>{formatMacrosInline(entry) || "No macros logged"}</span>
         <div className="flex items-center gap-2">
           <button
-            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white"
+            className="rounded px-1 py-0.5 font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
             onClick={() => setIsExpanded(false)}
             type="button"
           >
@@ -1150,7 +1128,7 @@ function FoodEntryRow({
           </button>
           {entry.verdictSource === "unscored" || isStuck ? (
             <button
-              className="rounded border border-white/30 bg-black/20 px-2 py-1 font-semibold text-white transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={disabled || isVerdictSaving}
               onClick={regenerateVerdict}
               type="button"
@@ -1159,7 +1137,7 @@ function FoodEntryRow({
             </button>
           ) : null}
           <button
-            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded px-1 py-0.5 font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();
@@ -1170,11 +1148,24 @@ function FoodEntryRow({
             Edit
           </button>
           <button
-            className="rounded px-1 py-0.5 font-semibold text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded px-1 py-0.5 font-semibold text-[var(--accent-primary-text)] transition hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled || isTemplating}
+            onClick={(event) => {
+              event.stopPropagation();
+              void saveAsTemplate();
+            }}
+            type="button"
+          >
+            {templateStatus === "saved" ? "Saved" : isTemplating ? "Saving..." : "Save"}
+          </button>
+          <button
+            className="rounded px-1 py-0.5 font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();
-              onDelete(entry.id);
+              if (window.confirm(`Delete "${entry.mealName || categoryLabel(entry.category)}"?`)) {
+                onDelete(entry.id);
+              }
             }}
             type="button"
           >
@@ -1247,7 +1238,7 @@ function DayTotalsPanel({
 
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Day totals
       </p>
       <div className="mt-3 space-y-3">
@@ -1290,19 +1281,19 @@ function DayTotalHero({
   const textClass = metricTextClass(state.tone);
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
           {label}
         </p>
-        <p className={`text-xl font-bold ${textClass}`}>
+        <p className={`text-3xl font-bold tracking-tight ${textClass}`}>
           {formatTargetProgress(value, target, unit)}
         </p>
       </div>
       {target !== null ? (
-        <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
-            className={`h-2.5 rounded-full transition-all ${fillClass}`}
+            className={`h-2.5 rounded-full transition-colors ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
           />
         </div>
@@ -1324,321 +1315,35 @@ function DayTotalMetric({
   const state = metricState(value, target, kind, unit);
   const fillClass = metricFillClass(state.tone);
   const textClass = metricTextClass(state.tone);
+  const shouldStackValue = unit === "mg" && target !== null;
 
   return (
-    <div className="rounded-md border border-white/10 bg-black/15 p-3">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex items-start justify-between gap-2">
-        <p className={`text-sm font-bold ${textClass}`}>{label}</p>
-        <p className={`text-sm font-bold ${textClass}`}>
-          {formatTargetProgress(value, target, unit)}
-        </p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{label}</p>
+        {shouldStackValue ? (
+          <p className={`text-right font-bold leading-none tracking-tight ${textClass}`}>
+            <span className="block text-base">{value.toLocaleString()}</span>
+            <span className="mt-1 block text-[10px] font-semibold leading-none text-[var(--text-tertiary)]">
+              /{target.toLocaleString()} {unit}
+            </span>
+          </p>
+        ) : (
+          <p className={`text-lg font-bold tracking-tight ${textClass}`}>
+            {formatTargetProgress(value, target, unit)}
+          </p>
+        )}
       </div>
       {target !== null ? (
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
-            className={`h-1.5 rounded-full transition-all ${fillClass}`}
+            className={`h-1.5 rounded-full transition-colors ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
           />
         </div>
       ) : null}
       <p className={`mt-1 text-xs font-semibold ${textClass}`}>{state.note}</p>
     </div>
-  );
-}
-
-function MealOrderPromptBox({ disabled }: { disabled: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [zipCode, setZipCode] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : (window.localStorage.getItem("shiftlycal-order-zip") ?? ""),
-  );
-  const [prompt, setPrompt] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  async function generatePrompt() {
-    setStatus(null);
-    setIsGenerating(true);
-    try {
-      window.localStorage.setItem("shiftlycal-order-zip", zipCode);
-      const result = await generateMealOrderPromptAction({
-        locationHint: zipCode,
-      });
-      setPrompt(result.prompt);
-      setIsOpen(true);
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to generate prompt.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function copyPrompt() {
-    if (!prompt) return;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setStatus("Copied to clipboard.");
-    } catch {
-      setStatus("Copy failed. Select the text and copy it manually.");
-    }
-  }
-
-  return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <button
-        className="w-full rounded-md border border-emerald-300/50 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={disabled || isGenerating}
-        onClick={() => {
-          if (!isOpen || !prompt) {
-            void generatePrompt();
-            return;
-          }
-          setIsOpen((current) => !current);
-        }}
-        type="button"
-      >
-        {isGenerating ? "Building DoorDash prompt..." : "🛵 Order final meal"}
-      </button>
-
-      {isOpen ? (
-        <div className="mt-3 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-md border border-emerald-300/50 bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!prompt}
-              onClick={copyPrompt}
-              type="button"
-            >
-              📋 Copy to clipboard
-            </button>
-            <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={disabled || isGenerating}
-              onClick={generatePrompt}
-              type="button"
-            >
-              Regenerate
-            </button>
-            <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            >
-              Close
-            </button>
-          </div>
-          {status ? <p className="text-xs font-semibold text-white/70">{status}</p> : null}
-          <label className="block text-xs font-semibold text-white/75">
-            Zip code
-            <input
-              className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
-              onChange={(event) => setZipCode(event.target.value)}
-              placeholder="10001"
-              value={zipCode}
-            />
-          </label>
-          <textarea
-            className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
-            onChange={(event) => setPrompt(event.target.value)}
-            value={prompt}
-          />
-        </div>
-      ) : status ? (
-        <p className="mt-2 text-xs font-semibold text-red-200">{status}</p>
-      ) : null}
-    </section>
-  );
-}
-
-function FindMealPromptBox({ disabled }: { disabled: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [zipCode, setZipCode] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : (window.localStorage.getItem("shiftlycal-order-zip") ?? ""),
-  );
-  const [prompt, setPrompt] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  async function generatePrompt() {
-    setStatus(null);
-    setIsGenerating(true);
-    try {
-      window.localStorage.setItem("shiftlycal-order-zip", zipCode);
-      const result = await generateFindMealPromptAction({ locationHint: zipCode });
-      setPrompt(result.prompt);
-      setIsOpen(true);
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to generate prompt.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function copyPrompt() {
-    if (!prompt) return;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setStatus("Copied to clipboard.");
-    } catch {
-      setStatus("Copy failed. Select the text and copy it manually.");
-    }
-  }
-
-  return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <button
-        className="w-full rounded-md border border-sky-300/50 bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={disabled || isGenerating}
-        onClick={() => {
-          if (!isOpen || !prompt) {
-            void generatePrompt();
-            return;
-          }
-          setIsOpen((current) => !current);
-        }}
-        type="button"
-      >
-        {isGenerating ? "Finding nearby meals..." : "🔎 Find meal"}
-      </button>
-
-      {isOpen ? (
-        <div className="mt-3 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-md border border-sky-300/50 bg-sky-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!prompt}
-              onClick={copyPrompt}
-              type="button"
-            >
-              📋 Copy to clipboard
-            </button>
-            <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={disabled || isGenerating}
-              onClick={generatePrompt}
-              type="button"
-            >
-              Regenerate
-            </button>
-            <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            >
-              Close
-            </button>
-          </div>
-          {status ? <p className="text-xs font-semibold text-white/70">{status}</p> : null}
-          <label className="block text-xs font-semibold text-white/75">
-            Zip code or area
-            <input
-              className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
-              onChange={(event) => setZipCode(event.target.value)}
-              placeholder="10001 or New Milford CT"
-              value={zipCode}
-            />
-          </label>
-          <textarea
-            className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
-            onChange={(event) => setPrompt(event.target.value)}
-            value={prompt}
-          />
-        </div>
-      ) : status ? (
-        <p className="mt-2 text-xs font-semibold text-red-200">{status}</p>
-      ) : null}
-    </section>
-  );
-}
-
-function HomeRecipePromptBox({ disabled }: { disabled: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [prompt, setPrompt] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  async function generatePrompt() {
-    setStatus(null);
-    setIsGenerating(true);
-    try {
-      const result = await generateHomeRecipePromptAction();
-      setPrompt(result.prompt);
-      setIsOpen(true);
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to generate prompt.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function copyPrompt() {
-    if (!prompt) return;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setStatus("Copied to clipboard.");
-    } catch {
-      setStatus("Copy failed. Select the text and copy it manually.");
-    }
-  }
-
-  return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <button
-        className="w-full rounded-md border border-amber-300/50 bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={disabled || isGenerating}
-        onClick={() => {
-          if (!isOpen || !prompt) {
-            void generatePrompt();
-            return;
-          }
-          setIsOpen((current) => !current);
-        }}
-        type="button"
-      >
-        {isGenerating ? "Building recipe prompt..." : "🍳 Cook at home"}
-      </button>
-
-      {isOpen ? (
-        <div className="mt-3 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-md border border-amber-300/50 bg-amber-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!prompt}
-              onClick={copyPrompt}
-              type="button"
-            >
-              📋 Copy to clipboard
-            </button>
-            <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={disabled || isGenerating}
-              onClick={generatePrompt}
-              type="button"
-            >
-              Regenerate
-            </button>
-            <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            >
-              Close
-            </button>
-          </div>
-          {status ? <p className="text-xs font-semibold text-white/70">{status}</p> : null}
-          <textarea
-            className="h-[400px] w-full rounded-md border border-white/20 bg-black/25 px-3 py-2 font-mono text-xs leading-5 text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
-            onChange={(event) => setPrompt(event.target.value)}
-            value={prompt}
-          />
-        </div>
-      ) : status ? (
-        <p className="mt-2 text-xs font-semibold text-red-200">{status}</p>
-      ) : null}
-    </section>
   );
 }
 
@@ -1658,7 +1363,7 @@ function WaterPanel({
   const fillClass = metricFillClass(state.tone);
 
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="flex items-center justify-between gap-3">
         <p className={`text-sm font-bold ${textClass}`}>Water</p>
         <p className={`text-sm font-bold ${textClass}`}>
@@ -1666,9 +1371,9 @@ function WaterPanel({
         </p>
       </div>
       {targetOz !== null ? (
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]">
           <div
-            className={`h-1.5 rounded-full transition-all ${fillClass}`}
+            className={`h-1.5 rounded-full transition-colors ${fillClass}`}
             style={{ width: `${state.barPct}%` }}
           />
         </div>
@@ -1676,7 +1381,7 @@ function WaterPanel({
       <div className="mt-3 flex flex-wrap gap-2">
         {[8, 10, 12, 16].map((amount) => (
           <button
-            className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             key={amount}
             onClick={() => onLog(amount)}
@@ -1706,15 +1411,15 @@ function WeightPanel({
   weightValue: string;
 }) {
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Weight
       </p>
       <form className="mt-3 flex gap-2" onSubmit={onSubmit}>
-        <label className="min-w-0 flex-1 text-sm font-semibold text-white/80">
+        <label className="min-w-0 flex-1 text-sm font-semibold text-[var(--text-secondary)]">
           {focusedDayLabel(day.date, todayIso)}
           <input
-            className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
             min={1}
             onChange={(event) => setWeightValue(event.target.value)}
             step="0.1"
@@ -1723,7 +1428,7 @@ function WeightPanel({
           />
         </label>
         <button
-          className="mt-6 rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+          className="mt-6 rounded-md bg-[var(--surface-base)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
           disabled={disabled || !weightValue.trim()}
           type="submit"
         >
@@ -1734,43 +1439,144 @@ function WeightPanel({
   );
 }
 
-function SavedFoodsList({
+// Discreet mobile-only dropdown of saved foods. Renders a thin button
+// "Quick log (N) ▾" that, when tapped, reveals a compact list of saved
+// food rows. Hidden entirely when the user has no saved foods so it
+// doesn't add clutter for new users. Closes after one-tap log.
+function MobileSavedFoodsDropdown({
   disabled,
   loggedFoodId,
-  onFill,
+  onDelete,
   onInstantLog,
   savedFoods,
 }: {
   disabled: boolean;
   loggedFoodId: string | null;
-  onFill: (food: SavedFood) => void;
+  onDelete: (id: string) => void;
   onInstantLog: (food: SavedFood) => void;
   savedFoods: SavedFood[];
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (savedFoods.length === 0) return null;
+
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-        Saved foods
-      </p>
-      <h2 className="mt-1 text-xl font-semibold text-white">Quick log</h2>
-      <div className="mt-4 grid gap-2">
-        {savedFoods.length > 0 ? (
-          savedFoods.map((food) => (
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+      <button
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>Quick log ({savedFoods.length})</span>
+        <span
+          aria-hidden="true"
+          className={`text-[10px] transition-transform ${isOpen ? "rotate-180" : ""}`}
+        >
+          ▾
+        </span>
+      </button>
+      {isOpen ? (
+        <div className="space-y-1 border-t border-[var(--border-subtle)] px-2 py-2">
+          {savedFoods.map((food) => (
+            <div className="flex items-center gap-1" key={food.id}>
+              <button
+                className={`flex flex-1 items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  loggedFoodId === food.id
+                    ? "bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]"
+                }`}
+                disabled={disabled}
+                onClick={() => {
+                  onInstantLog(food);
+                  setIsOpen(false);
+                }}
+                type="button"
+              >
+                <span className="truncate font-semibold">{food.name}</span>
+                <span className="shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)]">
+                  {food.calories} cal
+                </span>
+              </button>
+              <button
+                aria-label={`Delete ${food.name}`}
+                className="shrink-0 rounded px-1.5 py-1 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                onClick={() => {
+                  if (window.confirm(`Delete saved food "${food.name}"?`)) {
+                    onDelete(food.id);
+                  }
+                }}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SavedFoodsList({
+  disabled,
+  loggedFoodId,
+  onDelete,
+  onInstantLog,
+  savedFoods,
+}: {
+  disabled: boolean;
+  loggedFoodId: string | null;
+  onDelete: (id: string) => void;
+  onInstantLog: (food: SavedFood) => void;
+  savedFoods: SavedFood[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (savedFoods.length === 0) {
+    return (
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          Saved foods
+        </p>
+        <p className="mt-2 rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-secondary)]">
+          Save logged foods to quick-log them later.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+      <button
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>Quick log ({savedFoods.length})</span>
+        <span
+          aria-hidden="true"
+          className={`text-[10px] transition-transform ${isOpen ? "rotate-180" : ""}`}
+        >
+          ▾
+        </span>
+      </button>
+      {isOpen ? (
+        <div className="space-y-1 border-t border-[var(--border-subtle)] px-2 py-2">
+          {savedFoods.map((food) => (
             <SavedFoodRow
               disabled={disabled}
               food={food}
               isLogged={loggedFoodId === food.id}
               key={food.id}
-              onFill={onFill}
+              onDelete={onDelete}
               onInstantLog={onInstantLog}
             />
-          ))
-        ) : (
-          <p className="rounded-md border border-dashed border-white/20 bg-black/15 p-4 text-sm text-white/70">
-            Create saved foods from Trends.
-          </p>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1779,41 +1585,46 @@ function SavedFoodRow({
   disabled,
   food,
   isLogged,
-  onFill,
+  onDelete,
   onInstantLog,
 }: {
   disabled: boolean;
   food: SavedFood;
   isLogged: boolean;
-  onFill: (food: SavedFood) => void;
+  onDelete: (id: string) => void;
   onInstantLog: (food: SavedFood) => void;
 }) {
   return (
-    <div className={categoryBarClass(food.category)}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold">{food.name}</p>
-          <p className="text-sm text-white/70">
-            {categoryLabel(food.category)} - {food.calories.toLocaleString()} cal
-            {formatMacros(food)}
-          </p>
-        </div>
-        <button
-          className="rounded-md bg-zinc-950 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
-          disabled={disabled}
-          onClick={() => onInstantLog(food)}
-          type="button"
-        >
-          {isLogged ? "Logged" : "Log"}
-        </button>
-      </div>
+    <div
+      className={`flex items-center gap-2 rounded px-2 py-1.5 transition ${
+        isLogged
+          ? "bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]"
+          : "text-[var(--text-secondary)] hover:bg-[var(--surface-base)]"
+      }`}
+    >
       <button
-        className="mt-2 text-xs font-semibold text-white/60 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex flex-1 items-center justify-between gap-3 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
-        onClick={() => onFill(food)}
+        onClick={() => onInstantLog(food)}
         type="button"
       >
-        Edit
+        <span className="min-w-0 truncate font-semibold">{food.name}</span>
+        <span className="shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)]">
+          {food.calories} cal
+        </span>
+      </button>
+      <button
+        aria-label={`Delete ${food.name}`}
+        className="shrink-0 rounded px-1.5 py-1 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled}
+        onClick={() => {
+          if (window.confirm(`Delete saved food "${food.name}"?`)) {
+            onDelete(food.id);
+          }
+        }}
+        type="button"
+      >
+        ×
       </button>
     </div>
   );
@@ -1829,10 +1640,10 @@ function CategorySelect({
   value: FoodCategory;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <select
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-[#111827] px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value as FoodCategory)}
         value={value}
       >
@@ -1862,10 +1673,10 @@ function TextInput({
   value: string;
 }) {
   return (
-    <label className={`block text-sm font-semibold text-white/80 ${className}`}>
+    <label className={`block text-sm font-semibold text-[var(--text-secondary)] ${className}`}>
       {label}
       <input
-        className="mt-1 h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -1889,11 +1700,11 @@ function NumberInput({
   value: string;
 }) {
   return (
-    <label className="block text-sm font-semibold text-white/80">
+    <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <span className="relative mt-1 block">
         <input
-          className="h-10 w-full rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white/40"
+          className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
           min={0}
           onChange={(event) => onChange(event.target.value)}
           required={required}
@@ -1902,7 +1713,7 @@ function NumberInput({
           value={value}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/50">
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-tertiary)]">
             {suffix}
           </span>
         ) : null}
@@ -2117,13 +1928,13 @@ function metricState(
 function metricTextClass(tone: "green" | "amber" | "red" | "neutral"): string {
   switch (tone) {
     case "green":
-      return "text-emerald-300";
+      return "text-[var(--accent-primary-text)]";
     case "amber":
-      return "text-amber-300";
+      return "text-[var(--accent-warning-text)]";
     case "red":
       return "text-red-300";
     case "neutral":
-      return "text-white";
+      return "text-[var(--text-primary)]";
   }
 }
 
@@ -2134,13 +1945,13 @@ function formatAmount(value: number, unit: string): string {
 function metricFillClass(tone: "green" | "amber" | "red" | "neutral"): string {
   switch (tone) {
     case "green":
-      return "bg-emerald-300";
+      return "bg-[var(--accent-primary-text)]";
     case "amber":
-      return "bg-amber-300";
+      return "bg-[var(--accent-warning-text)]";
     case "red":
       return "bg-red-300";
     case "neutral":
-      return "bg-white/40";
+      return "bg-[var(--surface-hover)]";
   }
 }
 

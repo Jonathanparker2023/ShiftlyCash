@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
-import { getTodayIso } from "@/lib/dashboard/dates";
+import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
 import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 
@@ -61,10 +61,24 @@ export type ToggleTransactionStatusInput = {
   newStatus: "applied" | "excluded";
 };
 
+export type TransactionIdInput = {
+  transactionId: string;
+};
+
+export type RenameTransactionInput = {
+  transactionId: string;
+  merchantName: string;
+};
+
 export type AddManualTransactionInput = {
   dayId: string;
   merchantName: string;
   amountCents: number;
+};
+
+export type AmortizeTransactionInput = {
+  transactionId: string;
+  months: 1 | 3;
 };
 
 export type CloseWeekResult = {
@@ -82,6 +96,7 @@ export type ManualTransactionResult = {
     category: string | null;
     source: "manual";
     status: "applied";
+    isAmortized: boolean;
     date: string;
     time: string | null;
     createdAt: string;
@@ -308,6 +323,216 @@ export async function toggleTransactionStatusAction(
   return { ok: true };
 }
 
+export async function deleteTransactionAction(
+  input: TransactionIdInput,
+): Promise<{ ok: true }> {
+  const { supabase } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("id", transactionId);
+
+  if (error) {
+    throw new Error(`Unable to delete transaction: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function moveTransactionToYesterdayAction(
+  input: TransactionIdInput,
+): Promise<{ ok: true; dayId: string; date: string }> {
+  const { supabase } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id,date")
+    .eq("id", transactionId)
+    .maybeSingle();
+
+  if (transactionError) {
+    throw new Error(`Unable to validate transaction: ${transactionError.message}`);
+  }
+
+  if (!transaction) {
+    throw new Error("Transaction not found.");
+  }
+
+  const yesterdayIso = addDaysIso(String(transaction.date), -1);
+  const { data: day, error: dayError } = await supabase
+    .from("days")
+    .select("id,date")
+    .eq("date", yesterdayIso)
+    .maybeSingle();
+
+  if (dayError) {
+    throw new Error(`Unable to find yesterday: ${dayError.message}`);
+  }
+
+  if (!day) {
+    throw new Error("Yesterday is outside the active dashboard week.");
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      day_id: day.id,
+      date: day.date,
+    })
+    .eq("id", transactionId);
+
+  if (error) {
+    throw new Error(`Unable to move transaction: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  return { ok: true, dayId: String(day.id), date: String(day.date) };
+}
+
+export async function renameTransactionAction(
+  input: RenameTransactionInput,
+): Promise<{ ok: true; merchantName: string }> {
+  const { supabase } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+  const merchantName = requireNonEmptyString(input.merchantName, "merchantName");
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({ merchant_name: merchantName })
+    .eq("id", transactionId);
+
+  if (error) {
+    throw new Error(`Unable to rename transaction: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  return { ok: true, merchantName };
+}
+
+export async function amortizeTransactionAction(
+  input: AmortizeTransactionInput,
+): Promise<{ ok: true; expenseId: string }> {
+  const { supabase, user } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+  const months = requireEnum(
+    String(input.months),
+    ["1", "3"] as const,
+    "months",
+  );
+
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id,amount,merchant_name,date")
+    .eq("id", transactionId)
+    .maybeSingle();
+
+  if (transactionError) {
+    throw new Error(`Unable to validate transaction: ${transactionError.message}`);
+  }
+
+  if (!transaction) {
+    throw new Error("Transaction not found.");
+  }
+
+  const amount = Math.abs(Number(transaction.amount));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Transaction has no positive amount to amortize.");
+  }
+
+  const monthCount = months === "1" ? 1 : 3;
+  // expenses.amount is a MONTHLY figure. 1mo => bill full amount over one month;
+  // 3mo => bill a third per month for three months (sums to the full amount).
+  const monthlyAmount =
+    monthCount === 1 ? amount : Math.round((amount / 3) * 100) / 100;
+  const transactionDate = String(transaction.date);
+  const expirationDate = addMonthsIso(transactionDate, monthCount);
+  const merchantName = String(transaction.merchant_name ?? "Expense").trim() || "Expense";
+  const baseName = `${merchantName} (amort ${transactionDate})`;
+
+  // expenses has a unique (user_id, name) constraint — find a free name.
+  const { data: existingRows, error: existingError } = await supabase
+    .from("expenses")
+    .select("name")
+    .ilike("name", `${baseName}%`);
+
+  if (existingError) {
+    throw new Error(`Unable to prepare expense: ${existingError.message}`);
+  }
+
+  const takenNames = new Set(
+    (existingRows ?? []).map((row) => String((row as { name: string }).name)),
+  );
+  let expenseName = baseName;
+  let suffix = 2;
+  while (takenNames.has(expenseName)) {
+    expenseName = `${baseName} #${suffix}`;
+    suffix += 1;
+  }
+
+  const { data: maxSortRow, error: maxSortError } = await supabase
+    .from("expenses")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (maxSortError) {
+    throw new Error(`Unable to prepare expense: ${maxSortError.message}`);
+  }
+
+  const sortOrder =
+    ((maxSortRow as { sort_order?: number } | null)?.sort_order ?? 0) + 10;
+
+  const { data: expense, error: insertError } = await supabase
+    .from("expenses")
+    .insert({
+      user_id: user.id,
+      name: expenseName,
+      amount: monthlyAmount,
+      withdrawal_day: null,
+      expiration_date: expirationDate,
+      is_active: true,
+      sort_order: sortOrder,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) {
+    throw new Error(`Unable to create amortized expense: ${insertError.message}`);
+  }
+
+  // Pull the original transaction out of spend so the cost isn't double-counted.
+  const { error: excludeError } = await supabase
+    .from("transactions")
+    .update({
+      status: "excluded",
+      review_reason: "amortized_expense",
+      excluded_at: new Date().toISOString(),
+    })
+    .eq("id", transactionId);
+
+  if (excludeError) {
+    throw new Error(`Unable to exclude transaction: ${excludeError.message}`);
+  }
+
+  const { error: baselineError } = await supabase.rpc(
+    "apply_baseline_to_future_days",
+    { p_user_id: user.id },
+  );
+
+  if (baselineError) {
+    throw new Error(`Unable to apply baseline: ${baselineError.message}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/baseline");
+
+  return { ok: true, expenseId: String((expense as { id: string }).id) };
+}
+
 export async function addManualTransactionAction(
   input: AddManualTransactionInput,
 ): Promise<ManualTransactionResult> {
@@ -368,6 +593,7 @@ export async function addManualTransactionAction(
       category: row.category,
       source: "manual",
       status: "applied",
+      isAmortized: false,
       date: row.date,
       time: null,
       createdAt: row.created_at,
@@ -501,6 +727,18 @@ function normalizeWagePayType(payType: PayType): PayType {
   }
 
   return "regular";
+}
+
+// Add N calendar months to an ISO yyyy-mm-dd date, clamping the day to the
+// last valid day of the target month (e.g. Jan 31 + 1mo => Feb 28/29).
+function addMonthsIso(iso: string, months: number): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + months, 1));
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(day, lastDayOfTargetMonth));
+  return target.toISOString().slice(0, 10);
 }
 
 function requireUuid(value: string, fieldName: string): string {

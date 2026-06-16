@@ -10,6 +10,7 @@ export type ChimeParseKind =
   | "transfer_in"
   | "transfer_out"
   | "refund"
+  | "payment_request"
   | "pending_charge"
   | "balance_alert"
   | "card_event"
@@ -28,19 +29,48 @@ export type ChimeParseResult =
     }
   | { ok: false; reason: string };
 
-const SYSTEM_PROMPT = `You read Chime bank push notifications from the user's iPhone and extract structured transaction data. Return JSON only.
+const SYSTEM_PROMPT = `You read Chime bank notifications — either short iPhone push notifications OR full Chime email alerts forwarded by an IMAP cron — and extract structured transaction data. Return JSON only.
+
+Email bodies are LONG and contain marketing footers, legal boilerplate, and unsubscribe text. Ignore all of that. Focus on the SUBJECT LINE and the first 1-2 sentences of the body, which always describe the actual event. If you see a dollar amount in the footer (e.g. fee schedule, minimum balance disclosures), do NOT use it — only use the amount associated with the event described in the subject/lede.
 
 ## Known Chime notification types
 
-- **purchase**: card debit at a merchant. Example: "You spent $5.05" / "Your new Chime account balance is $233.76 after your purchase at Anthropic."
-- **deposit**: paycheck or external deposit arriving. Example: "You got paid $1,500.00 from EMPLOYER" or "$500 was deposited"
-- **transfer_in**: money received from another Chime user or external source. Example: "John P. sent you $50"
-- **transfer_out**: money sent to another person. Example: "You sent $50 to John P."
-- **refund**: money returned from a merchant. Example: "You got a $12.34 refund from MERCHANT"
-- **pending_charge**: card auth before settlement. Example: "Pending charge of $43.27 at MERCHANT"
-- **balance_alert**: informational, no transaction. Example: "Your balance is below $100"
-- **card_event**: security/lock notifications. Example: "Your card was used at..." (without dollar amount)
+- **purchase**: card debit at a merchant.
+  - Push: "You spent $5.05" / "Your new Chime account balance is $233.76 after your purchase at Anthropic."
+  - Email subject: "You made a purchase" / "Card swipe at MERCHANT"
+- **deposit**: paycheck or external deposit arriving.
+  - Push: "You got paid $1,500.00 from EMPLOYER" / "$500 was deposited"
+  - Email subject: "Your deposit is now available" / "You got paid 💸"
+- **transfer_in**: money received from another Chime user or external source.
+  - Push: "John P. sent you $50"
+  - Email subject: "kayla b. just sent you money 💸" / "[NAME] just sent you money"
+- **transfer_out**: money sent to another person.
+  - Push: "You sent $50 to John P."
+  - Email subject: "You sent money. 💸" — body starts with "you just sent $X.XX for [memo] to [NAME]" or "Hi [first name], you just sent $X.XX..."
+- **refund**: money returned from a merchant.
+  - Push/Email: "You got a $12.34 refund from MERCHANT"
+- **payment_request**: someone requested money from you, but no money moved yet.
+  - Push/Email: "Tamesha requested $28" / "[NAME] requested money" / "You have a money request"
+  - These are NOT transactions. Do not classify requests as transfer_in or transfer_out.
+- **pending_charge**: card auth before settlement.
+  - Push: "Pending charge of $43.27 at MERCHANT"
+- **balance_alert**: informational, no transaction.
+  - "Your balance is below $100"
+- **card_event**: security/lock notifications.
+  - Email subject: "New login detected" / "Was this you?" — these are NOT transactions even when the body contains numbers
 - **unknown_known_chime**: clearly a Chime notification but doesn't fit any pattern above
+
+## Critical disambiguation
+
+If the subject line is "You sent money", classify as **transfer_out** (debit). The recipient name is the merchantOrSource. The amount is the $X.XX in the first sentence of the body.
+
+If the subject line is "[Name] just sent you money", classify as **transfer_in** (credit). The sender's name is the merchantOrSource.
+
+If the subject or body says someone "requested" money, classify as **payment_request** (neutral), even if the notification contains a dollar amount or a person name.
+
+If the subject is "Your deposit is now available" or "You just got paid", classify as **deposit** (credit).
+
+If the subject is "New login detected" or "Was this you?", classify as **card_event** — these are security alerts, not transactions.
 
 ## Output JSON schema (strict, no markdown)
 
@@ -57,7 +87,7 @@ const SYSTEM_PROMPT = `You read Chime bank push notifications from the user's iP
 Direction rules:
 - purchase, transfer_out, pending_charge -> "debit"
 - deposit, transfer_in, refund -> "credit"
-- balance_alert, card_event, unknown -> "neutral"
+- payment_request, balance_alert, card_event, unknown -> "neutral"
 
 If amount has commas (e.g. "$1,234.56"), strip the comma before returning as a number.
 
@@ -67,15 +97,20 @@ export async function parseChimeNotification(input: {
   title: string | null;
   body: string;
 }): Promise<ChimeParseResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return { ok: false, reason: "ANTHROPIC_API_KEY not configured" };
-  }
-
   const title = (input.title ?? "").trim();
   const body = input.body.trim();
   if (!body && !title) {
     return { ok: false, reason: "Empty notification" };
+  }
+
+  const requestResult = parsePaymentRequest({ title, body });
+  if (requestResult) {
+    return requestResult;
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { ok: false, reason: "ANTHROPIC_API_KEY not configured" };
   }
 
   const client = new Anthropic({ apiKey });
@@ -140,6 +175,7 @@ function parseKind(value: unknown): ChimeParseKind {
     "transfer_in",
     "transfer_out",
     "refund",
+    "payment_request",
     "pending_charge",
     "balance_alert",
     "card_event",
@@ -149,6 +185,37 @@ function parseKind(value: unknown): ChimeParseKind {
     return value as ChimeParseKind;
   }
   return "unknown_known_chime";
+}
+
+function parsePaymentRequest(input: {
+  title: string;
+  body: string;
+}): Extract<ChimeParseResult, { ok: true }> | null {
+  const text = `${input.title}\n${input.body}`.toLowerCase();
+  const requestedMoney =
+    /\b(requested|requesting|requests|request)\b.{0,80}\$\s*\d/i.test(text) ||
+    /\$\s*\d[\d,.]*.{0,80}\b(requested|requesting|requests|request)\b/i.test(text) ||
+    /\b(money request|request for money|requested money)\b/i.test(text);
+
+  if (!requestedMoney) {
+    return null;
+  }
+
+  const amountMatch = text.match(/\$\s*([\d,]+(?:\.\d{1,2})?)/);
+  const nameMatch =
+    input.title.match(/^(.+?)\s+(?:requested|requests|is requesting)\b/i) ??
+    input.body.match(/^(.+?)\s+(?:requested|requests|is requesting)\b/i);
+
+  return {
+    ok: true,
+    kind: "payment_request",
+    amountDollars: amountMatch ? toOptionalNumber(amountMatch[1]) : null,
+    merchantOrSource: nameMatch?.[1]?.trim().slice(0, 120) || null,
+    newBalanceDollars: null,
+    direction: "neutral",
+    confidence: "high",
+    reasoning: "Payment request only; no money moved.",
+  };
 }
 
 function parseDirection(value: unknown): "debit" | "credit" | "neutral" {

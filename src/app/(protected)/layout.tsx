@@ -3,10 +3,28 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { requireUser } from "@/lib/auth";
+import { CAPABILITIES, type EditionCapabilities } from "@/lib/edition";
 import { NavLink } from "./NavLink";
 import { SwipeNavigation } from "./SwipeNavigation";
 
 export const dynamic = "force-dynamic";
+
+const NAV_LINKS = [
+  { href: "/setup", label: "Setup", capability: "showSetup" },
+  { href: "/", label: "Dashboard", capability: "showDashboard" },
+  { href: "/baseline", label: "Fixed", capability: "showFixed" },
+  { href: "/history", label: "History", capability: "showHistory" },
+  { href: "/trends", label: "Trends", capability: "showTrends" },
+  { href: "/paychecks", label: "Paychecks", capability: "showPaycheckAudit" },
+  { href: "/projects", label: "Projects", capability: "showProjects" },
+  { href: "/debt", label: "Debt", capability: "showDebt" },
+  { href: "/net-worth", label: "Net Worth", capability: "showNetWorth" },
+  { href: "/cal", label: "ShiftlyCal", capability: "showCal" },
+] as const satisfies ReadonlyArray<{
+  href: string;
+  label: string;
+  capability: keyof EditionCapabilities | null;
+}>;
 
 export default async function ProtectedLayout({
   children,
@@ -14,6 +32,9 @@ export default async function ProtectedLayout({
   children: ReactNode;
 }>) {
   const { user } = await requireUser();
+  const visibleNavLinks = NAV_LINKS.filter(
+    (link) => link.capability === null || CAPABILITIES[link.capability],
+  );
 
   return (
     <>
@@ -46,14 +67,11 @@ export default async function ProtectedLayout({
           <div className="min-w-0">
             <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
               <div className="flex w-max min-w-full items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] backdrop-blur-md">
-                <NavLink href="/">Dashboard</NavLink>
-                <NavLink href="/baseline">Baseline</NavLink>
-                <NavLink href="/history">History</NavLink>
-                <NavLink href="/paychecks">Paychecks</NavLink>
-                <NavLink href="/projects">Projects</NavLink>
-                <NavLink href="/debt">Debt</NavLink>
-                <NavLink href="/net-worth">Net Worth</NavLink>
-                <NavLink href="/cal">ShiftlyCal</NavLink>
+                {visibleNavLinks.map((link) => (
+                  <NavLink href={link.href} key={link.href}>
+                    {link.label}
+                  </NavLink>
+                ))}
               </div>
             </div>
 
@@ -74,7 +92,7 @@ export default async function ProtectedLayout({
           </div>
         </div>
       </nav>
-      <SwipeNavigation>
+      <SwipeNavigation routes={visibleNavLinks.map((link) => link.href)}>
         <div className="w-full max-w-[100vw] overflow-x-hidden">{children}</div>
       </SwipeNavigation>
     </>

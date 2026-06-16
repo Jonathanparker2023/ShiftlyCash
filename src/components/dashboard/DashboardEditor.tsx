@@ -6,8 +6,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   addManualTransactionAction,
+  amortizeTransactionAction,
   closeWeekAction,
+  deleteTransactionAction,
+  moveTransactionToYesterdayAction,
   refreshDashboardProjectionMaintenanceAction,
+  renameTransactionAction,
   saveEarnSlotAction,
   toggleTransactionStatusAction,
   type SaveEarnSlotInput,
@@ -40,6 +44,7 @@ import {
   cashflowDailyColor,
   cashflowDailyTone,
   cashflowWeeklyTone,
+  earningsWeeklyTone,
   spendWeeklyTone,
 } from "@/lib/domain/legacyRules";
 const JOB_OPTIONS: JobType[] = [
@@ -345,6 +350,187 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     }
   }
 
+  async function deleteTransaction(transaction: DashboardTransaction) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const previousDays = days;
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+    setDays((currentDays) =>
+      currentDays.map((day) => removeTransactionFromDay(day, transaction.id)),
+    );
+
+    try {
+      await deleteTransactionAction({ transactionId: transaction.id });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to delete transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
+  async function moveTransactionToYesterday(transaction: DashboardTransaction) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const previousDays = days;
+    const yesterdayIso = addDaysIso(transaction.date, -1);
+    const targetDay = days.find((day) => day.date === yesterdayIso);
+
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+
+    if (targetDay) {
+      setDays((currentDays) =>
+        moveTransactionToDay(currentDays, transaction, targetDay),
+      );
+    }
+
+    try {
+      await moveTransactionToYesterdayAction({ transactionId: transaction.id });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      router.refresh();
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to move transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
+  async function renameTransaction(
+    transaction: DashboardTransaction,
+    merchantName: string,
+  ) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const trimmed = merchantName.trim();
+    if (!trimmed || trimmed === transaction.merchantName) {
+      return;
+    }
+
+    const previousDays = days;
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+    setDays((currentDays) =>
+      currentDays.map((day) => renameTransactionInDay(day, transaction.id, trimmed)),
+    );
+
+    try {
+      await renameTransactionAction({
+        transactionId: transaction.id,
+        merchantName: trimmed,
+      });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to rename transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
+  async function amortizeTransaction(
+    transaction: DashboardTransaction,
+    months: 1 | 3,
+  ) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const previousDays = days;
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+    setDays((currentDays) =>
+      currentDays.map((day) =>
+        day.id === transaction.dayId
+          ? moveTransactionBetweenBuckets(
+              day,
+              { ...transaction, isAmortized: true },
+              "excluded",
+            )
+          : day,
+      ),
+    );
+
+    try {
+      await amortizeTransactionAction({
+        transactionId: transaction.id,
+        months,
+      });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      router.refresh();
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to amortize transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
   async function addManualTransaction(
     day: DashboardDay,
     merchantName: string,
@@ -363,6 +549,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       category: null,
       source: "manual",
       status: "applied",
+      isAmortized: false,
       date: day.date,
       time: null,
       createdAt: new Date().toISOString(),
@@ -557,34 +744,34 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1220]/10 px-3 py-4 text-[#f8fafc] sm:px-4 lg:px-6">
+    <div className="min-h-screen bg-[var(--surface-base)] px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6">
       {closeError ? (
-        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[#fecaca] bg-[#fff1f2] p-3 text-sm font-medium text-[#b91c1c]">
+        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] p-3 text-sm font-medium text-[var(--accent-negative-text)]">
           {closeError}
         </div>
       ) : null}
 
       {closeToast ? (
-        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[#bae6fd] bg-[#e0f2fe] p-3 text-sm font-medium text-[#0e7490]">
+        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] p-3 text-sm font-medium text-[var(--accent-primary-text)]">
           {closeToast}
         </div>
       ) : null}
 
       <main className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-xl border border-white/15 bg-black/5 shadow-[0_24px_70px_rgba(8,15,28,0.22)] backdrop-blur-[1px]">
-          <div className="h-2 bg-white/10" />
+        <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+          <div className="h-2 bg-[var(--surface-elevated)]" />
           <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                 Week {initialData.week.displayWeekNumber}
               </p>
-              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] drop-shadow-sm sm:text-3xl">
                 {formatFullRange(initialData.week.startDate, initialData.week.endDate)}
                 <CalendarIcon />
               </h1>
               <div className="mt-3 flex flex-wrap gap-2">
-                <p className="inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                   {initialData.week.payPeriodRole === "week_1"
                     ? "Week 1 of Pay Period"
                     : "Week 2 of Pay Period"}
@@ -599,11 +786,11 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
             <div>
               <div className="mb-3 flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-                <span className="inline-flex rounded-full border border-white/25 bg-white/15 px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                   Active week
                 </span>
                 <button
-                  className="inline-flex rounded-full border border-emerald-200/60 bg-emerald-400/90 px-3 py-1 text-xs font-bold text-[#052e16] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isSyncing}
                   onClick={handleManualSync}
                   type="button"
@@ -611,7 +798,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                   {isSyncing ? "Syncing..." : "Sync now"}
                 </button>
                 {syncStatus ? (
-                  <span className="inline-flex rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+                  <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
                     {syncStatus}
                   </span>
                 ) : null}
@@ -656,6 +843,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               totals={focusedDayTotals}
               onAddShift={addShift}
               onAddManualTransaction={addManualTransaction}
+              onAmortizeTransaction={amortizeTransaction}
+              onDeleteTransaction={deleteTransaction}
+              onMoveTransactionToYesterday={moveTransactionToYesterday}
+              onRenameTransaction={renameTransaction}
               onRemoveSlot={removeSlot}
               onReorderSlots={reorderSlots}
               onSlotChange={updateSlot}
@@ -668,8 +859,8 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             />
           ) : null}
 
-          <div className="mt-4 flex flex-col gap-3 border-t border-white/20 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-white">
+          <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border-default)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[var(--text-primary)]">
               <span>
                 Prestige:{" "}
                 {formatHoursFromSlots(days, ["prestige", "prestige_ilst"])}h
@@ -685,7 +876,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               prestigeNetCents={weekNetTotals.prestigeNetCents}
             />
             <button
-              className="h-10 w-full rounded-md bg-[#0b1220] px-5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(16,16,15,0.18)] transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:bg-[#d7dee8] disabled:text-[#64748b] disabled:shadow-none sm:w-auto"
+              className="h-10 w-full rounded-md bg-[var(--surface-base)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:shadow-none sm:w-auto"
               disabled={!canCloseWeek || isClosing}
               onClick={closeWeek}
               title={canCloseWeek ? "Close this week" : "Available after Saturday"}
@@ -715,12 +906,14 @@ function MetricStrip({
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
   const cashflowTone = cashflowWeeklyTone(displayCashflowCents);
   const spendTone = spendWeeklyTone(spendCents, medians.spendCents);
+  const earningsTone = earningsWeeklyTone(earningsCents, medians.earningsCents);
 
   return (
     <div className="grid grid-cols-3 gap-2">
       <TopMetric
-        accent="green"
+        accent={earningsTone}
         label="Earn"
+        tone={earningsTone}
         trend={buildMedianTrend(earningsCents, medians.earningsCents, "higher")}
         value={formatMoney(earningsCents)}
       />
@@ -775,34 +968,34 @@ function TopMetric({
       : accent === "positive"
         ? "before:bg-green-600"
         : accent === "amber"
-          ? "before:bg-amber-500"
+          ? "before:bg-[var(--accent-warning)]"
           : accent === "negative"
             ? "before:bg-red-600"
       : accent === "blue"
-        ? "before:bg-[#7e22ce]"
-        : "before:bg-[#cbd5e1]";
+        ? "before:bg-[var(--accent-primary)]"
+        : "before:bg-[var(--border-strong)]";
 
   return (
     <div
       className={
         dark
-          ? `rounded-md bg-[#0b1220] px-2.5 py-3 text-white shadow-[0_10px_24px_rgba(16,16,15,0.22)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border-2 border-white/45 bg-white/10 px-2.5 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
+          ? `rounded-md bg-[var(--surface-base)] px-2.5 py-3 text-[var(--text-primary)] sm:px-4 ${className}`
+          : `relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
       }
     >
       <div className="flex items-start justify-between gap-2">
         <div
           className={
             dark
-              ? "text-[9px] font-semibold uppercase tracking-[0.12em] text-[#cbd5e1] sm:text-[10px] sm:tracking-[0.14em]"
-              : "text-[9px] font-semibold uppercase tracking-[0.12em] text-white/85 sm:text-[10px] sm:tracking-[0.14em]"
+              ? "text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
+              : "text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
           }
         >
           {label}
         </div>
         {trend ? (
           <div
-            className={`shrink-0 text-right text-[10px] font-bold uppercase tracking-[0.08em] ${cashflowColorFromTone(
+            className={`shrink-0 whitespace-nowrap pr-px text-right text-[8px] font-bold uppercase leading-none tracking-[0.02em] sm:text-[9px] md:text-[10px] md:tracking-[0.08em] ${cashflowColorFromTone(
               trend.tone,
             )}`}
           >
@@ -818,10 +1011,10 @@ function TopMetric({
       <div
         className={
           dark
-            ? "mt-1 text-base font-semibold text-white sm:text-lg"
+            ? "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
             : tone
-              ? `mt-1 text-base font-semibold sm:text-lg ${cashflowColorFromTone(tone)}`
-              : "mt-1 text-base font-semibold text-white sm:text-lg"
+              ? `mt-1 text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl ${cashflowColorFromTone(tone)}`
+              : "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
         }
       >
         {value}
@@ -834,7 +1027,7 @@ function CalendarIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4 text-white"
+      className="h-4 w-4 text-[var(--text-primary)]"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -890,60 +1083,69 @@ function WeekStripCell({
   const dayTone = cashflowDailyTone(displayCashflowCents);
   const toneBorder =
     dayTone === "positive"
-      ? "border-emerald-400/80"
+      ? "border-[var(--accent-primary-border)]"
       : dayTone === "amber"
-        ? "border-amber-400/80"
-        : "border-rose-400/80";
+        ? "border-[var(--accent-warning-border)]"
+        : "border-[var(--accent-negative-border)]";
   const toneBorderFocused =
     dayTone === "positive"
-      ? "border-emerald-300"
+      ? "border-[var(--accent-primary-border)]"
       : dayTone === "amber"
-        ? "border-amber-300"
-        : "border-rose-300";
+        ? "border-[var(--accent-warning-border)]"
+        : "border-[var(--accent-negative-border)]";
   const toneGlow =
     dayTone === "positive"
-      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.45)]"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
       : dayTone === "amber"
-        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(245,158,11,0.45)]"
-        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(244,63,94,0.45)]";
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]";
   const toneGlowFocused =
     dayTone === "positive"
-      ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(16,185,129,0.95),0_0_85px_rgba(16,185,129,0.55)]"
+      ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
       : dayTone === "amber"
-        ? "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(245,158,11,0.95),0_0_85px_rgba(245,158,11,0.55)]"
-        : "shadow-[inset_0_2px_0_rgba(255,255,255,0.4),0_0_45px_rgba(244,63,94,0.95),0_0_85px_rgba(244,63,94,0.55)]";
+        ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+        : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
+  const selectedStyle = isFocused
+    ? {
+        borderColor: "var(--accent-primary)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px var(--accent-primary), 0 0 24px -6px rgba(10, 129, 86, 0.45)",
+      }
+    : undefined;
 
   return (
     <button
-        className={
-          isFocused
-          ? `min-w-0 scale-105 rounded-md border-[3px] ${toneBorderFocused} bg-black/30 px-1.5 py-2 text-left ${toneGlowFocused} backdrop-blur-xl transition-all duration-200 focus:outline-none sm:p-3`
+      className={
+        isFocused
+          ? `min-w-0 rounded-md border-[3px] ${toneBorderFocused} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlowFocused} transition-colors duration-150 focus:outline-none sm:p-3`
           : day.spendLocked
-            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left opacity-75 ${toneGlow} backdrop-blur-lg transition hover:bg-black/20 focus:outline-none sm:p-3`
-            : `min-w-0 rounded-md border-2 ${toneBorder} bg-black/10 px-1.5 py-2 text-left ${toneGlow} backdrop-blur-xl transition hover:bg-black/20 focus:outline-none sm:p-3`
+            ? `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left opacity-75 ${toneGlow} transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
+            : `min-w-0 rounded-md border-2 ${toneBorder} bg-[var(--surface-elevated)] px-1.5 py-2 text-left ${toneGlow} transition hover:bg-[var(--surface-elevated)] focus:outline-none sm:p-3`
       }
       onClick={() => onFocus(dayIndex)}
+      style={selectedStyle}
       type="button"
     >
-      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[10px] sm:tracking-[0.14em]">
-        <span className="truncate">
-          {shortDayName(day.date)} {formatDayOnly(day.date)}
+      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] sm:text-[10px] sm:tracking-[0.18em]">
+        <span className="whitespace-nowrap">
+          {shortDayName(day.date)}
+          <span className="hidden sm:inline"> {formatDayOnly(day.date)}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {isToday ? (
-            <span className="hidden rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-semibold text-white sm:inline-flex">
+            <span className="hidden rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-primary)] sm:inline-flex">
               Today
             </span>
           ) : null}
           {day.spendLocked ? (
-            <span className="hidden rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-semibold text-white sm:inline-flex">
+            <span className="hidden rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-primary)] sm:inline-flex">
               Locked
             </span>
           ) : null}
         </span>
       </div>
       <p
-        className={`mt-2 truncate text-xs font-bold tracking-tight sm:mt-3 sm:text-xl ${cashflowDailyColor(
+        className={`mt-2 truncate text-xs font-bold tracking-tight sm:mt-3 sm:text-sm md:text-base lg:text-lg xl:text-xl ${cashflowDailyColor(
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >
@@ -965,6 +1167,10 @@ function FocusedDayEditor({
   onToggleSlot,
   onToggleTransactionStatus,
   onAddManualTransaction,
+  onDeleteTransaction,
+  onMoveTransactionToYesterday,
+  onRenameTransaction,
+  onAmortizeTransaction,
   onAddShift,
   onRemoveSlot,
   onReorderSlots,
@@ -991,6 +1197,16 @@ function FocusedDayEditor({
     merchantName: string,
     amountCents: number,
   ) => void;
+  onDeleteTransaction: (transaction: DashboardTransaction) => void;
+  onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
+  onRenameTransaction: (
+    transaction: DashboardTransaction,
+    merchantName: string,
+  ) => void;
+  onAmortizeTransaction: (
+    transaction: DashboardTransaction,
+    months: 1 | 3,
+  ) => void;
   onAddShift: (day: DashboardDay) => void;
   onRemoveSlot: (slot: DashboardSlot) => void;
   onReorderSlots: (
@@ -1000,7 +1216,7 @@ function FocusedDayEditor({
   ) => void;
 }) {
   return (
-    <section className="mt-4 rounded-lg border border-white/15 bg-black/15 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-md">
+    <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
         <ShiftList
           day={day}
@@ -1019,6 +1235,10 @@ function FocusedDayEditor({
           isManualTransactionPending={isManualTransactionPending}
           pendingTransactionIds={pendingTransactionIds}
           onAddManualTransaction={onAddManualTransaction}
+          onAmortizeTransaction={onAmortizeTransaction}
+          onDeleteTransaction={onDeleteTransaction}
+          onMoveTransactionToYesterday={onMoveTransactionToYesterday}
+          onRenameTransaction={onRenameTransaction}
           onToggleTransactionStatus={onToggleTransactionStatus}
         />
       </div>
@@ -1032,6 +1252,10 @@ function TransactionDrawer({
   isManualTransactionPending,
   pendingTransactionIds,
   onToggleTransactionStatus,
+  onDeleteTransaction,
+  onMoveTransactionToYesterday,
+  onRenameTransaction,
+  onAmortizeTransaction,
   onAddManualTransaction,
 }: {
   day: DashboardDay;
@@ -1041,6 +1265,16 @@ function TransactionDrawer({
   onToggleTransactionStatus: (
     transaction: DashboardTransaction,
     newStatus: "applied" | "excluded",
+  ) => void;
+  onDeleteTransaction: (transaction: DashboardTransaction) => void;
+  onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
+  onRenameTransaction: (
+    transaction: DashboardTransaction,
+    merchantName: string,
+  ) => void;
+  onAmortizeTransaction: (
+    transaction: DashboardTransaction,
+    months: 1 | 3,
   ) => void;
   onAddManualTransaction: (
     day: DashboardDay,
@@ -1069,9 +1303,9 @@ function TransactionDrawer({
   }
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/15 p-3 text-white shadow-sm backdrop-blur-md">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)] shadow-sm">
       {error ? (
-        <div className="mb-3 rounded-md border border-[#fecaca] bg-[#fff1f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
+        <div className="mb-3 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-negative-text)]">
           {error}
         </div>
       ) : null}
@@ -1082,6 +1316,10 @@ function TransactionDrawer({
           pendingTransactionIds={pendingTransactionIds}
           transactions={appliedTransactions}
           variant="spending"
+          onDelete={onDeleteTransaction}
+          onMoveToYesterday={onMoveTransactionToYesterday}
+          onRename={onRenameTransaction}
+          onAmortize={onAmortizeTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "excluded")
           }
@@ -1091,27 +1329,30 @@ function TransactionDrawer({
           pendingTransactionIds={pendingTransactionIds}
           transactions={excludedTransactions}
           variant="exempt"
+          onDelete={onDeleteTransaction}
+          onMoveToYesterday={onMoveTransactionToYesterday}
+          onRename={onRenameTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "applied")
           }
         />
       </div>
 
-      <div className="mt-3 border-t border-dashed border-white/20 pt-3">
+      <div className="mt-3 border-t border-dashed border-[var(--border-default)] pt-3">
         {isAdding ? (
           <form
             className="grid gap-2 sm:grid-cols-[1fr_140px_auto_auto]"
             onSubmit={submitManualTransaction}
           >
             <input
-              className="h-10 rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
+              className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
               onChange={(event) => setMerchantName(event.target.value)}
               placeholder="Merchant"
               type="text"
               value={merchantName}
             />
             <input
-              className="h-10 rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition placeholder:text-white/50 focus:border-white/60 focus:ring-2 focus:ring-white"
+              className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
               min="0"
               onChange={(event) => setAmount(event.target.value)}
               placeholder="Amount"
@@ -1120,14 +1361,14 @@ function TransactionDrawer({
               value={amount}
             />
             <button
-              className="h-10 rounded-md bg-[#0b1220] px-3 text-sm font-semibold text-white transition hover:bg-[#1e293b]"
+              className="h-10 rounded-md bg-[var(--surface-base)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
               disabled={isManualTransactionPending}
               type="submit"
             >
               {isManualTransactionPending ? "Saving..." : "Save"}
             </button>
             <button
-              className="h-10 rounded-md border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-white/15"
+              className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)]"
               onClick={() => {
                 setIsAdding(false);
                 setMerchantName("");
@@ -1140,7 +1381,7 @@ function TransactionDrawer({
           </form>
         ) : (
           <button
-            className="h-9 rounded-md border border-dashed border-white/25 bg-black/5 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/10"
+            className="h-9 rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)]"
             onClick={() => setIsAdding(true)}
             type="button"
           >
@@ -1157,21 +1398,29 @@ function TransactionColumn({
   pendingTransactionIds,
   transactions,
   variant,
+  onDelete,
+  onMoveToYesterday,
+  onRename,
   onToggle,
+  onAmortize,
 }: {
   heading: string;
   pendingTransactionIds: Set<string>;
   transactions: DashboardTransaction[];
   variant: "spending" | "exempt";
+  onDelete: (transaction: DashboardTransaction) => void;
+  onMoveToYesterday: (transaction: DashboardTransaction) => void;
+  onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
+  onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
   return (
-    <div className="min-h-0 rounded-md border border-white/15 bg-black/15 p-3 backdrop-blur-md">
+    <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
           {heading}
         </h3>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
+        <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
           {transactions.length}
         </span>
       </div>
@@ -1183,7 +1432,11 @@ function TransactionColumn({
             transaction={transaction}
             disabled={pendingTransactionIds.has(transaction.id)}
             variant={variant}
+            onDelete={onDelete}
+            onMoveToYesterday={onMoveToYesterday}
+            onRename={onRename}
             onToggle={onToggle}
+            onAmortize={onAmortize}
           />
         ))}
       </div>
@@ -1195,41 +1448,181 @@ function TransactionRowButton({
   transaction,
   disabled,
   variant,
+  onDelete,
+  onMoveToYesterday,
+  onRename,
   onToggle,
+  onAmortize,
 }: {
   transaction: DashboardTransaction;
   disabled: boolean;
   variant: "spending" | "exempt";
+  onDelete: (transaction: DashboardTransaction) => void;
+  onMoveToYesterday: (transaction: DashboardTransaction) => void;
+  onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
+  onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(transaction.merchantName);
+  const isAmortizedExempt = variant === "exempt" && transaction.isAmortized;
+  const rowStyle = isAmortizedExempt
+    ? {
+        backgroundColor: "rgba(37, 99, 235, 0.12)",
+        borderColor: "rgba(96, 165, 250, 0.48)",
+      }
+    : undefined;
+
+  function submitRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = renameValue.trim();
+    if (!trimmed) return;
+    onRename(transaction, trimmed);
+    setIsRenaming(false);
+  }
+
   return (
-    <button
-      className="grid w-full grid-cols-[1fr_auto] gap-3 rounded-md border border-white/10 bg-black/10 px-3 py-2 text-left text-sm shadow-sm transition hover:border-white/40 hover:bg-black/15 focus:outline-none focus:ring-2 focus:ring-white"
-      disabled={disabled}
-      onClick={() => onToggle(transaction)}
-      type="button"
+    <div
+      className="overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-sm shadow-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
+      style={rowStyle}
     >
-      <span className="min-w-0">
+      <button
+        className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled}
+        onClick={() => setIsExpanded((current) => !current)}
+        type="button"
+      >
+        <span className="min-w-0">
+          <span
+            className={
+              isAmortizedExempt
+                ? "block truncate font-semibold text-sky-200 line-through"
+                : variant === "exempt"
+                ? "block truncate font-semibold text-[var(--text-muted)] line-through"
+                : "block truncate font-semibold text-[var(--text-primary)]"
+            }
+          >
+            {transaction.merchantName}
+          </span>
+          <span
+            className={
+              variant === "exempt"
+                ? "block text-[10px] font-semibold text-[var(--text-tertiary)]"
+                : "block text-[10px] font-semibold text-[var(--text-tertiary)]"
+            }
+          >
+            {formatTransactionTime(transaction.time)}
+          </span>
+        </span>
         <span
           className={
-            variant === "exempt"
-              ? "block truncate font-semibold text-[#64748b] line-through"
-              : "block truncate font-semibold text-white"
+            isAmortizedExempt
+              ? "font-semibold text-sky-200 line-through"
+              : variant === "exempt"
+              ? "font-semibold text-[var(--text-tertiary)] line-through"
+              : "font-semibold text-red-600"
           }
         >
-          {transaction.merchantName}
+          {formatTransactionAmount(transaction.amountCents, variant)}
         </span>
-      </span>
-      <span
-        className={
-          variant === "exempt"
-            ? "font-semibold text-[#94a3b8] line-through"
-            : "font-semibold text-[#b91c1c]"
-        }
-      >
-        {formatMoney(transaction.amountCents)}
-      </span>
-    </button>
+      </button>
+
+      {isExpanded ? (
+        <div className="border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2">
+          {isRenaming ? (
+            <form className="mb-2 flex gap-2" onSubmit={submitRename}>
+              <input
+                className="min-w-0 flex-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-base)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/30"
+                disabled={disabled}
+                onChange={(event) => setRenameValue(event.target.value)}
+                value={renameValue}
+              />
+              <button
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled || !renameValue.trim()}
+                type="submit"
+              >
+                Save
+              </button>
+              <button
+                className="rounded-md px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+                onClick={() => {
+                  setRenameValue(transaction.merchantName);
+                  setIsRenaming(false);
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+            </form>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={disabled}
+              onClick={() => {
+                setRenameValue(transaction.merchantName);
+                setIsRenaming(true);
+              }}
+              type="button"
+            >
+              Rename
+            </button>
+            <button
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={disabled}
+            onClick={() => onToggle(transaction)}
+            type="button"
+          >
+            {variant === "exempt" ? "Include" : "Exempt"}
+          </button>
+          <button
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={disabled}
+            onClick={() => onMoveToYesterday(transaction)}
+            type="button"
+          >
+            Move to yesterday
+          </button>
+          {variant === "spending" && onAmortize ? (
+            <>
+              <button
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                onClick={() => onAmortize(transaction, 1)}
+                title="Spread this cost across fixed costs over 1 month, then expire."
+                type="button"
+              >
+                Amort 1mo
+              </button>
+              <button
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                onClick={() => onAmortize(transaction, 3)}
+                title="Spread this cost across fixed costs over 3 months, then expire."
+                type="button"
+              >
+                Amort 3mo
+              </button>
+            </>
+          ) : null}
+          <button
+            className="rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-negative-text)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={disabled}
+            onClick={() => {
+              if (window.confirm(`Delete ${transaction.merchantName}?`)) {
+                onDelete(transaction);
+              }
+            }}
+            type="button"
+          >
+            Delete
+          </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1295,13 +1688,13 @@ function ShiftList({
             />
           ))
         ) : (
-          <div className="rounded-md border border-dashed border-white/25 bg-black/5 p-4 text-sm text-white/70">
+          <div className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-secondary)]">
             No shifts logged for this day.
           </div>
         )}
       </div>
       <button
-        className="h-10 w-full rounded-md border border-dashed border-white/25 bg-black/5 px-3 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-10 w-full rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
         disabled={day.spendLocked || activeSlots.length >= 4}
         onClick={() => onAddShift(day)}
         type="button"
@@ -1347,7 +1740,7 @@ function ShiftRow({
     "rounded-md border shadow-sm transition",
     shiftBarClass(slot.jobType),
     locked ? "opacity-60" : "",
-    isDragging ? "scale-[0.99] opacity-70 ring-2 ring-[#0e7490]" : "",
+    isDragging ? "scale-[0.99] opacity-70 ring-2 ring-[var(--accent-primary)]" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -1398,7 +1791,7 @@ function ShiftRow({
       </button>
 
       {expanded && !locked ? (
-        <div className="grid gap-3 border-t border-dashed border-white/25 bg-black/15 p-3 backdrop-blur-md sm:grid-cols-2">
+        <div className="grid gap-3 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 sm:grid-cols-2">
           <SelectField
             label="Job"
             value={slot.jobType}
@@ -1508,11 +1901,11 @@ function ShiftRow({
             }
           />
           <div className="flex items-center justify-between sm:col-span-2">
-            <span className="text-xs text-white/70">
+            <span className="text-xs text-[var(--text-secondary)]">
               Auto-saves after edits.
             </span>
             <button
-              className="text-xs font-medium text-[#b91c1c] hover:underline"
+              className="text-xs font-medium text-[var(--accent-negative-text)] hover:underline"
               onClick={() => onRemove(slot)}
               type="button"
             >
@@ -1525,6 +1918,11 @@ function ShiftRow({
   );
 }
 
+// DOMAIN COLORS — DO NOT THEME-SWEEP THESE.
+// Ability = deep blue, Prestige = yellow/amber, Other = neutral.
+// The colors carry shift-TYPE meaning, not theme semantics. They live
+// outside the design token system on purpose. If you want to retune
+// them, change the hex values here directly. Do not swap to var(--accent-*).
 function shiftBarClass(jobType: JobType): string {
   if (isAbilityShift(jobType) || jobType === "incentive") {
     return "border-[#1e3a8a] bg-[#1d4ed8] text-white";
@@ -1551,14 +1949,14 @@ function shiftDotClass(jobType: JobType): string {
 
 function payTypeBadgeClass(payType: PayType | null | undefined): string {
   if (payType === "split") {
-    return "rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-[#0f172a]";
+    return "rounded-full bg-[var(--text-primary)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--surface-base)]";
   }
 
   if (payType === "overtime") {
-    return "rounded-full bg-[#22c55e] px-2 py-0.5 text-[10px] font-bold uppercase text-white";
+    return "rounded-full bg-[var(--accent-primary)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--text-primary)]";
   }
 
-  return "rounded-full bg-[#dbeafe] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#1d4ed8]";
+  return "rounded-full bg-[var(--text-primary)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--surface-base)]";
 }
 
 function TotalsPanel({
@@ -1576,15 +1974,15 @@ function TotalsPanel({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-white/15 bg-black/15 p-2.5 text-sm backdrop-blur-md">
+      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-sm">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
         <TotalLine
           label="Spend"
           tone="negative"
           value={formatMoney(spendCents)}
         />
-        <TotalLine label="Base" value={formatMoney(baseCents)} />
-        <div className="my-2 border-t border-white/20" />
+        <TotalLine label="Fixed" value={formatMoney(baseCents)} />
+        <div className="my-2 border-t border-[var(--border-default)]" />
         <TotalLine
           strong
           label="Cashflow"
@@ -1609,14 +2007,14 @@ function TotalLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <span className={strong ? "font-semibold text-white" : "text-white/75"}>{label}</span>
+      <span className={strong ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}>{label}</span>
       <span
         className={
           tone
             ? `font-semibold ${cashflowColorFromTone(tone)}`
             : strong
-              ? "font-semibold text-white"
-              : "font-medium text-white"
+              ? "font-semibold text-[var(--text-primary)]"
+              : "font-medium text-[var(--text-primary)]"
         }
       >
         {value}
@@ -1640,11 +2038,11 @@ function SelectField({
 }) {
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         {label}
       </span>
       <select
-        className="h-9 w-full rounded-md border border-white/20 bg-[#111827] px-2 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white"
+        className="h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
         onChange={(event) => onChange(event.target.value)}
         value={value}
       >
@@ -1669,19 +2067,45 @@ function NumberField({
   onChange?: (value: number) => void;
   readOnly?: boolean;
 }) {
+  const [draftValue, setDraftValue] = useState(() => formatNumberInput(value));
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draftValue : formatNumberInput(value);
+
+  function updateDraft(nextValue: string) {
+    setDraftValue(nextValue);
+    if (nextValue.trim() === "") return;
+
+    const parsed = Number(nextValue);
+    if (Number.isFinite(parsed)) onChange?.(Math.max(0, parsed));
+  }
+
+  function commitDraft() {
+    setIsEditing(false);
+    const parsed = Number(draftValue);
+    const nextValue = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    setDraftValue(formatNumberInput(nextValue));
+    onChange?.(nextValue);
+  }
+
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition read-only:bg-white/10 read-only:text-white/60 focus:border-white/60 focus:ring-2 focus:ring-white"
+        className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition read-only:bg-[var(--surface-elevated)] read-only:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
+        inputMode="decimal"
         min="0"
-        onChange={(event) => onChange?.(parsePositiveNumber(event.target.value))}
+        onBlur={commitDraft}
+        onChange={(event) => updateDraft(event.target.value)}
+        onFocus={() => {
+          setDraftValue(formatNumberInput(value));
+          setIsEditing(true);
+        }}
         readOnly={readOnly}
         step="0.01"
-        type="number"
-        value={formatNumberInput(value)}
+        type="text"
+        value={displayValue}
       />
     </label>
   );
@@ -1698,11 +2122,11 @@ function TextField({
 }) {
   return (
     <label className="space-y-1">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/80">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-white/20 bg-black/10 px-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white"
+        className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
         onChange={(event) => onChange(event.target.value)}
         type="text"
         value={value}
@@ -1731,8 +2155,8 @@ function SaveIndicator({
     <div
       className={
         state === "error"
-          ? "rounded-full bg-[#fff1f2] px-3 py-1 text-xs font-medium text-[#b91c1c]"
-          : "rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white"
+          ? "rounded-full bg-[var(--accent-negative-fill)] px-3 py-1 text-xs font-medium text-[var(--accent-negative-text)]"
+          : "rounded-full bg-[var(--surface-elevated)] px-3 py-1 text-xs font-medium text-[var(--text-primary)]"
       }
     >
       {label}
@@ -1792,6 +2216,89 @@ function addAppliedTransactionToDay(
       transaction,
     ]),
   };
+}
+
+function removeTransactionFromDay(
+  day: DashboardDay,
+  transactionId: string,
+): DashboardDay {
+  const removedAppliedTransaction = day.appliedTransactions.find(
+    (transaction) => transaction.id === transactionId,
+  );
+
+  return {
+    ...day,
+    transactionSpendCents: removedAppliedTransaction
+      ? day.transactionSpendCents - removedAppliedTransaction.amountCents
+      : day.transactionSpendCents,
+    appliedTransactions: day.appliedTransactions.filter(
+      (transaction) => transaction.id !== transactionId,
+    ),
+    excludedTransactions: day.excludedTransactions.filter(
+      (transaction) => transaction.id !== transactionId,
+    ),
+  };
+}
+
+function renameTransactionInDay(
+  day: DashboardDay,
+  transactionId: string,
+  merchantName: string,
+): DashboardDay {
+  return {
+    ...day,
+    appliedTransactions: day.appliedTransactions.map((transaction) =>
+      transaction.id === transactionId
+        ? { ...transaction, merchantName }
+        : transaction,
+    ),
+    excludedTransactions: day.excludedTransactions.map((transaction) =>
+      transaction.id === transactionId
+        ? { ...transaction, merchantName }
+        : transaction,
+    ),
+  };
+}
+
+function moveTransactionToDay(
+  days: DashboardDay[],
+  transaction: DashboardTransaction,
+  targetDay: DashboardDay,
+): DashboardDay[] {
+  const movedTransaction = {
+    ...transaction,
+    dayId: targetDay.id,
+    date: targetDay.date,
+  };
+
+  return days.map((day) => {
+    const dayWithoutTransaction = removeTransactionFromDay(day, transaction.id);
+
+    if (day.id !== targetDay.id) {
+      return dayWithoutTransaction;
+    }
+
+    if (transaction.status === "excluded") {
+      return {
+        ...dayWithoutTransaction,
+        excludedTransactions: sortDashboardTransactions([
+          ...dayWithoutTransaction.excludedTransactions,
+          movedTransaction,
+        ]),
+      };
+    }
+
+    return {
+      ...dayWithoutTransaction,
+      transactionSpendCents:
+        dayWithoutTransaction.transactionSpendCents +
+        movedTransaction.amountCents,
+      appliedTransactions: sortDashboardTransactions([
+        ...dayWithoutTransaction.appliedTransactions,
+        movedTransaction,
+      ]),
+    };
+  });
 }
 
 function replaceTransaction(
@@ -2083,6 +2590,43 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+// Format a transaction's timestamp for chronological display in the
+// transaction row. Returns "—" when time is missing so the row layout
+// stays consistent. Accepts ISO timestamps (Plaid datetime) and bare
+// HH:MM/HH:MM:SS strings (manual entries).
+function formatTransactionTime(time: string | null): string {
+  const raw = time?.trim();
+  if (!raw) return "—";
+
+  // ISO timestamp path
+  const isoMs = Date.parse(raw);
+  if (Number.isFinite(isoMs)) {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date(isoMs));
+  }
+
+  // Bare HH:MM or HH:MM:SS (assume 24h)
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match) {
+    const hour24 = Number(match[1]);
+    const minute = match[2];
+    const period = hour24 >= 12 ? "PM" : "AM";
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    return `${hour12}:${minute} ${period}`;
+  }
+
+  // 12-hour format already
+  const twelve = raw.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (twelve) {
+    return `${twelve[1]}:${twelve[2]} ${twelve[3].toUpperCase()}`;
+  }
+
+  return raw;
+}
+
 function formatMoney(value: number): string {
   // Legacy display: round to whole dollars, no decimals.
   return new Intl.NumberFormat("en-US", {
@@ -2091,6 +2635,17 @@ function formatMoney(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(centsToDollars(value)));
+}
+
+function formatTransactionAmount(
+  amountCents: number,
+  variant: "spending" | "exempt",
+): string {
+  if (variant === "exempt" && amountCents < 0) {
+    return `+${formatMoney(Math.abs(amountCents))}`;
+  }
+
+  return formatMoney(amountCents);
 }
 
 function roundCashflowToNearestFiveDollars(value: number): number {

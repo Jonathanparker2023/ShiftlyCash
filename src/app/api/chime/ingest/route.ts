@@ -6,6 +6,7 @@ import {
   type ChimeParseKind,
   type ChimeParseResult,
 } from "@/lib/domain/chime-parser";
+import { toLocalIsoDate } from "@/lib/dashboard/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const SECRET_ENV = "CHIME_INGEST_SECRET";
@@ -72,10 +73,23 @@ export async function POST(request: Request) {
   let parsedAt: string | null = null;
 
   if (parsed.ok && isMoneyMovementKind(parsed.kind)) {
-    const todayDate = receivedAt.slice(0, 10);
+    // Use the user's LOCAL date, not the UTC date from the email
+    // timestamp. A Chime email sent at 9:38 PM EDT has receivedAt of
+    // 01:38 UTC the next day; naive UTC slicing would land it on
+    // tomorrow's date and miss the days row, forcing pending_review.
+    const todayDate = toLocalIsoDate(receivedAt);
     const importKey = `${receivedAt}|${title ?? ""}|${text}`.slice(0, 240);
     const amount = transactionAmount(parsed);
-    const merchantName = parsed.merchantOrSource || `Chime ${parsed.kind}`;
+    const merchantName = formatChimeMerchantName(parsed);
+
+    // Guardrail: if Haiku returned amountDollars=null the parser fills
+    // amount with 0. A dedup query keyed on amount=0 matches any
+    // placeholder Plaid row and silently merges unrelated transactions.
+    // Skip the insert in that case and leave the capture with a clear
+    // failure reason for review rather than corrupting dedup state.
+    if (!Number.isFinite(amount) || amount === 0) {
+      parseFailureReason = `No amount extracted for ${parsed.kind} (kind=${parsed.kind}, direction=${parsed.direction})`;
+    } else {
 
     // Resolve the day row for this transaction's date so we can mark it
     // applied immediately (mirrors Plaid sync logic). If no day exists or
@@ -87,14 +101,21 @@ export async function POST(request: Request) {
       .eq("date", todayDate)
       .maybeSingle();
 
+    const shouldExclude = shouldAutoExclude(parsed.kind);
     const canApply = Boolean(day?.id) && !day?.spend_locked;
-    const status = canApply ? "applied" : "pending_review";
+    const status = shouldExclude
+      ? "excluded"
+      : canApply
+        ? "applied"
+        : "pending_review";
     const dayId = canApply ? (day!.id as string) : null;
-    const reviewReason = canApply
-      ? null
-      : day?.spend_locked
-        ? "day_locked"
-        : "no_matching_day";
+    const reviewReason = shouldExclude
+      ? reviewReasonForExcludedKind(parsed.kind)
+      : canApply
+        ? null
+        : day?.spend_locked
+          ? "day_locked"
+          : "no_matching_day";
 
     // Cross-source dedup: if a Plaid sync already landed this exact
     // transaction (same date + amount), don't double-write — just note
@@ -110,10 +131,28 @@ export async function POST(request: Request) {
       .limit(1)
       .maybeSingle();
 
+    // Same-source dedup: if a prior Chime capture (e.g. from Make.com)
+    // already created a transaction for the same date + amount, don't
+    // double-write when Tasker fires for the same real-world event.
+    const { data: existingChime } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("source", "chime")
+      .eq("date", todayDate)
+      .eq("amount", amount)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
     if (existingPlaid?.id) {
       parsedTransactionId = existingPlaid.id as string;
       parsedAt = new Date().toISOString();
       parseFailureReason = "Cross-source match: Plaid row already exists";
+    } else if (existingChime?.id) {
+      parsedTransactionId = existingChime.id as string;
+      parsedAt = new Date().toISOString();
+      parseFailureReason = "Duplicate: Chime row already exists (Make.com + Tasker overlap)";
     } else {
       const { data: txInserted, error: txError } = await supabase
         .from("transactions")
@@ -131,6 +170,7 @@ export async function POST(request: Request) {
           import_key: importKey,
           category: categoryForKind(parsed.kind),
           pending: parsed.kind === "pending_charge",
+          excluded_at: shouldExclude ? new Date().toISOString() : null,
           notes: chimeNotes(parsed),
         })
         .select("id")
@@ -146,6 +186,7 @@ export async function POST(request: Request) {
         parsedAt = new Date().toISOString();
       }
     }
+    } // end amount-guard else
   } else if (!parsed.ok) {
     parseFailureReason = parsed.reason;
   } else {
@@ -175,10 +216,22 @@ export async function POST(request: Request) {
     revalidatePath("/");
   }
 
+  // Always log parseFailureReason when present, even on parsed.ok=true —
+  // a parsed=ok with no transaction means Haiku classified the event as
+  // non-money-movement (balance_alert, card_event, etc.) and we want to
+  // see why.
+  const parseSummary = parsed.ok
+    ? `kind=${parsed.kind} amount=${parsed.amountDollars ?? "null"} dir=${parsed.direction}`
+    : "parse-failed";
+  const logStatus = parsedTransactionId
+    ? "TX"
+    : parseFailureReason
+      ? `SKIP: ${parseFailureReason}`
+      : parsed.ok
+        ? `NOOP kind=${parsed.kind}`
+        : "PARSE_FAIL";
   console.info(
-    `[chime/ingest] capture=${capInserted?.id ?? "fail"} tx=${parsedTransactionId ?? "none"} ${
-      parsed.ok ? "OK" : (parseFailureReason ?? "no-match")
-    }`,
+    `[chime/ingest] capture=${capInserted?.id ?? "fail"} tx=${parsedTransactionId ?? "none"} ${logStatus} (${parseSummary})`,
   );
 
   return NextResponse.json({
@@ -188,6 +241,28 @@ export async function POST(request: Request) {
     parsed: parsed.ok,
     parse_failure_reason: parseFailureReason,
   });
+}
+
+// Build a merchant-name string for the transaction row.
+// Transfers show as generic "Transfer" — the recipient name is stored
+// in notes for traceability but should not appear as the merchant in
+// the dashboard (looks like a purchase, breaks budgeting categories).
+function formatChimeMerchantName(
+  parsed: Extract<ChimeParseResult, { ok: true }>,
+): string {
+  const source = parsed.merchantOrSource?.trim() || `Chime ${parsed.kind}`;
+  switch (parsed.kind) {
+    case "transfer_out":
+    case "transfer_in":
+      return "Transfer";
+    case "deposit":
+      return "Deposit";
+    case "refund":
+      return `Refund: ${source}`;
+    default:
+      // purchase, pending_charge, etc. — keep the merchant name plain
+      return source;
+  }
 }
 
 function isMoneyMovementKind(kind: ChimeParseKind): boolean {
@@ -219,10 +294,28 @@ function categoryForKind(kind: ChimeParseKind): string {
       return "pending_charge";
     case "purchase":
       return "purchase";
+    case "payment_request":
     case "balance_alert":
     case "card_event":
     case "unknown_known_chime":
       return "chime";
+  }
+}
+
+function shouldAutoExclude(kind: ChimeParseKind): boolean {
+  return kind === "transfer_in" || kind === "deposit" || kind === "refund";
+}
+
+function reviewReasonForExcludedKind(kind: ChimeParseKind): string | null {
+  switch (kind) {
+    case "transfer_in":
+      return "transfer_credit";
+    case "deposit":
+      return "income_deposit";
+    case "refund":
+      return "refund_credit";
+    default:
+      return null;
   }
 }
 

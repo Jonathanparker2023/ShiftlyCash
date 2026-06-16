@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { CrossProjectFilter } from "@/components/projects/CrossProjectFilter";
 import { ProjectsView } from "@/components/projects/ProjectsView";
 import { QuickCaptureInbox } from "@/components/projects/QuickCaptureInbox";
@@ -5,14 +7,21 @@ import { TodayView } from "@/components/projects/TodayView";
 import { WeeklyReflection } from "@/components/projects/WeeklyReflection";
 import { requireUser } from "@/lib/auth";
 import { getTodayIso } from "@/lib/dashboard/dates";
+import { CAPABILITIES } from "@/lib/edition";
 import { getProjectsData, getTasksFiltered } from "@/lib/projects/data";
 import type { TaskStatus } from "@/lib/projects/types";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  if (!CAPABILITIES.showProjects) {
+    redirect("/");
+  }
+
   const data = await getProjectsData();
   const todayIso = getTodayIso();
   const weekStartIso = getSundayUtcStartIso(todayIso);

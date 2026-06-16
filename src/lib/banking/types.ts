@@ -27,6 +27,16 @@ export type BankingDayOption = {
   date: string;
 };
 
+export type ChimeCapture = {
+  id: string;
+  rawTitle: string | null;
+  rawText: string;
+  receivedAt: string;
+  parsedAt: string | null;
+  parsedTransactionId: string | null;
+  parseFailureReason: string | null;
+};
+
 export type BankingConfigStatus = {
   isConfigured: boolean;
   missing: string[];
@@ -37,4 +47,5 @@ export type BankingData = {
   items: BankingPlaidItem[];
   pendingTransactions: PendingTransaction[];
   dayOptions: BankingDayOption[];
+  chimeCaptures: ChimeCapture[];
 };

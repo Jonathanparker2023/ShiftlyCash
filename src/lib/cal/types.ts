@@ -5,7 +5,7 @@ export type FoodCategory =
   | "drink"
   | "other";
 
-export type FoodVerdict = "good" | "fine" | "bad";
+export type FoodVerdict = "good" | "bad";
 export type FoodVerdictSource = "pending" | "ai" | "manual_override" | "unscored";
 export type CalPhase = "cut" | "maintain" | "bulk" | "recomp";
 export type CalSex = "male" | "female";
@@ -100,6 +100,7 @@ export type CalTargets = {
   currentPhase: CalPhase | null;
   goalsText: string | null;
   healthFlags: string[];
+  bannedFoods: string[];
 };
 
 export type CalTotals = {
@@ -113,11 +114,24 @@ export type CalTotals = {
   saturatedFatG: number;
 };
 
+export type DayFoodVerdict = {
+  id: string;
+  date: string;
+  verdict: FoodVerdict;
+  reason: string;
+  calorieTotal: number;
+  proteinTotal: number;
+  withinCalorieTolerance: boolean;
+  withinProteinTarget: boolean;
+  generatedAt: string;
+};
+
 export type CalDay = {
   date: string;
   dayIndex: number;
   entries: FoodEntry[];
   totals: CalTotals;
+  dayVerdict: DayFoodVerdict | null;
   weight: WeightLog | null;
   waterOz: number;
 };

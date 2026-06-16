@@ -12,6 +12,12 @@ export type { FoodEstimate } from "@/lib/cal/estimateParser";
 
 const ESTIMATOR_MODEL = "claude-sonnet-4-5";
 const MAX_DESCRIPTION_LENGTH = 4000;
+const MAX_LABEL_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_LABEL_IMAGE_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
 const SYSTEM_PROMPT = `You are a precise nutrition estimator. Your job is to estimate calories, macros, sodium, added sugar, and saturated fat for food a user has eaten.
 
 ## Authoritative user-entered numbers
@@ -66,6 +72,8 @@ You have access to web_search. USE IT when:
 - The food is a specific branded product (Cliff bar Chocolate Chip, Fairlife protein shake, Trader Joe's mandarin orange chicken) - search published nutrition facts.
 - The food is a new or seasonal item you don't recognize from training data.
 - The user names a place you don't have stored values for.
+- You are uncertain about sodium because the food may be restaurant/takeout, branded, packaged, sauce-heavy, marinated, deli/cured, or otherwise prep-dependent. Search first; do not guess high.
+- The food sounds like a menu item but the restaurant is omitted. Search the food name plus "nutrition sodium" once before falling back to a midpoint/null.
 
 DO NOT search for:
 - Common whole foods (banana, chicken breast, rice, broccoli, eggs).
@@ -114,11 +122,20 @@ Estimate these whenever possible:
 - addedSugarG: grams of added sugar only. Soda, juice drinks, candy, pastries, sweet coffee, desserts, and sweet sauces count. Whole fruit natural sugar does not.
 - saturatedFatG: grams of saturated fat. Cheese, butter, cream, fatty meats, fried fast food, pastries, and coconut-heavy foods count.
 
-Use 0 when the food genuinely contains none. Use null only when the description is too vague to estimate.
+Use 0 when the food genuinely contains none. Use null when the description is too vague to estimate without guessing.
 
-## Hidden sodium watchlist — DO NOT miss these
+## Sodium calibration - evidence first, no panic guesses
 
-The most common estimation failure is under-counting sodium in foods that READ as healthy but pack heavy sodium. ALWAYS account for these when present:
+The goal is useful rough logging, not worst-case sodium alarms. Sodium estimates must be evidence-based and should usually be the midpoint of a plausible range, not the top of the range.
+
+Priority order:
+1. If the user provides sodium explicitly, copy it exactly.
+2. If web search finds an official nutrition value, use the official value.
+3. If the food clearly contains known high-sodium components, estimate those components with reasonable portions.
+4. If sodium depends on prep/salt/sauce and web search has not been tried, search the web before estimating.
+5. If search does not produce a usable source and the description is still vague, set sodiumMg to null instead of inventing a high number.
+
+Do NOT inflate sodium just because a food is restaurant-style, seasoned, grilled, "Mediterranean", "Greek", "bowl", "plate", or "salad". Only add sodium for components that are named, strongly implied by the dish, or found in official nutrition data.
 
 **Cheese (per oz, very high):**
 - Feta: 300-500mg
@@ -164,15 +181,15 @@ The most common estimation failure is under-counting sodium in foods that READ a
 - Canned tuna in water: 200-300mg per 3oz
 - Bread (1 slice): 150-200mg
 
-**Restaurant / takeout marinades (NOT visible to user but always present):**
-- Greek/Mediterranean grilled meat marinade: adds ~300-500mg per 6oz serving
+**Restaurant / takeout marinades (not automatically present):**
+- Greek/Mediterranean grilled meat marinade: adds ~300-500mg per 6oz serving ONLY if the item is restaurant/takeout, marinated, seasoned, kabob/kalamaki/gyro/shawarma, or official data supports it. Plain homemade grilled chicken should not get hidden marinade sodium.
 - Korean / Japanese marinated meat (bulgogi, teriyaki): adds 700-1000mg
 - BBQ / smoked meats: adds 400-700mg
 - Brined / cured / smoked: assume +400mg minimum on top of base meat
 
-**Decision rule:** when a food description suggests any item from the lists above is present even implicitly (e.g., "Greek salad" implies feta + olives + dressing; "Mediterranean plate" implies marinated meat; "deli sandwich" implies cured meat + cheese; "sushi" implies soy sauce), SUM each component's sodium. Do not estimate the whole dish as a single low number just because it "feels healthy."
+**Decision rule:** when the description names or strongly implies items from the lists above (e.g., "Greek salad" usually implies feta + olives + dressing; "deli sandwich" implies cured meat + bread; "sushi with soy sauce" implies soy sauce), SUM each component's sodium. If a component is optional or unknown (sauce on the side, dressing amount, salted vs unsalted), use a moderate default or null rather than a worst-case number.
 
-When in doubt, estimate sodium on the HIGH side. Under-counting sodium for a user with HBP risk is the worst failure mode.
+When in doubt, search first. If search does not resolve the uncertainty, do NOT estimate sodium on the high side. Use the middle of the plausible range. If the range is too wide to be useful, set sodiumMg to null and keep the rest of the estimate useful.
 
 ## Confidence calibration
 
@@ -221,6 +238,14 @@ Strict rules:
 - Brand names are fine ("Chipotle", "Starbucks") but don't append "Hit" or "Bomb" reflexively
 - When in doubt, lean specific over generic ("Friday Pizza" > "Heavy Pizza Hit")
 
+## Component decomposition (REQUIRED for composites)
+
+When an entry is a composite of two or more distinguishable foods (yogurt + chia, bowl + side, salad + dressing + protein, sandwich + chips, meal + drink), output each component in the \`components\` array with its own macros. Do not omit small components ("tbsp of chia", "splash of dressing") just because they are small — they will be summed by code.
+
+The top-level macro fields (calories, proteinG, etc.) are still required, but when \`components\` contains 2+ entries the system will RE-SUM them in code and overwrite the top-level totals. This is by design — you are unreliable at arithmetic on multi-component meals; the code will do the addition. Your job is to estimate each component honestly, not to sum them.
+
+For single-food entries (one whole-food item, or a single named dish with no distinguishable components like "Chipotle Bowl"), leave \`components\` as an empty array \`[]\`. Top-level macros are authoritative in that case.
+
 ## Output format
 
 Output JSON ONLY. No prose before or after. No markdown fence. No code blocks. The entire response must be a single valid top-level JSON array.
@@ -238,8 +263,27 @@ Per-item schema (all keys required; macro fields may be null only if truly unkno
   "addedSugarG": integer | null,
   "saturatedFatG": integer | null,
   "reasoning": string, max 300 chars. STRICT FORMAT — only a component list, no prose. One item per line with newline separator. Format each line as "• <food> <calories> cal". No sentences, no commentary, no notes after the list. Multi-component example (use \n between items): "• Steak 240 cal\n• Rice 105 cal\n• Beans 130 cal\n• Guac 230 cal". Single-item example: "• Medium banana 105 cal". If macros are non-trivial, append protein/carbs to a line: "• Chicken bowl 450 cal, 38g protein". Never write paragraphs.,
-  "confidence": "high" | "medium" | "low"
+  "confidence": "high" | "medium" | "low",
+  "components": EstimateComponent[]
 }
+
+Where EstimateComponent is:
+{
+  "name": string (e.g., "Greek yogurt", "Chia seeds", "Olive oil dressing"),
+  "calories": integer,
+  "proteinG": integer | null,
+  "carbsG": integer | null,
+  "fatG": integer | null,
+  "fiberG": integer | null,
+  "sodiumMg": integer | null,
+  "addedSugarG": integer | null,
+  "saturatedFatG": integer | null
+}
+
+Examples:
+- "2 Oikos Triple Zero yogurts + 2 tbsp chia seeds" → components: [{"name":"Oikos Triple Zero yogurt (2)","calories":180,"proteinG":30,"carbsG":14,"fatG":0,"fiberG":0,"sodiumMg":120,"addedSugarG":0,"saturatedFatG":0},{"name":"Chia seeds (2 tbsp)","calories":120,"proteinG":6,"carbsG":2,"fatG":7,"fiberG":8,"sodiumMg":0,"addedSugarG":0,"saturatedFatG":1}]
+- "Medium banana" → components: []
+- "Chipotle steak bowl with rice, beans, salsa, guac" → components: [] (single named dish, no separable line items)
 
 Category rules:
 - "meal" - bowls, plates, sandwiches, burritos, full breakfast/lunch/dinner.
@@ -247,6 +291,29 @@ Category rules:
 - "unhealthy_snack" - candy, chips, cookies, pastries, ice cream, baked sweets.
 - "drink" - coffee, juice, soda, smoothies, alcohol, milk, water.
 - "other" - anything that genuinely doesn't fit above.`;
+
+const LABEL_PHOTO_PROMPT = `${SYSTEM_PROMPT}
+
+## Nutrition label photo mode
+
+The user is uploading a photo of a Nutrition Facts label, package front, barcode area, or ingredient/product label. Read the visible label text and return a food estimate from the label.
+
+Rules:
+- Nutrition Facts numbers visible in the image are AUTHORITATIVE. Copy calories, protein, carbs, fat, fiber, sodium, added sugar, and saturated fat exactly when visible.
+- Preserve the label serving size in reasoning if visible.
+- If the user typed a quantity ("2 servings", "half package", "one bar"), scale the label numbers by that quantity in code-like arithmetic. If no quantity is typed, use one labeled serving.
+- If the photo shows multiple labels/products, return one entry per product.
+- If a field is not visible/readable, use null instead of guessing unless it can be safely inferred from the label (for example, added sugar listed under total sugar).
+- Prefer product/brand name from the package as mealName, but keep it short.
+- Confidence should be "high" when the nutrition panel is readable, "medium" when partly readable, and "low" only if the image is blurry or incomplete.
+- Do not use web_search unless the photo has a clear product name but the Nutrition Facts panel is unreadable.
+- The reasoning field must stay the normal component-list format, but include the serving basis in one short line, e.g. "• Label serving 1 bar 210 cal".`;
+
+export type LabelPhotoInput = {
+  imageBase64: string;
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+  note?: string;
+};
 
 export async function estimateFood(description: string): Promise<FoodEstimate[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -263,14 +330,19 @@ export async function estimateFood(description: string): Promise<FoodEstimate[]>
   const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
     model: ESTIMATOR_MODEL,
-    max_tokens: 1500,
+    // 1500 was being silently truncated on multi-component meals with
+    // full reasoning, which the parser surfaced as
+    // "Estimator returned invalid JSON.". 5000 leaves comfortable
+    // headroom for the most complex composite meals. Cost-neutral on
+    // simple meals — Sonnet only emits what it needs.
+    max_tokens: 5000,
     temperature: 0,
     system: SYSTEM_PROMPT,
     tools: [
       {
         type: "web_search_20250305",
         name: "web_search",
-        max_uses: 3,
+        max_uses: 5,
       },
     ],
     messages: [{ role: "user", content: trimmed }],
@@ -280,6 +352,74 @@ export async function estimateFood(description: string): Promise<FoodEstimate[]>
     parseEstimateResponse(extractFinalText(response.content)),
     fullDescription,
   );
+}
+
+export async function estimateFoodFromLabelPhoto(
+  input: LabelPhotoInput,
+): Promise<FoodEstimate[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("Estimator unavailable: ANTHROPIC_API_KEY not set.");
+  }
+
+  if (!ALLOWED_LABEL_IMAGE_MEDIA_TYPES.includes(input.mediaType)) {
+    throw new Error("Use a JPEG, PNG, or WebP label photo.");
+  }
+
+  const imageBase64 = normalizeBase64(input.imageBase64);
+  if (!imageBase64) {
+    throw new Error("Take or choose a label photo first.");
+  }
+
+  const imageBytes = Buffer.byteLength(imageBase64, "base64");
+  if (imageBytes > MAX_LABEL_IMAGE_BYTES) {
+    throw new Error("Label photo is too large. Try cropping closer to the label.");
+  }
+
+  const note = input.note?.trim().slice(0, 1000) ?? "";
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: ESTIMATOR_MODEL,
+    max_tokens: 5000,
+    temperature: 0,
+    system: LABEL_PHOTO_PROMPT,
+    tools: [
+      {
+        type: "web_search_20250305",
+        name: "web_search",
+        max_uses: 2,
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: note
+              ? `Read this nutrition label photo. User note: ${note}`
+              : "Read this nutrition label photo. Use one labeled serving unless the image or note says otherwise.",
+          },
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: input.mediaType,
+              data: imageBase64,
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  return parseEstimateResponse(extractFinalText(response.content));
+}
+
+function normalizeBase64(value: string): string {
+  const trimmed = value.trim();
+  const commaIndex = trimmed.indexOf(",");
+  return commaIndex >= 0 ? trimmed.slice(commaIndex + 1).trim() : trimmed;
 }
 
 function extractFinalText(content: Anthropic.Messages.ContentBlock[]): string {

@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { ShiftlyCalTrendsView } from "@/components/cal/ShiftlyCalTrendsView";
 import { getShiftlyCalTrendsData } from "@/lib/cal/data";
+import { CAPABILITIES } from "@/lib/edition";
 
 export const maxDuration = 60;
 
@@ -10,6 +12,10 @@ export default async function ShiftlyCalTrendsPage({
 }: {
   searchParams: Promise<{ week?: string }>;
 }) {
+  if (!CAPABILITIES.showCal) {
+    redirect("/");
+  }
+
   const { week } = await searchParams;
   const data = await getShiftlyCalTrendsData({ weekStartIso: week });
 
