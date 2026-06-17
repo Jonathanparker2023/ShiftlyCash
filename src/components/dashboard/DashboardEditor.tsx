@@ -1149,7 +1149,8 @@ function WeekStripCell({
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >
-        {formatMoney(displayCashflowCents)}
+        <span className="sm:hidden">{formatMoneyNoSymbol(displayCashflowCents)}</span>
+        <span className="hidden sm:inline">{formatMoney(displayCashflowCents)}</span>
       </p>
     </button>
   );
@@ -2632,6 +2633,16 @@ function formatMoney(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(centsToDollars(value)));
+}
+
+// Same rounding as formatMoney but no currency symbol — used in the mobile
+// week-strip day squares where the $ caused number clipping.
+function formatMoneyNoSymbol(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "decimal",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(centsToDollars(value)));
