@@ -1980,9 +1980,13 @@ function sendChat(){
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,system:buildSys(),messages:[{role:'user',content:txt}]})
   })
-  .then(function(r){return r.json();})
+  .then(function(r){
+    if(!r.ok){return r.text().then(function(t){throw new Error('API '+r.status+': '+t);});}
+    return r.json();
+  })
   .then(function(data){
     th.remove();
+    if(data.error){throw new Error(data.error.message||JSON.stringify(data.error));}
     var raw=(data.content&&data.content[0]&&data.content[0].text)||'{}';
     var clean=raw.replace(/^```[a-z]*\s*/i,'').replace(/```\s*$/,'').trim();
     try{
@@ -1994,7 +1998,7 @@ function sendChat(){
     }
     btn.disabled=false;
   })
-  .catch(function(){th.remove();addMsg('API error. Check your connection.','err');btn.disabled=false;});
+  .catch(function(e){th.remove();addMsg('API error: '+((e&&e.message)||'Check your connection.'),'err');btn.disabled=false;});
 }
 document.getElementById('chatInp').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
 
