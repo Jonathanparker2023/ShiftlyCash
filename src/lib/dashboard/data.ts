@@ -567,7 +567,13 @@ function mapDashboardDay(
 ): DashboardDay {
   const existingSlots = new Map(slots.map((slot) => [slot.slot_index, slot]));
   const spendCents = dollarsToCents(toNumber(day.manual_spend_adjustment));
-  const baseCents = dollarsToCents(toNumber(day.base_amount));
+  // Use the derived base from v_day_totals (amortization-aware, horizon-frozen)
+  // so the displayed "Fixed" always matches the cashflow that subtracts it.
+  // Pre-migration this equals day.base_amount; post-migration it's the derived
+  // value within the freeze window.
+  const baseCents = dollarsToCents(
+    toNumber(totals?.base_amount ?? day.base_amount),
+  );
   const transactionSpendCents = dollarsToCents(
     toNumber(totals?.transaction_spend_total ?? 0),
   );
