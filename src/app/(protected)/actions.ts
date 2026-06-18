@@ -320,6 +320,22 @@ export async function toggleTransactionStatusAction(
     throw new Error(`Unable to update transaction: ${error.message}`);
   }
 
+  // Re-including a previously-amortized transaction as spend must cancel its
+  // amortization, or the cost would be counted twice (once as the day charge,
+  // once via the still-active amortized baseline allocation).
+  if (newStatus === "applied") {
+    const { error: deactivateError } = await supabase
+      .from("amortized_expenses")
+      .update({ is_active: false })
+      .eq("source_transaction_id", transactionId);
+    if (deactivateError) {
+      throw new Error(
+        `Unable to clear amortization: ${deactivateError.message}`,
+      );
+    }
+    revalidatePath("/baseline");
+  }
+
   return { ok: true };
 }
 
@@ -412,16 +428,22 @@ export async function renameTransactionAction(
   return { ok: true, merchantName };
 }
 
+// Calendar-day span of `months` real months from a start date, so "1 month"
+// means a true calendar month (28-31 days), matching user expectation and the
+// legacy expiration semantics — not a hardcoded 30/90.
+function amortizationPeriodDays(startIso: string, months: number): number {
+  const end = addMonthsIso(startIso, months);
+  const ms = Date.parse(`${end}T00:00:00Z`) - Date.parse(`${startIso}T00:00:00Z`);
+  return Math.max(1, Math.round(ms / 86_400_000));
+}
+
 export async function amortizeTransactionAction(
   input: AmortizeTransactionInput,
-): Promise<{ ok: true; expenseId: string }> {
+): Promise<{ ok: true; amortizedId: string }> {
   const { supabase, user } = await requireUser();
   const transactionId = requireUuid(input.transactionId, "transactionId");
-  const months = requireEnum(
-    String(input.months),
-    ["1", "3"] as const,
-    "months",
-  );
+  const months = requireEnum(String(input.months), ["1", "3"] as const, "months");
+  const monthCount = months === "1" ? 1 : 3;
 
   const { data: transaction, error: transactionError } = await supabase
     .from("transactions")
@@ -432,7 +454,6 @@ export async function amortizeTransactionAction(
   if (transactionError) {
     throw new Error(`Unable to validate transaction: ${transactionError.message}`);
   }
-
   if (!transaction) {
     throw new Error("Transaction not found.");
   }
@@ -442,66 +463,34 @@ export async function amortizeTransactionAction(
     throw new Error("Transaction has no positive amount to amortize.");
   }
 
-  const monthCount = months === "1" ? 1 : 3;
-  // expenses.amount is a MONTHLY figure. 1mo => bill full amount over one month;
-  // 3mo => bill a third per month for three months (sums to the full amount).
-  const monthlyAmount =
-    monthCount === 1 ? amount : Math.round((amount / 3) * 100) / 100;
   const transactionDate = String(transaction.date);
-  const expirationDate = addMonthsIso(transactionDate, monthCount);
-  const merchantName = String(transaction.merchant_name ?? "Expense").trim() || "Expense";
-  const baseName = `${merchantName} (amort ${transactionDate})`;
+  const merchantName =
+    String(transaction.merchant_name ?? "Expense").trim() || "Expense";
+  const originalAmountCents = Math.round(amount * 100);
+  const periodDays = amortizationPeriodDays(transactionDate, monthCount);
 
-  // expenses has a unique (user_id, name) constraint — find a free name.
-  const { data: existingRows, error: existingError } = await supabase
-    .from("expenses")
-    .select("name")
-    .ilike("name", `${baseName}%`);
-
-  if (existingError) {
-    throw new Error(`Unable to prepare expense: ${existingError.message}`);
-  }
-
-  const takenNames = new Set(
-    (existingRows ?? []).map((row) => String((row as { name: string }).name)),
-  );
-  let expenseName = baseName;
-  let suffix = 2;
-  while (takenNames.has(expenseName)) {
-    expenseName = `${baseName} #${suffix}`;
-    suffix += 1;
-  }
-
-  const { data: maxSortRow, error: maxSortError } = await supabase
-    .from("expenses")
-    .select("sort_order")
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (maxSortError) {
-    throw new Error(`Unable to prepare expense: ${maxSortError.message}`);
-  }
-
-  const sortOrder =
-    ((maxSortRow as { sort_order?: number } | null)?.sort_order ?? 0) + 10;
-
-  const { data: expense, error: insertError } = await supabase
-    .from("expenses")
-    .insert({
-      user_id: user.id,
-      name: expenseName,
-      amount: monthlyAmount,
-      withdrawal_day: null,
-      expiration_date: expirationDate,
-      is_active: true,
-      sort_order: sortOrder,
-    })
+  // Real amortization record (one row, FK to the source transaction). Upsert on
+  // the source transaction so re-amortizing the same txn edits in place instead
+  // of stacking rows (the old name-suffix double-count bug).
+  const { data: amortized, error: upsertError } = await supabase
+    .from("amortized_expenses")
+    .upsert(
+      {
+        user_id: user.id,
+        source_transaction_id: transactionId,
+        merchant_name: merchantName,
+        original_amount_cents: originalAmountCents,
+        start_date: transactionDate,
+        period_days: periodDays,
+        is_active: true,
+      },
+      { onConflict: "source_transaction_id" },
+    )
     .select("id")
     .single();
 
-  if (insertError) {
-    throw new Error(`Unable to create amortized expense: ${insertError.message}`);
+  if (upsertError) {
+    throw new Error(`Unable to create amortized expense: ${upsertError.message}`);
   }
 
   // Pull the original transaction out of spend so the cost isn't double-counted.
@@ -518,19 +507,89 @@ export async function amortizeTransactionAction(
     throw new Error(`Unable to exclude transaction: ${excludeError.message}`);
   }
 
-  const { error: baselineError } = await supabase.rpc(
-    "apply_baseline_to_future_days",
-    { p_user_id: user.id },
-  );
+  revalidatePath("/");
+  revalidatePath("/baseline");
 
-  if (baselineError) {
-    throw new Error(`Unable to apply baseline: ${baselineError.message}`);
+  return { ok: true, amortizedId: String((amortized as { id: string }).id) };
+}
+
+// Change an existing amortization's period in place (e.g. 1mo -> 3mo). Bumps
+// schedule_version; the derived views redistribute the original amount over the
+// new window retroactively, with zero per-day writes.
+export async function reAmortizeTransactionAction(
+  input: AmortizeTransactionInput,
+): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+  const months = requireEnum(String(input.months), ["1", "3"] as const, "months");
+  const monthCount = months === "1" ? 1 : 3;
+
+  const { data: row, error: rowError } = await supabase
+    .from("amortized_expenses")
+    .select("id,start_date,schedule_version")
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (rowError) {
+    throw new Error(`Unable to load amortization: ${rowError.message}`);
+  }
+  if (!row) {
+    throw new Error("No amortization found for this transaction.");
+  }
+
+  const periodDays = amortizationPeriodDays(String(row.start_date), monthCount);
+  const { error: updateError } = await supabase
+    .from("amortized_expenses")
+    .update({
+      period_days: periodDays,
+      is_active: true,
+      schedule_version: Number(row.schedule_version ?? 1) + 1,
+    })
+    .eq("id", row.id);
+
+  if (updateError) {
+    throw new Error(`Unable to re-amortize: ${updateError.message}`);
   }
 
   revalidatePath("/");
   revalidatePath("/baseline");
+  return { ok: true };
+}
 
-  return { ok: true, expenseId: String((expense as { id: string }).id) };
+// Undo an amortization (refund / remove / reclassify). Deactivates the
+// amortization so its baseline contribution drops from every overlapping day in
+// the live window. If reInclude is true, the original transaction is restored to
+// spend (reclassify back to a normal expense day-charge).
+export async function removeAmortizationAction(
+  input: { transactionId: string; reInclude?: boolean },
+): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+
+  const { error: deactivateError } = await supabase
+    .from("amortized_expenses")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+
+  if (deactivateError) {
+    throw new Error(`Unable to remove amortization: ${deactivateError.message}`);
+  }
+
+  if (input.reInclude) {
+    const { error: reincludeError } = await supabase
+      .from("transactions")
+      .update({ status: "applied", review_reason: null, excluded_at: null })
+      .eq("id", transactionId);
+    if (reincludeError) {
+      throw new Error(`Unable to re-include transaction: ${reincludeError.message}`);
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/baseline");
+  return { ok: true };
 }
 
 export async function addManualTransactionAction(
