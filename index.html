@@ -1812,8 +1812,9 @@ function isExempt(name, cats){
 }
 
 // Claude chat bot
-var APIKEY='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';
-var ELEVEN_KEY='sk_cbecdb132f65320e22427c2ae648dc40750524b5f603a122';
+// SECURITY: API keys are NO LONGER embedded in client code. Anthropic and ElevenLabs
+// calls now go through same-origin serverless proxies (/api/anthropic, /api/elevenlabs)
+// that read keys from server-side env vars. See SECRETS_MIGRATION.md.
 var ELEVEN_VOICE='j9jfwdrw7BRfcR43Qohk';
 var chatOpen=false;
 function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('hidden',!chatOpen);}
@@ -1974,9 +1975,9 @@ function sendChat(){
   inp.value='';addMsg(txt,'user');
   var btn=document.getElementById('chatSend');btn.disabled=true;
   var th=addMsg('Thinking...','thinking');
-  fetch('https://api.anthropic.com/v1/messages',{
+  fetch('/api/anthropic',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':APIKEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,system:buildSys(),messages:[{role:'user',content:txt}]})
   })
   .then(function(r){return r.json();})
@@ -2958,10 +2959,10 @@ function generateVoiceReview(histIdx){
   if(!w||!w.days||!w.days.length){showToast('No day data for this week');return;}
   showToast('Generating review...');
   var prompt=buildReviewPrompt(w);
-  // Step 1: Get review text from Anthropic
-  fetch('https://api.anthropic.com/v1/messages',{
+  // Step 1: Get review text from Anthropic (via same-origin serverless proxy)
+  fetch('/api/anthropic',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':APIKEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,messages:[{role:'user',content:prompt}]})
   })
   .then(function(r){
@@ -2975,10 +2976,10 @@ function generateVoiceReview(histIdx){
     // Clean text for TTS — strip any artifacts
     txt=txt.replace(/\*+/g,'').replace(/#+/g,'').replace(/\[.*?\]/g,'').replace(/\(.*?\)/g,'').replace(/https?:\/\/\S+/g,'').replace(/\n+/g,' ').replace(/\s{2,}/g,' ').trim();
     w.reviewText=txt;
-    // Step 2: Convert to speech via ElevenLabs
-    return fetch('https://api.elevenlabs.io/v1/text-to-speech/'+ELEVEN_VOICE,{
+    // Step 2: Convert to speech via ElevenLabs (via same-origin serverless proxy)
+    return fetch('/api/elevenlabs?voice='+encodeURIComponent(ELEVEN_VOICE),{
       method:'POST',
-      headers:{'xi-api-key':ELEVEN_KEY,'Content-Type':'application/json','Accept':'audio/mpeg'},
+      headers:{'Content-Type':'application/json','Accept':'audio/mpeg'},
       body:JSON.stringify({text:txt,model_id:'eleven_multilingual_v2',voice_settings:{stability:0.6,similarity_boost:0.8}})
     });
   })
