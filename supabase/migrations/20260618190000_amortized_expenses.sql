@@ -310,14 +310,16 @@ select
   d.week_id,
   d.date,
   d.day_index,
-  -- effective base: derived live within freeze horizon, else frozen cache
+  -- effective base: derived live within freeze horizon, else frozen cache.
+  -- Must stay numeric(10,2) to match the existing view column type (a view
+  -- replace cannot change a column's type).
   (
     case
       when d.date >= current_date - 62
         then round(coalesce(b.base_cents, 0)::numeric / 100.0, 2)
       else d.base_amount
     end
-  )::numeric(12, 2) as base_amount,
+  )::numeric(10, 2) as base_amount,
   d.manual_spend_adjustment,
   d.spend_locked,
   coalesce(e.earnings_total, 0)::numeric(12, 2) as earnings_total,
