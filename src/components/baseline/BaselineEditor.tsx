@@ -9,12 +9,25 @@ import {
   saveExpenseAction,
   type SaveExpenseInput,
 } from "@/app/(protected)/baseline/actions";
-import type { BaselineData, BaselineExpense } from "@/lib/baseline/types";
+import {
+  createAmortizationBucketAction,
+  deleteAmortizationBucketAction,
+  deleteAmortizationItemAction,
+  updateAmortizationBucketAction,
+  upsertAmortizationItemAction,
+} from "@/app/(protected)/actions";
+import type {
+  BaselineBucket,
+  BaselineBucketItem,
+  BaselineData,
+  BaselineExpense,
+} from "@/lib/baseline/types";
 import {
   calculateBaselineTotals,
   isExpenseExpired,
   parseMonthlyAmountToCents,
 } from "@/lib/domain/baseline";
+import { addDaysIso } from "@/lib/dashboard/dates";
 import { centsToDollars } from "@/lib/domain/money";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -276,9 +289,476 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
             )}
           </div>
         </section>
+
+        <AmortizedIncomeSection
+          initialBuckets={initialData.buckets}
+          todayIso={initialData.todayIso}
+        />
       </section>
     </main>
   );
+}
+
+// Inclusive day count for [startIso, endIso]; clamps to >= 1 for the optimistic
+// UI (the server is the real validator and rejects end-before-start).
+function inclusiveDaysBetween(startIso: string, endIso: string): number {
+  const ms =
+    Date.parse(`${endIso}T00:00:00Z`) - Date.parse(`${startIso}T00:00:00Z`);
+  if (Number.isNaN(ms)) {
+    return 1;
+  }
+  return Math.max(1, Math.round(ms / 86_400_000) + 1);
+}
+
+function deriveBucket(
+  items: BaselineBucketItem[],
+  periodDays: number,
+): { totalCents: number; dailyRateCents: number } {
+  const totalCents = items.reduce((sum, item) => sum + item.amountCents, 0);
+  return {
+    totalCents,
+    dailyRateCents: Math.round(totalCents / Math.max(1, periodDays)),
+  };
+}
+
+function AmortizedIncomeSection({
+  initialBuckets,
+  todayIso,
+}: {
+  initialBuckets: BaselineBucket[];
+  todayIso: string;
+}) {
+  const [buckets, setBuckets] = useState(initialBuckets);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const timers = useRef<TimerMap>({});
+
+  useEffect(() => {
+    const scheduled = timers.current;
+    return () => Object.values(scheduled).forEach(clearTimeout);
+  }, []);
+
+  function markError(error: unknown) {
+    setSaveState("error");
+    setSaveError(error instanceof Error ? error.message : "Save failed.");
+  }
+  function markSaved() {
+    setSaveState("saved");
+    setSaveError(null);
+    window.setTimeout(() => setSaveState("idle"), 1200);
+  }
+
+  // Optimistic patch + live recompute of periodDays/total/dailyRate.
+  function patchBucket(bucketId: string, patch: Partial<BaselineBucket>) {
+    setBuckets((prev) =>
+      prev.map((bucket) => {
+        if (bucket.id !== bucketId) {
+          return bucket;
+        }
+        const next = { ...bucket, ...patch };
+        const periodDays = inclusiveDaysBetween(next.startDate, next.endDate);
+        return { ...next, periodDays, ...deriveBucket(next.items, periodDays) };
+      }),
+    );
+  }
+
+  function schedule(key: string, fn: () => Promise<unknown>) {
+    clearTimeout(timers.current[key]);
+    timers.current[key] = setTimeout(async () => {
+      setSaveState("saving");
+      setSaveError(null);
+      try {
+        await fn();
+        markSaved();
+      } catch (error) {
+        markError(error);
+      }
+    }, 600);
+  }
+
+  async function addBucket() {
+    setBusy(true);
+    setSaveState("saving");
+    setSaveError(null);
+    const startDate = todayIso;
+    const endDate = addDaysIso(todayIso, 20); // 21-day default window
+    try {
+      const result = await createAmortizationBucketAction({
+        name: "New bucket",
+        startDate,
+        endDate,
+      });
+      setBuckets((prev) => [
+        ...prev,
+        {
+          id: result.bucketId,
+          name: "New bucket",
+          startDate,
+          endDate,
+          periodDays: 21,
+          status: "active",
+          items: [],
+          totalCents: 0,
+          dailyRateCents: 0,
+        },
+      ]);
+      markSaved();
+    } catch (error) {
+      markError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function updateBucketName(bucketId: string, name: string) {
+    patchBucket(bucketId, { name });
+    schedule(`bucket:${bucketId}:name`, () =>
+      updateAmortizationBucketAction({ bucketId, name }),
+    );
+  }
+
+  function updateBucketDates(
+    bucketId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    patchBucket(bucketId, { startDate, endDate });
+    schedule(`bucket:${bucketId}:dates`, () =>
+      updateAmortizationBucketAction({ bucketId, startDate, endDate }),
+    );
+  }
+
+  async function deleteBucket(bucketId: string) {
+    setBusy(true);
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      await deleteAmortizationBucketAction({ bucketId });
+      setBuckets((prev) => prev.filter((bucket) => bucket.id !== bucketId));
+      markSaved();
+    } catch (error) {
+      markError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleArchive(bucketId: string, archived: boolean) {
+    const status: BaselineBucket["status"] = archived ? "archived" : "active";
+    patchBucket(bucketId, { status });
+    setSaveState("saving");
+    try {
+      await updateAmortizationBucketAction({ bucketId, status });
+      markSaved();
+    } catch (error) {
+      markError(error);
+    }
+  }
+
+  async function addItem(bucketId: string) {
+    const bucket = buckets.find((current) => current.id === bucketId);
+    if (!bucket) {
+      return;
+    }
+    const itemIndex = bucket.items.reduce(
+      (max, item) => Math.max(max, item.itemIndex + 1),
+      0,
+    );
+    patchBucket(bucketId, {
+      items: [
+        ...bucket.items,
+        { id: `temp:${itemIndex}`, itemIndex, label: "Item", amountCents: 0 },
+      ],
+    });
+    setSaveState("saving");
+    try {
+      await upsertAmortizationItemAction({
+        bucketId,
+        itemIndex,
+        label: "Item",
+        amountCents: 0,
+      });
+      markSaved();
+    } catch (error) {
+      markError(error);
+    }
+  }
+
+  function updateItem(
+    bucketId: string,
+    itemIndex: number,
+    patch: Partial<BaselineBucketItem>,
+  ) {
+    const bucket = buckets.find((current) => current.id === bucketId);
+    if (!bucket) {
+      return;
+    }
+    const nextItems = bucket.items.map((item) =>
+      item.itemIndex === itemIndex ? { ...item, ...patch } : item,
+    );
+    patchBucket(bucketId, { items: nextItems });
+    const target = nextItems.find((item) => item.itemIndex === itemIndex);
+    if (!target) {
+      return;
+    }
+    schedule(`item:${bucketId}:${itemIndex}`, () =>
+      upsertAmortizationItemAction({
+        bucketId,
+        itemIndex,
+        label: target.label.trim() || "Item",
+        amountCents: target.amountCents,
+      }),
+    );
+  }
+
+  async function deleteItem(bucketId: string, itemIndex: number) {
+    const bucket = buckets.find((current) => current.id === bucketId);
+    if (!bucket) {
+      return;
+    }
+    patchBucket(bucketId, {
+      items: bucket.items.filter((item) => item.itemIndex !== itemIndex),
+    });
+    setSaveState("saving");
+    try {
+      await deleteAmortizationItemAction({ bucketId, itemIndex });
+      markSaved();
+    } catch (error) {
+      markError(error);
+    }
+  }
+
+  return (
+    <section className="mt-10">
+      <div className="mb-3 flex flex-col gap-3 px-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+            Amortized Income
+          </h2>
+          <p className="mt-1 text-xs text-white/45">
+            One-time cash spread evenly as daily &quot;Other&quot; earnings across
+            a date range.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <SaveIndicator state={saveState} error={saveError} />
+          <button
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={busy}
+            onClick={addBucket}
+            type="button"
+          >
+            <span className="text-base leading-none">+</span> Add bucket
+          </button>
+        </div>
+      </div>
+
+      {buckets.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-5 py-12 text-center">
+          <p className="text-sm font-medium text-white/70">
+            No amortized income yet.
+          </p>
+          <p className="mt-1 text-xs text-white/45">
+            Add a bucket (e.g. &quot;Lean Break&quot;) and list the one-time
+            amounts to smooth them into daily income.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {buckets.map((bucket) => (
+            <BucketCard
+              bucket={bucket}
+              busy={busy}
+              key={bucket.id}
+              onAddItem={addItem}
+              onDeleteBucket={deleteBucket}
+              onDeleteItem={deleteItem}
+              onToggleArchive={toggleArchive}
+              onUpdateDates={updateBucketDates}
+              onUpdateItem={updateItem}
+              onUpdateName={updateBucketName}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BucketCard({
+  bucket,
+  busy,
+  onUpdateName,
+  onUpdateDates,
+  onDeleteBucket,
+  onToggleArchive,
+  onAddItem,
+  onUpdateItem,
+  onDeleteItem,
+}: {
+  bucket: BaselineBucket;
+  busy: boolean;
+  onUpdateName: (bucketId: string, name: string) => void;
+  onUpdateDates: (bucketId: string, startDate: string, endDate: string) => void;
+  onDeleteBucket: (bucketId: string) => void;
+  onToggleArchive: (bucketId: string, archived: boolean) => void;
+  onAddItem: (bucketId: string) => void;
+  onUpdateItem: (
+    bucketId: string,
+    itemIndex: number,
+    patch: Partial<BaselineBucketItem>,
+  ) => void;
+  onDeleteItem: (bucketId: string, itemIndex: number) => void;
+}) {
+  const isArchived = bucket.status === "archived";
+
+  return (
+    <div
+      className={[
+        "rounded-2xl border p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl transition",
+        isArchived
+          ? "border-white/10 bg-white/[0.02] opacity-60"
+          : "border-white/[0.12] bg-white/[0.045]",
+      ].join(" ")}
+    >
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="grid flex-1 gap-3 sm:grid-cols-[minmax(160px,1fr)_150px_150px]">
+          <label className="block">
+            <MobileLabel>Name</MobileLabel>
+            <input
+              className={FIELD_CLASS}
+              onChange={(event) => onUpdateName(bucket.id, event.target.value)}
+              placeholder="Bucket name"
+              type="text"
+              value={bucket.name}
+            />
+          </label>
+          <label className="block">
+            <MobileLabel>Start</MobileLabel>
+            <input
+              className={FIELD_CLASS}
+              onChange={(event) =>
+                onUpdateDates(
+                  bucket.id,
+                  event.target.value || bucket.startDate,
+                  bucket.endDate,
+                )
+              }
+              type="date"
+              value={bucket.startDate}
+            />
+          </label>
+          <label className="block">
+            <MobileLabel>End</MobileLabel>
+            <input
+              className={FIELD_CLASS}
+              onChange={(event) =>
+                onUpdateDates(
+                  bucket.id,
+                  bucket.startDate,
+                  event.target.value || bucket.endDate,
+                )
+              }
+              type="date"
+              value={bucket.endDate}
+            />
+          </label>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            className="h-9 rounded-lg border border-white/12 bg-white/[0.05] px-3 text-xs font-semibold text-white/70 transition hover:bg-white/10"
+            onClick={() => onToggleArchive(bucket.id, !isArchived)}
+            type="button"
+          >
+            {isArchived ? "Unarchive" : "Archive"}
+          </button>
+          <button
+            className="h-9 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={busy}
+            onClick={() => onDeleteBucket(bucket.id)}
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <Stat label="Total" value={formatSignedMoney(bucket.totalCents)} />
+        <Stat
+          label={`Daily rate · ${bucket.periodDays}d`}
+          value={formatSignedMoney(bucket.dailyRateCents)}
+        />
+        <Stat label="Items" value={String(bucket.items.length)} />
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {bucket.items.map((item) => (
+          <div className="flex items-center gap-2" key={item.itemIndex}>
+            <input
+              className={FIELD_CLASS}
+              onChange={(event) =>
+                onUpdateItem(bucket.id, item.itemIndex, {
+                  label: event.target.value,
+                })
+              }
+              placeholder="Label (e.g. Sold laptop)"
+              type="text"
+              value={item.label}
+            />
+            <input
+              className={`${FIELD_CLASS} w-32 shrink-0`}
+              onChange={(event) =>
+                onUpdateItem(bucket.id, item.itemIndex, {
+                  amountCents: parseSignedDollarsToCents(event.target.value),
+                })
+              }
+              step="0.01"
+              type="number"
+              value={formatNumberInput(centsToDollars(item.amountCents))}
+            />
+            <button
+              aria-label="Delete item"
+              className="h-11 w-11 shrink-0 rounded-xl border border-white/10 bg-white/[0.04] text-base text-white/60 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200"
+              onClick={() => onDeleteItem(bucket.id, item.itemIndex)}
+              type="button"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          className="h-10 w-full rounded-xl border border-dashed border-white/15 bg-white/[0.03] text-sm font-semibold text-white/75 transition hover:bg-white/[0.06]"
+          onClick={() => onAddItem(bucket.id)}
+          type="button"
+        >
+          + Add item
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/50">
+        {label}
+      </div>
+      <div className="mt-1 text-lg font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function formatSignedMoney(cents: number): string {
+  const magnitude = formatMoney(Math.abs(cents));
+  return cents < 0 ? `-${magnitude}` : magnitude;
+}
+
+function parseSignedDollarsToCents(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
 }
 
 function TotalsPanel({

@@ -592,6 +592,223 @@ export async function removeAmortizationAction(
   return { ok: true };
 }
 
+// ── Lump-Sum Amortizer ("Amortized Income") ─────────────────────────────────
+// A named bucket of SIGNED line items spread EVENLY as a daily NET earnings credit
+// across [startDate, endDate]. Daily credits are DERIVED at read time
+// (v_day_amortization_credit*), never materialized — so an edit is one row write,
+// a delete leaves no orphans, and a range change re-derives with zero per-day writes.
+
+export type CreateAmortizationBucketInput = {
+  name: string;
+  startDate: string;
+  endDate: string;
+};
+export type UpdateAmortizationBucketInput = {
+  bucketId: string;
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: "active" | "archived";
+};
+export type UpsertAmortizationItemInput = {
+  bucketId: string;
+  itemIndex: number;
+  label: string;
+  amountCents: number;
+};
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function requireIsoDate(value: string, fieldName: string): string {
+  if (
+    typeof value !== "string" ||
+    !ISO_DATE_PATTERN.test(value) ||
+    Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+  ) {
+    throw new Error(`Invalid ${fieldName}.`);
+  }
+  return value;
+}
+
+// Inclusive day count for [startIso, endIso]. Throws on an end-before-start (or
+// otherwise non-positive) range — this is the zero/negative-range block. A
+// single-day range yields 1 (credit = total).
+function inclusivePeriodDays(startIso: string, endIso: string): number {
+  const ms =
+    Date.parse(`${endIso}T00:00:00Z`) - Date.parse(`${startIso}T00:00:00Z`);
+  const days = Math.round(ms / 86_400_000) + 1;
+  if (!Number.isInteger(days) || days <= 0) {
+    throw new Error("Amortization range must end on or after it starts.");
+  }
+  return days;
+}
+
+export async function createAmortizationBucketAction(
+  input: CreateAmortizationBucketInput,
+): Promise<{ ok: true; bucketId: string }> {
+  const { supabase, user } = await requireUser();
+  const name = requireNonEmptyString(input.name, "name");
+  const startDate = requireIsoDate(input.startDate, "startDate");
+  const endDate = requireIsoDate(input.endDate, "endDate");
+  const periodDays = inclusivePeriodDays(startDate, endDate);
+
+  const { data, error } = await supabase
+    .from("amortization_bucket")
+    .insert({
+      user_id: user.id,
+      name,
+      start_date: startDate,
+      period_days: periodDays,
+      status: "active",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Unable to create bucket: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/baseline");
+  return { ok: true, bucketId: String((data as { id: string }).id) };
+}
+
+export async function updateAmortizationBucketAction(
+  input: UpdateAmortizationBucketInput,
+): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const bucketId = requireUuid(input.bucketId, "bucketId");
+
+  const { data: row, error: rowError } = await supabase
+    .from("amortization_bucket")
+    .select("id,start_date,period_days,schedule_version")
+    .eq("id", bucketId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (rowError) {
+    throw new Error(`Unable to load bucket: ${rowError.message}`);
+  }
+  if (!row) {
+    throw new Error("Bucket not found.");
+  }
+
+  const patch: Record<string, unknown> = {
+    schedule_version: Number(row.schedule_version ?? 1) + 1,
+  };
+  if (input.name !== undefined) {
+    patch.name = requireNonEmptyString(input.name, "name");
+  }
+  if (input.status !== undefined) {
+    patch.status = requireEnum(
+      input.status,
+      ["active", "archived"] as const,
+      "status",
+    );
+  }
+  if (input.startDate !== undefined || input.endDate !== undefined) {
+    const startDate = requireIsoDate(
+      input.startDate ?? String(row.start_date),
+      "startDate",
+    );
+    const currentEnd = addDaysIso(
+      String(row.start_date),
+      Number(row.period_days) - 1,
+    );
+    const endDate = requireIsoDate(input.endDate ?? currentEnd, "endDate");
+    patch.start_date = startDate;
+    patch.period_days = inclusivePeriodDays(startDate, endDate);
+  }
+
+  const { error } = await supabase
+    .from("amortization_bucket")
+    .update(patch)
+    .eq("id", bucketId)
+    .eq("user_id", user.id);
+  if (error) {
+    throw new Error(`Unable to update bucket: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/baseline");
+  return { ok: true };
+}
+
+export async function upsertAmortizationItemAction(
+  input: UpsertAmortizationItemInput,
+): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const bucketId = requireUuid(input.bucketId, "bucketId");
+  const itemIndex = requireNonNegativeInteger(input.itemIndex, "itemIndex");
+  const label = requireNonEmptyString(input.label, "label");
+  // SIGNED net cents: negatives (returns) are allowed; only require integer cents.
+  if (!Number.isInteger(input.amountCents)) {
+    throw new Error("Invalid amountCents.");
+  }
+
+  const { error } = await supabase.from("amortization_item").upsert(
+    {
+      user_id: user.id,
+      bucket_id: bucketId,
+      item_index: itemIndex,
+      label,
+      amount_cents: input.amountCents,
+    },
+    { onConflict: "bucket_id,item_index" },
+  );
+  if (error) {
+    throw new Error(`Unable to save item: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/baseline");
+  return { ok: true };
+}
+
+export async function deleteAmortizationItemAction(input: {
+  bucketId: string;
+  itemIndex: number;
+}): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const bucketId = requireUuid(input.bucketId, "bucketId");
+  const itemIndex = requireNonNegativeInteger(input.itemIndex, "itemIndex");
+
+  const { error } = await supabase
+    .from("amortization_item")
+    .delete()
+    .eq("bucket_id", bucketId)
+    .eq("item_index", itemIndex)
+    .eq("user_id", user.id);
+  if (error) {
+    throw new Error(`Unable to delete item: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/baseline");
+  return { ok: true };
+}
+
+// Hard delete: CASCADE drops the items, and because credits are derived (never
+// materialized) they vanish the instant the bucket is gone — no orphans.
+export async function deleteAmortizationBucketAction(input: {
+  bucketId: string;
+}): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const bucketId = requireUuid(input.bucketId, "bucketId");
+
+  const { error } = await supabase
+    .from("amortization_bucket")
+    .delete()
+    .eq("id", bucketId)
+    .eq("user_id", user.id);
+  if (error) {
+    throw new Error(`Unable to delete bucket: ${error.message}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/baseline");
+  return { ok: true };
+}
+
 export async function addManualTransactionAction(
   input: AddManualTransactionInput,
 ): Promise<ManualTransactionResult> {

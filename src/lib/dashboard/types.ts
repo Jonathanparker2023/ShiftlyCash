@@ -36,6 +36,24 @@ export type DashboardSlot = EarnSlotInput & {
   incentiveAmount: number;
   label: string;
   source: EarnSlotSource;
+  // "earn" = a real, editable earn_slot. "bucket" = a synthetic, READ-ONLY row
+  // surfacing an Amortized Income daily credit (derived, not a stored slot). Bucket
+  // rows carry a signed creditCents and never consume a real slot_index.
+  kind?: "earn" | "bucket";
+  bucketId?: string | null;
+  creditCents?: number;
+};
+
+// One row of v_day_amortization_credit_items (per day, per active bucket).
+export type AmortizationCreditRow = {
+  day_id: string;
+  bucket_id: string;
+  bucket_name: string;
+  total_cents: number;
+  period_days: number;
+  daily_rate_cents: number;
+  credit_cents: number;
+  schedule_version: number;
 };
 
 export type DashboardBaseAllocation = {

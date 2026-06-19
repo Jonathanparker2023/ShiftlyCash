@@ -169,15 +169,25 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       new Map(
         days.map((day) => [
           day.id,
-          calculateDayTotals(toDayInput(day), initialData.settings),
+          withBucketCredit(
+            calculateDayTotals(toDayInput(day), initialData.settings),
+            sumBucketCreditCents(day),
+          ),
         ]),
       ),
     [days, initialData.settings],
   );
-  const weekTotals = useMemo(
-    () => calculateWeekTotals({ days: days.map(toDayInput) }, initialData.settings),
-    [days, initialData.settings],
-  );
+  const weekTotals = useMemo(() => {
+    const base = calculateWeekTotals(
+      { days: days.map(toDayInput) },
+      initialData.settings,
+    );
+    const creditCents = days.reduce(
+      (sum, day) => sum + sumBucketCreditCents(day),
+      0,
+    );
+    return withBucketCredit(base, creditCents);
+  }, [days, initialData.settings]);
   const weekNetTotals = useMemo(
     () => netEarningsByBucket(toComputedEarningSlots(days, initialData.settings)),
     [days, initialData.settings],
@@ -257,8 +267,12 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       return;
     }
 
+    // Reorder only operates on real (editable) slots. Synthetic bucket rows have
+    // slotIndex >= 4 and are never persisted as earn_slots; carry them through
+    // untouched so the optimistic UI keeps showing them.
+    const bucketSlots = day.slots.filter((slot) => slot.kind === "bucket");
     const activeSlots = day.slots
-      .filter((slot) => slot.jobType !== "none")
+      .filter((slot) => slot.kind !== "bucket" && slot.jobType !== "none")
       .sort((a, b) => a.slotIndex - b.slotIndex);
     const fromPosition = activeSlots.findIndex(
       (slot) => slot.slotIndex === fromSlotIndex,
@@ -275,19 +289,22 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     const [movedSlot] = reorderedActiveSlots.splice(fromPosition, 1);
     reorderedActiveSlots.splice(toPosition, 0, movedSlot);
 
-    const nextSlots = Array.from({ length: 4 }, (_, slotIndex) => {
-      const activeSlot = reorderedActiveSlots[slotIndex];
+    const nextSlots = [
+      ...Array.from({ length: 4 }, (_, slotIndex) => {
+        const activeSlot = reorderedActiveSlots[slotIndex];
 
-      if (activeSlot) {
-        return normalizeSlotForClient({
-          ...activeSlot,
-          slotIndex,
-          source: "user",
-        });
-      }
+        if (activeSlot) {
+          return normalizeSlotForClient({
+            ...activeSlot,
+            slotIndex,
+            source: "user",
+          });
+        }
 
-      return makeEmptySlot(dayId, slotIndex);
-    });
+        return makeEmptySlot(dayId, slotIndex);
+      }),
+      ...bucketSlots,
+    ];
 
     setExpandedSlotIndex(null);
     setDays((currentDays) =>
@@ -651,6 +668,10 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   function scheduleSlotSave(slot: DashboardSlot) {
+    // Synthetic Amortized Income rows are derived, never persisted as earn_slots.
+    if (slot.kind === "bucket") {
+      return;
+    }
     const key = `slot:${slot.dayId}:${slot.slotIndex}`;
     const version = bumpVersion(key);
     const input: SaveEarnSlotInput = {
@@ -1655,7 +1676,11 @@ function ShiftList({
   ) => void;
 }) {
   const [draggedSlotIndex, setDraggedSlotIndex] = useState<number | null>(null);
+  // Bucket rows render in the list but must NOT count toward the 4-shift cap.
   const activeSlots = day.slots.filter((slot) => slot.jobType !== "none");
+  const realActiveCount = activeSlots.filter(
+    (slot) => slot.kind !== "bucket",
+  ).length;
 
   function handleDrop(targetSlotIndex: number) {
     if (draggedSlotIndex === null || draggedSlotIndex === targetSlotIndex) {
@@ -1696,7 +1721,7 @@ function ShiftList({
       </div>
       <button
         className="h-10 w-full rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={day.spendLocked || activeSlots.length >= 4}
+        disabled={day.spendLocked || realActiveCount >= 4}
         onClick={() => onAddShift(day)}
         type="button"
       >
@@ -1737,6 +1762,37 @@ function ShiftRow({
   onDrop: () => void;
   onDragEnd: () => void;
 }) {
+  // Synthetic Amortized Income credit: READ-ONLY. No expand, no Remove, not
+  // draggable. The amount is formatted DIRECTLY from the signed creditCents,
+  // bypassing formatShiftAmountValue (which blanks/clamps non-positive values).
+  if (slot.kind === "bucket") {
+    return (
+      <div
+        className={[
+          "flex min-h-11 w-full items-center gap-3 rounded-md border px-3 py-2 shadow-sm",
+          shiftBarClass(slot.jobType),
+          locked ? "opacity-60" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <span className="flex shrink-0 items-center gap-2">
+          <span className={shiftDotClass(slot.jobType)} />
+          <span className="text-sm font-semibold">Other</span>
+          <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
+            Amortized
+          </span>
+        </span>
+        <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
+          {slot.label}
+        </span>
+        <span className="shrink-0 text-sm font-medium tabular-nums">
+          {formatBucketCreditAmount(slot.creditCents ?? 0)}
+        </span>
+      </div>
+    );
+  }
+
   const rowClassName = [
     "rounded-md border shadow-sm transition",
     shiftBarClass(slot.jobType),
@@ -2416,19 +2472,50 @@ function replaceTransaction(
 
 function toDayInput(day: DashboardDay) {
   return {
-    earnSlots: day.slots.map((slot) => ({
-      jobType: slot.jobType,
-      payType: slot.payType,
-      hoursOrUnits: slot.hoursOrUnits,
-      regularHours: slot.regularHours,
-      overtimeHours: slot.overtimeHours,
-      incentiveMode: slot.incentiveMode,
-      incentiveRate: slot.incentiveRate,
-      incentiveAmount: slot.incentiveAmount,
-      label: slot.label,
-    })),
+    // Exclude synthetic bucket rows: their signed credit is added explicitly
+    // (see sumBucketCreditCents) so it isn't clamped to >=0 by calculateEarnSlot.
+    earnSlots: day.slots
+      .filter((slot) => slot.kind !== "bucket")
+      .map((slot) => ({
+        jobType: slot.jobType,
+        payType: slot.payType,
+        hoursOrUnits: slot.hoursOrUnits,
+        regularHours: slot.regularHours,
+        overtimeHours: slot.overtimeHours,
+        incentiveMode: slot.incentiveMode,
+        incentiveRate: slot.incentiveRate,
+        incentiveAmount: slot.incentiveAmount,
+        label: slot.label,
+      })),
     spendCents: day.spendCents + day.transactionSpendCents,
     baseCents: day.baseCents,
+  };
+}
+
+// Sum of a day's Amortized Income daily credits (SIGNED cents). Added on top of
+// calculateDayTotals so the displayed earnings/cashflow match the server view
+// exactly (including negative-net buckets, which calculateEarnSlot would clamp).
+function sumBucketCreditCents(day: DashboardDay): number {
+  return day.slots.reduce(
+    (sum, slot) =>
+      slot.kind === "bucket" ? sum + (slot.creditCents ?? 0) : sum,
+    0,
+  );
+}
+
+// Apply the signed bucket credit to earnings + cashflow. Mirrors how the server
+// v_day_totals adds the credit to earnings_total and cashflow_total only.
+function withBucketCredit<T extends ReturnType<typeof calculateDayTotals>>(
+  totals: T,
+  creditCents: number,
+): T {
+  if (creditCents === 0) {
+    return totals;
+  }
+  return {
+    ...totals,
+    earningsCents: totals.earningsCents + creditCents,
+    cashflowCents: totals.cashflowCents + creditCents,
   };
 }
 
@@ -2666,6 +2753,14 @@ function formatShiftAmountValue(
   }
 
   return formatMoney(earningsCents);
+}
+
+// Sign-aware, to-the-cent amount for a synthetic Amortized Income credit row.
+// Bypasses calculateEarnSlot/formatShiftAmountValue, which blank out and clamp
+// non-positive values — a negative daily slice must render as a real negative.
+function formatBucketCreditAmount(creditCents: number): string {
+  const magnitude = formatMoneyExact(Math.abs(creditCents));
+  return creditCents < 0 ? `-${magnitude}` : magnitude;
 }
 
 function formatShiftQuantityValue(slot: DashboardSlot): string {

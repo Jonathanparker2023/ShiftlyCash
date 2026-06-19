@@ -7,8 +7,10 @@ import {
   getTodayIso,
 } from "@/lib/dashboard/dates";
 import type {
+  AmortizationCreditRow,
   DashboardData,
   DashboardDay,
+  DashboardSlot,
   DashboardTransaction,
   DashboardTransactionSource,
   DashboardTransactionStatus,
@@ -323,6 +325,26 @@ export async function getDashboardData(): Promise<DashboardData> {
     }
   }
 
+  // Amortized Income daily credits per day+bucket (the synthetic "Other" shift-bar
+  // rows). Soft-fail: pre-migration the view is absent and the dashboard still
+  // renders, just without bucket credits.
+  let bucketCredits: AmortizationCreditRow[] = [];
+  if (dayIds.length > 0) {
+    const { data: creditData, error: creditError } = await supabase
+      .from("v_day_amortization_credit_items")
+      .select(
+        "day_id,bucket_id,bucket_name,total_cents,period_days,daily_rate_cents,credit_cents,schedule_version",
+      )
+      .in("day_id", dayIds);
+    if (creditError) {
+      console.warn(
+        `[dashboard] amortization credits unavailable: ${creditError.message}`,
+      );
+    } else {
+      bucketCredits = (creditData ?? []) as AmortizationCreditRow[];
+    }
+  }
+
   const adjacentAbilityPayPeriod = await loadAdjacentAbilityPayPeriod({
     supabase,
     week: weekData as WeekRow,
@@ -341,6 +363,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
     closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
     baseAllocations,
+    bucketCredits,
     todayIso,
   });
   since("dashboard:total", tTotal);
@@ -359,6 +382,7 @@ function mapDashboardData(input: {
   baselineTotal: BaselineTotalRow | null;
   closedWeekMetrics: ClosedWeekMetricRow[];
   baseAllocations: BaseAllocationRow[];
+  bucketCredits: AmortizationCreditRow[];
   todayIso: string;
 }): DashboardData {
   const settings = mapPaySettings(input.settings);
@@ -399,6 +423,12 @@ function mapDashboardData(input: {
     list.push(row);
     allocationsByDay.set(row.day_id, list);
   }
+  const creditsByDay = new Map<string, AmortizationCreditRow[]>();
+  for (const row of input.bucketCredits) {
+    const list = creditsByDay.get(row.day_id) ?? [];
+    list.push(row);
+    creditsByDay.set(row.day_id, list);
+  }
   const days = input.days.map((day) =>
     mapDashboardDay(
       day,
@@ -406,6 +436,7 @@ function mapDashboardData(input: {
       transactionsByDay.get(day.id) ?? [],
       totalsByDay.get(day.id),
       allocationsByDay.get(day.id) ?? [],
+      creditsByDay.get(day.id) ?? [],
     ),
   );
 
@@ -606,6 +637,7 @@ function mapDashboardDay(
   transactions: DashboardTransaction[],
   totals: DayTotalRow | undefined,
   allocations: BaseAllocationRow[],
+  credits: AmortizationCreditRow[],
 ): DashboardDay {
   const existingSlots = new Map(slots.map((slot) => [slot.slot_index, slot]));
   const spendCents = dollarsToCents(toNumber(day.manual_spend_adjustment));
@@ -665,25 +697,52 @@ function mapDashboardDay(
       cashflowCents,
       legacyRoundedCashflowCents: roundCentsToNearestTenDollars(cashflowCents),
     },
-    slots: Array.from({ length: 4 }, (_, slotIndex) => {
-      const slot = existingSlots.get(slotIndex);
+    slots: [
+      ...Array.from({ length: 4 }, (_, slotIndex): DashboardSlot => {
+        const slot = existingSlots.get(slotIndex);
 
-      return {
-        id: slot?.id ?? null,
-        dayId: day.id,
-        slotIndex,
-        jobType: slot?.job_type ?? "none",
-        payType: slot?.pay_type ?? "none",
-        hoursOrUnits: toNumber(slot?.hours_or_units ?? 0),
-        regularHours: toNumber(slot?.regular_hours ?? 0),
-        overtimeHours: toNumber(slot?.overtime_hours ?? 0),
-        incentiveMode: mapIncentiveMode(slot?.incentive_mode ?? null),
-        incentiveRate: toNumber(slot?.incentive_rate ?? 0),
-        incentiveAmount: toNumber(slot?.incentive_amount ?? 0),
-        label: slot?.label ?? "",
-        source: slot?.source ?? "user",
-      };
-    }),
+        return {
+          id: slot?.id ?? null,
+          dayId: day.id,
+          slotIndex,
+          jobType: slot?.job_type ?? "none",
+          payType: slot?.pay_type ?? "none",
+          hoursOrUnits: toNumber(slot?.hours_or_units ?? 0),
+          regularHours: toNumber(slot?.regular_hours ?? 0),
+          overtimeHours: toNumber(slot?.overtime_hours ?? 0),
+          incentiveMode: mapIncentiveMode(slot?.incentive_mode ?? null),
+          incentiveRate: toNumber(slot?.incentive_rate ?? 0),
+          incentiveAmount: toNumber(slot?.incentive_amount ?? 0),
+          label: slot?.label ?? "",
+          source: slot?.source ?? "user",
+          kind: "earn",
+        };
+      }),
+      // Synthetic READ-ONLY rows for Amortized Income daily credits. slotIndex >= 4
+      // is a sentinel that never collides with real slots (0..3), so these never
+      // consume a real slot or get treated as editable shifts.
+      ...credits.map((credit, n): DashboardSlot => {
+        const creditCents = Math.round(toNumber(credit.credit_cents));
+        return {
+          id: `bucket:${credit.bucket_id}`,
+          dayId: day.id,
+          slotIndex: 4 + n,
+          jobType: "other",
+          payType: "none",
+          hoursOrUnits: creditCents / 100,
+          regularHours: 0,
+          overtimeHours: 0,
+          incentiveMode: "none",
+          incentiveRate: 0,
+          incentiveAmount: 0,
+          label: credit.bucket_name,
+          source: "migration",
+          kind: "bucket",
+          bucketId: credit.bucket_id,
+          creditCents,
+        };
+      }),
+    ],
     appliedTransactions: transactions.filter(
       (transaction) => transaction.status === "applied",
     ),

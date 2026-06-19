@@ -2,6 +2,8 @@ import { requireUserWithBootstrapStatus } from "@/lib/auth";
 import { mark, since, timed } from "@/lib/perf";
 import { getTodayIso } from "@/lib/dashboard/dates";
 import type {
+  BaselineBucket,
+  BaselineBucketItem,
   BaselineData,
   BaselineExpense,
   BaselineViewTotals,
@@ -9,6 +11,23 @@ import type {
 import { dollarsToCents } from "@/lib/domain/money";
 
 type NumericValue = number | string | null;
+
+type BucketRow = {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  period_days: NumericValue;
+  status: string;
+};
+
+type BucketItemRow = {
+  id: string;
+  bucket_id: string;
+  item_index: number;
+  label: string;
+  amount_cents: NumericValue;
+};
 
 type ExpenseRow = {
   id: string;
@@ -58,13 +77,79 @@ export async function getBaselineData(): Promise<BaselineData> {
     throw new Error(`Unable to load baseline totals: ${totalError.message}`);
   }
 
+  // Amortized Income buckets + items. Soft-fail: pre-migration the tables are
+  // absent and the Fixed page still renders, just without the income section.
+  let buckets: BaselineBucket[] = [];
+  const [
+    { data: bucketData, error: bucketError },
+    { data: itemData, error: itemError },
+  ] = await Promise.all([
+    supabase
+      .from("amortization_bucket")
+      .select("id,name,start_date,end_date,period_days,status")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("amortization_item")
+      .select("id,bucket_id,item_index,label,amount_cents")
+      .eq("user_id", user.id)
+      .order("item_index", { ascending: true }),
+  ]);
+  if (bucketError || itemError) {
+    console.warn(
+      `[baseline] amortization buckets unavailable: ${(bucketError ?? itemError)?.message}`,
+    );
+  } else {
+    buckets = assembleBuckets(
+      (bucketData ?? []) as BucketRow[],
+      (itemData ?? []) as BucketItemRow[],
+    );
+  }
+
   const result = {
     todayIso: getTodayIso(),
     expenses: ((expenseData ?? []) as ExpenseRow[]).map(mapExpenseRow),
     totals: mapExpenseTotals(totalData as ExpenseTotalRow | null),
+    buckets,
   };
   since("baseline:total", tTotal);
   return result;
+}
+
+function assembleBuckets(
+  bucketRows: BucketRow[],
+  itemRows: BucketItemRow[],
+): BaselineBucket[] {
+  const itemsByBucket = new Map<string, BaselineBucketItem[]>();
+  for (const row of itemRows) {
+    const list = itemsByBucket.get(row.bucket_id) ?? [];
+    list.push({
+      id: row.id,
+      itemIndex: row.item_index,
+      label: row.label,
+      amountCents: Math.round(toNumber(row.amount_cents)),
+    });
+    itemsByBucket.set(row.bucket_id, list);
+  }
+
+  return bucketRows.map((row) => {
+    const items = (itemsByBucket.get(row.id) ?? []).sort(
+      (a, b) => a.itemIndex - b.itemIndex,
+    );
+    const totalCents = items.reduce((sum, item) => sum + item.amountCents, 0);
+    const periodDays = Math.max(1, Math.round(toNumber(row.period_days)));
+    return {
+      id: row.id,
+      name: row.name,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      periodDays,
+      status: row.status === "archived" ? "archived" : "active",
+      items,
+      totalCents,
+      dailyRateCents: Math.round(totalCents / periodDays),
+    };
+  });
 }
 
 function mapExpenseRow(row: ExpenseRow): BaselineExpense {
