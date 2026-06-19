@@ -38,8 +38,11 @@ type BaselineEditorProps = {
   initialData: BaselineData;
 };
 
-const FIELD_CLASS =
-  "h-11 w-full rounded-xl border border-white/10 bg-white/[0.05] px-3.5 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:bg-white/[0.08] focus:ring-2 focus:ring-white/10";
+// Width-free base so callers set width explicitly (composing with w-full caused a
+// Tailwind precedence conflict that collapsed flex item rows).
+const FIELD_BASE =
+  "h-11 rounded-xl border border-white/10 bg-white/[0.05] px-3.5 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:bg-white/[0.08] focus:ring-2 focus:ring-white/10";
+const FIELD_CLASS = `${FIELD_BASE} w-full`;
 
 export function BaselineEditor({ initialData }: BaselineEditorProps) {
   const [expenses, setExpenses] = useState(initialData.expenses);
@@ -697,7 +700,7 @@ function BucketCard({
         {bucket.items.map((item) => (
           <div className="flex items-center gap-2" key={item.itemIndex}>
             <input
-              className={FIELD_CLASS}
+              className={`${FIELD_BASE} min-w-0 flex-1`}
               onChange={(event) =>
                 onUpdateItem(bucket.id, item.itemIndex, {
                   label: event.target.value,
@@ -708,12 +711,13 @@ function BucketCard({
               value={item.label}
             />
             <input
-              className={`${FIELD_CLASS} w-32 shrink-0`}
+              className={`${FIELD_BASE} w-32 shrink-0 text-right tabular-nums`}
               onChange={(event) =>
                 onUpdateItem(bucket.id, item.itemIndex, {
                   amountCents: parseSignedDollarsToCents(event.target.value),
                 })
               }
+              placeholder="0.00"
               step="0.01"
               type="number"
               value={formatNumberInput(centsToDollars(item.amountCents))}
