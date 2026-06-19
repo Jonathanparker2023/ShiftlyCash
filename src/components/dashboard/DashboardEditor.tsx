@@ -1978,7 +1978,11 @@ function TotalsPanel({
     (sum, item) => sum + item.appliedCents,
     0,
   );
-  const reconciles = breakdownSumCents === baseCents;
+  // Tolerate sub-cent aggregate-vs-per-expense rounding (the day's base is an
+  // aggregate round; the breakdown is a sum of per-expense rounds). A real gap
+  // — e.g. a past day whose stamped baseline differs from today's expenses —
+  // still surfaces.
+  const reconciles = Math.abs(breakdownSumCents - baseCents) <= 2;
 
   return (
     <div className="space-y-3">
@@ -2007,7 +2011,7 @@ function TotalsPanel({
             ) : null}
           </span>
           <span className="font-semibold text-[var(--text-primary)] tabular-nums">
-            {formatMoney(baseCents)}
+            {formatMoneyExact(baseCents)}
           </span>
         </button>
         {showBaseBreakdown && breakdown.length > 0 ? (
@@ -2055,12 +2059,12 @@ function BaseBreakdown({
               </span>
               <span className="block text-[10px] text-[var(--text-tertiary)]">
                 {item.itemKind === "amortized"
-                  ? `${formatMoney(item.originalAmountCents)} over ${item.periodDays}d → ${formatMoney(item.dailyAllocCents)}/day`
-                  : `${formatMoney(item.originalAmountCents)}/mo → ${formatMoney(item.dailyAllocCents)}/day`}
+                  ? `${formatMoneyExact(item.originalAmountCents)} over ${item.periodDays}d → ${formatMoneyExact(item.dailyAllocCents)}/day`
+                  : `${formatMoneyExact(item.originalAmountCents)}/mo → ${formatMoneyExact(item.dailyAllocCents)}/day`}
               </span>
             </span>
             <span className="shrink-0 font-semibold tabular-nums text-[var(--text-primary)]">
-              {formatMoney(item.appliedCents)}
+              {formatMoneyExact(item.appliedCents)}
             </span>
           </li>
         ))}
@@ -2075,7 +2079,7 @@ function BaseBreakdown({
         >
           {reconciles
             ? "Sum matches Fixed ✓"
-            : `Sum ${formatMoney(sumCents)} ≠ Fixed ${formatMoney(baseCents)}`}
+            : `Sum ${formatMoneyExact(sumCents)} ≠ Fixed ${formatMoneyExact(baseCents)}`}
         </span>
         <a
           className="text-[10px] font-semibold text-[var(--accent-primary)] hover:underline"
@@ -2739,6 +2743,17 @@ function formatMoneyNoSymbol(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(centsToDollars(value)));
+}
+
+// Exact to-the-cent currency. Used for fixed-cost figures and the breakdown,
+// where whole-dollar rounding would break the penny-level reconciliation.
+function formatMoneyExact(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(centsToDollars(value));
 }
 
 function formatTransactionAmount(
