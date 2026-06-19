@@ -137,6 +137,18 @@ type DayTotalRow = {
   cashflow_total: NumericValue;
 };
 
+type BaseAllocationRow = {
+  day_id: string;
+  item_kind: "recurring" | "amortized";
+  item_id: string;
+  item_name: string;
+  original_amount_cents: NumericValue;
+  period_days: NumericValue | null;
+  daily_alloc_cents: NumericValue;
+  applied_cents: NumericValue;
+  schedule_version: NumericValue;
+};
+
 type AdjacentAbilityPayPeriod = {
   adjacentWeekAbilityHours: number;
   adjacentWeekAbilityRegularHours: number;
@@ -291,6 +303,26 @@ export async function getDashboardData(): Promise<DashboardData> {
     throw new Error(`Unable to load transactions: ${transactionError.message}`);
   }
 
+  // Per-day fixed-cost breakdown (the "Fixed" drill-down). Soft-fail: if the
+  // derivation view isn't present yet (pre-migration) the dashboard still
+  // renders, just with empty breakdowns.
+  let baseAllocations: BaseAllocationRow[] = [];
+  if (dayIds.length > 0) {
+    const { data: allocData, error: allocError } = await supabase
+      .from("v_day_base_allocations")
+      .select(
+        "day_id,item_kind,item_id,item_name,original_amount_cents,period_days,daily_alloc_cents,applied_cents,schedule_version",
+      )
+      .in("day_id", dayIds);
+    if (allocError) {
+      console.warn(
+        `[dashboard] base allocations unavailable: ${allocError.message}`,
+      );
+    } else {
+      baseAllocations = (allocData ?? []) as BaseAllocationRow[];
+    }
+  }
+
   const adjacentAbilityPayPeriod = await loadAdjacentAbilityPayPeriod({
     supabase,
     week: weekData as WeekRow,
@@ -308,6 +340,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     adjacentAbilityPayPeriod,
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
     closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
+    baseAllocations,
     todayIso,
   });
   since("dashboard:total", tTotal);
@@ -325,6 +358,7 @@ function mapDashboardData(input: {
   adjacentAbilityPayPeriod: AdjacentAbilityPayPeriod;
   baselineTotal: BaselineTotalRow | null;
   closedWeekMetrics: ClosedWeekMetricRow[];
+  baseAllocations: BaseAllocationRow[];
   todayIso: string;
 }): DashboardData {
   const settings = mapPaySettings(input.settings);
@@ -359,12 +393,19 @@ function mapDashboardData(input: {
   const totalsByDay = new Map(
     input.dayTotals.map((totals) => [totals.day_id, totals]),
   );
+  const allocationsByDay = new Map<string, BaseAllocationRow[]>();
+  for (const row of input.baseAllocations) {
+    const list = allocationsByDay.get(row.day_id) ?? [];
+    list.push(row);
+    allocationsByDay.set(row.day_id, list);
+  }
   const days = input.days.map((day) =>
     mapDashboardDay(
       day,
       slotsByDay.get(day.id) ?? [],
       transactionsByDay.get(day.id) ?? [],
       totalsByDay.get(day.id),
+      allocationsByDay.get(day.id) ?? [],
     ),
   );
 
@@ -564,6 +605,7 @@ function mapDashboardDay(
   slots: EarnSlotRow[],
   transactions: DashboardTransaction[],
   totals: DayTotalRow | undefined,
+  allocations: BaseAllocationRow[],
 ): DashboardDay {
   const existingSlots = new Map(slots.map((slot) => [slot.slot_index, slot]));
   const spendCents = dollarsToCents(toNumber(day.manual_spend_adjustment));
@@ -589,6 +631,24 @@ function mapDashboardDay(
     spendCents,
     transactionSpendCents,
     spendLocked: day.spend_locked,
+    baseBreakdown: allocations
+      .map((row) => ({
+        itemKind: row.item_kind,
+        itemId: row.item_id,
+        itemName: row.item_name,
+        originalAmountCents: Math.round(toNumber(row.original_amount_cents)),
+        periodDays:
+          row.period_days === null ? null : Math.round(toNumber(row.period_days)),
+        dailyAllocCents: Math.round(toNumber(row.daily_alloc_cents)),
+        appliedCents: Math.round(toNumber(row.applied_cents)),
+        scheduleVersion: Math.round(toNumber(row.schedule_version)),
+      }))
+      .sort((a, b) => {
+        if (a.itemKind !== b.itemKind) {
+          return a.itemKind === "recurring" ? -1 : 1;
+        }
+        return a.itemName.localeCompare(b.itemName);
+      }),
     totals: {
       earningsCents: dollarsToCents(toNumber(totals?.earnings_total ?? 0)),
       abilityPaycheckCents: dollarsToCents(

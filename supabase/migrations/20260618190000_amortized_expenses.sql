@@ -131,8 +131,12 @@ join public.expenses e
   and e.is_active
   and (e.expiration_date is null or e.expiration_date >= current_date);
 
--- Authoritative per-day baseline (cents): recurring aggregate scalar (no drift)
--- + sum of amortized exact slices.
+-- Authoritative per-day baseline (cents) = the EXACT sum of the drill-down
+-- allocation rows, so the displayed "Fixed" total always equals the sum of its
+-- breakdown to the penny (the verify-nothing's-off requirement). This means the
+-- recurring contribution is the sum of per-expense daily slices rather than a
+-- single aggregate round — a one-time sub-cent shift from the legacy number,
+-- intentional so the breakdown reconciles.
 create or replace view public.v_day_base_totals
 with (security_invoker = true)
 as
@@ -140,18 +144,11 @@ select
   d.user_id,
   d.id as day_id,
   d.date,
-  (
-    coalesce(r.recurring_daily_cents, 0)
-    + coalesce(am.amortized_cents, 0)
-  )::bigint as base_cents
+  coalesce(sum(al.applied_cents), 0)::bigint as base_cents
 from public.days d
-left join public.v_recurring_daily_base r on r.user_id = d.user_id
-left join (
-  select user_id, day_id, sum(applied_cents)::bigint as amortized_cents
-  from public.v_day_base_allocations
-  where item_kind = 'amortized'
-  group by user_id, day_id
-) am on am.day_id = d.id and am.user_id = d.user_id;
+left join public.v_day_base_allocations al
+  on al.day_id = d.id and al.user_id = d.user_id
+group by d.user_id, d.id, d.date;
 
 ----------------------------------------------------------------------
 -- 3. force_recompute_baseline — manual lever to re-stamp a frozen window

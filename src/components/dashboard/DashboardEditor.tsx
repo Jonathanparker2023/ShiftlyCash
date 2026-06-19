@@ -1972,6 +1972,13 @@ function TotalsPanel({
   const baseCents = totals?.baseCents ?? day.baseCents;
   const cashflowCents = totals?.cashflowCents ?? 0;
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
+  const [showBaseBreakdown, setShowBaseBreakdown] = useState(false);
+  const breakdown = day.baseBreakdown;
+  const breakdownSumCents = breakdown.reduce(
+    (sum, item) => sum + item.appliedCents,
+    0,
+  );
+  const reconciles = breakdownSumCents === baseCents;
 
   return (
     <div className="space-y-3">
@@ -1982,7 +1989,35 @@ function TotalsPanel({
           tone="negative"
           value={formatMoney(spendCents)}
         />
-        <TotalLine label="Fixed" value={formatMoney(baseCents)} />
+        <button
+          aria-expanded={showBaseBreakdown}
+          className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
+          disabled={breakdown.length === 0}
+          onClick={() => setShowBaseBreakdown((open) => !open)}
+          type="button"
+        >
+          <span className="inline-flex items-center gap-1 text-[var(--text-secondary)]">
+            Fixed
+            {breakdown.length > 0 ? (
+              <span
+                className={`text-[10px] transition ${showBaseBreakdown ? "rotate-90" : ""}`}
+              >
+                ▸
+              </span>
+            ) : null}
+          </span>
+          <span className="font-semibold text-[var(--text-primary)] tabular-nums">
+            {formatMoney(baseCents)}
+          </span>
+        </button>
+        {showBaseBreakdown && breakdown.length > 0 ? (
+          <BaseBreakdown
+            baseCents={baseCents}
+            breakdown={breakdown}
+            reconciles={reconciles}
+            sumCents={breakdownSumCents}
+          />
+        ) : null}
         <div className="my-2 border-t border-[var(--border-default)]" />
         <TotalLine
           strong
@@ -1990,6 +2025,64 @@ function TotalsPanel({
           tone={cashflowDailyTone(displayCashflowCents)}
           value={formatMoney(displayCashflowCents)}
         />
+      </div>
+    </div>
+  );
+}
+
+function BaseBreakdown({
+  breakdown,
+  sumCents,
+  baseCents,
+  reconciles,
+}: {
+  breakdown: DashboardDay["baseBreakdown"];
+  sumCents: number;
+  baseCents: number;
+  reconciles: boolean;
+}) {
+  return (
+    <div className="mt-1 mb-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-base)] p-2 text-xs">
+      <ul className="space-y-1.5">
+        {breakdown.map((item) => (
+          <li
+            key={`${item.itemKind}:${item.itemId}`}
+            className="flex items-start justify-between gap-3"
+          >
+            <span className="min-w-0">
+              <span className="block truncate text-[var(--text-primary)]">
+                {item.itemName}
+              </span>
+              <span className="block text-[10px] text-[var(--text-tertiary)]">
+                {item.itemKind === "amortized"
+                  ? `${formatMoney(item.originalAmountCents)} over ${item.periodDays}d → ${formatMoney(item.dailyAllocCents)}/day`
+                  : `${formatMoney(item.originalAmountCents)}/mo → ${formatMoney(item.dailyAllocCents)}/day`}
+              </span>
+            </span>
+            <span className="shrink-0 font-semibold tabular-nums text-[var(--text-primary)]">
+              {formatMoney(item.appliedCents)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 flex items-center justify-between border-t border-[var(--border-default)] pt-1.5">
+        <span
+          className={
+            reconciles
+              ? "text-[10px] text-[var(--text-tertiary)]"
+              : "text-[10px] font-semibold text-[var(--accent-warning)]"
+          }
+        >
+          {reconciles
+            ? "Sum matches Fixed ✓"
+            : `Sum ${formatMoney(sumCents)} ≠ Fixed ${formatMoney(baseCents)}`}
+        </span>
+        <a
+          className="text-[10px] font-semibold text-[var(--accent-primary)] hover:underline"
+          href="/baseline"
+        >
+          Edit in Fixed →
+        </a>
       </div>
     </div>
   );

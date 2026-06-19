@@ -38,6 +38,17 @@ export type DashboardSlot = EarnSlotInput & {
   source: EarnSlotSource;
 };
 
+export type DashboardBaseAllocation = {
+  itemKind: "recurring" | "amortized";
+  itemId: string;
+  itemName: string;
+  originalAmountCents: number;
+  periodDays: number | null;
+  dailyAllocCents: number;
+  appliedCents: number;
+  scheduleVersion: number;
+};
+
 export type DashboardDay = {
   id: string;
   weekId: string;
@@ -48,6 +59,7 @@ export type DashboardDay = {
   spendCents: number;
   transactionSpendCents: number;
   spendLocked: boolean;
+  baseBreakdown: DashboardBaseAllocation[];
   totals: DayTotals;
   slots: DashboardSlot[];
   appliedTransactions: DashboardTransaction[];
