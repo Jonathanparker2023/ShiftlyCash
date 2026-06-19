@@ -139,6 +139,17 @@ async function applyBaselineAndRevalidate(
     throw new Error(`Unable to apply baseline: ${error.message}`);
   }
 
+  // Heal recently-passed days so an expired subscription doesn't leave phantom
+  // fixed cost on days stamped before it expired. Bounded + soft-fail (safe
+  // before the migration that defines this function lands).
+  const { error: restampError } = await supabase.rpc(
+    "restamp_recent_baseline",
+    { p_user_id: userId, p_days_back: 14 },
+  );
+  if (restampError) {
+    console.warn(`[baseline] recent restamp skipped: ${restampError.message}`);
+  }
+
   revalidatePath("/baseline");
   revalidatePath("/dashboard");
 }
