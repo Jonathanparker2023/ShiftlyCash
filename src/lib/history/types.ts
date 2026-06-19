@@ -39,6 +39,11 @@ export type HistoryDetailSlot = {
   computedEarningsCents: number;
   label: string;
   source: string;
+  // "bucket" = a synthetic READ-ONLY Amortized Income credit row (slotIndex>=4),
+  // carrying the SIGNED daily credit. Not a stored earn_slot.
+  kind?: "earn" | "bucket";
+  bucketId?: string | null;
+  creditCents?: number;
 };
 
 export type HistoryDetailTransaction = {

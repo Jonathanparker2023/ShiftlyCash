@@ -217,7 +217,9 @@ function FocusedDayPanel({ day }: { day: HistoryDetailDay }) {
         <section className="space-y-2">
           {(() => {
             const realSlots = day.slots.filter(
-              (slot) => slot.jobType !== "none" && slot.hoursOrUnits > 0,
+              (slot) =>
+                slot.kind === "bucket" ||
+                (slot.jobType !== "none" && slot.hoursOrUnits > 0),
             );
             if (realSlots.length === 0) {
               return (
@@ -241,6 +243,24 @@ function FocusedDayPanel({ day }: { day: HistoryDetailDay }) {
 }
 
 function ShiftRow({ slot }: { slot: HistoryDetailSlot }) {
+  if (slot.kind === "bucket") {
+    return (
+      <div className={historyShiftBarClass(slot.jobType)}>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-xs font-semibold">Other</span>
+          <span className="shrink-0 rounded bg-black/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
+            Amortized
+          </span>
+          <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
+            {slot.label || ""}
+          </span>
+          <span className="ml-auto shrink-0 text-sm font-medium tabular-nums">
+            {formatBucketCreditAmount(slot.creditCents ?? 0)}
+          </span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={historyShiftBarClass(slot.jobType)}>
       <div className="flex min-w-0 items-center gap-2">
@@ -451,6 +471,18 @@ function formatMoney(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(centsToDollars(value)));
+}
+
+// Sign-aware, to-the-cent amount for a synthetic Amortized Income credit row
+// (a negative daily slice must render as a real negative, not blank/clamped).
+function formatBucketCreditAmount(creditCents: number): string {
+  const magnitude = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(centsToDollars(Math.abs(creditCents)));
+  return creditCents < 0 ? `-${magnitude}` : magnitude;
 }
 
 function formatQuantity(value: number): string {

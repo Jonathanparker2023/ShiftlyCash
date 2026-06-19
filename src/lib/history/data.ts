@@ -86,6 +86,13 @@ type EarnSlotRow = {
   source: string;
 };
 
+type CreditItemRow = {
+  day_id: string;
+  bucket_id: string;
+  bucket_name: string;
+  credit_cents: NumericValue;
+};
+
 type TransactionRow = {
   id: string;
   day_id: string | null;
@@ -241,9 +248,10 @@ export async function getHistoryDetailData(
   const days = (dayData ?? []) as DayRow[];
   const dayIds = days.map((day) => day.id);
   const settings = mapPaySettings(settingsData as SettingsRow);
-  const [slotRows, transactionRows] = await Promise.all([
+  const [slotRows, transactionRows, creditRows] = await Promise.all([
     loadEarnSlots(dayIds),
     loadTransactions(dayIds),
+    loadAmortizationCredits(dayIds),
   ]);
   const totalsByDay = new Map(
     ((dayTotalData ?? []) as DayTotalRow[]).map((row) => [row.day_id, row]),
@@ -260,11 +268,33 @@ export async function getHistoryDetailData(
         totalsByDay.get(day.id),
         slotRows.filter((slot) => slot.day_id === day.id),
         transactionRows.filter((transaction) => transaction.day_id === day.id),
+        creditRows.filter((credit) => credit.day_id === day.id),
         settings,
       ),
     ),
     snapshots: ((snapshotData ?? []) as SnapshotRow[]).map(mapSnapshotSummary),
   };
+
+  // Amortized Income daily credits for these days. Soft-fail: pre-migration the
+  // view is absent and history still renders (just without bucket rows).
+  async function loadAmortizationCredits(dayIdsToLoad: string[]) {
+    if (dayIdsToLoad.length === 0) {
+      return [] as CreditItemRow[];
+    }
+
+    const { data, error } = await supabase
+      .from("v_day_amortization_credit_items")
+      .select("day_id,bucket_id,bucket_name,credit_cents")
+      .eq("user_id", user.id)
+      .in("day_id", dayIdsToLoad);
+
+    if (error) {
+      console.warn(`[history] amortization credits unavailable: ${error.message}`);
+      return [] as CreditItemRow[];
+    }
+
+    return (data ?? []) as CreditItemRow[];
+  }
 
   async function loadEarnSlots(dayIdsToLoad: string[]) {
     if (dayIdsToLoad.length === 0) {
@@ -350,6 +380,7 @@ function mapHistoryDetailDay(
   totals: DayTotalRow | undefined,
   slots: EarnSlotRow[],
   transactions: TransactionRow[],
+  credits: CreditItemRow[],
   settings: PaySettings,
 ): HistoryDetailDay {
   return {
@@ -366,7 +397,31 @@ function mapHistoryDetailDay(
     earningsCents: dollarsToCents(toNumber(totals?.earnings_total ?? 0)),
     spendCents: dollarsToCents(toNumber(totals?.spend_total ?? 0)),
     cashflowCents: dollarsToCents(toNumber(totals?.cashflow_total ?? 0)),
-    slots: slots.map((slot) => mapHistoryDetailSlot(slot, settings)),
+    slots: [
+      ...slots.map((slot) => mapHistoryDetailSlot(slot, settings)),
+      // Synthetic READ-ONLY Amortized Income credit rows (slotIndex >= 4 sentinel).
+      ...credits.map((credit, n): HistoryDetailSlot => {
+        const creditCents = Math.round(toNumber(credit.credit_cents));
+        return {
+          id: `bucket:${credit.bucket_id}`,
+          slotIndex: 4 + n,
+          jobType: "other",
+          payType: "none",
+          hoursOrUnits: creditCents / 100,
+          regularHours: 0,
+          overtimeHours: 0,
+          incentiveMode: "none",
+          incentiveRate: 0,
+          incentiveAmount: 0,
+          computedEarningsCents: creditCents,
+          label: credit.bucket_name,
+          source: "migration",
+          kind: "bucket",
+          bucketId: credit.bucket_id,
+          creditCents,
+        };
+      }),
+    ],
     transactions: sortChronologicalTransactions(
       transactions.map(mapHistoryDetailTransaction),
     ),
