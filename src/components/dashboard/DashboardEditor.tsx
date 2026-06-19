@@ -2755,11 +2755,11 @@ function formatShiftAmountValue(
   return formatMoney(earningsCents);
 }
 
-// Sign-aware, to-the-cent amount for a synthetic Amortized Income credit row.
+// Sign-aware, whole-dollar amount for a synthetic Amortized Income credit row.
 // Bypasses calculateEarnSlot/formatShiftAmountValue, which blank out and clamp
 // non-positive values — a negative daily slice must render as a real negative.
 function formatBucketCreditAmount(creditCents: number): string {
-  const magnitude = formatMoneyExact(Math.abs(creditCents));
+  const magnitude = formatMoney(Math.abs(creditCents));
   return creditCents < 0 ? `-${magnitude}` : magnitude;
 }
 

@@ -473,15 +473,10 @@ function formatMoney(value: number): string {
   }).format(Math.round(centsToDollars(value)));
 }
 
-// Sign-aware, to-the-cent amount for a synthetic Amortized Income credit row
+// Sign-aware, whole-dollar amount for a synthetic Amortized Income credit row
 // (a negative daily slice must render as a real negative, not blank/clamped).
 function formatBucketCreditAmount(creditCents: number): string {
-  const magnitude = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(centsToDollars(Math.abs(creditCents)));
+  const magnitude = formatMoney(Math.abs(creditCents));
   return creditCents < 0 ? `-${magnitude}` : magnitude;
 }
 
