@@ -33,9 +33,26 @@ export type BaselineBucket = {
   dailyRateCents: number; // round(total / periodDays) — the display rate
 };
 
+// A one-time cost spread over a window (the dashboard "amortize this" feature).
+// Contributes to daily fixed cost via amortized slices — shown here so the Fixed
+// page matches the dashboard's Fixed breakdown one-to-one.
+export type BaselineAmortizedExpense = {
+  id: string;
+  merchantName: string;
+  originalAmountCents: number;
+  startDate: string;
+  endDate: string;
+  periodDays: number;
+  dailyCents: number; // nominal round(original / period)
+  todaySliceCents: number; // exact cumulative-floor slice for today (0 if outside window)
+  sourceTransactionId: string | null;
+};
+
 export type BaselineData = {
   todayIso: string;
   expenses: BaselineExpense[];
   totals: BaselineViewTotals;
   buckets: BaselineBucket[];
+  amortizedExpenses: BaselineAmortizedExpense[];
+  amortizedDailyTodayCents: number; // sum of today's slices (matches dashboard)
 };

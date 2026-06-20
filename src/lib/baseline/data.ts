@@ -2,6 +2,7 @@ import { requireUserWithBootstrapStatus } from "@/lib/auth";
 import { mark, since, timed } from "@/lib/perf";
 import { getTodayIso } from "@/lib/dashboard/dates";
 import type {
+  BaselineAmortizedExpense,
   BaselineBucket,
   BaselineBucketItem,
   BaselineData,
@@ -11,6 +12,16 @@ import type {
 import { dollarsToCents } from "@/lib/domain/money";
 
 type NumericValue = number | string | null;
+
+type AmortizedExpenseRow = {
+  id: string;
+  merchant_name: string;
+  original_amount_cents: NumericValue;
+  start_date: string;
+  end_date: string;
+  period_days: NumericValue;
+  source_transaction_id: string | null;
+};
 
 type BucketRow = {
   id: string;
@@ -106,14 +117,73 @@ export async function getBaselineData(): Promise<BaselineData> {
     );
   }
 
+  // Amortized expenses (one-time costs spread over a window — the dashboard
+  // "amortize this" feature). Shown so the Fixed page matches the dashboard's
+  // Fixed breakdown. Soft-fail like the buckets above.
+  const todayIso = getTodayIso();
+  let amortizedExpenses: BaselineAmortizedExpense[] = [];
+  const { data: amortData, error: amortError } = await supabase
+    .from("amortized_expenses")
+    .select(
+      "id,merchant_name,original_amount_cents,start_date,end_date,period_days,source_transaction_id",
+    )
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("start_date", { ascending: true });
+  if (amortError) {
+    console.warn(`[baseline] amortized expenses unavailable: ${amortError.message}`);
+  } else {
+    amortizedExpenses = ((amortData ?? []) as AmortizedExpenseRow[]).map((row) =>
+      mapAmortizedExpenseRow(row, todayIso),
+    );
+  }
+  const amortizedDailyTodayCents = amortizedExpenses.reduce(
+    (sum, expense) => sum + expense.todaySliceCents,
+    0,
+  );
+
   const result = {
-    todayIso: getTodayIso(),
+    todayIso,
     expenses: ((expenseData ?? []) as ExpenseRow[]).map(mapExpenseRow),
     totals: mapExpenseTotals(totalData as ExpenseTotalRow | null),
     buckets,
+    amortizedExpenses,
+    amortizedDailyTodayCents,
   };
   since("baseline:total", tTotal);
   return result;
+}
+
+// Exact cumulative-floor slice for today, matching the dashboard's
+// v_day_amortization / v_day_base_allocations math. 0 if today is outside the
+// [start, end] window.
+function mapAmortizedExpenseRow(
+  row: AmortizedExpenseRow,
+  todayIso: string,
+): BaselineAmortizedExpense {
+  const originalAmountCents = Math.round(toNumber(row.original_amount_cents));
+  const periodDays = Math.max(1, Math.round(toNumber(row.period_days)));
+  const startMs = Date.parse(`${row.start_date}T00:00:00Z`);
+  const endMs = Date.parse(`${row.end_date}T00:00:00Z`);
+  const todayMs = Date.parse(`${todayIso}T00:00:00Z`);
+  let todaySliceCents = 0;
+  if (todayMs >= startMs && todayMs <= endMs) {
+    const k = Math.round((todayMs - startMs) / 86_400_000);
+    todaySliceCents =
+      Math.floor((originalAmountCents * (k + 1)) / periodDays) -
+      Math.floor((originalAmountCents * k) / periodDays);
+  }
+  return {
+    id: row.id,
+    merchantName: row.merchant_name,
+    originalAmountCents,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    periodDays,
+    dailyCents: Math.round(originalAmountCents / periodDays),
+    todaySliceCents,
+    sourceTransactionId: row.source_transaction_id,
+  };
 }
 
 function assembleBuckets(

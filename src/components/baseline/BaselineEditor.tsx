@@ -13,10 +13,12 @@ import {
   createAmortizationBucketAction,
   deleteAmortizationBucketAction,
   deleteAmortizationItemAction,
+  removeAmortizationAction,
   updateAmortizationBucketAction,
   upsertAmortizationItemAction,
 } from "@/app/(protected)/actions";
 import type {
+  BaselineAmortizedExpense,
   BaselineBucket,
   BaselineBucketItem,
   BaselineData,
@@ -293,12 +295,139 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
           </div>
         </section>
 
+        <AmortizedExpensesSection
+          initialExpenses={initialData.amortizedExpenses}
+          recurringDailyCents={totals.projectedDailyBaseCents}
+        />
+
         <AmortizedIncomeSection
           initialBuckets={initialData.buckets}
           todayIso={initialData.todayIso}
         />
       </section>
     </main>
+  );
+}
+
+function AmortizedExpensesSection({
+  initialExpenses,
+  recurringDailyCents,
+}: {
+  initialExpenses: BaselineAmortizedExpense[];
+  recurringDailyCents: number;
+}) {
+  const [expenses, setExpenses] = useState(initialExpenses);
+  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  // Recompute from current list so a removal updates the total optimistically.
+  const amortizedTotal = expenses.reduce(
+    (sum, expense) => sum + expense.todaySliceCents,
+    0,
+  );
+  const combinedDaily = recurringDailyCents + amortizedTotal;
+
+  async function remove(expense: BaselineAmortizedExpense) {
+    if (!expense.sourceTransactionId) {
+      return;
+    }
+    setRemovingIds((current) => new Set(current).add(expense.id));
+    setError(null);
+    try {
+      await removeAmortizationAction({
+        transactionId: expense.sourceTransactionId,
+      });
+      setExpenses((list) => list.filter((item) => item.id !== expense.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Remove failed.");
+    } finally {
+      setRemovingIds((current) => {
+        const next = new Set(current);
+        next.delete(expense.id);
+        return next;
+      });
+    }
+  }
+
+  return (
+    <section className="mt-10">
+      <div className="mb-3 flex flex-col gap-3 px-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+            Amortized Expenses
+          </h2>
+          <p className="mt-1 text-xs text-white/45">
+            One-time costs spread across days — these add to your daily fixed
+            cost and show in the dashboard Fixed breakdown.
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/50">
+            Daily fixed today
+          </div>
+          <div className="text-2xl font-semibold tabular-nums">
+            {formatMoney(combinedDaily)}
+          </div>
+          <div className="text-xs text-white/45">
+            {formatMoney(recurringDailyCents)} recurring +{" "}
+            {formatMoney(amortizedTotal)} amortized
+          </div>
+        </div>
+      </div>
+
+      {expenses.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-5 py-10 text-center">
+          <p className="text-sm font-medium text-white/70">
+            No amortized expenses.
+          </p>
+          <p className="mt-1 text-xs text-white/45">
+            On a transaction, tap &quot;Spread this cost&quot; to amortize a
+            one-time purchase across months.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_30px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+          <div className="divide-y divide-white/[0.07]">
+            {expenses.map((expense) => (
+              <div
+                className="flex items-center gap-3 px-5 py-3.5"
+                key={expense.id}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {expense.merchantName}
+                  </p>
+                  <p className="mt-0.5 text-xs text-white/55">
+                    {formatMoney(expense.originalAmountCents)} over{" "}
+                    {expense.periodDays}d · {expense.startDate} →{" "}
+                    {expense.endDate}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-semibold tabular-nums">
+                    {formatMoney(expense.todaySliceCents)}
+                    <span className="text-xs font-normal text-white/50">
+                      /day
+                    </span>
+                  </p>
+                </div>
+                {expense.sourceTransactionId ? (
+                  <button
+                    className="h-9 shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={removingIds.has(expense.id)}
+                    onClick={() => remove(expense)}
+                    type="button"
+                  >
+                    {removingIds.has(expense.id) ? "..." : "Remove"}
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {error ? <p className="mt-2 px-1 text-xs text-red-300">{error}</p> : null}
+    </section>
   );
 }
 
