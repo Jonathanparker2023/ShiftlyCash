@@ -296,6 +296,7 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
         </section>
 
         <AmortizedExpensesSection
+          canonicalDailyCents={initialData.dailyFixedTodayCents}
           initialExpenses={initialData.amortizedExpenses}
           recurringDailyCents={totals.projectedDailyBaseCents}
         />
@@ -312,20 +313,31 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
 function AmortizedExpensesSection({
   initialExpenses,
   recurringDailyCents,
+  canonicalDailyCents,
 }: {
   initialExpenses: BaselineAmortizedExpense[];
   recurringDailyCents: number;
+  // The dashboard's exact daily-fixed value (from v_day_totals). When present it
+  // IS the headline — same source as the dashboard, so they can't disagree.
+  canonicalDailyCents: number | null;
 }) {
   const [expenses, setExpenses] = useState(initialExpenses);
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // Recompute from current list so a removal updates the total optimistically.
+  // Component sum (recompute from current list so a removal updates optimistically).
   const amortizedTotal = expenses.reduce(
     (sum, expense) => sum + expense.todaySliceCents,
     0,
   );
-  const combinedDaily = recurringDailyCents + amortizedTotal;
+  const componentSum = recurringDailyCents + amortizedTotal;
+  // Headline = the dashboard's own value when available; fall back to the sum.
+  const headlineDaily = canonicalDailyCents ?? componentSum;
+  // If the component sum ever drifts from the canonical value, surface it loudly
+  // (within a couple cents of rounding) instead of letting it pass silently.
+  const drifts =
+    canonicalDailyCents !== null &&
+    Math.abs(canonicalDailyCents - componentSum) > 2;
 
   async function remove(expense: BaselineAmortizedExpense) {
     if (!expense.sourceTransactionId) {
@@ -366,12 +378,17 @@ function AmortizedExpensesSection({
             Daily fixed today
           </div>
           <div className="text-2xl font-semibold tabular-nums">
-            {formatMoney(combinedDaily)}
+            {formatMoney(headlineDaily)}
           </div>
           <div className="text-xs text-white/45">
             {formatMoney(recurringDailyCents)} recurring +{" "}
             {formatMoney(amortizedTotal)} amortized
           </div>
+          {drifts ? (
+            <div className="mt-1 text-xs font-semibold text-amber-300">
+              ⚠ components sum to {formatMoney(componentSum)}
+            </div>
+          ) : null}
         </div>
       </div>
 

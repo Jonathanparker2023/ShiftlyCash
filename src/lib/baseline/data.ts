@@ -142,6 +142,27 @@ export async function getBaselineData(): Promise<BaselineData> {
     0,
   );
 
+  // The canonical daily fixed for today, read from the SAME view the dashboard
+  // uses (v_day_totals). This is the single source of truth for the headline
+  // number — it cannot disagree with the dashboard because it IS the dashboard's
+  // value. Soft-fail to null (then the page falls back to the component sum).
+  let dailyFixedTodayCents: number | null = null;
+  const { data: todayTotalData, error: todayTotalError } = await supabase
+    .from("v_day_totals")
+    .select("base_amount")
+    .eq("user_id", user.id)
+    .eq("date", todayIso)
+    .maybeSingle();
+  if (todayTotalError) {
+    console.warn(
+      `[baseline] today fixed total unavailable: ${todayTotalError.message}`,
+    );
+  } else if (todayTotalData) {
+    dailyFixedTodayCents = dollarsToCents(
+      toNumber((todayTotalData as { base_amount: NumericValue }).base_amount),
+    );
+  }
+
   const result = {
     todayIso,
     expenses: ((expenseData ?? []) as ExpenseRow[]).map(mapExpenseRow),
@@ -149,6 +170,7 @@ export async function getBaselineData(): Promise<BaselineData> {
     buckets,
     amortizedExpenses,
     amortizedDailyTodayCents,
+    dailyFixedTodayCents,
   };
   since("baseline:total", tTotal);
   return result;

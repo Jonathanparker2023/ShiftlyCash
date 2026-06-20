@@ -55,4 +55,8 @@ export type BaselineData = {
   buckets: BaselineBucket[];
   amortizedExpenses: BaselineAmortizedExpense[];
   amortizedDailyTodayCents: number; // sum of today's slices (matches dashboard)
+  // The CANONICAL daily fixed for today, read straight from v_day_totals — the
+  // exact same source the dashboard uses. Single source of truth: the Fixed page
+  // and the dashboard cannot show different numbers because it's the same value.
+  dailyFixedTodayCents: number | null;
 };
