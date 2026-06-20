@@ -424,7 +424,9 @@ export async function renameTransactionAction(
     throw new Error(`Unable to rename transaction: ${error.message}`);
   }
 
+  // /baseline shows the amortized expense whose name derives from this txn.
   revalidatePath("/");
+  revalidatePath("/baseline");
   return { ok: true, merchantName };
 }
 

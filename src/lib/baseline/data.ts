@@ -133,8 +133,33 @@ export async function getBaselineData(): Promise<BaselineData> {
   if (amortError) {
     console.warn(`[baseline] amortized expenses unavailable: ${amortError.message}`);
   } else {
-    amortizedExpenses = ((amortData ?? []) as AmortizedExpenseRow[]).map((row) =>
-      mapAmortizedExpenseRow(row, todayIso),
+    const amortRows = (amortData ?? []) as AmortizedExpenseRow[];
+    // Resolve the LIVE source-transaction name so a rename in the dashboard
+    // propagates here (single source). Separate lookup, not an embed, so a join
+    // mismatch can never break the page.
+    const txnNameById = new Map<string, string>();
+    const txnIds = amortRows
+      .map((row) => row.source_transaction_id)
+      .filter((id): id is string => Boolean(id));
+    if (txnIds.length > 0) {
+      const { data: txnData, error: txnError } = await supabase
+        .from("transactions")
+        .select("id,merchant_name")
+        .eq("user_id", user.id)
+        .in("id", txnIds);
+      if (txnError) {
+        console.warn(`[baseline] amortized txn names unavailable: ${txnError.message}`);
+      } else {
+        for (const row of (txnData ?? []) as {
+          id: string;
+          merchant_name: string;
+        }[]) {
+          txnNameById.set(row.id, row.merchant_name);
+        }
+      }
+    }
+    amortizedExpenses = amortRows.map((row) =>
+      mapAmortizedExpenseRow(row, todayIso, txnNameById),
     );
   }
   const amortizedDailyTodayCents = amortizedExpenses.reduce(
@@ -182,7 +207,11 @@ export async function getBaselineData(): Promise<BaselineData> {
 function mapAmortizedExpenseRow(
   row: AmortizedExpenseRow,
   todayIso: string,
+  txnNameById: Map<string, string>,
 ): BaselineAmortizedExpense {
+  const liveName = row.source_transaction_id
+    ? txnNameById.get(row.source_transaction_id)
+    : undefined;
   const originalAmountCents = Math.round(toNumber(row.original_amount_cents));
   const periodDays = Math.max(1, Math.round(toNumber(row.period_days)));
   const startMs = Date.parse(`${row.start_date}T00:00:00Z`);
@@ -197,7 +226,7 @@ function mapAmortizedExpenseRow(
   }
   return {
     id: row.id,
-    merchantName: row.merchant_name,
+    merchantName: liveName ?? row.merchant_name,
     originalAmountCents,
     startDate: row.start_date,
     endDate: row.end_date,
