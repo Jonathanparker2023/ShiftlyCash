@@ -84,6 +84,15 @@ type EarnSlotRow = {
   incentive_amount: NumericValue;
   label: string | null;
   source: string;
+  custom_job_id: string | null;
+};
+
+type CustomJobRow = {
+  id: string;
+  name: string;
+  color: string;
+  regular_rate_cents: number;
+  ot_rate_cents: number;
 };
 
 type CreditItemRow = {
@@ -248,11 +257,13 @@ export async function getHistoryDetailData(
   const days = (dayData ?? []) as DayRow[];
   const dayIds = days.map((day) => day.id);
   const settings = mapPaySettings(settingsData as SettingsRow);
-  const [slotRows, transactionRows, creditRows] = await Promise.all([
-    loadEarnSlots(dayIds),
-    loadTransactions(dayIds),
-    loadAmortizationCredits(dayIds),
-  ]);
+  const [slotRows, transactionRows, creditRows, customJobsById] =
+    await Promise.all([
+      loadEarnSlots(dayIds),
+      loadTransactions(dayIds),
+      loadAmortizationCredits(dayIds),
+      loadCustomJobs(),
+    ]);
   const totalsByDay = new Map(
     ((dayTotalData ?? []) as DayTotalRow[]).map((row) => [row.day_id, row]),
   );
@@ -270,6 +281,7 @@ export async function getHistoryDetailData(
         transactionRows.filter((transaction) => transaction.day_id === day.id),
         creditRows.filter((credit) => credit.day_id === day.id),
         settings,
+        customJobsById,
       ),
     ),
     snapshots: ((snapshotData ?? []) as SnapshotRow[]).map(mapSnapshotSummary),
@@ -304,7 +316,7 @@ export async function getHistoryDetailData(
     const { data, error } = await supabase
       .from("earn_slots")
       .select(
-        "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,source",
+        "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,source,custom_job_id",
       )
       .eq("user_id", user.id)
       .in("day_id", dayIdsToLoad)
@@ -315,6 +327,24 @@ export async function getHistoryDetailData(
     }
 
     return (data ?? []) as EarnSlotRow[];
+  }
+
+  // Custom jobs library — to color + price custom shift rows. Soft-fail: pre-
+  // migration the table is absent and history still renders without it.
+  async function loadCustomJobs() {
+    const { data, error } = await supabase
+      .from("custom_jobs")
+      .select("id,name,color,regular_rate_cents,ot_rate_cents")
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.warn(`[history] custom jobs unavailable: ${error.message}`);
+      return new Map<string, CustomJobRow>();
+    }
+
+    return new Map(
+      ((data ?? []) as CustomJobRow[]).map((row) => [row.id, row]),
+    );
   }
 
   async function loadTransactions(dayIdsToLoad: string[]) {
@@ -382,6 +412,7 @@ function mapHistoryDetailDay(
   transactions: TransactionRow[],
   credits: CreditItemRow[],
   settings: PaySettings,
+  customJobsById: Map<string, CustomJobRow>,
 ): HistoryDetailDay {
   return {
     id: day.id,
@@ -398,7 +429,9 @@ function mapHistoryDetailDay(
     spendCents: dollarsToCents(toNumber(totals?.spend_total ?? 0)),
     cashflowCents: dollarsToCents(toNumber(totals?.cashflow_total ?? 0)),
     slots: [
-      ...slots.map((slot) => mapHistoryDetailSlot(slot, settings)),
+      ...slots.map((slot) =>
+        mapHistoryDetailSlot(slot, settings, customJobsById),
+      ),
       // Synthetic READ-ONLY Amortized Income credit rows (slotIndex >= 4 sentinel).
       ...credits.map((credit, n): HistoryDetailSlot => {
         const creditCents = Math.round(toNumber(credit.credit_cents));
@@ -431,7 +464,12 @@ function mapHistoryDetailDay(
 function mapHistoryDetailSlot(
   row: EarnSlotRow,
   settings: PaySettings,
+  customJobsById: Map<string, CustomJobRow>,
 ): HistoryDetailSlot {
+  const customJob =
+    row.job_type === "custom" && row.custom_job_id
+      ? customJobsById.get(row.custom_job_id)
+      : undefined;
   const slot = {
     jobType: row.job_type,
     payType: row.pay_type,
@@ -442,6 +480,10 @@ function mapHistoryDetailSlot(
     incentiveRate: toNumber(row.incentive_rate),
     incentiveAmount: toNumber(row.incentive_amount),
     label: row.label ?? "",
+    // Feed the custom rate into calculateEarnSlot so the per-row amount prices
+    // correctly (undefined for non-custom rows -> identical to before).
+    customRegularRateCents: customJob?.regular_rate_cents,
+    customOvertimeRateCents: customJob?.ot_rate_cents,
   };
 
   return {
@@ -450,6 +492,9 @@ function mapHistoryDetailSlot(
     ...slot,
     computedEarningsCents: calculateEarnSlot(slot, settings).earningsCents,
     source: row.source,
+    customJobId: row.custom_job_id ?? null,
+    customColor: customJob?.color,
+    customName: customJob?.name,
   };
 }
 

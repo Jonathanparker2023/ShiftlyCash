@@ -39,6 +39,13 @@ export type HistoryDetailSlot = {
   computedEarningsCents: number;
   label: string;
   source: string;
+  // Set when jobType==='custom'. Color/name drive the bar styling; the rate
+  // fields feed calculateEarnSlot so the per-row amount prices correctly.
+  customJobId?: string | null;
+  customColor?: string;
+  customName?: string;
+  customRegularRateCents?: number;
+  customOvertimeRateCents?: number;
   // "bucket" = a synthetic READ-ONLY Amortized Income credit row (slotIndex>=4),
   // carrying the SIGNED daily credit. Not a stored earn_slot.
   kind?: "earn" | "bucket";

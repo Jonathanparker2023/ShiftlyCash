@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
+import { contrastText, darken } from "@/lib/domain/jobColor";
 import {
   cashflowColorFromTone,
   cashflowDailyTone,
@@ -28,6 +29,33 @@ export function HistoryWeekView({ data }: { data: HistoryDetailData }) {
     () => netEarningsByBucket(data.days.flatMap((day) => day.slots)),
     [data.days],
   );
+  // Per-custom-job net for this closed week (chips beside Prestige/Ability net),
+  // grouped from the priced slots so they reconcile to the week's earnings.
+  const customNets = useMemo(() => {
+    const byJob = new Map<
+      string,
+      { id: string; name: string; color: string; netCents: number }
+    >();
+    for (const day of data.days) {
+      for (const slot of day.slots) {
+        if (slot.kind === "bucket" || slot.jobType !== "custom" || !slot.customJobId) {
+          continue;
+        }
+        const existing = byJob.get(slot.customJobId);
+        if (existing) {
+          existing.netCents += slot.computedEarningsCents;
+        } else {
+          byJob.set(slot.customJobId, {
+            id: slot.customJobId,
+            name: slot.customName ?? "Custom",
+            color: slot.customColor ?? "#3b82f6",
+            netCents: slot.computedEarningsCents,
+          });
+        }
+      }
+    }
+    return Array.from(byJob.values());
+  }, [data.days]);
 
   const metrics = useMemo(
     () => [
@@ -94,6 +122,7 @@ export function HistoryWeekView({ data }: { data: HistoryDetailData }) {
 
       <WeekNetSummary
         abilityNetCents={weekNetTotals.abilityNetCents}
+        customNets={customNets}
         prestigeNetCents={weekNetTotals.prestigeNetCents}
       />
 
@@ -261,11 +290,29 @@ function ShiftRow({ slot }: { slot: HistoryDetailSlot }) {
       </div>
     );
   }
+  const isCustom = slot.jobType === "custom";
+  const customStyle =
+    isCustom && slot.customColor
+      ? {
+          backgroundColor: slot.customColor,
+          borderColor: darken(slot.customColor),
+          color: contrastText(slot.customColor),
+        }
+      : undefined;
   return (
-    <div className={historyShiftBarClass(slot.jobType)}>
+    <div
+      className={
+        isCustom
+          ? "rounded-md border p-3 text-sm shadow-sm"
+          : historyShiftBarClass(slot.jobType)
+      }
+      style={customStyle}
+    >
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 text-xs font-semibold">
-          {formatJobLabel(slot.jobType)}
+          {isCustom
+            ? (slot.customName ?? "Custom")
+            : formatJobLabel(slot.jobType)}
         </span>
         {slot.payType === "regular" ||
         slot.payType === "overtime" ||
