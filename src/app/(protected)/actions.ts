@@ -15,6 +15,7 @@ const JOB_TYPES = [
   "prestige_ilst",
   "incentive",
   "other",
+  "custom",
   "none",
 ] as const;
 const INCENTIVE_MODES = ["none", "rate", "lump_sum"] as const;
@@ -37,6 +38,7 @@ export type SaveEarnSlotInput = {
   incentiveRate?: number;
   incentiveAmount?: number;
   label: string;
+  customJobId?: string | null;
 };
 
 export type SaveDayResult = {
@@ -190,6 +192,7 @@ export async function saveEarnSlotAction(
         incentive_amount: normalized.incentiveAmount ?? 0,
         label: normalized.label || null,
         source: "user",
+        custom_job_id: normalized.customJobId ?? null,
       },
       { onConflict: "day_id,slot_index" },
     )
@@ -884,6 +887,11 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
   const slotIndex = requireSlotIndex(input.slotIndex);
   const jobType = requireEnum(input.jobType, JOB_TYPES, "jobType");
   const label = input.label.trim();
+  // custom_job_id is required IFF job_type='custom' (DB check constraint).
+  const customJobId =
+    jobType === "custom"
+      ? requireUuid(input.customJobId ?? "", "customJobId")
+      : null;
 
   if (jobType === "none") {
     return {
@@ -938,6 +946,7 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
       regularHours,
       overtimeHours,
       ...incentiveFields,
+      customJobId,
       label,
     };
   }
@@ -956,6 +965,7 @@ function normalizeEarnSlotInput(input: SaveEarnSlotInput): SaveEarnSlotInput {
     regularHours: payType === "regular" ? hoursOrUnits : 0,
     overtimeHours: payType === "overtime" ? hoursOrUnits : 0,
     ...incentiveFields,
+    customJobId,
     label,
   };
 }

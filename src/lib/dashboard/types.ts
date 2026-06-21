@@ -42,6 +42,21 @@ export type DashboardSlot = EarnSlotInput & {
   kind?: "earn" | "bucket";
   bucketId?: string | null;
   creditCents?: number;
+  // Resolved from the linked custom job (jobType==='custom'). Rates feed the
+  // client earnings calc; color/name drive the bar's inline-styled rendering.
+  customJobId?: string | null;
+  customRegularRateCents?: number;
+  customOvertimeRateCents?: number;
+  customColor?: string;
+  customName?: string;
+};
+
+export type DashboardCustomJob = {
+  id: string;
+  name: string;
+  color: string;
+  regularRateCents: number;
+  otRateCents: number;
 };
 
 // One row of v_day_amortization_credit_items (per day, per active bucket).
@@ -125,6 +140,7 @@ export type DashboardData = {
   settings: PaySettings;
   week: DashboardWeek;
   days: DashboardDay[];
+  customJobs: DashboardCustomJob[];
   baselineTotals: DashboardBaselineTotals;
   metricMedians: DashboardMetricMedians;
   abilityPayPeriod: DashboardAbilityPayPeriod;

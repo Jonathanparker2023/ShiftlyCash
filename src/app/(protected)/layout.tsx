@@ -25,6 +25,7 @@ const NAV_LINKS = [
     label: "Template",
     capability: "showWeeklyTemplate",
   },
+  { href: "/settings/jobs", label: "Jobs", capability: "showCustomJobs" },
 ] as const satisfies ReadonlyArray<{
   href: string;
   label: string;

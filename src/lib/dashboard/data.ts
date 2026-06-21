@@ -72,6 +72,16 @@ type EarnSlotRow = {
   incentive_amount: NumericValue;
   label: string | null;
   source: EarnSlotSource;
+  custom_job_id: string | null;
+};
+
+type CustomJobRow = {
+  id: string;
+  name: string;
+  color: string;
+  regular_rate_cents: NumericValue;
+  ot_rate_cents: NumericValue;
+  active: boolean;
 };
 
 type AdjacentEarnSlotRow = {
@@ -276,7 +286,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           supabase
             .from("earn_slots")
             .select(
-              "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,source",
+              "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,source,custom_job_id",
             )
             .in("day_id", dayIds)
             .order("slot_index", { ascending: true }),
@@ -345,6 +355,21 @@ export async function getDashboardData(): Promise<DashboardData> {
     }
   }
 
+  // Custom jobs library (rates + colors). Soft-fail: pre-migration the table is
+  // absent and the dashboard renders without custom-job pricing/colors.
+  let customJobs: CustomJobRow[] = [];
+  {
+    const { data: jobData, error: jobError } = await supabase
+      .from("custom_jobs")
+      .select("id,name,color,regular_rate_cents,ot_rate_cents,active")
+      .order("created_at", { ascending: true });
+    if (jobError) {
+      console.warn(`[dashboard] custom jobs unavailable: ${jobError.message}`);
+    } else {
+      customJobs = (jobData ?? []) as CustomJobRow[];
+    }
+  }
+
   const adjacentAbilityPayPeriod = await loadAdjacentAbilityPayPeriod({
     supabase,
     week: weekData as WeekRow,
@@ -364,6 +389,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
     baseAllocations,
     bucketCredits,
+    customJobs,
     todayIso,
   });
   since("dashboard:total", tTotal);
@@ -383,8 +409,12 @@ function mapDashboardData(input: {
   closedWeekMetrics: ClosedWeekMetricRow[];
   baseAllocations: BaseAllocationRow[];
   bucketCredits: AmortizationCreditRow[];
+  customJobs: CustomJobRow[];
   todayIso: string;
 }): DashboardData {
+  const customJobsById = new Map(
+    input.customJobs.map((job) => [job.id, job]),
+  );
   const settings = mapPaySettings(input.settings);
   const week: DashboardWeek = {
     id: input.week.id,
@@ -437,6 +467,7 @@ function mapDashboardData(input: {
       totalsByDay.get(day.id),
       allocationsByDay.get(day.id) ?? [],
       creditsByDay.get(day.id) ?? [],
+      customJobsById,
     ),
   );
 
@@ -445,6 +476,15 @@ function mapDashboardData(input: {
     settings,
     week,
     days,
+    customJobs: input.customJobs
+      .filter((job) => job.active)
+      .map((job) => ({
+        id: job.id,
+        name: job.name,
+        color: job.color,
+        regularRateCents: Math.round(toNumber(job.regular_rate_cents)),
+        otRateCents: Math.round(toNumber(job.ot_rate_cents)),
+      })),
     baselineTotals: {
       monthlyTotalCents: dollarsToCents(
         toNumber(input.baselineTotal?.monthly_total ?? 0),
@@ -638,6 +678,7 @@ function mapDashboardDay(
   totals: DayTotalRow | undefined,
   allocations: BaseAllocationRow[],
   credits: AmortizationCreditRow[],
+  customJobsById: Map<string, CustomJobRow>,
 ): DashboardDay {
   const existingSlots = new Map(slots.map((slot) => [slot.slot_index, slot]));
   const spendCents = dollarsToCents(toNumber(day.manual_spend_adjustment));
@@ -700,6 +741,10 @@ function mapDashboardDay(
     slots: [
       ...Array.from({ length: 4 }, (_, slotIndex): DashboardSlot => {
         const slot = existingSlots.get(slotIndex);
+        const customJob =
+          slot?.job_type === "custom" && slot.custom_job_id
+            ? customJobsById.get(slot.custom_job_id)
+            : undefined;
 
         return {
           id: slot?.id ?? null,
@@ -716,6 +761,15 @@ function mapDashboardDay(
           label: slot?.label ?? "",
           source: slot?.source ?? "user",
           kind: "earn",
+          customJobId: slot?.custom_job_id ?? null,
+          customRegularRateCents: customJob
+            ? Math.round(toNumber(customJob.regular_rate_cents))
+            : undefined,
+          customOvertimeRateCents: customJob
+            ? Math.round(toNumber(customJob.ot_rate_cents))
+            : undefined,
+          customColor: customJob?.color,
+          customName: customJob?.name,
         };
       }),
       // Synthetic READ-ONLY rows for Amortized Income daily credits. slotIndex >= 4

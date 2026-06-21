@@ -16,6 +16,7 @@ export type EditionCapabilities = {
   showWealthProjection: boolean;
   showTaxSetAside: boolean;
   showWeeklyTemplate: boolean;
+  showCustomJobs: boolean;
 };
 
 export const EDITION_CAPABILITIES = {
@@ -35,6 +36,7 @@ export const EDITION_CAPABILITIES = {
     showWealthProjection: true,
     showTaxSetAside: true,
     showWeeklyTemplate: true,
+    showCustomJobs: true,
   },
   consumer: {
     showDashboard: true,
@@ -52,6 +54,7 @@ export const EDITION_CAPABILITIES = {
     showWealthProjection: false,
     showTaxSetAside: false,
     showWeeklyTemplate: false,
+    showCustomJobs: false,
   },
 } as const satisfies Record<AppEdition, EditionCapabilities>;
 

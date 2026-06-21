@@ -2,7 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import type { DragEvent, FormEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   addManualTransactionAction,
@@ -21,6 +28,7 @@ import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
 import { addDaysIso, formatDayLabel } from "@/lib/dashboard/dates";
 import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
 import type {
+  DashboardCustomJob,
   DashboardData,
   DashboardDay,
   DashboardSlot,
@@ -28,6 +36,7 @@ import type {
   SaveState,
 } from "@/lib/dashboard/types";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
+import { contrastText, darken } from "@/lib/domain/jobColor";
 import {
   calculateEarnSlot,
   calculateDayTotals,
@@ -65,7 +74,10 @@ type DashboardEditorProps = {
 type TimerMap = Record<string, ReturnType<typeof setTimeout>>;
 type VersionMap = Record<string, number>;
 
+const CustomJobsContext = createContext<DashboardCustomJob[]>([]);
+
 export function DashboardEditor({ initialData }: DashboardEditorProps) {
+  const customJobs = initialData.customJobs;
   const router = useRouter();
   const [days, setDays] = useState(initialData.days);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -686,6 +698,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       incentiveRate: slot.incentiveRate,
       incentiveAmount: slot.incentiveAmount,
       label: slot.label,
+      customJobId: slot.jobType === "custom" ? slot.customJobId : null,
     };
 
     clearTimeout(timers.current[key]);
@@ -765,6 +778,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   return (
+    <CustomJobsContext.Provider value={customJobs}>
     <div className="min-h-screen bg-[var(--surface-base)] px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6">
       {closeError ? (
         <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] p-3 text-sm font-medium text-[var(--accent-negative-text)]">
@@ -910,6 +924,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
         </section>
       </main>
     </div>
+    </CustomJobsContext.Provider>
   );
 }
 
@@ -1793,9 +1808,18 @@ function ShiftRow({
     );
   }
 
+  const isCustom = slot.jobType === "custom";
+  const customStyle =
+    isCustom && slot.customColor
+      ? {
+          backgroundColor: slot.customColor,
+          borderColor: darken(slot.customColor),
+          color: contrastText(slot.customColor),
+        }
+      : undefined;
   const rowClassName = [
     "rounded-md border shadow-sm transition",
-    shiftBarClass(slot.jobType),
+    isCustom ? "" : shiftBarClass(slot.jobType),
     locked ? "opacity-60" : "",
     isDragging ? "scale-[0.99] opacity-70 ring-2 ring-[var(--accent-primary)]" : "",
   ]
@@ -1807,6 +1831,7 @@ function ShiftRow({
   return (
     <div
       className={rowClassName}
+      style={customStyle}
       draggable={!locked}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
@@ -1820,9 +1845,16 @@ function ShiftRow({
         type="button"
       >
         <span className="flex shrink-0 items-center gap-2">
-          <span className={shiftDotClass(slot.jobType)} />
+          <span
+            className={shiftDotClass(slot.jobType)}
+            style={
+              isCustom && slot.customColor
+                ? { backgroundColor: contrastText(slot.customColor) }
+                : undefined
+            }
+          />
           <span className="text-sm font-semibold">
-            {formatJobLabel(slot.jobType)}
+            {isCustom ? (slot.customName ?? "Custom") : formatJobLabel(slot.jobType)}
           </span>
           {slot.payType === "regular" ||
           slot.payType === "overtime" ||
@@ -1849,17 +1881,7 @@ function ShiftRow({
 
       {expanded && !locked ? (
         <div className="grid gap-3 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 sm:grid-cols-2">
-          <SelectField
-            label="Job"
-            value={slot.jobType}
-            values={JOB_OPTIONS}
-            formatOption={formatJobLabel}
-            onChange={(value) =>
-              onSlotChange(slot.dayId, slot.slotIndex, {
-                jobType: value as JobType,
-              })
-            }
-          />
+          <JobPicker slot={slot} onSlotChange={onSlotChange} />
           {slot.payType === "unit" ? (
             <span aria-hidden className="hidden sm:block" />
           ) : (
@@ -2210,6 +2232,83 @@ function SelectField({
   );
 }
 
+// Job dropdown: built-in job types + the user's custom jobs (from context).
+// Selecting a custom job stamps its rates/color onto the slot so the client
+// calc + colored bar work immediately; switching back to a built-in clears them.
+function JobPicker({
+  slot,
+  onSlotChange,
+}: {
+  slot: DashboardSlot;
+  onSlotChange: (
+    dayId: string,
+    slotIndex: number,
+    patch: Partial<DashboardSlot>,
+  ) => void;
+}) {
+  const customJobs = useContext(CustomJobsContext);
+  const value =
+    slot.jobType === "custom" && slot.customJobId
+      ? `custom:${slot.customJobId}`
+      : slot.jobType;
+
+  function handleChange(raw: string) {
+    if (raw.startsWith("custom:")) {
+      const jobId = raw.slice("custom:".length);
+      const job = customJobs.find((current) => current.id === jobId);
+      onSlotChange(slot.dayId, slot.slotIndex, {
+        jobType: "custom",
+        customJobId: jobId,
+        customRegularRateCents: job?.regularRateCents,
+        customOvertimeRateCents: job?.otRateCents,
+        customColor: job?.color,
+        customName: job?.name,
+        payType:
+          slot.payType === "split" || slot.payType === "overtime"
+            ? slot.payType
+            : "regular",
+      });
+    } else {
+      onSlotChange(slot.dayId, slot.slotIndex, {
+        jobType: raw as JobType,
+        customJobId: null,
+        customRegularRateCents: undefined,
+        customOvertimeRateCents: undefined,
+        customColor: undefined,
+        customName: undefined,
+      });
+    }
+  }
+
+  return (
+    <label className="space-y-1">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+        Job
+      </span>
+      <select
+        className="h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
+        onChange={(event) => handleChange(event.target.value)}
+        value={value}
+      >
+        {JOB_OPTIONS.map((jobType) => (
+          <option key={jobType} value={jobType}>
+            {formatJobLabel(jobType)}
+          </option>
+        ))}
+        {customJobs.length > 0 ? (
+          <optgroup label="Custom jobs">
+            {customJobs.map((job) => (
+              <option key={job.id} value={`custom:${job.id}`}>
+                {job.name}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+      </select>
+    </label>
+  );
+}
+
 function NumberField({
   label,
   value,
@@ -2486,6 +2585,8 @@ function toDayInput(day: DashboardDay) {
         incentiveRate: slot.incentiveRate,
         incentiveAmount: slot.incentiveAmount,
         label: slot.label,
+        customRegularRateCents: slot.customRegularRateCents,
+        customOvertimeRateCents: slot.customOvertimeRateCents,
       })),
     spendCents: day.spendCents + day.transactionSpendCents,
     baseCents: day.baseCents,
