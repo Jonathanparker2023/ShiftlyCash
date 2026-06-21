@@ -325,8 +325,10 @@ function TemplateShiftBar({
                     hoursOrUnits:
                       slot.payType === "unit" ? 0 : slot.hoursOrUnits,
                     customJobId: id,
-                    customColor: job?.color,
-                    customName: job?.name,
+                    // Keep the stamped color/name if the job is inactive (not
+                    // in the picker list) so the bar styling survives.
+                    customColor: job?.color ?? slot.customColor,
+                    customName: job?.name ?? slot.customName,
                   });
                 } else {
                   onSlotChange(slot.dayIndex, slot.slotIndex, {
@@ -339,6 +341,13 @@ function TemplateShiftBar({
               }}
               value={isCustom ? `custom:${slot.customJobId ?? ""}` : slot.jobType}
             >
+              {isCustom &&
+              slot.customJobId &&
+              !customJobs.some((job) => job.id === slot.customJobId) ? (
+                <option value={`custom:${slot.customJobId}`}>
+                  {`${slot.customName ?? "Custom"} (inactive)`}
+                </option>
+              ) : null}
               {JOB_OPTIONS.map((jobType) => (
                 <option key={jobType} value={jobType}>
                   {formatJobLabel(jobType)}

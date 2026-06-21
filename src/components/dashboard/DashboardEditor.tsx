@@ -204,22 +204,19 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     () => netEarningsByBucket(toComputedEarningSlots(days, initialData.settings)),
     [days, initialData.settings],
   );
-  // Per-custom-job net for the week (one chip per ACTIVE custom job that has
-  // shifts). Filtered to active jobs so deleting/deactivating a job drops it
-  // from the bar — without wiping the shift history it earned.
+  // Per-custom-job net for the week: one chip per custom job that has shifts.
+  // Derived straight from the week's slots (grouped by job) using the stamped
+  // name/color, so the chips ALWAYS reconcile to the Earn total — including a
+  // job later deactivated that still holds shifts this week. A job with no
+  // shifts shows no chip (so a removed/unused job drops off the bar).
   const customNets = useMemo(() => {
-    const activeIds = new Set(initialData.customJobs.map((job) => job.id));
     const byJob = new Map<
       string,
       { id: string; name: string; color: string; netCents: number }
     >();
     for (const day of days) {
       for (const slot of day.slots) {
-        if (
-          slot.jobType !== "custom" ||
-          !slot.customJobId ||
-          !activeIds.has(slot.customJobId)
-        ) {
+        if (slot.jobType !== "custom" || !slot.customJobId) {
           continue;
         }
         const earnings = calculateEarnSlot(slot, initialData.settings)
@@ -238,7 +235,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       }
     }
     return Array.from(byJob.values());
-  }, [days, initialData.settings, initialData.customJobs]);
+  }, [days, initialData.settings]);
   const focusedDay = days[focusedDayIndex] ?? days[0];
   const focusedDayTotals = focusedDay ? dayTotals.get(focusedDay.id) : undefined;
 
@@ -2292,13 +2289,15 @@ function JobPicker({
     if (raw.startsWith("custom:")) {
       const jobId = raw.slice("custom:".length);
       const job = customJobs.find((current) => current.id === jobId);
+      // job is undefined when re-selecting a deactivated job (not in the active
+      // list) — keep the slot's already-stamped rate/color so pricing survives.
       onSlotChange(slot.dayId, slot.slotIndex, {
         jobType: "custom",
         customJobId: jobId,
-        customRegularRateCents: job?.regularRateCents,
-        customOvertimeRateCents: job?.otRateCents,
-        customColor: job?.color,
-        customName: job?.name,
+        customRegularRateCents: job?.regularRateCents ?? slot.customRegularRateCents,
+        customOvertimeRateCents: job?.otRateCents ?? slot.customOvertimeRateCents,
+        customColor: job?.color ?? slot.customColor,
+        customName: job?.name ?? slot.customName,
         payType:
           slot.payType === "split" || slot.payType === "overtime"
             ? slot.payType
@@ -2326,6 +2325,15 @@ function JobPicker({
         onChange={(event) => handleChange(event.target.value)}
         value={value}
       >
+        {/* If this slot points at a deactivated custom job (not in the active
+            list), keep it selectable so the dropdown shows its name, not blank. */}
+        {slot.jobType === "custom" &&
+        slot.customJobId &&
+        !customJobs.some((job) => job.id === slot.customJobId) ? (
+          <option value={`custom:${slot.customJobId}`}>
+            {`${slot.customName ?? "Custom"} (inactive)`}
+          </option>
+        ) : null}
         {JOB_OPTIONS.map((jobType) => (
           <option key={jobType} value={jobType}>
             {formatJobLabel(jobType)}
