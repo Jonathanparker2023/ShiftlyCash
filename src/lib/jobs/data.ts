@@ -7,6 +7,9 @@ export type JobsCustomJob = {
   color: string;
   regularRateCents: number;
   otRateCents: number;
+  regularGrossRateCents: number;
+  otGrossRateCents: number;
+  withholdingRate: number;
   active: boolean;
 };
 
@@ -40,7 +43,9 @@ export async function getJobsData(): Promise<JobsData> {
   ] = await Promise.all([
     supabase
       .from("custom_jobs")
-      .select("id,name,color,regular_rate_cents,ot_rate_cents,active")
+      .select(
+        "id,name,color,regular_rate_cents,ot_rate_cents,regular_gross_rate_cents,ot_gross_rate_cents,withholding_rate,active",
+      )
       .eq("user_id", user.id)
       .order("created_at", { ascending: true }),
     supabase
@@ -67,6 +72,9 @@ export async function getJobsData(): Promise<JobsData> {
       color: string;
       regular_rate_cents: NumericValue;
       ot_rate_cents: NumericValue;
+      regular_gross_rate_cents: NumericValue;
+      ot_gross_rate_cents: NumericValue;
+      withholding_rate: NumericValue;
       active: boolean;
     }[]
   ).map((row) => ({
@@ -75,6 +83,13 @@ export async function getJobsData(): Promise<JobsData> {
     color: row.color,
     regularRateCents: Math.round(toNumber(row.regular_rate_cents)),
     otRateCents: Math.round(toNumber(row.ot_rate_cents)),
+    regularGrossRateCents: Math.round(
+      toNumber(row.regular_gross_rate_cents || row.regular_rate_cents),
+    ),
+    otGrossRateCents: Math.round(
+      toNumber(row.ot_gross_rate_cents || row.ot_rate_cents),
+    ),
+    withholdingRate: toNumber(row.withholding_rate),
     active: row.active,
   }));
 

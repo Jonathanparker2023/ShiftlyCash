@@ -4,11 +4,17 @@ import { useState } from "react";
 
 import {
   createCustomJobAction,
+  deleteCustomJobAction,
   updateBuiltinRatesAction,
   updateCustomJobAction,
 } from "@/app/(protected)/settings/jobs/actions";
 import type { JobsBuiltin, JobsCustomJob, JobsData } from "@/lib/jobs/data";
 import { contrastText, darken } from "@/lib/domain/jobColor";
+import {
+  netRateFromGross,
+  percentFromRate,
+  rateFromPercent,
+} from "@/lib/jobs/rates";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -21,6 +27,43 @@ function dollars(cents: number): string {
 function centsFrom(value: string): number {
   const n = Number(value);
   return Number.isFinite(n) ? Math.round(Math.max(0, n) * 100) : 0;
+}
+function percentFrom(value: string): number {
+  const n = Number(value);
+  return rateFromPercent(Number.isFinite(n) ? n : 0);
+}
+
+type CustomJobSavePatch = Partial<
+  Pick<
+    JobsCustomJob,
+    | "name"
+    | "color"
+    | "regularGrossRateCents"
+    | "otGrossRateCents"
+    | "withholdingRate"
+    | "active"
+  >
+>;
+
+function computedRatePatch(
+  job: JobsCustomJob,
+  patch: Partial<
+    Pick<
+      JobsCustomJob,
+      "regularGrossRateCents" | "otGrossRateCents" | "withholdingRate"
+    >
+  >,
+): Partial<JobsCustomJob> {
+  const regularGrossRateCents =
+    patch.regularGrossRateCents ?? job.regularGrossRateCents;
+  const otGrossRateCents = patch.otGrossRateCents ?? job.otGrossRateCents;
+  const withholdingRate = patch.withholdingRate ?? job.withholdingRate;
+
+  return {
+    ...patch,
+    regularRateCents: netRateFromGross(regularGrossRateCents, withholdingRate),
+    otRateCents: netRateFromGross(otGrossRateCents, withholdingRate),
+  };
 }
 
 export function JobsEditor({ initialData }: { initialData: JobsData }) {
@@ -48,8 +91,9 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
       const result = await createCustomJobAction({
         name: "New job",
         color,
-        regularRateCents: 0,
-        otRateCents: 0,
+        regularGrossRateCents: 0,
+        otGrossRateCents: 0,
+        withholdingRate: 0,
       });
       setCustomJobs((prev) => [
         ...prev,
@@ -59,6 +103,9 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
           color,
           regularRateCents: 0,
           otRateCents: 0,
+          regularGrossRateCents: 0,
+          otGrossRateCents: 0,
+          withholdingRate: 0,
           active: true,
         },
       ]);
@@ -76,10 +123,20 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
     );
   }
 
-  async function saveJob(id: string, patch: Partial<JobsCustomJob>) {
+  async function saveJob(id: string, patch: CustomJobSavePatch) {
     setState("saving");
     try {
       await updateCustomJobAction({ id, ...patch });
+      ok();
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  async function deleteJob(id: string) {
+    setState("saving");
+    try {
+      await deleteCustomJobAction({ id });
       ok();
     } catch (e) {
       fail(e);
@@ -113,7 +170,8 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
               Custom jobs
             </h2>
             <p className="mt-1 text-xs text-white/45">
-              Net take-home rates. Available everywhere a shift can be added.
+              Gross hourly rates with withholding. Net is calculated for the
+              dashboard.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -137,75 +195,119 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
           <div className="space-y-2">
             {customJobs.map((job) => (
               <div
-                className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-3 sm:flex-row sm:items-center"
+                className="grid gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
                 key={job.id}
                 style={job.active ? undefined : { opacity: 0.5 }}
               >
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
-                  style={{
-                    backgroundColor: job.color,
-                    color: contrastText(job.color),
-                    border: `1px solid ${darken(job.color)}`,
-                  }}
-                >
-                  {job.name.slice(0, 2).toUpperCase()}
-                </span>
-                <input
-                  className={`${FIELD} min-w-0 flex-1`}
-                  defaultValue={job.name}
-                  onBlur={(e) => {
-                    patchLocal(job.id, { name: e.target.value });
-                    saveJob(job.id, { name: e.target.value });
-                  }}
-                  placeholder="Job name"
-                />
-                <input
-                  aria-label="Color"
-                  className="h-9 w-12 shrink-0 cursor-pointer rounded-lg border border-white/12 bg-transparent"
-                  onChange={(e) => {
-                    patchLocal(job.id, { color: e.target.value });
-                    saveJob(job.id, { color: e.target.value });
-                  }}
-                  type="color"
-                  value={job.color}
-                />
-                <label className="flex shrink-0 items-center gap-1 text-xs text-white/55">
-                  Reg $
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+                    style={{
+                      backgroundColor: job.color,
+                      color: contrastText(job.color),
+                      border: `1px solid ${darken(job.color)}`,
+                    }}
+                  >
+                    {job.name.slice(0, 2).toUpperCase()}
+                  </span>
                   <input
-                    className={`${FIELD} w-20`}
-                    defaultValue={dollars(job.regularRateCents)}
-                    onBlur={(e) =>
-                      saveJob(job.id, {
-                        regularRateCents: centsFrom(e.target.value),
-                      })
-                    }
-                    step="0.01"
-                    type="number"
+                    className={`${FIELD} min-w-0 flex-1`}
+                    defaultValue={job.name}
+                    onBlur={(e) => {
+                      patchLocal(job.id, { name: e.target.value });
+                      saveJob(job.id, { name: e.target.value });
+                    }}
+                    placeholder="Job name"
                   />
-                </label>
-                <label className="flex shrink-0 items-center gap-1 text-xs text-white/55">
-                  OT $
                   <input
-                    className={`${FIELD} w-20`}
-                    defaultValue={dollars(job.otRateCents)}
-                    onBlur={(e) =>
-                      saveJob(job.id, { otRateCents: centsFrom(e.target.value) })
-                    }
-                    step="0.01"
-                    type="number"
+                    aria-label="Color"
+                    className="h-9 w-12 shrink-0 cursor-pointer rounded-lg border border-white/12 bg-transparent"
+                    onChange={(e) => {
+                      patchLocal(job.id, { color: e.target.value });
+                      saveJob(job.id, { color: e.target.value });
+                    }}
+                    type="color"
+                    value={job.color}
                   />
-                </label>
-                <button
-                  className="h-9 shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200"
-                  onClick={() => {
-                    patchLocal(job.id, { active: !job.active });
-                    saveJob(job.id, { active: !job.active });
-                  }}
-                  type="button"
-                >
-                  {job.active ? "Deactivate" : "Reactivate"}
-                </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  <label className="grid gap-1 text-xs text-white/55">
+                    Gross reg
+                    <input
+                      className={FIELD}
+                      defaultValue={dollars(job.regularGrossRateCents)}
+                      onBlur={(e) => {
+                        const regularGrossRateCents = centsFrom(e.target.value);
+                        const localPatch = computedRatePatch(job, {
+                          regularGrossRateCents,
+                        });
+                        patchLocal(job.id, localPatch);
+                        saveJob(job.id, { regularGrossRateCents });
+                      }}
+                      step="0.01"
+                      type="number"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs text-white/55">
+                    Gross OT
+                    <input
+                      className={FIELD}
+                      defaultValue={dollars(job.otGrossRateCents)}
+                      onBlur={(e) => {
+                        const otGrossRateCents = centsFrom(e.target.value);
+                        const localPatch = computedRatePatch(job, {
+                          otGrossRateCents,
+                        });
+                        patchLocal(job.id, localPatch);
+                        saveJob(job.id, { otGrossRateCents });
+                      }}
+                      step="0.01"
+                      type="number"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs text-white/55">
+                    Withhold %
+                    <input
+                      className={FIELD}
+                      defaultValue={percentFromRate(job.withholdingRate)}
+                      max="99"
+                      min="0"
+                      onBlur={(e) => {
+                        const withholdingRate = percentFrom(e.target.value);
+                        const localPatch = computedRatePatch(job, {
+                          withholdingRate,
+                        });
+                        patchLocal(job.id, localPatch);
+                        saveJob(job.id, { withholdingRate });
+                      }}
+                      step="0.1"
+                      type="number"
+                    />
+                  </label>
+                  <div className="grid content-end gap-1 text-xs text-white/45">
+                    <span>Net calc</span>
+                    <span className="h-10 rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-sm font-semibold text-white/75">
+                      {`$${dollars(job.regularRateCents)} / $${dollars(job.otRateCents)}`}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    className="h-9 shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200"
+                    onClick={() => {
+                      if (job.active) {
+                        patchLocal(job.id, { active: false });
+                        deleteJob(job.id);
+                      } else {
+                        patchLocal(job.id, { active: true });
+                        saveJob(job.id, { active: true });
+                      }
+                    }}
+                    type="button"
+                  >
+                    {job.active ? "Delete" : "Restore"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
