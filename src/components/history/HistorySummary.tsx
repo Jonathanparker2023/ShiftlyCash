@@ -49,21 +49,33 @@ type SummaryTile = {
   isMoney: boolean;
 };
 
+type WeekWindow = number | "all";
+
 type SavedPreferences = {
   order: string[];
   hidden: string[];
+  weekWindow?: WeekWindow;
 };
 
 const TILE_IDS = TILE_DEFINITIONS.map((tile) => tile.id);
+const WEEK_WINDOW_OPTIONS = [4, 6, 8, 12, 26] as const;
 
 export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
   const closedWeeks = useMemo(
     () => weeks.filter((week) => week.status === "closed"),
     [weeks],
   );
-  const tiles = useMemo(() => buildTiles(closedWeeks), [closedWeeks]);
-  const defaultOrder = useMemo(() => buildDefaultOrder(tiles), [tiles]);
   const [isCustomizing, setIsCustomizing] = useState(false);
+  // Limit the totals/averages/medians to the most recent N closed weeks. The
+  // weeks arrive newest-first, so slice from the front.
+  const [weekWindow, setWeekWindow] = useState<WeekWindow>("all");
+  const windowedWeeks = useMemo(
+    () =>
+      weekWindow === "all" ? closedWeeks : closedWeeks.slice(0, weekWindow),
+    [closedWeeks, weekWindow],
+  );
+  const tiles = useMemo(() => buildTiles(windowedWeeks), [windowedWeeks]);
+  const defaultOrder = useMemo(() => buildDefaultOrder(tiles), [tiles]);
   const [order, setOrder] = useState<TileId[]>(defaultOrder);
   const [hidden, setHidden] = useState<Set<TileId>>(() => new Set());
   const [hasHydrated, setHasHydrated] = useState(false);
@@ -75,6 +87,7 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
     window.setTimeout(() => {
       setOrder(preferences.order);
       setHidden(preferences.hidden);
+      setWeekWindow(preferences.weekWindow);
       setHasHydrated(true);
     }, 0);
   }, [defaultOrder]);
@@ -86,9 +99,9 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
 
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ order, hidden: Array.from(hidden) }),
+      JSON.stringify({ order, hidden: Array.from(hidden), weekWindow }),
     );
-  }, [hasHydrated, hidden, order]);
+  }, [hasHydrated, hidden, order, weekWindow]);
 
   const normalizedOrder = normalizeOrder(order);
   const orderedTiles = normalizedOrder
@@ -115,16 +128,43 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
                 History summary
               </p>
               <p className="mt-1 text-sm text-white/85">
-                Totals, averages, and medians across closed weeks.
+                Totals, averages, and medians across{" "}
+                {weekWindow === "all"
+                  ? "all closed weeks"
+                  : `the last ${windowedWeeks.length} closed week${windowedWeeks.length === 1 ? "" : "s"}`}
+                .
               </p>
             </div>
-            <button
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/40"
-              onClick={() => setIsCustomizing((current) => !current)}
-              type="button"
-            >
-              Customize
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                aria-label="Weeks to summarize"
+                className="rounded-md border border-white/20 bg-black/40 px-2.5 py-2 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+                onChange={(event) =>
+                  setWeekWindow(
+                    event.target.value === "all"
+                      ? "all"
+                      : Number(event.target.value),
+                  )
+                }
+                value={String(weekWindow)}
+              >
+                <option value="all">All weeks</option>
+                {WEEK_WINDOW_OPTIONS.filter((n) => n < closedWeeks.length).map(
+                  (n) => (
+                    <option key={n} value={n}>
+                      Last {n} weeks
+                    </option>
+                  ),
+                )}
+              </select>
+              <button
+                className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/40"
+                onClick={() => setIsCustomizing((current) => !current)}
+                type="button"
+              >
+                Customize
+              </button>
+            </div>
           </div>
 
           {isCustomizing ? (
@@ -152,22 +192,27 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
 function readSavedPreferences(
   raw: string | null,
   defaultOrder: TileId[],
-): { order: TileId[]; hidden: Set<TileId> } {
+): { order: TileId[]; hidden: Set<TileId>; weekWindow: WeekWindow } {
   if (!raw) {
-    return { order: defaultOrder, hidden: new Set() };
+    return { order: defaultOrder, hidden: new Set(), weekWindow: "all" };
   }
 
   try {
     const parsed = JSON.parse(raw) as SavedPreferences;
+    const weekWindow: WeekWindow =
+      typeof parsed.weekWindow === "number" && parsed.weekWindow > 0
+        ? parsed.weekWindow
+        : "all";
 
     return {
       order: normalizeOrder(parsed.order),
       hidden: new Set(
         parsed.hidden.filter((id): id is TileId => isTileId(id)),
       ),
+      weekWindow,
     };
   } catch {
-    return { order: defaultOrder, hidden: new Set() };
+    return { order: defaultOrder, hidden: new Set(), weekWindow: "all" };
   }
 }
 
