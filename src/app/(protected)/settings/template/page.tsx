@@ -21,20 +21,19 @@ export default async function TemplateSettingsPage() {
   ].join("|");
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-5 text-zinc-950 sm:px-6 lg:px-8">
-      <section className="mx-auto max-w-7xl">
-        <header className="mb-5 border-b border-zinc-200 pb-4">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-500">
-              ShiftlyCash
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Default Template
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600">
-              V1 schedule editor for the template used to prefill new weeks.
-            </p>
-          </div>
+    <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-3xl">
+        <header className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+            ShiftlyCash
+          </p>
+          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">
+            Weekly Template
+          </h1>
+          <p className="mt-1.5 text-sm text-white/65">
+            The shifts that autofill into every new week. Edit them like the
+            dashboard.
+          </p>
         </header>
 
         <TemplateEditor initialData={data} key={editorKey} />
