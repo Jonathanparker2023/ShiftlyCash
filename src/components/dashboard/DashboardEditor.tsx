@@ -13,6 +13,7 @@ import {
 
 import {
   addManualTransactionAction,
+  allocateGasTransactionAction,
   amortizeTransactionAction,
   closeWeekAction,
   deleteTransactionAction,
@@ -592,6 +593,51 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     }
   }
 
+  async function allocateGasTransaction(
+    transaction: DashboardTransaction,
+    gasAmountCents: number,
+    previousFillDate: string | null,
+  ) {
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    if (gasAmountCents <= 0 || gasAmountCents > transaction.originalAmountCents) {
+      setTransactionError("Gas amount must be above $0 and no more than the transaction.");
+      return;
+    }
+
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+    try {
+      await allocateGasTransactionAction({
+        transactionId: transaction.id,
+        gasAmountCents,
+        previousFillDate,
+      });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      router.refresh();
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to allocate gas.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
   async function addManualTransaction(
     day: DashboardDay,
     merchantName: string,
@@ -607,10 +653,14 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       dayId: day.id,
       merchantName,
       amountCents,
+      originalAmountCents: amountCents,
       category: null,
       source: "manual",
       status: "applied",
       isAmortized: false,
+      isGasAllocated: false,
+      gasAllocatedCents: 0,
+      gasRemainderCents: amountCents,
       date: day.date,
       time: null,
       createdAt: new Date().toISOString(),
@@ -911,6 +961,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               onAddShift={addShift}
               onAddManualTransaction={addManualTransaction}
               onAmortizeTransaction={amortizeTransaction}
+              onAllocateGasTransaction={allocateGasTransaction}
               onDeleteTransaction={deleteTransaction}
               onMoveTransactionToYesterday={moveTransactionToYesterday}
               onRenameTransaction={renameTransaction}
@@ -1241,6 +1292,7 @@ function FocusedDayEditor({
   onMoveTransactionToYesterday,
   onRenameTransaction,
   onAmortizeTransaction,
+  onAllocateGasTransaction,
   onAddShift,
   onRemoveSlot,
   onReorderSlots,
@@ -1277,6 +1329,11 @@ function FocusedDayEditor({
     transaction: DashboardTransaction,
     months: 1 | 3,
   ) => void;
+  onAllocateGasTransaction: (
+    transaction: DashboardTransaction,
+    gasAmountCents: number,
+    previousFillDate: string | null,
+  ) => void;
   onAddShift: (day: DashboardDay) => void;
   onRemoveSlot: (slot: DashboardSlot) => void;
   onReorderSlots: (
@@ -1305,6 +1362,7 @@ function FocusedDayEditor({
           isManualTransactionPending={isManualTransactionPending}
           pendingTransactionIds={pendingTransactionIds}
           onAddManualTransaction={onAddManualTransaction}
+          onAllocateGasTransaction={onAllocateGasTransaction}
           onAmortizeTransaction={onAmortizeTransaction}
           onDeleteTransaction={onDeleteTransaction}
           onMoveTransactionToYesterday={onMoveTransactionToYesterday}
@@ -1326,6 +1384,7 @@ function TransactionDrawer({
   onMoveTransactionToYesterday,
   onRenameTransaction,
   onAmortizeTransaction,
+  onAllocateGasTransaction,
   onAddManualTransaction,
 }: {
   day: DashboardDay;
@@ -1345,6 +1404,11 @@ function TransactionDrawer({
   onAmortizeTransaction: (
     transaction: DashboardTransaction,
     months: 1 | 3,
+  ) => void;
+  onAllocateGasTransaction: (
+    transaction: DashboardTransaction,
+    gasAmountCents: number,
+    previousFillDate: string | null,
   ) => void;
   onAddManualTransaction: (
     day: DashboardDay,
@@ -1389,6 +1453,7 @@ function TransactionDrawer({
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
           onRename={onRenameTransaction}
+          onAllocateGas={onAllocateGasTransaction}
           onAmortize={onAmortizeTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "excluded")
@@ -1472,6 +1537,7 @@ function TransactionColumn({
   onMoveToYesterday,
   onRename,
   onToggle,
+  onAllocateGas,
   onAmortize,
 }: {
   heading: string;
@@ -1482,6 +1548,11 @@ function TransactionColumn({
   onMoveToYesterday: (transaction: DashboardTransaction) => void;
   onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
+  onAllocateGas?: (
+    transaction: DashboardTransaction,
+    gasAmountCents: number,
+    previousFillDate: string | null,
+  ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
   return (
@@ -1506,6 +1577,7 @@ function TransactionColumn({
             onMoveToYesterday={onMoveToYesterday}
             onRename={onRename}
             onToggle={onToggle}
+            onAllocateGas={onAllocateGas}
             onAmortize={onAmortize}
           />
         ))}
@@ -1522,6 +1594,7 @@ function TransactionRowButton({
   onMoveToYesterday,
   onRename,
   onToggle,
+  onAllocateGas,
   onAmortize,
 }: {
   transaction: DashboardTransaction;
@@ -1531,11 +1604,25 @@ function TransactionRowButton({
   onMoveToYesterday: (transaction: DashboardTransaction) => void;
   onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
+  onAllocateGas?: (
+    transaction: DashboardTransaction,
+    gasAmountCents: number,
+    previousFillDate: string | null,
+  ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(transaction.merchantName);
+  const [isGasEditing, setIsGasEditing] = useState(false);
+  const [gasAmountValue, setGasAmountValue] = useState(
+    formatCentsForInput(
+      transaction.isGasAllocated
+        ? transaction.gasAllocatedCents
+        : transaction.originalAmountCents,
+    ),
+  );
+  const [previousGasDate, setPreviousGasDate] = useState("");
   const isAmortizedExempt = variant === "exempt" && transaction.isAmortized;
   const rowStyle = isAmortizedExempt
     ? {
@@ -1550,6 +1637,17 @@ function TransactionRowButton({
     if (!trimmed) return;
     onRename(transaction, trimmed);
     setIsRenaming(false);
+  }
+
+  function submitGasAllocation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const gasAmountCents = dollarsToCents(parsePositiveNumber(gasAmountValue));
+    onAllocateGas?.(
+      transaction,
+      gasAmountCents,
+      previousGasDate.trim() || null,
+    );
+    setIsGasEditing(false);
   }
 
   return (
@@ -1583,6 +1681,11 @@ function TransactionRowButton({
             }
           >
             {formatTransactionTime(transaction.time)}
+            {transaction.isGasAllocated ? (
+              <span className="ml-1 text-[var(--accent-warning-text)]">
+                Gas spread
+              </span>
+            ) : null}
           </span>
         </span>
         <span
@@ -1600,6 +1703,56 @@ function TransactionRowButton({
 
       {isExpanded ? (
         <div className="border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2">
+          {transaction.isGasAllocated ? (
+            <div className="mb-2 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-2 py-1 text-[10px] font-semibold text-[var(--accent-warning-text)]">
+              Gas {formatMoneyExact(transaction.gasAllocatedCents)} spread as daily
+              spend; {formatMoneyExact(transaction.gasRemainderCents)} stays here.
+            </div>
+          ) : null}
+          {isGasEditing ? (
+            <form
+              className="mb-2 grid gap-2 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] p-2 sm:grid-cols-[110px_1fr_auto]"
+              onSubmit={submitGasAllocation}
+            >
+              <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-warning-text)]">
+                Gas $
+                <input
+                  className="mt-1 block h-8 w-full rounded-md border border-[var(--accent-warning-border)] bg-[var(--surface-base)] px-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--border-strong)]"
+                  disabled={disabled}
+                  inputMode="decimal"
+                  onChange={(event) => setGasAmountValue(event.target.value)}
+                  value={gasAmountValue}
+                />
+              </label>
+              <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-warning-text)]">
+                Previous date
+                <input
+                  className="mt-1 block h-8 w-full rounded-md border border-[var(--accent-warning-border)] bg-[var(--surface-base)] px-2 text-xs font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)]"
+                  disabled={disabled}
+                  onChange={(event) => setPreviousGasDate(event.target.value)}
+                  placeholder="Auto"
+                  type="date"
+                  value={previousGasDate}
+                />
+              </label>
+              <div className="flex items-end gap-2">
+                <button
+                  className="h-8 rounded-md border border-[var(--accent-warning-border)] bg-[var(--surface-base)] px-2.5 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={disabled || parsePositiveNumber(gasAmountValue) <= 0}
+                  type="submit"
+                >
+                  Save
+                </button>
+                <button
+                  className="h-8 rounded-md px-2.5 text-xs font-semibold text-[var(--accent-warning-text)] transition hover:text-[var(--text-primary)]"
+                  onClick={() => setIsGasEditing(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : null}
           {isRenaming ? (
             <form className="mb-2 flex gap-2" onSubmit={submitRename}>
               <input
@@ -1655,6 +1808,30 @@ function TransactionRowButton({
           >
             Move to yesterday
           </button>
+          {variant === "spending" && onAllocateGas ? (
+            <button
+              className="rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-warning-text)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={disabled}
+              onClick={() => {
+                const next = !isGasEditing;
+                if (next) {
+                  setGasAmountValue(
+                    formatCentsForInput(
+                      transaction.isGasAllocated
+                        ? transaction.gasAllocatedCents
+                        : transaction.originalAmountCents,
+                    ),
+                  );
+                }
+                setIsGasEditing(next);
+                setIsRenaming(false);
+              }}
+              title="Spread the gas part as daily spend; any extra stays on this day."
+              type="button"
+            >
+              {transaction.isGasAllocated ? "Edit gas" : "Gas"}
+            </button>
+          ) : null}
           {variant === "spending" && onAmortize ? (
             <>
               <button
@@ -2809,7 +2986,7 @@ function makeEmptySlot(dayId: string, slotIndex: number): DashboardSlot {
 }
 
 function parsePositiveNumber(value: string): number {
-  const parsed = Number(value);
+  const parsed = Number(value.replace(/[$,]/g, "").trim());
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
 
@@ -2994,6 +3171,10 @@ function formatMoneyExact(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(centsToDollars(value));
+}
+
+function formatCentsForInput(value: number): string {
+  return centsToDollars(Math.max(0, value)).toFixed(2);
 }
 
 // Cashflow shows an explicit sign: "+$40" when positive (matching the "-$10"

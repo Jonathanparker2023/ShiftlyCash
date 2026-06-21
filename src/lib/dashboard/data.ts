@@ -110,6 +110,13 @@ type TransactionRow = {
   review_reason: string | null;
 };
 
+type GasAllocationRow = {
+  source_transaction_id: string;
+  gas_amount_cents: NumericValue;
+  remainder_amount_cents: NumericValue;
+  is_active: boolean;
+};
+
 type WeekTotalRow = {
   week_id: string;
   display_week_number: number;
@@ -315,6 +322,25 @@ export async function getDashboardData(): Promise<DashboardData> {
     throw new Error(`Unable to load transactions: ${transactionError.message}`);
   }
 
+  let gasAllocations: GasAllocationRow[] = [];
+  const transactionIds = ((transactionData ?? []) as TransactionRow[]).map(
+    (transaction) => transaction.id,
+  );
+  if (transactionIds.length > 0) {
+    const { data: gasData, error: gasError } = await supabase
+      .from("gas_allocations")
+      .select(
+        "source_transaction_id,gas_amount_cents,remainder_amount_cents,is_active",
+      )
+      .in("source_transaction_id", transactionIds)
+      .eq("is_active", true);
+    if (gasError) {
+      console.warn(`[dashboard] gas allocations unavailable: ${gasError.message}`);
+    } else {
+      gasAllocations = (gasData ?? []) as GasAllocationRow[];
+    }
+  }
+
   // Per-day fixed-cost breakdown (the "Fixed" drill-down). Soft-fail: if the
   // derivation view isn't present yet (pre-migration) the dashboard still
   // renders, just with empty breakdowns.
@@ -383,6 +409,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     dayTotals: (dayTotalData ?? []) as DayTotalRow[],
     slots: (slotData ?? []) as EarnSlotRow[],
     transactions: (transactionData ?? []) as TransactionRow[],
+    gasAllocations,
     weekTotal: weekTotalData as WeekTotalRow,
     adjacentAbilityPayPeriod,
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
@@ -403,6 +430,7 @@ function mapDashboardData(input: {
   dayTotals: DayTotalRow[];
   slots: EarnSlotRow[];
   transactions: TransactionRow[];
+  gasAllocations: GasAllocationRow[];
   weekTotal: WeekTotalRow;
   adjacentAbilityPayPeriod: AdjacentAbilityPayPeriod;
   baselineTotal: BaselineTotalRow | null;
@@ -443,7 +471,16 @@ function mapDashboardData(input: {
     },
   };
   const slotsByDay = groupSlotsByDay(input.slots);
-  const transactionsByDay = groupTransactionsByDay(input.transactions);
+  const gasByTransactionId = new Map(
+    input.gasAllocations.map((allocation) => [
+      allocation.source_transaction_id,
+      allocation,
+    ]),
+  );
+  const transactionsByDay = groupTransactionsByDay(
+    input.transactions,
+    gasByTransactionId,
+  );
   const totalsByDay = new Map(
     input.dayTotals.map((totals) => [totals.day_id, totals]),
   );
@@ -849,7 +886,10 @@ function groupSlotsByDay(slots: EarnSlotRow[]) {
   return grouped;
 }
 
-function groupTransactionsByDay(transactions: TransactionRow[]) {
+function groupTransactionsByDay(
+  transactions: TransactionRow[],
+  gasByTransactionId: Map<string, GasAllocationRow>,
+) {
   const grouped = new Map<string, DashboardTransaction[]>();
 
   transactions.forEach((transaction) => {
@@ -858,7 +898,7 @@ function groupTransactionsByDay(transactions: TransactionRow[]) {
     }
 
     const rows = grouped.get(transaction.day_id) ?? [];
-    rows.push(mapDashboardTransaction(transaction));
+    rows.push(mapDashboardTransaction(transaction, gasByTransactionId));
     grouped.set(transaction.day_id, rows);
   });
 
@@ -869,16 +909,34 @@ function groupTransactionsByDay(transactions: TransactionRow[]) {
   return grouped;
 }
 
-function mapDashboardTransaction(row: TransactionRow): DashboardTransaction {
+function mapDashboardTransaction(
+  row: TransactionRow,
+  gasByTransactionId: Map<string, GasAllocationRow>,
+): DashboardTransaction {
+  const originalAmountCents = dollarsToCents(toNumber(row.amount));
+  const gasAllocation = gasByTransactionId.get(row.id);
+  const hasActiveGasAllocation = gasAllocation?.is_active === true;
+  const gasAllocatedCents =
+    hasActiveGasAllocation
+      ? Math.round(toNumber(gasAllocation.gas_amount_cents))
+      : 0;
+  const gasRemainderCents =
+    hasActiveGasAllocation
+      ? Math.round(toNumber(gasAllocation.remainder_amount_cents))
+      : originalAmountCents;
   return {
     id: row.id,
     dayId: row.day_id ?? "",
     merchantName: row.merchant_name,
-    amountCents: dollarsToCents(toNumber(row.amount)),
+    amountCents: hasActiveGasAllocation ? gasRemainderCents : originalAmountCents,
+    originalAmountCents,
     category: row.category,
     source: row.source,
     status: row.status === "excluded" ? "excluded" : "applied",
     isAmortized: row.review_reason === "amortized_expense",
+    isGasAllocated: hasActiveGasAllocation,
+    gasAllocatedCents,
+    gasRemainderCents,
     date: row.date,
     time: row.datetime ?? row.legacy_time,
     createdAt: row.created_at,

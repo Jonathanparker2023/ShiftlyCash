@@ -15,10 +15,14 @@ export type DashboardTransaction = {
   dayId: string;
   merchantName: string;
   amountCents: number;
+  originalAmountCents: number;
   category: string | null;
   source: DashboardTransactionSource;
   status: DashboardTransactionStatus;
   isAmortized: boolean;
+  isGasAllocated: boolean;
+  gasAllocatedCents: number;
+  gasRemainderCents: number;
   date: string;
   time: string | null;
   createdAt: string;

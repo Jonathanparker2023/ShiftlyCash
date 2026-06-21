@@ -83,6 +83,12 @@ export type AmortizeTransactionInput = {
   months: 1 | 3;
 };
 
+export type AllocateGasTransactionInput = {
+  transactionId: string;
+  gasAmountCents: number;
+  previousFillDate?: string | null;
+};
+
 export type CloseWeekResult = {
   ok: true;
   newWeekId: string;
@@ -95,10 +101,14 @@ export type ManualTransactionResult = {
     dayId: string;
     merchantName: string;
     amountCents: number;
+    originalAmountCents: number;
     category: string | null;
     source: "manual";
     status: "applied";
     isAmortized: boolean;
+    isGasAllocated: boolean;
+    gasAllocatedCents: number;
+    gasRemainderCents: number;
     date: string;
     time: string | null;
     createdAt: string;
@@ -285,7 +295,7 @@ export async function refreshDashboardProjectionMaintenanceAction(): Promise<Ref
 export async function toggleTransactionStatusAction(
   input: ToggleTransactionStatusInput,
 ): Promise<{ ok: true }> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const transactionId = requireUuid(input.transactionId, "transactionId");
   const newStatus = requireEnum(
     input.newStatus,
@@ -323,22 +333,32 @@ export async function toggleTransactionStatusAction(
     throw new Error(`Unable to update transaction: ${error.message}`);
   }
 
-  // Re-including a previously-amortized transaction as spend must cancel its
-  // amortization, or the cost would be counted twice (once as the day charge,
-  // once via the still-active amortized baseline allocation).
-  if (newStatus === "applied") {
-    const { error: deactivateError } = await supabase
-      .from("amortized_expenses")
-      .update({ is_active: false })
-      .eq("source_transaction_id", transactionId);
-    if (deactivateError) {
-      throw new Error(
-        `Unable to clear amortization: ${deactivateError.message}`,
-      );
-    }
-    revalidatePath("/baseline");
+  // Status changes return the transaction to the normal spend/exempt flow.
+  // Clear derived overlays so gas/amortization cannot keep moving totals after
+  // the source row has been manually reclassified.
+  const { error: deactivateAmortizationError } = await supabase
+    .from("amortized_expenses")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateAmortizationError) {
+    throw new Error(
+      `Unable to clear amortization: ${deactivateAmortizationError.message}`,
+    );
   }
 
+  const { error: deactivateGasError } = await supabase
+    .from("gas_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateGasError) {
+    throw new Error(`Unable to clear gas allocation: ${deactivateGasError.message}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/baseline");
+  revalidatePath("/history");
   return { ok: true };
 }
 
@@ -364,7 +384,7 @@ export async function deleteTransactionAction(
 export async function moveTransactionToYesterdayAction(
   input: TransactionIdInput,
 ): Promise<{ ok: true; dayId: string; date: string }> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const transactionId = requireUuid(input.transactionId, "transactionId");
   const { data: transaction, error: transactionError } = await supabase
     .from("transactions")
@@ -407,7 +427,17 @@ export async function moveTransactionToYesterdayAction(
     throw new Error(`Unable to move transaction: ${error.message}`);
   }
 
+  const { error: deactivateGasError } = await supabase
+    .from("gas_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateGasError) {
+    throw new Error(`Unable to clear gas allocation: ${deactivateGasError.message}`);
+  }
+
   revalidatePath("/");
+  revalidatePath("/history");
   return { ok: true, dayId: String(day.id), date: String(day.date) };
 }
 
@@ -512,10 +542,113 @@ export async function amortizeTransactionAction(
     throw new Error(`Unable to exclude transaction: ${excludeError.message}`);
   }
 
+  const { error: deactivateGasError } = await supabase
+    .from("gas_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateGasError) {
+    throw new Error(`Unable to clear gas allocation: ${deactivateGasError.message}`);
+  }
+
   revalidatePath("/");
   revalidatePath("/baseline");
+  revalidatePath("/history");
 
   return { ok: true, amortizedId: String((amortized as { id: string }).id) };
+}
+
+export async function allocateGasTransactionAction(
+  input: AllocateGasTransactionInput,
+): Promise<{ ok: true; allocationId: string; previousFillDate: string }> {
+  const { supabase, user } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+  const gasAmountCents = requirePositiveInteger(
+    input.gasAmountCents,
+    "gasAmountCents",
+  );
+
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id,amount,merchant_name,date,status,day_id")
+    .eq("id", transactionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (transactionError) {
+    throw new Error(`Unable to validate transaction: ${transactionError.message}`);
+  }
+  if (!transaction) {
+    throw new Error("Transaction not found.");
+  }
+
+  const row = transaction as {
+    id: string;
+    amount: number | string;
+    merchant_name: string | null;
+    date: string;
+    status: string;
+    day_id: string | null;
+  };
+  if (row.status !== "applied" || !row.day_id) {
+    throw new Error("Gas allocation requires an applied spending transaction.");
+  }
+
+  const originalAmountCents = Math.round(Math.abs(Number(row.amount)) * 100);
+  if (!Number.isFinite(originalAmountCents) || originalAmountCents <= 0) {
+    throw new Error("Transaction has no positive amount to allocate.");
+  }
+  if (gasAmountCents > originalAmountCents) {
+    throw new Error("Gas amount cannot exceed the transaction amount.");
+  }
+
+  const fillDate = row.date;
+  const previousFillDate = input.previousFillDate
+    ? requirePastDate(input.previousFillDate, fillDate, "previousFillDate")
+    : await findPreviousGasFillDate(supabase, user.id, fillDate, transactionId);
+  const merchantName = String(row.merchant_name ?? "Gas").trim() || "Gas";
+
+  const { data: allocation, error: upsertError } = await supabase
+    .from("gas_allocations")
+    .upsert(
+      {
+        user_id: user.id,
+        source_transaction_id: transactionId,
+        merchant_name: merchantName,
+        fill_date: fillDate,
+        previous_fill_date: previousFillDate,
+        gas_amount_cents: gasAmountCents,
+        original_amount_cents: originalAmountCents,
+        remainder_amount_cents: originalAmountCents - gasAmountCents,
+        is_active: true,
+      },
+      { onConflict: "source_transaction_id" },
+    )
+    .select("id")
+    .single();
+
+  if (upsertError) {
+    throw new Error(`Unable to allocate gas: ${upsertError.message}`);
+  }
+
+  const { error: deactivateAmortizationError } = await supabase
+    .from("amortized_expenses")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateAmortizationError) {
+    throw new Error(
+      `Unable to clear amortization: ${deactivateAmortizationError.message}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  return {
+    ok: true,
+    allocationId: String((allocation as { id: string }).id),
+    previousFillDate,
+  };
 }
 
 // Change an existing amortization's period in place (e.g. 1mo -> 3mo). Bumps
@@ -871,10 +1004,14 @@ export async function addManualTransactionAction(
       dayId: row.day_id,
       merchantName: row.merchant_name,
       amountCents: dollarsToCents(Number(row.amount)),
+      originalAmountCents: dollarsToCents(Number(row.amount)),
       category: row.category,
       source: "manual",
       status: "applied",
       isAmortized: false,
+      isGasAllocated: false,
+      gasAllocatedCents: 0,
+      gasRemainderCents: dollarsToCents(Number(row.amount)),
       date: row.date,
       time: null,
       createdAt: row.created_at,
@@ -1064,6 +1201,16 @@ function requirePositiveInteger(value: number, fieldName: string): number {
   return value;
 }
 
+function requirePastDate(value: string, currentDate: string, fieldName: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`Invalid ${fieldName}. Use YYYY-MM-DD.`);
+  }
+  if (value >= currentDate) {
+    throw new Error("Previous gas date must be before the current gas date.");
+  }
+  return value;
+}
+
 function requireNonNegativeNumber(value: number, fieldName: string): number {
   if (!Number.isFinite(value) || value < 0) {
     throw new Error(`Invalid ${fieldName}.`);
@@ -1102,6 +1249,72 @@ function requireEnum<T extends string>(
   }
 
   return matched;
+}
+
+const GAS_MERCHANT_PATTERN =
+  /\b(gas|fuel|shell|mobil|exxon|sunoco|citgo|bp|cumberland|valero|speedway|gulf|7-eleven|seven eleven|wawa)\b/i;
+
+async function findPreviousGasFillDate(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+  fillDate: string,
+  currentTransactionId: string,
+): Promise<string> {
+  const { data: allocationData, error: allocationError } = await supabase
+    .from("gas_allocations")
+    .select("fill_date")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .lt("fill_date", fillDate)
+    .order("fill_date", { ascending: false })
+    .limit(1);
+  if (allocationError) {
+    throw new Error(`Unable to load gas history: ${allocationError.message}`);
+  }
+
+  const priorAllocation = (allocationData ?? [])[0] as
+    | { fill_date: string }
+    | undefined;
+  if (priorAllocation?.fill_date) {
+    return String(priorAllocation.fill_date);
+  }
+
+  const { data: transactionData, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id,date,merchant_name,raw_name,category")
+    .eq("user_id", userId)
+    .eq("status", "applied")
+    .lt("date", fillDate)
+    .order("date", { ascending: false })
+    .order("datetime", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (transactionError) {
+    throw new Error(`Unable to load gas candidates: ${transactionError.message}`);
+  }
+
+  const priorGas = (
+    (transactionData ?? []) as {
+      id: string;
+      date: string;
+      merchant_name: string | null;
+      raw_name: string | null;
+      category: string | null;
+    }[]
+  ).find((transaction) => {
+    if (transaction.id === currentTransactionId) {
+      return false;
+    }
+    return GAS_MERCHANT_PATTERN.test(
+      [
+        transaction.merchant_name ?? "",
+        transaction.raw_name ?? "",
+        transaction.category ?? "",
+      ].join(" "),
+    );
+  });
+
+  return priorGas?.date ?? addDaysIso(fillDate, -1);
 }
 
 function centsToDollars(value: number): number {
