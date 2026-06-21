@@ -14,6 +14,12 @@ type TemplateRow = {
   id: string;
 };
 
+type StickyLabelRow = {
+  day_index: number;
+  slot_index: number;
+  label: string;
+};
+
 type TemplateSlotRow = {
   day_index: number;
   slot_index: number;
@@ -54,13 +60,34 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
     throw new Error(`Unable to load template slots: ${slotError.message}`);
   }
 
+  // Labels live in sticky_labels (keyed by day_index/slot_index), separate from
+  // template_slots. Load them so the editor can view + edit shift labels.
+  const { data: labelData, error: labelError } = await supabase
+    .from("sticky_labels")
+    .select("day_index,slot_index,label");
+  if (labelError) {
+    throw new Error(`Unable to load template labels: ${labelError.message}`);
+  }
+  const labelByPosition = new Map(
+    ((labelData ?? []) as StickyLabelRow[]).map((row) => [
+      `${row.day_index}:${row.slot_index}`,
+      row.label,
+    ]),
+  );
+
   return {
     templateId: template.id,
-    days: mapTemplateDays((slotData ?? []) as TemplateSlotRow[]),
+    days: mapTemplateDays(
+      (slotData ?? []) as TemplateSlotRow[],
+      labelByPosition,
+    ),
   };
 }
 
-function mapTemplateDays(rows: TemplateSlotRow[]): TemplateDayDraft[] {
+function mapTemplateDays(
+  rows: TemplateSlotRow[],
+  labelByPosition: Map<string, string>,
+): TemplateDayDraft[] {
   const slotsByPosition = new Map(
     rows.map((row) => [`${row.day_index}:${row.slot_index}`, row]),
   );
@@ -73,6 +100,7 @@ function mapTemplateDays(rows: TemplateSlotRow[]): TemplateDayDraft[] {
         dayIndex,
         slotIndex,
         slotsByPosition.get(`${dayIndex}:${slotIndex}`),
+        labelByPosition.get(`${dayIndex}:${slotIndex}`) ?? "",
       ),
     ),
   }));
@@ -82,6 +110,7 @@ function mapTemplateSlot(
   dayIndex: number,
   slotIndex: number,
   row: TemplateSlotRow | undefined,
+  label: string,
 ): TemplateSlotDraft {
   return {
     dayIndex,
@@ -94,6 +123,7 @@ function mapTemplateSlot(
     incentiveMode: mapIncentiveMode(row?.incentive_mode ?? null),
     incentiveRate: toNumber(row?.incentive_rate ?? 0),
     incentiveAmount: toNumber(row?.incentive_amount ?? 0),
+    label,
   };
 }
 

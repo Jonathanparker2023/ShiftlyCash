@@ -29,7 +29,7 @@ export type SaveTemplateResult = {
 export async function saveDefaultTemplateAction(
   input: SaveTemplateInput,
 ): Promise<SaveTemplateResult> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const slots = input.slots.map(normalizeTemplateSlot);
 
   const { data, error } = await supabase.rpc("replace_default_template_slots", {
@@ -38,6 +38,27 @@ export async function saveDefaultTemplateAction(
 
   if (error) {
     throw new Error(`Unable to save template: ${error.message}`);
+  }
+
+  // Labels live in sticky_labels. Persist the editor's label for each ACTIVE
+  // slot (empty string clears it); inactive slots are left untouched so their
+  // manual-entry label memory survives. The autofill reads these for non-ability
+  // slots (ability labels are app-managed).
+  const labelRows = input.slots
+    .filter((slot) => requireEnum(slot.jobType, JOB_TYPES, "jobType") !== "none")
+    .map((slot) => ({
+      user_id: user.id,
+      day_index: requireIntegerInRange(slot.dayIndex, 0, 6, "dayIndex"),
+      slot_index: requireIntegerInRange(slot.slotIndex, 0, 3, "slotIndex"),
+      label: typeof slot.label === "string" ? slot.label.trim() : "",
+    }));
+  if (labelRows.length > 0) {
+    const { error: labelError } = await supabase
+      .from("sticky_labels")
+      .upsert(labelRows, { onConflict: "user_id,day_index,slot_index" });
+    if (labelError) {
+      throw new Error(`Unable to save labels: ${labelError.message}`);
+    }
   }
 
   revalidatePath("/settings/template");

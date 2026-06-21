@@ -277,6 +277,25 @@ function TemplateSlotRow({
           />
         </>
       ) : null}
+
+      {slot.jobType !== "none" ? (
+        <input
+          aria-label="Shift label"
+          className="col-span-full h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm"
+          onChange={(event) =>
+            onChange(slot.dayIndex, slot.slotIndex, {
+              label: event.target.value,
+            })
+          }
+          placeholder={
+            isAbilityShift(slot.jobType)
+              ? "Label (auto-set for Ability shifts)"
+              : "Label (e.g. Spanish Shift)"
+          }
+          type="text"
+          value={slot.label ?? ""}
+        />
+      ) : null}
     </div>
   );
 }
