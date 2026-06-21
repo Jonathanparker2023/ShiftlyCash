@@ -1,3 +1,4 @@
+import type { DashboardSpendProjection } from "@/lib/dashboard/spendProjection";
 import type {
   DayTotals,
   EarnSlotInput,
@@ -118,11 +119,6 @@ export type DashboardBaselineTotals = {
   monthlyTotalCents: number;
   weeklyAverageCents: number;
   projectedDailyBaseCents: number;
-};
-
-export type DashboardSpendProjection = {
-  previousWeekSpendCents: number;
-  projectedDailySpendCents: number;
 };
 
 export type DashboardMetricMedians = {

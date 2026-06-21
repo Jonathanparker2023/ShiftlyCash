@@ -19,6 +19,7 @@ import type {
 } from "@/lib/dashboard/types";
 import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
 import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
+import { deriveSpendProjection } from "@/lib/dashboard/spendProjection";
 import {
   dollarsToCents,
   roundCentsToNearestTenDollars,
@@ -138,6 +139,10 @@ type ClosedWeekMetricRow = {
   cashflow_total: NumericValue;
 };
 
+type ProjectionWeekRow = {
+  spend_for_projection: NumericValue;
+};
+
 type BaselineTotalRow = {
   monthly_total: NumericValue;
   weekly_average: NumericValue;
@@ -178,7 +183,7 @@ type AdjacentAbilityPayPeriod = {
 
 export async function getDashboardData(): Promise<DashboardData> {
   const tTotal = mark();
-  const { supabase } = await timed("dashboard:auth", () =>
+  const { supabase, user } = await timed("dashboard:auth", () =>
     requireUserWithBootstrapStatus(),
   );
   const startDate = getSundayOnOrBeforeTodayIso();
@@ -211,6 +216,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     { data: weekTotalData, error: weekTotalError },
     { data: baselineTotalData, error: baselineTotalError },
     { data: closedWeekMetricData, error: closedWeekMetricError },
+    { data: projectionWeekData, error: projectionWeekError },
   ] = await Promise.all([
     supabase
       .from("settings")
@@ -252,6 +258,12 @@ export async function getDashboardData(): Promise<DashboardData> {
       .select("earnings_total,spend_total,cashflow_total")
       .eq("status", "closed")
       .order("start_date", { ascending: true }),
+    supabase
+      .from("v_projection_weeks")
+      .select("spend_for_projection")
+      .eq("user_id", user.id)
+      .not("spend_for_projection", "is", null)
+      .order("start_date", { ascending: true }),
   ]);
   since("dashboard:batchA(settings+week+days+totals+baseline+closed)", tBatchA);
 
@@ -278,6 +290,11 @@ export async function getDashboardData(): Promise<DashboardData> {
   if (closedWeekMetricError) {
     throw new Error(
       `Unable to load metric medians: ${closedWeekMetricError.message}`,
+    );
+  }
+  if (projectionWeekError) {
+    throw new Error(
+      `Unable to load spend projection weeks: ${projectionWeekError.message}`,
     );
   }
 
@@ -414,6 +431,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     adjacentAbilityPayPeriod,
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
     closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
+    projectionWeeks: (projectionWeekData ?? []) as ProjectionWeekRow[],
     baseAllocations,
     bucketCredits,
     customJobs,
@@ -435,6 +453,7 @@ function mapDashboardData(input: {
   adjacentAbilityPayPeriod: AdjacentAbilityPayPeriod;
   baselineTotal: BaselineTotalRow | null;
   closedWeekMetrics: ClosedWeekMetricRow[];
+  projectionWeeks: ProjectionWeekRow[];
   baseAllocations: BaseAllocationRow[];
   bucketCredits: AmortizationCreditRow[];
   customJobs: CustomJobRow[];
@@ -545,27 +564,12 @@ function mapDashboardData(input: {
       ),
     },
     abilityPayPeriod: input.adjacentAbilityPayPeriod,
-    spendProjection: deriveSpendProjection(input.closedWeekMetrics),
+    spendProjection: deriveSpendProjection(
+      input.projectionWeeks.map((row) => ({
+        spendCents: dollarsToCents(toNumber(row.spend_for_projection)),
+      })),
+    ),
   };
-}
-
-function deriveSpendProjection(
-  closedWeekMetrics: ClosedWeekMetricRow[],
-): { previousWeekSpendCents: number; projectedDailySpendCents: number } {
-  // closedWeekMetrics is ordered by start_date ASC. Use the most recent six
-  // closed weeks so one unusually high or low week doesn't drive autofill.
-  const recentSpendValues = closedWeekMetrics
-    .slice(-6)
-    .map((row) => row.spend_total);
-
-  if (recentSpendValues.length === 0) {
-    return { previousWeekSpendCents: 0, projectedDailySpendCents: 0 };
-  }
-
-  const previousWeekSpendCents = medianCents(recentSpendValues);
-  const projectedDailySpendCents = Math.round(previousWeekSpendCents / 7);
-
-  return { previousWeekSpendCents, projectedDailySpendCents };
 }
 
 async function loadAdjacentAbilityPayPeriod({

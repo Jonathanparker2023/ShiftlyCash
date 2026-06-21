@@ -3,7 +3,11 @@
 import { useMemo, useState } from "react";
 
 import { centsToDollars } from "@/lib/domain/money";
-import type { TrendsData, TrendsWeek } from "@/lib/trends/data";
+import type {
+  TrendsData,
+  TrendsSpendProjection,
+  TrendsWeek,
+} from "@/lib/trends/data";
 
 type RangeKey = "12w" | "ytd" | "all" | "custom";
 
@@ -148,6 +152,8 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
           </div>
         </header>
 
+        <SpendAutofillTracker projection={initialData.spendProjection} />
+
         <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -176,6 +182,69 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
         </section>
       </section>
     </main>
+  );
+}
+
+function SpendAutofillTracker({
+  projection,
+}: {
+  projection: TrendsSpendProjection;
+}) {
+  const weekList = projection.sourceWeeks
+    .map((week) => `W${week.weekNumber} ${formatMoney(week.spendCents)}`)
+    .join(" + ");
+
+  return (
+    <section className="mb-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/75">
+            Spend autofill math
+          </p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
+            {formatMoney(projection.projectedDailySpendCents)} per future day
+          </h2>
+          <p className="mt-1 text-sm text-white/65">
+            All included closed weeks averaged, then divided by 7.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-right sm:grid-cols-4">
+          <Stat label="Weeks" value={String(projection.sourceWeekCount)} />
+          <Stat
+            label="Total spend"
+            value={formatMoney(projection.sourceTotalSpendCents)}
+          />
+          <Stat
+            label="Avg week"
+            value={formatMoney(projection.sourceAverageWeekSpendCents)}
+          />
+          <Stat
+            label="Daily"
+            value={formatMoney(projection.projectedDailySpendCents)}
+          />
+        </div>
+      </div>
+      <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-white/60">
+        {projection.sourceWeekCount > 0 ? (
+          <>
+            <span className="text-white/85">{formatMoney(projection.sourceTotalSpendCents)}</span>
+            {" / "}
+            <span className="text-white/85">{projection.sourceWeekCount}</span>
+            {" weeks / 7 days = "}
+            <span className="text-amber-100">
+              {formatMoney(projection.projectedDailySpendCents)}
+            </span>
+          </>
+        ) : (
+          "No closed weeks are included yet, so future spend autofill stays blank."
+        )}
+      </div>
+      {weekList ? (
+        <p className="mt-2 max-h-8 overflow-hidden text-xs text-white/45">
+          Source weeks: {weekList}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

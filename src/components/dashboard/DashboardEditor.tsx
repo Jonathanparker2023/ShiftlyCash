@@ -596,7 +596,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   async function allocateGasTransaction(
     transaction: DashboardTransaction,
     gasAmountCents: number,
-    anchorStartDate: string | null,
+    previousFillDate: string | null,
   ) {
     if (pendingTransactionIds.has(transaction.id)) {
       return;
@@ -614,7 +614,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       await allocateGasTransactionAction({
         transactionId: transaction.id,
         gasAmountCents,
-        anchorStartDate,
+        previousFillDate,
       });
       lastSavedAt.current = Date.now();
       setSaveState("saved");
@@ -1332,7 +1332,7 @@ function FocusedDayEditor({
   onAllocateGasTransaction: (
     transaction: DashboardTransaction,
     gasAmountCents: number,
-    anchorStartDate: string | null,
+    previousFillDate: string | null,
   ) => void;
   onAddShift: (day: DashboardDay) => void;
   onRemoveSlot: (slot: DashboardSlot) => void;
@@ -1408,7 +1408,7 @@ function TransactionDrawer({
   onAllocateGasTransaction: (
     transaction: DashboardTransaction,
     gasAmountCents: number,
-    anchorStartDate: string | null,
+    previousFillDate: string | null,
   ) => void;
   onAddManualTransaction: (
     day: DashboardDay,
@@ -1551,7 +1551,7 @@ function TransactionColumn({
   onAllocateGas?: (
     transaction: DashboardTransaction,
     gasAmountCents: number,
-    anchorStartDate: string | null,
+    previousFillDate: string | null,
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
@@ -1607,7 +1607,7 @@ function TransactionRowButton({
   onAllocateGas?: (
     transaction: DashboardTransaction,
     gasAmountCents: number,
-    anchorStartDate: string | null,
+    previousFillDate: string | null,
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
@@ -1622,7 +1622,7 @@ function TransactionRowButton({
         : transaction.originalAmountCents,
     ),
   );
-  const [gasAnchorDate, setGasAnchorDate] = useState("");
+  const [previousGasDate, setPreviousGasDate] = useState("");
   const isAmortizedExempt = variant === "exempt" && transaction.isAmortized;
   const rowStyle = isAmortizedExempt
     ? {
@@ -1645,7 +1645,7 @@ function TransactionRowButton({
     onAllocateGas?.(
       transaction,
       gasAmountCents,
-      gasAnchorDate.trim() || null,
+      previousGasDate.trim() || null,
     );
     setIsGasEditing(false);
   }
@@ -1725,14 +1725,14 @@ function TransactionRowButton({
                 />
               </label>
               <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-warning-text)]">
-                Anchor start
+                Previous gas
                 <input
                   className="mt-1 block h-8 w-full rounded-md border border-[var(--accent-warning-border)] bg-[var(--surface-base)] px-2 text-xs font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)]"
                   disabled={disabled}
-                  onChange={(event) => setGasAnchorDate(event.target.value)}
+                  onChange={(event) => setPreviousGasDate(event.target.value)}
                   placeholder="Auto"
                   type="date"
-                  value={gasAnchorDate}
+                  value={previousGasDate}
                 />
               </label>
               <div className="flex items-end gap-2">
