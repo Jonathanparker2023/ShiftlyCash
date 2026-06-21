@@ -3,11 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { centsToDollars } from "@/lib/domain/money";
-import type {
-  TrendsData,
-  TrendsSpendProjection,
-  TrendsWeek,
-} from "@/lib/trends/data";
+import type { TrendsData, TrendsGasTracker, TrendsWeek } from "@/lib/trends/data";
 
 type RangeKey = "12w" | "ytd" | "all" | "custom";
 
@@ -152,8 +148,6 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
           </div>
         </header>
 
-        <SpendAutofillTracker projection={initialData.spendProjection} />
-
         <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -179,69 +173,66 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
           ) : (
             <WeeklyCashflowChart weeks={weeks} medianCents={stats.median} />
           )}
+
+          <GasTracker tracker={initialData.gasTracker} />
         </section>
       </section>
     </main>
   );
 }
 
-function SpendAutofillTracker({
-  projection,
-}: {
-  projection: TrendsSpendProjection;
-}) {
-  const weekList = projection.sourceWeeks
-    .map((week) => `W${week.weekNumber} ${formatMoney(week.spendCents)}`)
-    .join(" + ");
-
+function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
   return (
-    <section className="mb-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
+    <section className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/75">
-            Spend autofill math
+            Gas tracker
           </p>
           <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
-            {formatMoney(projection.projectedDailySpendCents)} per future day
+            {tracker.status === "active"
+              ? `${formatMoney(tracker.averageDailyGasCents)} per gas day`
+              : "Waiting for today's fill"}
           </h2>
           <p className="mt-1 text-sm text-white/65">
-            All included closed weeks averaged, then divided by 7.
+            {tracker.status === "active"
+              ? "Gas is tracked separately from total spend and added one day at a time."
+              : "Once you fill the tank and hit Gas on that transaction, this shows the daily gas math."}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3 text-right sm:grid-cols-4">
-          <Stat label="Weeks" value={String(projection.sourceWeekCount)} />
-          <Stat
-            label="Total spend"
-            value={formatMoney(projection.sourceTotalSpendCents)}
-          />
-          <Stat
-            label="Avg week"
-            value={formatMoney(projection.sourceAverageWeekSpendCents)}
-          />
-          <Stat
-            label="Daily"
-            value={formatMoney(projection.projectedDailySpendCents)}
-          />
-        </div>
+        {tracker.status === "active" ? (
+          <div className="grid grid-cols-2 gap-3 text-right sm:grid-cols-4">
+            <Stat label="Gas total" value={formatMoney(tracker.gasAmountCents)} />
+            <Stat label="Days" value={String(tracker.periodDays)} />
+            <Stat label="Daily" value={formatMoney(tracker.averageDailyGasCents)} />
+            <Stat label="Extra" value={formatMoney(tracker.remainderAmountCents)} />
+          </div>
+        ) : null}
       </div>
       <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-white/60">
-        {projection.sourceWeekCount > 0 ? (
+        {tracker.status === "active" ? (
           <>
-            <span className="text-white/85">{formatMoney(projection.sourceTotalSpendCents)}</span>
-            {" / "}
-            <span className="text-white/85">{projection.sourceWeekCount}</span>
-            {" weeks / 7 days = "}
+            <span className="text-white/85">{formatMoney(tracker.gasAmountCents)}</span>
+            {" gas / "}
+            <span className="text-white/85">{tracker.periodDays}</span>
+            {" days = "}
             <span className="text-amber-100">
-              {formatMoney(projection.projectedDailySpendCents)}
+              {formatMoney(tracker.averageDailyGasCents)}
             </span>
+            {" daily. Period: "}
+            <span className="text-white/85">
+              {shortDate(tracker.periodStartDate)} to {shortDate(tracker.fillDate)}
+            </span>
+            {"."}
           </>
         ) : (
-          "No closed weeks are included yet, so future spend autofill stays blank."
+          "No gas fill logged yet. Use the Gas button after today's fill; the prior fill date is just the anchor."
         )}
       </div>
-      {weekList ? (
-        <p className="mt-2 max-h-8 overflow-hidden text-xs text-white/45">
-          Source weeks: {weekList}
+      {tracker.status === "active" ? (
+        <p className="mt-2 text-xs text-white/45">
+          Previous gas: {shortDate(tracker.previousFillDate)}. Source:{" "}
+          {tracker.merchantName}. Store extras stay normal spend.
         </p>
       ) : null}
     </section>

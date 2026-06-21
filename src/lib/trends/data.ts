@@ -1,8 +1,5 @@
 import { requireUserWithBootstrapStatus } from "@/lib/auth";
-import {
-  deriveSpendProjection,
-  type DashboardSpendProjection,
-} from "@/lib/dashboard/spendProjection";
+import { addDaysIso } from "@/lib/dashboard/dates";
 import { dollarsToCents } from "@/lib/domain/money";
 
 type NumericValue = number | string | null;
@@ -19,13 +16,6 @@ type WeekTotalRow = {
   cashflow_total: NumericValue;
 };
 
-type ProjectionWeekRow = {
-  week_id: string;
-  start_date: string;
-  display_week_number: number;
-  spend_for_projection: NumericValue;
-};
-
 export type TrendsWeek = {
   weekId: string;
   startDate: string;
@@ -38,27 +28,48 @@ export type TrendsWeek = {
   cashflowCents: number;
 };
 
-export type TrendsSpendProjectionWeek = {
-  weekId: string;
-  startDate: string;
-  weekNumber: number;
-  spendCents: number;
+type GasAllocationRow = {
+  id: string;
+  merchant_name: string;
+  fill_date: string;
+  previous_fill_date: string;
+  gas_amount_cents: NumericValue;
+  original_amount_cents: NumericValue;
+  remainder_amount_cents: NumericValue;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
-export type TrendsSpendProjection = DashboardSpendProjection & {
-  sourceWeeks: TrendsSpendProjectionWeek[];
-};
+export type TrendsGasTracker =
+  | {
+      status: "waiting_for_fill";
+    }
+  | {
+      status: "active";
+      allocationId: string;
+      merchantName: string;
+      previousFillDate: string;
+      periodStartDate: string;
+      fillDate: string;
+      periodDays: number;
+      gasAmountCents: number;
+      averageDailyGasCents: number;
+      originalAmountCents: number;
+      remainderAmountCents: number;
+      updatedAt: string;
+    };
 
 export type TrendsData = {
   weeks: TrendsWeek[];
-  spendProjection: TrendsSpendProjection;
+  gasTracker: TrendsGasTracker;
 };
 
 export async function getTrendsData(): Promise<TrendsData> {
   const { supabase, user } = await requireUserWithBootstrapStatus();
   const [
     { data, error },
-    { data: projectionData, error: projectionError },
+    { data: gasData, error: gasError },
   ] = await Promise.all([
     supabase
       .from("v_week_totals")
@@ -68,33 +79,27 @@ export async function getTrendsData(): Promise<TrendsData> {
       .eq("user_id", user.id)
       .order("start_date", { ascending: true }),
     supabase
-      .from("v_projection_weeks")
-      .select("week_id,start_date,display_week_number,spend_for_projection")
+      .from("gas_allocations")
+      .select(
+        "id,merchant_name,fill_date,previous_fill_date,gas_amount_cents,original_amount_cents,remainder_amount_cents,is_active,created_at,updated_at",
+      )
       .eq("user_id", user.id)
-      .not("spend_for_projection", "is", null)
-      .order("start_date", { ascending: true }),
+      .eq("is_active", true)
+      .order("fill_date", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(1),
   ]);
 
   if (error) {
     throw new Error(`Unable to load trends: ${error.message}`);
   }
-  if (projectionError) {
-    throw new Error(
-      `Unable to load spend projection: ${projectionError.message}`,
-    );
+  if (gasError) {
+    throw new Error(`Unable to load gas tracker: ${gasError.message}`);
   }
-
-  const projectionWeeks = ((projectionData ?? []) as ProjectionWeekRow[])
-    .map(mapProjectionWeek)
-    .filter((week) => week.spendCents > 0);
-  const projection = deriveSpendProjection(projectionWeeks);
 
   return {
     weeks: ((data ?? []) as WeekTotalRow[]).map(mapTrendsWeek),
-    spendProjection: {
-      ...projection,
-      sourceWeeks: projectionWeeks,
-    },
+    gasTracker: mapGasTracker(((gasData ?? []) as GasAllocationRow[])[0]),
   };
 }
 
@@ -112,15 +117,6 @@ function mapTrendsWeek(row: WeekTotalRow): TrendsWeek {
   };
 }
 
-function mapProjectionWeek(row: ProjectionWeekRow): TrendsSpendProjectionWeek {
-  return {
-    weekId: row.week_id,
-    startDate: row.start_date,
-    weekNumber: row.display_week_number,
-    spendCents: dollarsToCents(toNumber(row.spend_for_projection)),
-  };
-}
-
 function toNumber(value: NumericValue): number {
   if (value === null) {
     return 0;
@@ -128,4 +124,36 @@ function toNumber(value: NumericValue): number {
 
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mapGasTracker(row: GasAllocationRow | undefined): TrendsGasTracker {
+  if (!row) {
+    return { status: "waiting_for_fill" };
+  }
+
+  const periodStartDate = addDaysIso(row.previous_fill_date, 1);
+  const periodDays = inclusiveDateDiff(periodStartDate, row.fill_date);
+  const gasAmountCents = Math.round(toNumber(row.gas_amount_cents));
+
+  return {
+    status: "active",
+    allocationId: row.id,
+    merchantName: row.merchant_name,
+    previousFillDate: row.previous_fill_date,
+    periodStartDate,
+    fillDate: row.fill_date,
+    periodDays,
+    gasAmountCents,
+    averageDailyGasCents: Math.round(gasAmountCents / periodDays),
+    originalAmountCents: Math.round(toNumber(row.original_amount_cents)),
+    remainderAmountCents: Math.round(toNumber(row.remainder_amount_cents)),
+    updatedAt: row.updated_at ?? row.created_at,
+  };
+}
+
+function inclusiveDateDiff(startIso: string, endIso: string): number {
+  const start = Date.parse(`${startIso}T00:00:00.000Z`);
+  const end = Date.parse(`${endIso}T00:00:00.000Z`);
+  const days = Math.round((end - start) / 86_400_000) + 1;
+  return Number.isFinite(days) && days > 0 ? days : 1;
 }
