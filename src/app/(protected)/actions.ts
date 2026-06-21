@@ -86,7 +86,7 @@ export type AmortizeTransactionInput = {
 export type AllocateGasTransactionInput = {
   transactionId: string;
   gasAmountCents: number;
-  previousFillDate?: string | null;
+  anchorStartDate?: string | null;
 };
 
 export type CloseWeekResult = {
@@ -560,7 +560,7 @@ export async function amortizeTransactionAction(
 
 export async function allocateGasTransactionAction(
   input: AllocateGasTransactionInput,
-): Promise<{ ok: true; allocationId: string; previousFillDate: string }> {
+): Promise<{ ok: true; allocationId: string; anchorStartDate: string }> {
   const { supabase, user } = await requireUser();
   const transactionId = requireUuid(input.transactionId, "transactionId");
   const gasAmountCents = requirePositiveInteger(
@@ -603,9 +603,13 @@ export async function allocateGasTransactionAction(
   }
 
   const fillDate = row.date;
-  const previousFillDate = input.previousFillDate
-    ? requirePastDate(input.previousFillDate, fillDate, "previousFillDate")
-    : await findPreviousGasFillDate(supabase, user.id, fillDate, transactionId);
+  const anchorStartDate = input.anchorStartDate
+    ? requirePastDate(input.anchorStartDate, fillDate, "anchorStartDate")
+    : addDaysIso(
+        await findPreviousGasFillDate(supabase, user.id, fillDate, transactionId),
+        1,
+      );
+  const previousFillDate = addDaysIso(anchorStartDate, -1);
   const merchantName = String(row.merchant_name ?? "Gas").trim() || "Gas";
 
   const { data: allocation, error: upsertError } = await supabase
@@ -647,7 +651,7 @@ export async function allocateGasTransactionAction(
   return {
     ok: true,
     allocationId: String((allocation as { id: string }).id),
-    previousFillDate,
+    anchorStartDate,
   };
 }
 
@@ -1205,8 +1209,8 @@ function requirePastDate(value: string, currentDate: string, fieldName: string) 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error(`Invalid ${fieldName}. Use YYYY-MM-DD.`);
   }
-  if (value >= currentDate) {
-    throw new Error("Previous gas date must be before the current gas date.");
+  if (value > currentDate) {
+    throw new Error("Gas anchor date cannot be after the current gas date.");
   }
   return value;
 }
