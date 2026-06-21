@@ -41,6 +41,7 @@ type SettingsRow = {
   prestige_ilst_net_rate: NumericValue;
   prestige_ilst_ot_net_rate: NumericValue;
   ability_withholding_rate: NumericValue;
+  hidden_builtin_jobs: string[] | null;
 };
 
 type WeekRow = {
@@ -221,7 +222,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabase
       .from("settings")
       .select(
-        "ability_regular_net_rate, ability_ot_net_rate, prestige_regular_net_rate, prestige_ot_net_rate, prestige_ilst_net_rate, prestige_ilst_ot_net_rate, ability_withholding_rate",
+        "ability_regular_net_rate, ability_ot_net_rate, prestige_regular_net_rate, prestige_ot_net_rate, prestige_ilst_net_rate, prestige_ilst_ot_net_rate, ability_withholding_rate, hidden_builtin_jobs",
       )
       .single(),
     supabase
@@ -532,6 +533,7 @@ function mapDashboardData(input: {
     settings,
     week,
     days,
+    hiddenBuiltins: (input.settings.hidden_builtin_jobs ?? []) as string[],
     customJobs: input.customJobs
       .filter((job) => job.active)
       .map((job) => ({

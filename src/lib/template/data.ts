@@ -91,6 +91,15 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
   const jobRows = (jobData ?? []) as (CustomJobRow & { active: boolean })[];
   const customJobsById = new Map(jobRows.map((row) => [row.id, row]));
 
+  // Built-in jobs the user "deleted" — dropped from the template picker too.
+  const { data: settingsData } = await supabase
+    .from("settings")
+    .select("hidden_builtin_jobs")
+    .single();
+  const hiddenBuiltins = ((settingsData as {
+    hidden_builtin_jobs: string[] | null;
+  } | null)?.hidden_builtin_jobs ?? []) as string[];
+
   return {
     templateId: template.id,
     days: mapTemplateDays(
@@ -101,6 +110,7 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
     customJobs: jobRows
       .filter((row) => row.active)
       .map((row) => ({ id: row.id, name: row.name, color: row.color })),
+    hiddenBuiltins,
   };
 }
 

@@ -3,15 +3,21 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
-import { netRateFromGross, normalizeWithholdingRate } from "@/lib/jobs/rates";
+import {
+  netRateFromGross,
+  normalizeWithholdingRate,
+  otGrossFromRegular,
+} from "@/lib/jobs/rates";
 
 export type CustomJobInput = {
   name: string;
   color: string;
   regularGrossRateCents: number;
-  otGrossRateCents: number;
   withholdingRate: number;
 };
+
+const BUILTIN_JOB_KEYS = ["ability", "prestige", "prestige_ilst"] as const;
+type BuiltinJobKey = (typeof BUILTIN_JOB_KEYS)[number];
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -61,7 +67,8 @@ export async function createCustomJobAction(
     input.regularGrossRateCents,
     "regular gross rate",
   );
-  const otGrossRateCents = cleanRate(input.otGrossRateCents, "overtime gross rate");
+  // OT is always 1.5x the regular gross — never user-entered.
+  const otGrossRateCents = otGrossFromRegular(regularGrossRateCents);
   const { data, error } = await supabase
     .from("custom_jobs")
     .insert({
@@ -89,7 +96,6 @@ export async function updateCustomJobAction(input: {
   name?: string;
   color?: string;
   regularGrossRateCents?: number;
-  otGrossRateCents?: number;
   withholdingRate?: number;
   active?: boolean;
 }): Promise<{ ok: true }> {
@@ -102,7 +108,6 @@ export async function updateCustomJobAction(input: {
 
   if (
     input.regularGrossRateCents !== undefined ||
-    input.otGrossRateCents !== undefined ||
     input.withholdingRate !== undefined
   ) {
     const { data: current, error: currentError } = await supabase
@@ -126,8 +131,6 @@ export async function updateCustomJobAction(input: {
     };
     const existingRegularGross =
       Number(row.regular_gross_rate_cents ?? row.regular_rate_cents ?? 0) || 0;
-    const existingOtGross =
-      Number(row.ot_gross_rate_cents ?? row.ot_rate_cents ?? 0) || 0;
     const existingWithholding = Number(row.withholding_rate ?? 0) || 0;
     const withholdingRate =
       input.withholdingRate !== undefined
@@ -137,10 +140,8 @@ export async function updateCustomJobAction(input: {
       input.regularGrossRateCents !== undefined
         ? cleanRate(input.regularGrossRateCents, "regular gross rate")
         : Math.round(existingRegularGross);
-    const otGrossRateCents =
-      input.otGrossRateCents !== undefined
-        ? cleanRate(input.otGrossRateCents, "overtime gross rate")
-        : Math.round(existingOtGross);
+    // OT is always derived as 1.5x the regular gross.
+    const otGrossRateCents = otGrossFromRegular(regularGrossRateCents);
 
     patch.regular_gross_rate_cents = regularGrossRateCents;
     patch.ot_gross_rate_cents = otGrossRateCents;
@@ -231,6 +232,48 @@ export async function updateBuiltinRatesAction(input: {
     throw new Error(`Unable to update rates: ${error.message}`);
   }
   revalidatePath("/settings/jobs");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// "Delete" / "Restore" a built-in job. This is a DISPLAY hide only: it adds or
+// removes the key from settings.hidden_builtin_jobs so it drops out of the shift
+// + template pickers and the net bar. Past shifts and the paycheck model are
+// never touched.
+export async function setBuiltinHiddenAction(input: {
+  jobKey: BuiltinJobKey;
+  hidden: boolean;
+}): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  if (!BUILTIN_JOB_KEYS.includes(input.jobKey)) {
+    throw new Error("Invalid job.");
+  }
+  const { data: current, error: loadError } = await supabase
+    .from("settings")
+    .select("hidden_builtin_jobs")
+    .eq("user_id", user.id)
+    .single();
+  if (loadError) {
+    throw new Error(`Unable to load settings: ${loadError.message}`);
+  }
+  const existing = new Set(
+    ((current as { hidden_builtin_jobs: string[] | null }).hidden_builtin_jobs ??
+      []) as string[],
+  );
+  if (input.hidden) {
+    existing.add(input.jobKey);
+  } else {
+    existing.delete(input.jobKey);
+  }
+  const { error } = await supabase
+    .from("settings")
+    .update({ hidden_builtin_jobs: Array.from(existing) })
+    .eq("user_id", user.id);
+  if (error) {
+    throw new Error(`Unable to update job visibility: ${error.message}`);
+  }
+  revalidatePath("/settings/jobs");
+  revalidatePath("/settings/template");
   revalidatePath("/");
   return { ok: true };
 }

@@ -1,5 +1,14 @@
 export const MAX_WITHHOLDING_RATE = 0.99;
 
+// Custom-job overtime is always time-and-a-half of the regular gross rate, so the
+// user never enters it. (Built-in jobs keep their own real OT rate — e.g. Ability
+// is 1.39x, not 1.5x — and are not derived this way.)
+export const OT_MULTIPLIER = 1.5;
+
+export function otGrossFromRegular(regularGrossRateCents: number): number {
+  return Math.round(Math.max(0, regularGrossRateCents) * OT_MULTIPLIER);
+}
+
 export function normalizeWithholdingRate(value: number): number {
   if (!Number.isFinite(value) || value < 0 || value >= 1) {
     throw new Error("Withholding rate must be between 0% and 99%.");

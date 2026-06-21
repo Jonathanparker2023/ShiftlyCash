@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
-import { TemplateEditor } from "@/components/template/TemplateEditor";
+import { TemplatesTabs } from "@/components/template/TemplatesTabs";
 import { CAPABILITIES } from "@/lib/edition";
+import { getJobsData, type JobsData } from "@/lib/jobs/data";
 import { getTemplateEditorData } from "@/lib/template/data";
 
 export default async function TemplateSettingsPage() {
@@ -10,6 +11,9 @@ export default async function TemplateSettingsPage() {
   }
 
   const data = await getTemplateEditorData();
+  const jobsData: JobsData | null = CAPABILITIES.showCustomJobs
+    ? await getJobsData()
+    : null;
   const editorKey = [
     data.templateId,
     ...data.days.flatMap((day) =>
@@ -28,15 +32,19 @@ export default async function TemplateSettingsPage() {
             ShiftlyCash
           </p>
           <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">
-            Weekly Template
+            Templates
           </h1>
           <p className="mt-1.5 text-sm text-white/65">
-            The shifts that autofill into every new week. Edit them like the
-            dashboard.
+            The shifts that autofill into every new week, and the jobs they use.
           </p>
         </header>
 
-        <TemplateEditor initialData={data} key={editorKey} />
+        <TemplatesTabs
+          editorKey={editorKey}
+          jobsData={jobsData}
+          showJobs={CAPABILITIES.showCustomJobs}
+          templateData={data}
+        />
       </section>
     </main>
   );

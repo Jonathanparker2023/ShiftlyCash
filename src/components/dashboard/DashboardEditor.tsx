@@ -76,6 +76,8 @@ type TimerMap = Record<string, ReturnType<typeof setTimeout>>;
 type VersionMap = Record<string, number>;
 
 const CustomJobsContext = createContext<DashboardCustomJob[]>([]);
+// Built-in job keys the user "deleted" (hidden). Dropped from the job picker.
+const HiddenBuiltinsContext = createContext<string[]>([]);
 
 export function DashboardEditor({ initialData }: DashboardEditorProps) {
   const customJobs = initialData.customJobs;
@@ -237,6 +239,12 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     }
     return Array.from(byJob.values());
   }, [days, initialData.settings]);
+  // How the week's Spend metric is built. Provably reconciles to
+  // weekTotals.spendCents because that total IS manual + transactions (toDayInput
+  // sums day.spendCents + day.transactionSpendCents). Categories are a sub-split
+  // of the transactions component, with an "Other" remainder so they always add
+  // back up to the server transaction total.
+  const spendBreakdown = useMemo(() => buildSpendBreakdown(days), [days]);
   const focusedDay = days[focusedDayIndex] ?? days[0];
   const focusedDayTotals = focusedDay ? dayTotals.get(focusedDay.id) : undefined;
 
@@ -861,6 +869,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
   return (
     <CustomJobsContext.Provider value={customJobs}>
+    <HiddenBuiltinsContext.Provider value={initialData.hiddenBuiltins}>
     <div className="min-h-screen bg-[var(--surface-base)] px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6">
       {closeError ? (
         <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] p-3 text-sm font-medium text-[var(--accent-negative-text)]">
@@ -924,6 +933,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
                 cashflowCents={weekTotals.cashflowCents}
                 earningsCents={weekTotals.earningsCents}
                 medians={initialData.metricMedians}
+                spendBreakdown={spendBreakdown}
                 spendCents={weekTotals.spendCents}
               />
             </div>
@@ -992,6 +1002,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             <WeekNetSummary
               abilityNetCents={weekNetTotals.abilityNetCents}
               customNets={customNets}
+              hiddenBuiltins={initialData.hiddenBuiltins}
               prestigeNetCents={weekNetTotals.prestigeNetCents}
             />
             <button
@@ -1008,6 +1019,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
         </section>
       </main>
     </div>
+    </HiddenBuiltinsContext.Provider>
     </CustomJobsContext.Provider>
   );
 }
@@ -1017,44 +1029,138 @@ function MetricStrip({
   spendCents,
   cashflowCents,
   medians,
+  spendBreakdown,
 }: {
   earningsCents: number;
   spendCents: number;
   cashflowCents: number;
   medians: DashboardData["metricMedians"];
+  spendBreakdown: SpendBreakdown;
 }) {
+  const [spendOpen, setSpendOpen] = useState(false);
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
   const cashflowTone = cashflowWeeklyTone(displayCashflowCents);
   const spendTone = spendWeeklyTone(spendCents, medians.spendCents);
   const earningsTone = earningsWeeklyTone(earningsCents, medians.earningsCents);
 
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <TopMetric
-        accent={earningsTone}
-        label="Earn"
-        tone={earningsTone}
-        trend={buildMedianTrend(earningsCents, medians.earningsCents, "higher")}
-        value={formatMoney(earningsCents)}
-      />
-      <TopMetric
-        accent={spendTone}
-        label="Spend"
-        tone={spendTone}
-        trend={buildMedianTrend(spendCents, medians.spendCents, "lower")}
-        value={formatMoney(spendCents)}
-      />
-      <TopMetric
-        accent={cashflowTone}
-        label="Cashflow"
-        tone={cashflowTone}
-        trend={buildMedianTrend(
-          displayCashflowCents,
-          medians.cashflowCents,
-          "higher",
-        )}
-        value={formatCashflow(displayCashflowCents)}
-      />
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        <TopMetric
+          accent={earningsTone}
+          label="Earn"
+          tone={earningsTone}
+          trend={buildMedianTrend(earningsCents, medians.earningsCents, "higher")}
+          value={formatMoney(earningsCents)}
+        />
+        <TopMetric
+          accent={spendTone}
+          expandable
+          expanded={spendOpen}
+          label="Spend"
+          onClick={() => setSpendOpen((open) => !open)}
+          tone={spendTone}
+          trend={buildMedianTrend(spendCents, medians.spendCents, "lower")}
+          value={formatMoney(spendCents)}
+        />
+        <TopMetric
+          accent={cashflowTone}
+          label="Cashflow"
+          tone={cashflowTone}
+          trend={buildMedianTrend(
+            displayCashflowCents,
+            medians.cashflowCents,
+            "higher",
+          )}
+          value={formatCashflow(displayCashflowCents)}
+        />
+      </div>
+      {spendOpen ? (
+        <SpendBreakdownPanel breakdown={spendBreakdown} totalCents={spendCents} />
+      ) : null}
+    </div>
+  );
+}
+
+// Read-only breakdown of how the week's Spend metric is computed. Reconciles to
+// the cent: categories + Other = transactions, and transactions + manual = Spend.
+function SpendBreakdownPanel({
+  breakdown,
+  totalCents,
+}: {
+  breakdown: SpendBreakdown;
+  totalCents: number;
+}) {
+  const rows: { key: string; label: string; cents: number; muted?: boolean }[] =
+    [
+      ...breakdown.categories.map((category) => ({
+        key: category.key,
+        label: category.label,
+        cents: category.cents,
+      })),
+    ];
+  if (breakdown.otherCents !== 0) {
+    rows.push({
+      key: "__other",
+      label: "Other transactions",
+      cents: breakdown.otherCents,
+    });
+  }
+  if (breakdown.manualCents !== 0) {
+    rows.push({
+      key: "__manual",
+      label: "Manual daily spend",
+      cents: breakdown.manualCents,
+      muted: true,
+    });
+  }
+
+  return (
+    <div className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-3 text-sm text-[var(--text-primary)] shadow-sm">
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+          Spend formula · this week
+        </span>
+        <span className="text-[11px] font-medium text-[var(--text-tertiary)]">
+          transactions + manual
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="py-1 text-[var(--text-tertiary)]">
+          No spend recorded this week yet.
+        </p>
+      ) : (
+        <ul className="divide-y divide-[var(--border-default)]">
+          {rows.map((row) => (
+            <li
+              className="flex items-center justify-between py-1.5"
+              key={row.key}
+            >
+              <span
+                className={
+                  row.muted
+                    ? "text-[var(--text-secondary)]"
+                    : "text-[var(--text-primary)]"
+                }
+              >
+                {row.label}
+              </span>
+              <span className="font-medium tabular-nums">
+                {formatMoney(row.cents)}
+                {totalCents > 0 ? (
+                  <span className="ml-2 text-[11px] text-[var(--text-tertiary)]">
+                    {Math.round((row.cents / totalCents) * 100)}%
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-1.5 flex items-center justify-between border-t-2 border-[var(--border-strong)] pt-2">
+        <span className="font-semibold">Spend</span>
+        <span className="font-bold tabular-nums">{formatMoney(totalCents)}</span>
+      </div>
     </div>
   );
 }
@@ -1073,6 +1179,9 @@ function TopMetric({
   trend,
   className = "",
   dark = false,
+  onClick,
+  expandable = false,
+  expanded = false,
 }: {
   label: string;
   value: string;
@@ -1081,6 +1190,9 @@ function TopMetric({
   trend?: MedianTrend | null;
   className?: string;
   dark?: boolean;
+  onClick?: () => void;
+  expandable?: boolean;
+  expanded?: boolean;
 }) {
   const accentClass =
     accent === "green"
@@ -1095,23 +1207,34 @@ function TopMetric({
         ? "before:bg-[var(--accent-primary)]"
         : "before:bg-[var(--border-strong)]";
 
-  return (
-    <div
-      className={
-        dark
-          ? `rounded-md bg-[var(--surface-base)] px-2.5 py-3 text-[var(--text-primary)] sm:px-4 ${className}`
-          : `relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`
-      }
-    >
+  const wrapperClass = dark
+    ? `rounded-md bg-[var(--surface-base)] px-2.5 py-3 text-[var(--text-primary)] sm:px-4 ${className}`
+    : `relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`;
+  const valueClass = dark
+    ? "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
+    : tone
+      ? `mt-1 text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl ${cashflowColorFromTone(tone)}`
+      : "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl";
+
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-2">
-        <div
-          className={
-            dark
-              ? "text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
-              : "text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
-          }
-        >
+        <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
           {label}
+          {expandable ? (
+            <svg
+              aria-hidden="true"
+              className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2.5"
+              viewBox="0 0 24 24"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          ) : null}
         </div>
         {trend ? (
           <div
@@ -1128,19 +1251,24 @@ function TopMetric({
           </div>
         ) : null}
       </div>
-      <div
-        className={
-          dark
-            ? "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
-            : tone
-              ? `mt-1 text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl ${cashflowColorFromTone(tone)}`
-              : "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
-        }
-      >
-        {value}
-      </div>
-    </div>
+      <div className={valueClass}>{value}</div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        aria-expanded={expandable ? expanded : undefined}
+        className={`${wrapperClass} cursor-pointer text-left transition hover:brightness-[1.04] active:brightness-95`}
+        onClick={onClick}
+        type="button"
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return <div className={wrapperClass}>{inner}</div>;
 }
 
 function CalendarIcon() {
@@ -2457,6 +2585,7 @@ function JobPicker({
   ) => void;
 }) {
   const customJobs = useContext(CustomJobsContext);
+  const hiddenBuiltins = useContext(HiddenBuiltinsContext);
   const value =
     slot.jobType === "custom" && slot.customJobId
       ? `custom:${slot.customJobId}`
@@ -2511,7 +2640,10 @@ function JobPicker({
             {`${slot.customName ?? "Custom"} (inactive)`}
           </option>
         ) : null}
-        {JOB_OPTIONS.map((jobType) => (
+        {JOB_OPTIONS.filter(
+          (jobType) =>
+            !hiddenBuiltins.includes(jobType) || jobType === slot.jobType,
+        ).map((jobType) => (
           <option key={jobType} value={jobType}>
             {formatJobLabel(jobType)}
           </option>
@@ -2823,6 +2955,58 @@ function sumBucketCreditCents(day: DashboardDay): number {
       slot.kind === "bucket" ? sum + (slot.creditCents ?? 0) : sum,
     0,
   );
+}
+
+type SpendBreakdown = {
+  categories: { key: string; label: string; cents: number }[];
+  transactionsCents: number;
+  manualCents: number;
+  otherCents: number;
+};
+
+// Decompose the week's Spend into the parts that produce it. The displayed Spend
+// metric IS manual + transactions (toDayInput sums day.spendCents +
+// day.transactionSpendCents), so this provably reconciles. Categories sub-split
+// the transactions component; an "Other" remainder keeps them summing to the
+// server transaction total even when gas-allocation/rounding shifts a cent.
+function buildSpendBreakdown(days: DashboardDay[]): SpendBreakdown {
+  let transactionsCents = 0;
+  let manualCents = 0;
+  const byCategory = new Map<string, number>();
+  for (const day of days) {
+    transactionsCents += day.transactionSpendCents;
+    manualCents += day.spendCents;
+    for (const transaction of day.appliedTransactions) {
+      const key = transaction.category ?? "UNCATEGORIZED";
+      byCategory.set(key, (byCategory.get(key) ?? 0) + transaction.amountCents);
+    }
+  }
+  const categories = Array.from(byCategory.entries())
+    .map(([key, cents]) => ({ key, label: formatTxCategory(key), cents }))
+    .filter((category) => category.cents !== 0)
+    .sort((a, b) => b.cents - a.cents);
+  const categorizedCents = categories.reduce(
+    (sum, category) => sum + category.cents,
+    0,
+  );
+  return {
+    categories,
+    transactionsCents,
+    manualCents,
+    otherCents: transactionsCents - categorizedCents,
+  };
+}
+
+function formatTxCategory(category: string): string {
+  if (!category || category.toUpperCase() === "UNCATEGORIZED") {
+    return "Uncategorized";
+  }
+  return category
+    .toLowerCase()
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 // Apply the signed bucket credit to earnings + cashflow. Mirrors how the server

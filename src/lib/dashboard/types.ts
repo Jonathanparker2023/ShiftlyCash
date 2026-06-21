@@ -141,6 +141,9 @@ export type DashboardData = {
   week: DashboardWeek;
   days: DashboardDay[];
   customJobs: DashboardCustomJob[];
+  // Built-in job keys ("ability" | "prestige" | "prestige_ilst") the user hid —
+  // dropped from the job picker + net bar. Display only; history is unaffected.
+  hiddenBuiltins: string[];
   baselineTotals: DashboardBaselineTotals;
   metricMedians: DashboardMetricMedians;
   abilityPayPeriod: DashboardAbilityPayPeriod;

@@ -19,6 +19,7 @@ export type JobsBuiltin = {
   color: string; // the (currently fixed) display color, for reference
   regularRateCents: number;
   otRateCents: number;
+  hidden: boolean;
 };
 
 export type JobsData = {
@@ -51,7 +52,7 @@ export async function getJobsData(): Promise<JobsData> {
     supabase
       .from("settings")
       .select(
-        "ability_regular_net_rate,ability_ot_net_rate,prestige_regular_net_rate,prestige_ot_net_rate,prestige_ilst_net_rate,prestige_ilst_ot_net_rate",
+        "ability_regular_net_rate,ability_ot_net_rate,prestige_regular_net_rate,prestige_ot_net_rate,prestige_ilst_net_rate,prestige_ilst_ot_net_rate,hidden_builtin_jobs",
       )
       .eq("user_id", user.id)
       .single(),
@@ -64,7 +65,10 @@ export async function getJobsData(): Promise<JobsData> {
     throw new Error(`Unable to load pay settings: ${settingsError.message}`);
   }
 
-  const s = settingsData as Record<string, NumericValue>;
+  const s = settingsData as Record<string, NumericValue> & {
+    hidden_builtin_jobs?: string[] | null;
+  };
+  const hiddenBuiltins = new Set((s.hidden_builtin_jobs ?? []) as string[]);
   const customJobs = (
     (jobData ?? []) as {
       id: string;
@@ -100,6 +104,7 @@ export async function getJobsData(): Promise<JobsData> {
       color: "#1d4ed8",
       regularRateCents: dollarsToCents(toNumber(s.ability_regular_net_rate)),
       otRateCents: dollarsToCents(toNumber(s.ability_ot_net_rate)),
+      hidden: hiddenBuiltins.has("ability"),
     },
     {
       key: "prestige",
@@ -107,6 +112,7 @@ export async function getJobsData(): Promise<JobsData> {
       color: "#facc15",
       regularRateCents: dollarsToCents(toNumber(s.prestige_regular_net_rate)),
       otRateCents: dollarsToCents(toNumber(s.prestige_ot_net_rate)),
+      hidden: hiddenBuiltins.has("prestige"),
     },
     {
       key: "prestige_ilst",
@@ -114,6 +120,7 @@ export async function getJobsData(): Promise<JobsData> {
       color: "#facc15",
       regularRateCents: dollarsToCents(toNumber(s.prestige_ilst_net_rate)),
       otRateCents: dollarsToCents(toNumber(s.prestige_ilst_ot_net_rate)),
+      hidden: hiddenBuiltins.has("prestige_ilst"),
     },
   ];
 

@@ -11,18 +11,30 @@ type WeekNetSummaryProps = {
   prestigeNetCents: number;
   abilityNetCents: number;
   customNets?: CustomNet[];
+  hiddenBuiltins?: string[];
 };
 
 export function WeekNetSummary({
   prestigeNetCents,
   abilityNetCents,
   customNets = [],
+  hiddenBuiltins = [],
 }: WeekNetSummaryProps) {
+  // A hidden built-in drops off the bar — but only once it's at zero, so a week
+  // that still has its earnings keeps the chip and the breakdown still sums.
+  const showPrestige =
+    !hiddenBuiltins.includes("prestige") || prestigeNetCents !== 0;
+  const showAbility =
+    !hiddenBuiltins.includes("ability") || abilityNetCents !== 0;
   return (
     <div className="rounded-md border border-white/15 bg-black/15 px-3 py-2 shadow-sm backdrop-blur-md">
       <div className="flex flex-wrap gap-x-6 gap-y-2">
-        <NetLine label="Prestige net" value={formatMoney(prestigeNetCents)} />
-        <NetLine label="Ability net" value={formatMoney(abilityNetCents)} />
+        {showPrestige ? (
+          <NetLine label="Prestige net" value={formatMoney(prestigeNetCents)} />
+        ) : null}
+        {showAbility ? (
+          <NetLine label="Ability net" value={formatMoney(abilityNetCents)} />
+        ) : null}
         {customNets.map((net) => (
           <NetLine
             color={net.color}

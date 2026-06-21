@@ -23,6 +23,8 @@ const PAY_OPTIONS: PayType[] = ["regular", "overtime", "split"];
 // Custom jobs available to the template picker, provided once at the top so the
 // nested shift bars can read them without prop threading.
 const CustomJobsContext = createContext<TemplateCustomJob[]>([]);
+// Built-in job keys the user hid — dropped from the template job picker.
+const HiddenBuiltinsContext = createContext<string[]>([]);
 const INCENTIVE_MODE_OPTIONS: IncentiveMode[] = ["rate", "lump_sum"];
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -116,6 +118,7 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
   );
 
   return (
+    <HiddenBuiltinsContext.Provider value={initialData.hiddenBuiltins}>
     <CustomJobsContext.Provider value={initialData.customJobs}>
     <div className="space-y-4">
       <section className="flex flex-col gap-3 rounded-2xl border border-white/12 bg-white/[0.045] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
@@ -194,6 +197,7 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
       </section>
     </div>
     </CustomJobsContext.Provider>
+    </HiddenBuiltinsContext.Provider>
   );
 }
 
@@ -252,6 +256,7 @@ function TemplateShiftBar({
   onRemove: () => void;
 }) {
   const customJobs = useContext(CustomJobsContext);
+  const hiddenBuiltins = useContext(HiddenBuiltinsContext);
   const isCustom = slot.jobType === "custom";
   const customColor = slot.customColor ?? "#3b82f6";
   const customStyle = isCustom
@@ -348,7 +353,10 @@ function TemplateShiftBar({
                   {`${slot.customName ?? "Custom"} (inactive)`}
                 </option>
               ) : null}
-              {JOB_OPTIONS.map((jobType) => (
+              {JOB_OPTIONS.filter(
+                (jobType) =>
+                  !hiddenBuiltins.includes(jobType) || jobType === slot.jobType,
+              ).map((jobType) => (
                 <option key={jobType} value={jobType}>
                   {formatJobLabel(jobType)}
                 </option>
