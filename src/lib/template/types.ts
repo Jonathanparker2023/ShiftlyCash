@@ -16,6 +16,11 @@ export type TemplateSlotDraft = {
   // Optional: the server slot-normalizer (for template_slots) ignores it;
   // labels are persisted separately to sticky_labels.
   label?: string;
+  // Set when jobType==='custom'. customColor/customName are display-only
+  // (resolved from the custom job) and not persisted to template_slots.
+  customJobId?: string | null;
+  customColor?: string;
+  customName?: string;
 };
 
 export type TemplateDayDraft = {
@@ -24,7 +29,14 @@ export type TemplateDayDraft = {
   slots: TemplateSlotDraft[];
 };
 
+export type TemplateCustomJob = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type TemplateEditorData = {
   templateId: string;
   days: TemplateDayDraft[];
+  customJobs: TemplateCustomJob[];
 };

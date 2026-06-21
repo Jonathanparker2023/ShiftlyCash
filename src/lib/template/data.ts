@@ -31,6 +31,13 @@ type TemplateSlotRow = {
   incentive_mode: IncentiveMode | null;
   incentive_rate: NumericValue;
   incentive_amount: NumericValue;
+  custom_job_id: string | null;
+};
+
+type CustomJobRow = {
+  id: string;
+  name: string;
+  color: string;
 };
 
 export async function getTemplateEditorData(): Promise<TemplateEditorData> {
@@ -50,7 +57,7 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
   const { data: slotData, error: slotError } = await supabase
     .from("template_slots")
     .select(
-      "day_index,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount",
+      "day_index,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,custom_job_id",
     )
     .eq("template_id", template.id)
     .order("day_index", { ascending: true })
@@ -75,18 +82,32 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
     ]),
   );
 
+  // Custom jobs for the picker + to resolve color/name on custom slots. Include
+  // inactive jobs that a slot might still reference so the bar still renders.
+  const { data: jobData } = await supabase
+    .from("custom_jobs")
+    .select("id,name,color,active")
+    .order("created_at", { ascending: true });
+  const jobRows = (jobData ?? []) as (CustomJobRow & { active: boolean })[];
+  const customJobsById = new Map(jobRows.map((row) => [row.id, row]));
+
   return {
     templateId: template.id,
     days: mapTemplateDays(
       (slotData ?? []) as TemplateSlotRow[],
       labelByPosition,
+      customJobsById,
     ),
+    customJobs: jobRows
+      .filter((row) => row.active)
+      .map((row) => ({ id: row.id, name: row.name, color: row.color })),
   };
 }
 
 function mapTemplateDays(
   rows: TemplateSlotRow[],
   labelByPosition: Map<string, string>,
+  customJobsById: Map<string, CustomJobRow>,
 ): TemplateDayDraft[] {
   const slotsByPosition = new Map(
     rows.map((row) => [`${row.day_index}:${row.slot_index}`, row]),
@@ -101,6 +122,7 @@ function mapTemplateDays(
         slotIndex,
         slotsByPosition.get(`${dayIndex}:${slotIndex}`),
         labelByPosition.get(`${dayIndex}:${slotIndex}`) ?? "",
+        customJobsById,
       ),
     ),
   }));
@@ -111,7 +133,12 @@ function mapTemplateSlot(
   slotIndex: number,
   row: TemplateSlotRow | undefined,
   label: string,
+  customJobsById: Map<string, CustomJobRow>,
 ): TemplateSlotDraft {
+  const customJob =
+    row?.job_type === "custom" && row.custom_job_id
+      ? customJobsById.get(row.custom_job_id)
+      : undefined;
   return {
     dayIndex,
     slotIndex,
@@ -124,6 +151,9 @@ function mapTemplateSlot(
     incentiveRate: toNumber(row?.incentive_rate ?? 0),
     incentiveAmount: toNumber(row?.incentive_amount ?? 0),
     label,
+    customJobId: row?.custom_job_id ?? null,
+    customColor: customJob?.color,
+    customName: customJob?.name,
   };
 }
 

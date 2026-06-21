@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
 import { saveDefaultTemplateAction } from "@/app/(protected)/settings/template/actions";
+import { contrastText, darken } from "@/lib/domain/jobColor";
 import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 import type {
+  TemplateCustomJob,
   TemplateDayDraft,
   TemplateEditorData,
   TemplateSlotDraft,
@@ -17,6 +19,10 @@ const JOB_OPTIONS: JobType[] = [
   "other",
 ];
 const PAY_OPTIONS: PayType[] = ["regular", "overtime", "split"];
+
+// Custom jobs available to the template picker, provided once at the top so the
+// nested shift bars can read them without prop threading.
+const CustomJobsContext = createContext<TemplateCustomJob[]>([]);
 const INCENTIVE_MODE_OPTIONS: IncentiveMode[] = ["rate", "lump_sum"];
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -110,6 +116,7 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
   );
 
   return (
+    <CustomJobsContext.Provider value={initialData.customJobs}>
     <div className="space-y-4">
       <section className="flex flex-col gap-3 rounded-2xl border border-white/12 bg-white/[0.045] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -186,6 +193,7 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
         </button>
       </section>
     </div>
+    </CustomJobsContext.Provider>
   );
 }
 
@@ -243,9 +251,20 @@ function TemplateShiftBar({
   ) => void;
   onRemove: () => void;
 }) {
+  const customJobs = useContext(CustomJobsContext);
+  const isCustom = slot.jobType === "custom";
+  const customColor = slot.customColor ?? "#3b82f6";
+  const customStyle = isCustom
+    ? {
+        backgroundColor: customColor,
+        borderColor: darken(customColor),
+        color: contrastText(customColor),
+      }
+    : undefined;
   return (
     <div
-      className={`rounded-xl border shadow-sm transition ${shiftBarClass(slot.jobType)}`}
+      className={`rounded-xl border shadow-sm transition ${isCustom ? "" : shiftBarClass(slot.jobType)}`}
+      style={customStyle}
     >
       <button
         className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left"
@@ -253,9 +272,20 @@ function TemplateShiftBar({
         type="button"
       >
         <span className="flex shrink-0 items-center gap-2">
-          <span className={shiftDotClass(slot.jobType)} />
+          <span
+            className={
+              isCustom ? "h-2.5 w-2.5 rounded-full" : shiftDotClass(slot.jobType)
+            }
+            style={
+              isCustom
+                ? { backgroundColor: contrastText(customColor) }
+                : undefined
+            }
+          />
           <span className="text-sm font-semibold">
-            {formatJobLabel(slot.jobType)}
+            {isCustom
+              ? (slot.customName ?? "Custom")
+              : formatJobLabel(slot.jobType)}
           </span>
           {slot.payType === "regular" ||
           slot.payType === "overtime" ||
@@ -278,16 +308,45 @@ function TemplateShiftBar({
           <Field label="Job">
             <select
               className={SELECT_CLASS}
-              onChange={(event) =>
-                onSlotChange(slot.dayIndex, slot.slotIndex, {
-                  jobType: event.target.value as JobType,
-                })
-              }
-              value={slot.jobType}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value.startsWith("custom:")) {
+                  const id = value.slice("custom:".length);
+                  const job = customJobs.find((entry) => entry.id === id);
+                  const wagePay =
+                    slot.payType === "regular" ||
+                    slot.payType === "overtime" ||
+                    slot.payType === "split"
+                      ? slot.payType
+                      : "regular";
+                  onSlotChange(slot.dayIndex, slot.slotIndex, {
+                    jobType: "custom",
+                    payType: wagePay,
+                    hoursOrUnits:
+                      slot.payType === "unit" ? 0 : slot.hoursOrUnits,
+                    customJobId: id,
+                    customColor: job?.color,
+                    customName: job?.name,
+                  });
+                } else {
+                  onSlotChange(slot.dayIndex, slot.slotIndex, {
+                    jobType: value as JobType,
+                    customJobId: null,
+                    customColor: undefined,
+                    customName: undefined,
+                  });
+                }
+              }}
+              value={isCustom ? `custom:${slot.customJobId ?? ""}` : slot.jobType}
             >
               {JOB_OPTIONS.map((jobType) => (
                 <option key={jobType} value={jobType}>
                   {formatJobLabel(jobType)}
+                </option>
+              ))}
+              {customJobs.map((job) => (
+                <option key={job.id} value={`custom:${job.id}`}>
+                  {job.name}
                 </option>
               ))}
             </select>

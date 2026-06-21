@@ -13,8 +13,12 @@ const JOB_TYPES = [
   "prestige_ilst",
   "incentive",
   "other",
+  "custom",
   "none",
 ] as const;
+
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INCENTIVE_MODES = ["none", "rate", "lump_sum"] as const;
 
 export type SaveTemplateInput = {
@@ -75,6 +79,14 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
   const slotIndex = requireIntegerInRange(slot.slotIndex, 0, 3, "slotIndex");
   const jobType = requireEnum(slot.jobType, JOB_TYPES, "jobType");
 
+  let customJobId: string | null = null;
+  if (jobType === "custom") {
+    if (!UUID.test(slot.customJobId ?? "")) {
+      throw new Error("A custom job must be selected for a custom slot.");
+    }
+    customJobId = slot.customJobId ?? null;
+  }
+
   if (jobType === "none") {
     return {
       dayIndex,
@@ -129,6 +141,7 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       regularHours,
       overtimeHours,
       ...incentiveFields,
+      customJobId,
     };
   }
 
@@ -146,6 +159,7 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
     regularHours: payType === "regular" ? hoursOrUnits : 0,
     overtimeHours: payType === "overtime" ? hoursOrUnits : 0,
     ...incentiveFields,
+    customJobId,
   };
 }
 
