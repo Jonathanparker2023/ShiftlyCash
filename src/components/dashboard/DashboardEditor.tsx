@@ -204,6 +204,41 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     () => netEarningsByBucket(toComputedEarningSlots(days, initialData.settings)),
     [days, initialData.settings],
   );
+  // Per-custom-job net for the week (one chip per ACTIVE custom job that has
+  // shifts). Filtered to active jobs so deleting/deactivating a job drops it
+  // from the bar — without wiping the shift history it earned.
+  const customNets = useMemo(() => {
+    const activeIds = new Set(initialData.customJobs.map((job) => job.id));
+    const byJob = new Map<
+      string,
+      { id: string; name: string; color: string; netCents: number }
+    >();
+    for (const day of days) {
+      for (const slot of day.slots) {
+        if (
+          slot.jobType !== "custom" ||
+          !slot.customJobId ||
+          !activeIds.has(slot.customJobId)
+        ) {
+          continue;
+        }
+        const earnings = calculateEarnSlot(slot, initialData.settings)
+          .earningsCents;
+        const existing = byJob.get(slot.customJobId);
+        if (existing) {
+          existing.netCents += earnings;
+        } else {
+          byJob.set(slot.customJobId, {
+            id: slot.customJobId,
+            name: slot.customName ?? "Custom",
+            color: slot.customColor ?? "#3b82f6",
+            netCents: earnings,
+          });
+        }
+      }
+    }
+    return Array.from(byJob.values());
+  }, [days, initialData.settings, initialData.customJobs]);
   const focusedDay = days[focusedDayIndex] ?? days[0];
   const focusedDayTotals = focusedDay ? dayTotals.get(focusedDay.id) : undefined;
 
@@ -908,6 +943,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
             </div>
             <WeekNetSummary
               abilityNetCents={weekNetTotals.abilityNetCents}
+              customNets={customNets}
               prestigeNetCents={weekNetTotals.prestigeNetCents}
             />
             <button
