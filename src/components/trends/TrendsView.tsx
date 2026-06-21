@@ -183,10 +183,10 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
 
 function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
   return (
-    <section className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
+    <section className="mt-5 rounded-2xl border border-sky-300/20 bg-sky-950/30 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/75">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/75">
             Gas tracker
           </p>
           <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
@@ -216,7 +216,7 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
             {" gas / "}
             <span className="text-white/85">{tracker.periodDays}</span>
             {" days = "}
-            <span className="text-amber-100">
+            <span className="text-sky-100">
               {formatMoney(tracker.averageDailyGasCents)}
             </span>
             {" daily. Period: "}
