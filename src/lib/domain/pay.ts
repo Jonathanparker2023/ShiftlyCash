@@ -12,6 +12,7 @@ export type JobType =
   | "prestige_ilst"
   | "incentive"
   | "other"
+  | "custom"
   | "none";
 export type PayType = "regular" | "overtime" | "split" | "unit" | "none";
 export type IncentiveMode = "none" | "rate" | "lump_sum";
@@ -39,6 +40,12 @@ export type EarnSlotInput = {
   incentiveRate?: number;
   incentiveAmount?: number;
   label?: string;
+  // Resolved from the linked custom_jobs row (job_type='custom' only). Carried
+  // per-slot so the client earnings calc matches the server's custom branch.
+  customJobId?: string | null;
+  customRegularRateCents?: MoneyCents;
+  customOvertimeRateCents?: MoneyCents;
+  customColor?: string;
 };
 
 export type NetEarningsBucketSlot = Pick<EarnSlotInput, "jobType"> & {
@@ -152,6 +159,25 @@ export function calculateEarnSlot(
       abilityPaycheckCents: 0,
       prestigePaycheckCents: earningsCents,
       wageHours,
+    };
+  }
+
+  if (slot.jobType === "custom") {
+    // Self-contained third income source (like 'other'): NET rates, in neither
+    // paycheck bucket, excluded from wage_hours_total. Round each leg exactly
+    // like the prestige split path so this matches the SQL custom arm to the cent.
+    const { regularHours, overtimeHours, wageHours } = wageHourParts(slot);
+    if (wageHours === 0) {
+      return emptyEarnSlotTotals();
+    }
+    const earningsCents =
+      Math.round(regularHours * (slot.customRegularRateCents ?? 0)) +
+      Math.round(overtimeHours * (slot.customOvertimeRateCents ?? 0));
+    return {
+      earningsCents,
+      abilityPaycheckCents: 0,
+      prestigePaycheckCents: 0,
+      wageHours: 0,
     };
   }
 
