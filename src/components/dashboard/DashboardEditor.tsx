@@ -954,7 +954,7 @@ function MetricStrip({
           medians.cashflowCents,
           "higher",
         )}
-        value={formatMoney(displayCashflowCents)}
+        value={formatCashflow(displayCashflowCents)}
       />
     </div>
   );
@@ -1170,8 +1170,8 @@ function WeekStripCell({
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >
-        <span className="sm:hidden">{formatMoneyNoSymbol(displayCashflowCents)}</span>
-        <span className="hidden sm:inline">{formatMoney(displayCashflowCents)}</span>
+        <span className="sm:hidden">{formatCashflowNoSymbol(displayCashflowCents)}</span>
+        <span className="hidden sm:inline">{formatCashflow(displayCashflowCents)}</span>
       </p>
     </button>
   );
@@ -2083,7 +2083,7 @@ function TotalsPanel({
           strong
           label="Cashflow"
           tone={cashflowDailyTone(displayCashflowCents)}
-          value={formatMoney(displayCashflowCents)}
+          value={formatCashflow(displayCashflowCents)}
         />
       </div>
     </div>
@@ -2849,6 +2849,18 @@ function formatMoneyExact(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(centsToDollars(value));
+}
+
+// Cashflow shows an explicit sign: "+$40" when positive (matching the "-$10"
+// that the currency formatter already produces for negatives). Zero stays "$0".
+function formatCashflow(value: number): string {
+  const base = formatMoney(value);
+  return value > 0 ? `+${base}` : base;
+}
+
+function formatCashflowNoSymbol(value: number): string {
+  const base = formatMoneyNoSymbol(value);
+  return value > 0 ? `+${base}` : base;
 }
 
 function formatTransactionAmount(

@@ -48,7 +48,7 @@ export function HistoryWeekView({ data }: { data: HistoryDetailData }) {
       },
       {
         label: "Cashflow",
-        value: formatMoney(data.week.cashflowCents),
+        value: formatCashflow(data.week.cashflowCents),
         accent: cashflowWeeklyTone(data.week.cashflowCents),
         tone: cashflowWeeklyTone(data.week.cashflowCents),
       },
@@ -183,7 +183,7 @@ function WeekStripCell({
           cashflowDailyTone(day.cashflowCents),
         )}`}
       >
-        {formatMoney(day.cashflowCents)}
+        {formatCashflow(day.cashflowCents)}
       </div>
     </button>
   );
@@ -305,7 +305,7 @@ function TotalsPanel({ day }: { day: HistoryDetailDay }) {
         strong
         label="Cashflow"
         tone={cashflowDailyTone(day.cashflowCents)}
-        value={formatMoney(day.cashflowCents)}
+        value={formatCashflow(day.cashflowCents)}
       />
     </div>
   );
@@ -471,6 +471,13 @@ function formatMoney(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(centsToDollars(value)));
+}
+
+// Cashflow shows an explicit "+" when positive (matching the "-" the currency
+// formatter already produces for negatives). Zero stays "$0".
+function formatCashflow(value: number): string {
+  const base = formatMoney(value);
+  return value > 0 ? `+${base}` : base;
 }
 
 // Sign-aware, whole-dollar amount for a synthetic Amortized Income credit row
