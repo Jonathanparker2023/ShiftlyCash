@@ -1750,7 +1750,6 @@ function TransactionRowButton({
         : transaction.originalAmountCents,
     ),
   );
-  const [previousGasDate, setPreviousGasDate] = useState("");
   const isAmortizedExempt = variant === "exempt" && transaction.isAmortized;
   const rowStyle = isAmortizedExempt
     ? {
@@ -1770,11 +1769,9 @@ function TransactionRowButton({
   function submitGasAllocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const gasAmountCents = dollarsToCents(parsePositiveNumber(gasAmountValue));
-    onAllocateGas?.(
-      transaction,
-      gasAmountCents,
-      previousGasDate.trim() || null,
-    );
+    // Previous fill date is always auto-derived server-side (last gas
+    // allocation -> last gas-pattern transaction -> day before).
+    onAllocateGas?.(transaction, gasAmountCents, null);
     setIsGasEditing(false);
   }
 
@@ -1839,7 +1836,7 @@ function TransactionRowButton({
           ) : null}
           {isGasEditing ? (
             <form
-              className="mb-2 grid gap-2 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] p-2 sm:grid-cols-[110px_1fr_auto]"
+              className="mb-2 grid gap-2 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] p-2 sm:grid-cols-[1fr_auto]"
               onSubmit={submitGasAllocation}
             >
               <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-warning-text)]">
@@ -1850,17 +1847,6 @@ function TransactionRowButton({
                   inputMode="decimal"
                   onChange={(event) => setGasAmountValue(event.target.value)}
                   value={gasAmountValue}
-                />
-              </label>
-              <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-warning-text)]">
-                Previous gas
-                <input
-                  className="mt-1 block h-8 w-full rounded-md border border-[var(--accent-warning-border)] bg-[var(--surface-base)] px-2 text-xs font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)]"
-                  disabled={disabled}
-                  onChange={(event) => setPreviousGasDate(event.target.value)}
-                  placeholder="Auto"
-                  type="date"
-                  value={previousGasDate}
                 />
               </label>
               <div className="flex items-end gap-2">
@@ -1879,6 +1865,9 @@ function TransactionRowButton({
                   Cancel
                 </button>
               </div>
+              <p className="text-[10px] text-[var(--accent-warning-text)] sm:col-span-2">
+                Spreads as daily spend back to your last fill-up automatically.
+              </p>
             </form>
           ) : null}
           {isRenaming ? (
