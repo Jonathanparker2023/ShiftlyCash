@@ -757,7 +757,12 @@ export function DashboardEditor({
   }
 
   function removeSlot(slot: DashboardSlot) {
-    const confirmed = window.confirm("Remove this shift?");
+    if (!shiftsEditable) {
+      return;
+    }
+    // window.confirm is suppressed in installed/mobile contexts; skip the
+    // blocking prompt when editing History so removal isn't silently dead.
+    const confirmed = isHistorical ? true : window.confirm("Remove this shift?");
 
     if (!confirmed) {
       return;
@@ -802,13 +807,10 @@ export function DashboardEditor({
     if (editingClosed || enablingEdit) {
       return;
     }
-    const confirmed = window.confirm(
-      `Edit closed Week ${initialData.week.displayWeekNumber}?\n\n` +
-        `Your changes recompute this week and shift the running balance for this week and every week after it. No earlier week changes. A recovery snapshot is saved first so this can be undone.`,
-    );
-    if (!confirmed) {
-      return;
-    }
+    // No window.confirm here — it's suppressed in installed/mobile web app
+    // contexts, which silently blocked editing. The action is deliberate
+    // (open a closed week, tap Edit week), a recovery snapshot is saved first,
+    // and the in-edit banner explains the forward-ripple.
     setEnablingEdit(true);
     setSaveError(null);
     try {
@@ -973,6 +975,14 @@ export function DashboardEditor({
           : "min-h-screen bg-[var(--surface-base)] px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6"
       }
     >
+      {isHistorical && editingClosed ? (
+        <div className="mx-auto mb-5 max-w-7xl rounded-md border border-amber-300/40 bg-amber-400/15 p-3 text-sm font-medium text-amber-100">
+          Editing closed Week {initialData.week.displayWeekNumber}. Changes save
+          automatically and recompute this week plus the running balance for
+          every later week — no earlier week changes. A recovery snapshot was
+          saved first. Tap &ldquo;Save &amp; done&rdquo; when finished.
+        </div>
+      ) : null}
       {closeError ? (
         <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] p-3 text-sm font-medium text-[var(--accent-negative-text)]">
           {closeError}
