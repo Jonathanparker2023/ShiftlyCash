@@ -263,7 +263,7 @@ export async function snapshotClosedWeekAction(input: {
 
   const { data: week, error: weekError } = await supabase
     .from("weeks")
-    .select("id,start_date,end_date,status,display_week_number")
+    .select("id,start_date,end_date,status")
     .eq("id", weekId)
     .maybeSingle();
   if (weekError) {
