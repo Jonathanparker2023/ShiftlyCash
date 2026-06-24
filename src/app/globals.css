@@ -81,6 +81,28 @@
   --motion-base: 180ms;
   --motion-slow: 260ms;
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Brand + chart tokens — defaults; overridden by [data-theme] blocks.
+     Added for the design-system PoC (Linear/Apple). */
+  --accent-brand: var(--accent-primary);
+  --accent-brand-fill: var(--accent-primary-fill);
+  --accent-brand-border: var(--accent-primary-border);
+  --accent-brand-text: var(--accent-primary-text);
+  --accent-brand-hover: var(--accent-primary);
+  --accent-ring: rgba(94, 106, 210, 0.35);
+  --panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.55);
+
+  --chart-invested: var(--accent-primary-text);
+  --chart-invested-soft: var(--accent-primary-fill);
+  --chart-principal: var(--text-tertiary);
+  --chart-principal-soft: rgba(255, 255, 255, 0.06);
+  --chart-debt: var(--accent-negative-text);
+  --chart-debt-soft: var(--accent-negative-fill);
+  --chart-target: var(--accent-primary);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-axis: rgba(245, 247, 250, 0.55);
+  --chart-zero: rgba(255, 255, 255, 0.28);
+  --chart-dot-stroke: var(--surface-elevated);
 }
 
 /*
@@ -185,6 +207,90 @@
   --radius-data: 6px;     /* Linear sm */
   --radius-control: 8px;  /* Linear md — buttons, inputs */
   --radius-panel: 12px;   /* Linear lg — cards */
+
+  --accent-brand-hover: #828fff;
+  --accent-ring: rgba(94, 106, 210, 0.35);
+  --panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.55);
+
+  --chart-invested: #5e6ad2;
+  --chart-invested-soft: rgba(94, 106, 210, 0.22);
+  --chart-principal: #8a8f98;
+  --chart-principal-soft: rgba(138, 143, 152, 0.12);
+  --chart-debt: #e5484d;
+  --chart-debt-soft: rgba(229, 72, 77, 0.20);
+  --chart-target: #27a644;
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-axis: rgba(247, 248, 248, 0.55);
+  --chart-zero: rgba(255, 255, 255, 0.28);
+  --chart-dot-stroke: #0f1011;
+}
+
+/*
+  ============================================================
+  Apple theme — scoped via data-theme="apple"
+  ============================================================
+  Light, airy, SF-style. Near-white page (#f5f5f7 parchment), white
+  cards with soft shadows + generous radii (18px), Apple system blue
+  (#0066cc) accent, SF Pro font stack. The same token contract flipped
+  to light — proof that a DESIGN.md swap is data, not code. Sourced
+  from the Apple entry in VoltAgent/awesome-design-md.
+*/
+[data-theme="apple"] {
+  font-family: "SF Pro Text", "SF Pro Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --surface-base: #f5f5f7;       /* parchment page */
+  --surface-elevated: #ffffff;   /* white cards */
+  --surface-overlay: #ffffff;
+  --surface-hover: #f0f0f2;       /* subtle gray hover/selected */
+
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: #d2d2d7;      /* Apple chip gray */
+  --border-strong: #c7c7cc;
+
+  --text-primary: #1d1d1f;        /* near-black ink */
+  --text-secondary: #424245;
+  --text-tertiary: #6e6e73;
+  --text-muted: #86868b;
+
+  --accent-brand: #0066cc;        /* Action Blue */
+  --accent-brand-fill: rgba(0, 102, 204, 0.10);
+  --accent-brand-border: rgba(0, 102, 204, 0.28);
+  --accent-brand-text: #0066cc;
+  --accent-brand-hover: #0071e3;  /* Focus Blue */
+  --accent-ring: rgba(0, 113, 227, 0.30);
+
+  --accent-primary: #34c759;      /* system green */
+  --accent-primary-fill: rgba(52, 199, 89, 0.12);
+  --accent-primary-border: rgba(52, 199, 89, 0.30);
+  --accent-primary-text: #248a3d; /* darker green legible on white */
+
+  --accent-warning: #ff9500;      /* system orange */
+  --accent-warning-fill: rgba(255, 149, 0, 0.12);
+  --accent-warning-border: rgba(255, 149, 0, 0.30);
+  --accent-warning-text: #b25e00;
+
+  --accent-negative: #ff3b30;     /* system red */
+  --accent-negative-fill: rgba(255, 59, 48, 0.10);
+  --accent-negative-border: rgba(255, 59, 48, 0.28);
+  --accent-negative-text: #d70015;
+
+  --radius-data: 8px;     /* Apple sm */
+  --radius-control: 11px; /* Apple md — buttons, inputs */
+  --radius-panel: 18px;   /* Apple lg — cards */
+
+  --panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.05);
+
+  --chart-invested: #0066cc;
+  --chart-invested-soft: rgba(0, 102, 204, 0.10);
+  --chart-principal: #86868b;
+  --chart-principal-soft: rgba(134, 134, 139, 0.10);
+  --chart-debt: #ff3b30;
+  --chart-debt-soft: rgba(255, 59, 48, 0.08);
+  --chart-target: #34c759;
+  --chart-grid: rgba(0, 0, 0, 0.08);
+  --chart-axis: rgba(29, 29, 31, 0.55);
+  --chart-zero: rgba(0, 0, 0, 0.22);
+  --chart-dot-stroke: #ffffff;
 }
 
 @theme inline {

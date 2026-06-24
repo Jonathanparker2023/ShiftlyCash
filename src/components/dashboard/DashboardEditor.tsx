@@ -123,6 +123,10 @@ export function DashboardEditor({
   const timers = useRef<TimerMap>({});
   const versions = useRef<VersionMap>({});
   const lastSavedAt = useRef<number | null>(null);
+  // Latest pending (debounced) slot save per key — so the History "Save & done"
+  // button can flush them immediately instead of waiting on the debounce.
+  const pendingSlotInputs = useRef<Map<string, SaveEarnSlotInput>>(new Map());
+  const [finishingEdit, setFinishingEdit] = useState(false);
   const canCloseWeek = initialData.todayIso >= initialData.week.endDate;
   const nextWeekStart = addDaysIso(initialData.week.endDate, 1);
   const nextWeekEnd = addDaysIso(nextWeekStart, 6);
@@ -846,6 +850,7 @@ export function DashboardEditor({
       allowClosedEdit: isHistorical,
     };
 
+    pendingSlotInputs.current.set(key, input);
     clearTimeout(timers.current[key]);
     timers.current[key] = setTimeout(async () => {
       setSaveState("saving");
@@ -853,6 +858,7 @@ export function DashboardEditor({
 
       try {
         await saveEarnSlotAction(input);
+        pendingSlotInputs.current.delete(key);
         // Skip reconcile: local optimistic state is the source of truth while
         // typing. Reconciling here can clobber characters typed between the
         // debounce firing and the network round-trip completing.
@@ -861,6 +867,40 @@ export function DashboardEditor({
         markError(error);
       }
     }, 1200);
+  }
+
+  // Flush every pending debounced slot save right now (used by the History
+  // "Save & done" button so nothing is lost to the 1.2s debounce).
+  async function flushPendingSaves() {
+    const entries = Array.from(pendingSlotInputs.current.entries());
+    for (const [key] of entries) {
+      clearTimeout(timers.current[key]);
+    }
+    for (const [key, input] of entries) {
+      await saveEarnSlotAction(input);
+      pendingSlotInputs.current.delete(key);
+    }
+  }
+
+  // Finish a History edit session: flush saves, refresh from the server, and
+  // drop back to read-only.
+  async function finishClosedEdit() {
+    if (finishingEdit) {
+      return;
+    }
+    setFinishingEdit(true);
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      await flushPendingSaves();
+      setSaveState("saved");
+      setEditingClosed(false);
+      router.refresh();
+    } catch (error) {
+      markError(error);
+    } finally {
+      setFinishingEdit(false);
+    }
   }
 
   function bumpVersion(key: string) {
@@ -979,18 +1019,25 @@ export function DashboardEditor({
                     <span className="inline-flex rounded-full border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-xs font-semibold text-amber-100 shadow-sm">
                       Closed week{editingClosed ? " - editing" : " - read only"}
                     </span>
-                    <button
-                      className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70"
-                      disabled={enablingEdit || editingClosed}
-                      onClick={enableClosedEdit}
-                      type="button"
-                    >
-                      {editingClosed
-                        ? "Editing"
-                        : enablingEdit
-                          ? "Saving snapshot..."
-                          : "Edit week"}
-                    </button>
+                    {editingClosed ? (
+                      <button
+                        className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70"
+                        disabled={finishingEdit}
+                        onClick={finishClosedEdit}
+                        type="button"
+                      >
+                        {finishingEdit ? "Saving..." : "Save & done"}
+                      </button>
+                    ) : (
+                      <button
+                        className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70"
+                        disabled={enablingEdit}
+                        onClick={enableClosedEdit}
+                        type="button"
+                      >
+                        {enablingEdit ? "Saving snapshot..." : "Edit week"}
+                      </button>
+                    )}
                     {saveState !== "idle" ? (
                       <SaveIndicator state={saveState} error={saveError} />
                     ) : null}

@@ -19,6 +19,7 @@ import type { DebtRow } from "@/lib/domain/projections";
 import type { DebtPageData } from "@/lib/debt/data";
 
 type ChartRange = "1y" | "3y" | "5y" | "10y" | "full";
+type ThemePreview = "linear" | "apple";
 
 const RANGE_WEEKS: Record<ChartRange, number> = {
   "1y": 52,
@@ -28,15 +29,14 @@ const RANGE_WEEKS: Record<ChartRange, number> = {
   full: Number.POSITIVE_INFINITY,
 };
 
-// Linear design tokens (see /DESIGN.md). These reference the
-// [data-theme="linear"] contract in globals.css, so the whole screen reskins
-// from one place — and could flip to the default shiftly-next theme by dropping
-// the data-theme attribute on the page root.
+// Design tokens (see /DESIGN.md). Every color reads from the [data-theme]
+// contract in globals.css, so the whole screen — chart included — reskins by
+// swapping one attribute. Nothing here is theme-specific.
 const PANEL: CSSProperties = {
   background: "var(--surface-elevated)",
   border: "1px solid var(--border-subtle)",
   borderRadius: "var(--radius-panel)",
-  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.55)",
+  boxShadow: "var(--panel-shadow)",
 };
 
 const FIELD: CSSProperties = {
@@ -50,22 +50,6 @@ const BRAND_BUTTON: CSSProperties = {
   background: "var(--accent-brand)",
   color: "#ffffff",
   border: "1px solid var(--accent-brand-border)",
-};
-
-// SVG data-viz palette. SVG presentation attributes can't read CSS vars
-// reliably, so the chart carries Linear's hex values directly: lavender brand
-// for the invested line, muted ink for principal, red for debt, green for goal.
-const CHART = {
-  invested: "#5e6ad2",
-  investedSoft: "rgba(94, 106, 210, 0.22)",
-  principal: "#8a8f98",
-  principalSoft: "rgba(138, 143, 152, 0.12)",
-  debt: "#e5484d",
-  debtSoft: "rgba(229, 72, 77, 0.20)",
-  target: "#27a644",
-  grid: "rgba(255, 255, 255, 0.08)",
-  axis: "rgba(247, 248, 248, 0.55)",
-  zero: "rgba(255, 255, 255, 0.28)",
 };
 
 function buildChartTicks(yMin: number, yMax: number): number[] {
@@ -95,6 +79,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
   const router = useRouter();
   const [debts, setDebts] = useState<DebtRow[]>(initialData.debts);
   const [chartRange, setChartRange] = useState<ChartRange>("full");
+  const [theme, setTheme] = useState<ThemePreview>("linear");
   const [error, setError] = useState<string | null>(null);
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -191,10 +176,48 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
   );
   return (
     <div
-      data-theme="linear"
+      data-theme={theme}
       className="min-h-screen w-full max-w-[100vw] overflow-x-hidden px-3 py-5 sm:px-6 lg:px-8"
       style={{ background: "var(--surface-base)", color: "var(--text-primary)" }}
     >
+      <div className="mx-auto mb-4 flex max-w-7xl items-center justify-end gap-2">
+        <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+          Theme preview
+        </span>
+        <div
+          className="flex gap-1"
+          style={{
+            background: "var(--surface-elevated)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "9999px",
+            padding: "3px",
+          }}
+        >
+          {(["linear", "apple"] as ThemePreview[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTheme(t)}
+              className="px-3 py-1 text-xs font-medium capitalize transition-colors"
+              style={
+                theme === t
+                  ? {
+                      background: "var(--accent-brand)",
+                      color: "#ffffff",
+                      borderRadius: "9999px",
+                    }
+                  : {
+                      background: "transparent",
+                      color: "var(--text-tertiary)",
+                      borderRadius: "9999px",
+                    }
+              }
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <header
         className="mx-auto mb-5 max-w-7xl pb-4"
         style={{ borderBottom: "1px solid var(--border-subtle)" }}
@@ -208,8 +231,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
               ShiftlyCash
             </p>
             <h1
-              className="mt-1 text-3xl font-semibold tracking-tight"
-              style={{ color: "var(--text-primary)" }}
+              className="mt-1 text-3xl font-semibold"
+              style={{ color: "var(--text-primary)", letterSpacing: "-0.03em" }}
             >
               Debt Obligations
             </h1>
@@ -248,7 +271,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
         </div>
       ) : null}
 
-      <main className="mx-auto grid w-full max-w-7xl min-w-0 gap-5">
+      <main className="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
         <section className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Metric
             label="Earnings avg"
@@ -313,7 +336,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
         </section>
 
-        <section className="min-w-0 p-3 sm:p-4" style={PANEL}>
+        <section className="min-w-0 p-4 sm:p-5" style={PANEL}>
           <div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <h2
@@ -327,20 +350,31 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                 compounds at 10%.
               </p>
             </div>
-            <div className="flex w-full flex-nowrap gap-1 sm:w-auto">
+            <div
+              className="flex w-full flex-nowrap gap-1 sm:w-auto"
+              style={{
+                background: "var(--surface-base)",
+                border: "1px solid var(--border-default)",
+                borderRadius: "9999px",
+                padding: "3px",
+              }}
+            >
               {(["1y", "3y", "5y", "10y", "full"] as ChartRange[]).map((r) => (
                 <button
                   key={r}
                   onClick={() => setChartRange(r)}
-                  className="min-w-0 flex-1 px-2 py-1 text-xs font-semibold transition-colors sm:flex-none sm:px-3"
+                  className="min-w-0 flex-1 px-2 py-1 text-xs font-medium transition-colors sm:flex-none sm:px-3"
                   style={
                     chartRange === r
-                      ? { ...BRAND_BUTTON, borderRadius: "var(--radius-data)" }
+                      ? {
+                          background: "var(--surface-hover)",
+                          color: "var(--text-primary)",
+                          borderRadius: "9999px",
+                        }
                       : {
                           background: "transparent",
                           color: "var(--text-tertiary)",
-                          border: "1px solid var(--border-default)",
-                          borderRadius: "var(--radius-data)",
+                          borderRadius: "9999px",
                         }
                   }
                 >
@@ -356,7 +390,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
         </section>
 
-        <section className="min-w-0 p-4" style={PANEL}>
+        <section className="min-w-0 p-5" style={PANEL}>
           <div className="mb-4">
             <h2
               className="text-sm font-semibold uppercase tracking-[0.14em]"
@@ -385,7 +419,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
             </h2>
             <button
               onClick={addDebt}
-              className="px-3 py-1.5 text-xs font-semibold transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold transition-colors hover:[background-color:var(--accent-brand-hover)]"
               style={{ ...BRAND_BUTTON, borderRadius: "var(--radius-control)" }}
             >
               + Add debt
@@ -443,7 +477,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                   <td className="p-2">
                     <input
                       value={debt.name}
-                      className="w-full px-2 py-1 text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)]"
+                      className="w-full px-2 py-1 text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)] focus:[box-shadow:0_0_0_3px_var(--accent-ring)]"
                       style={FIELD}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -458,7 +492,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       step="1"
                       min="0"
                       value={centsToDollars(debt.balanceCents)}
-                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)]"
+                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)] focus:[box-shadow:0_0_0_3px_var(--accent-ring)]"
                       style={FIELD}
                       onChange={(e) => {
                         const cents = dollarsToCents(parseFloat(e.target.value) || 0);
@@ -479,7 +513,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       step="1"
                       min="0"
                       value={centsToDollars(debt.minimumPaymentCents)}
-                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)]"
+                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)] focus:[box-shadow:0_0_0_3px_var(--accent-ring)]"
                       style={FIELD}
                       onChange={(e) => {
                         const cents = dollarsToCents(parseFloat(e.target.value) || 0);
@@ -498,7 +532,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       min="0"
                       max="100"
                       value={(debt.aprBps / 100).toFixed(2)}
-                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)]"
+                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)] focus:[box-shadow:0_0_0_3px_var(--accent-ring)]"
                       style={FIELD}
                       onChange={(e) => {
                         const bps = Math.round((parseFloat(e.target.value) || 0) * 100);
@@ -586,8 +620,8 @@ function Metric({
         {label}
       </div>
       <div
-        className="mt-2 text-2xl font-semibold tracking-tight"
-        style={{ color: valueColor }}
+        className="mt-2 text-2xl font-semibold"
+        style={{ color: valueColor, letterSpacing: "-0.02em" }}
       >
         {value}
       </div>
@@ -716,7 +750,7 @@ function Chart({
         <text
           x={PAD.l - 8}
           y={yy + 4}
-          fill={CHART.axis}
+          style={{ fill: "var(--chart-axis)" }}
           fontSize="10"
           textAnchor="end"
           fontFamily="ui-monospace, monospace"
@@ -728,7 +762,7 @@ function Chart({
           y1={yy}
           x2={W - PAD.r}
           y2={yy}
-          stroke={CHART.grid}
+          style={{ stroke: "var(--chart-grid)" }}
           strokeWidth="1"
         />
       </g>,
@@ -745,7 +779,7 @@ function Chart({
         key={`x-${year}`}
         x={px(wkIdx)}
         y={H - 8}
-        fill={CHART.axis}
+        style={{ fill: "var(--chart-axis)" }}
         fontSize="10"
         textAnchor="middle"
       >
@@ -760,7 +794,7 @@ function Chart({
         key="x-end"
         x={px(wkIdx)}
         y={H - 8}
-        fill={CHART.axis}
+        style={{ fill: "var(--chart-axis)" }}
         fontSize="10"
         textAnchor="middle"
       >
@@ -770,7 +804,7 @@ function Chart({
   }
 
   const endVal = series[series.length - 1];
-  const endColor = endVal >= 0 ? CHART.invested : CHART.debt;
+  const endColor = endVal >= 0 ? "var(--chart-invested)" : "var(--chart-debt)";
   const principalEnd = principalSeries[principalSeries.length - 1] ?? 0;
   const interestEarned = endVal - principalEnd;
   const visibleEvents = events.filter(
@@ -782,8 +816,8 @@ function Chart({
       {/* Total above the chart — sits in HTML so it scales independently of
           the SVG and can never collide with the interest endpoint label. */}
       <div
-        className="mb-1 text-center text-sm font-extrabold tracking-tight"
-        style={{ color: "var(--text-primary)" }}
+        className="mb-1 text-center text-sm font-semibold"
+        style={{ color: "var(--text-primary)", letterSpacing: "-0.01em" }}
       >
         Total {formatMoney(endVal)}
       </div>
@@ -799,7 +833,7 @@ function Chart({
           y1={zero}
           x2={W - PAD.r}
           y2={zero}
-          stroke={CHART.zero}
+          style={{ stroke: "var(--chart-zero)" }}
           strokeWidth="1"
           strokeDasharray="4 4"
         />
@@ -810,14 +844,14 @@ function Chart({
               y1={py(targetCents)}
               x2={W - PAD.r}
               y2={py(targetCents)}
-              stroke={CHART.target}
+              style={{ stroke: "var(--chart-target)" }}
               strokeDasharray="6 4"
               strokeWidth="1"
             />
             <text
               x={W - 10}
               y={py(targetCents) - 8}
-              fill={CHART.target}
+              style={{ fill: "var(--chart-target)" }}
               fontSize="10"
               fontWeight="700"
               textAnchor="end"
@@ -826,23 +860,29 @@ function Chart({
             </text>
           </>
         ) : null}
-        {debtFillPath ? <path d={debtFillPath} fill={CHART.debtSoft} /> : null}
+        {debtFillPath ? <path d={debtFillPath} style={{ fill: "var(--chart-debt-soft)" }} /> : null}
         {principalFillPath ? (
-          <path d={principalFillPath} fill={CHART.principalSoft} />
+          <path d={principalFillPath} style={{ fill: "var(--chart-principal-soft)" }} />
         ) : null}
         {interestFillPath ? (
-          <path d={interestFillPath} fill={CHART.investedSoft} />
+          <path d={interestFillPath} style={{ fill: "var(--chart-invested-soft)" }} />
         ) : null}
         {principalPath ? (
           <path
             d={principalPath}
             fill="none"
-            stroke={CHART.principal}
+            style={{ stroke: "var(--chart-principal)" }}
             strokeLinecap="round"
             strokeWidth="2.25"
           />
         ) : null}
-        <path d={linePath} fill="none" stroke={CHART.invested} strokeWidth="2.5" strokeLinecap="round" />
+        <path
+          d={linePath}
+          fill="none"
+          style={{ stroke: "var(--chart-invested)" }}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
         {principalTargetIndex >= 0 ? (
           <g>
             <line
@@ -850,22 +890,21 @@ function Chart({
               y1={PAD.t}
               x2={px(principalTargetIndex)}
               y2={H - PAD.b}
-              stroke={CHART.principal}
+              style={{ stroke: "var(--chart-principal)" }}
               strokeDasharray="3 4"
               strokeWidth="1"
             />
             <circle
               cx={px(principalTargetIndex)}
               cy={py(targetCents)}
-              fill="#ffffff"
+              style={{ fill: "var(--chart-principal)", stroke: "var(--chart-dot-stroke)" }}
               r="4"
-              stroke="#fff"
               strokeWidth="2"
             />
             <text
               x={px(principalTargetIndex) - 4}
               y={py(targetCents) + 16}
-              fill="#ffffff"
+              style={{ fill: "var(--text-primary)" }}
               fontSize="10"
               fontWeight="700"
               textAnchor="end"
@@ -881,22 +920,21 @@ function Chart({
               y1={PAD.t}
               x2={px(investedTargetIndex)}
               y2={H - PAD.b}
-              stroke={CHART.invested}
+              style={{ stroke: "var(--chart-invested)" }}
               strokeDasharray="3 4"
               strokeWidth="1"
             />
             <circle
               cx={px(investedTargetIndex)}
               cy={py(targetCents)}
-              fill={CHART.invested}
+              style={{ fill: "var(--chart-invested)", stroke: "var(--chart-dot-stroke)" }}
               r="4"
-              stroke="#fff"
               strokeWidth="2"
             />
             <text
               x={Math.max(PAD.l + 120, px(investedTargetIndex) - 140)}
               y={py(targetCents) - 28}
-              fill={CHART.invested}
+              style={{ fill: "var(--chart-invested)" }}
               fontSize="10"
               fontWeight="700"
               textAnchor="start"
@@ -912,14 +950,14 @@ function Chart({
               y1={PAD.t}
               x2={px(event.week)}
               y2={H - PAD.b}
-              stroke={CHART.invested}
+              style={{ stroke: "var(--chart-invested)" }}
               strokeDasharray="4 4"
               strokeWidth="1"
             />
             <text
               x={px(event.week) + 4}
               y={PAD.t + 12}
-              fill={CHART.invested}
+              style={{ fill: "var(--chart-invested)" }}
               fontSize="9"
               fontWeight="700"
             >
@@ -928,15 +966,27 @@ function Chart({
           </g>
         ))}
         {/* Now dot */}
-        <circle cx={px(0)} cy={py(series[0])} r="4" fill={CHART.debt} stroke="#fff" strokeWidth="2" />
+        <circle
+          cx={px(0)}
+          cy={py(series[0])}
+          r="4"
+          style={{ fill: "var(--chart-debt)", stroke: "var(--chart-dot-stroke)" }}
+          strokeWidth="2"
+        />
         {/* Crossover */}
         {crossIdx > 0 ? (
           <g>
-            <circle cx={px(crossIdx)} cy={zero} r="5" fill={CHART.invested} stroke="#fff" strokeWidth="2" />
+            <circle
+              cx={px(crossIdx)}
+              cy={zero}
+              r="5"
+              style={{ fill: "var(--chart-invested)", stroke: "var(--chart-dot-stroke)" }}
+              strokeWidth="2"
+            />
             <text
               x={px(crossIdx)}
               y={zero - 12}
-              fill={CHART.invested}
+              style={{ fill: "var(--chart-invested)" }}
               fontSize="11"
               fontWeight="700"
               textAnchor="middle"
@@ -961,14 +1011,13 @@ function Chart({
                 cx={xEnd}
                 cy={py(principalEnd)}
                 r="4"
-                fill={CHART.principal}
-                stroke="#fff"
+                style={{ fill: "var(--chart-principal)", stroke: "var(--chart-dot-stroke)" }}
                 strokeWidth="2"
               />
               <text
                 x={labelX}
                 y={py(principalEnd) + principalLabelOffset}
-                fill={CHART.principal}
+                style={{ fill: "var(--chart-principal)" }}
                 fontSize="10"
                 fontWeight="700"
                 textAnchor="end"
@@ -982,14 +1031,13 @@ function Chart({
                 cx={xEnd}
                 cy={py(endVal)}
                 r="4"
-                fill={endColor}
-                stroke="#fff"
+                style={{ fill: endColor, stroke: "var(--chart-dot-stroke)" }}
                 strokeWidth="2"
               />
               <text
                 x={labelX}
                 y={py(endVal) + 18}
-                fill={endColor}
+                style={{ fill: endColor }}
                 fontSize="10"
                 fontWeight="700"
                 textAnchor="end"
@@ -1007,10 +1055,10 @@ function Chart({
       >
         <span className="flex flex-wrap items-center gap-3">
           <span className="flex items-center gap-1">
-            <span className="h-0.5 w-4" style={{ background: CHART.principal }} /> Principal only
+            <span className="h-0.5 w-4" style={{ background: "var(--chart-principal)" }} /> Principal only
           </span>
           <span className="flex items-center gap-1">
-            <span className="h-0.5 w-4" style={{ background: CHART.invested }} /> Invested at 10%
+            <span className="h-0.5 w-4" style={{ background: "var(--chart-invested)" }} /> Invested at 10%
           </span>
         </span>
         <span style={{ color: "var(--text-tertiary)" }}>
