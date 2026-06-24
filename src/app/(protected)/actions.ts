@@ -39,6 +39,10 @@ export type SaveEarnSlotInput = {
   incentiveAmount?: number;
   label: string;
   customJobId?: string | null;
+  // Server backstop for the Money Hard Rule: a CLOSED week's shifts can only be
+  // written when the History "Edit week" mode explicitly sets this. Without it,
+  // closed weeks are immutable on the server, not just hidden by read-only UI.
+  allowClosedEdit?: boolean;
 };
 
 export type SaveDayResult = {
@@ -173,7 +177,7 @@ export async function saveEarnSlotAction(
 
   const { data: day, error: dayError } = await supabase
     .from("days")
-    .select("id")
+    .select("id, week_id")
     .eq("id", normalized.dayId)
     .maybeSingle();
 
@@ -183,6 +187,26 @@ export async function saveEarnSlotAction(
 
   if (!day) {
     throw new Error("Day not found.");
+  }
+
+  // Closed-week backstop: refuse to write a closed week's shift unless the
+  // History edit mode explicitly authorized it. This is the server guard that
+  // makes "history is read-only" an invariant, not just a UI convention.
+  const { data: parentWeek, error: weekStatusError } = await supabase
+    .from("weeks")
+    .select("status")
+    .eq("id", (day as { week_id: string }).week_id)
+    .maybeSingle();
+  if (weekStatusError) {
+    throw new Error(`Unable to validate week: ${weekStatusError.message}`);
+  }
+  if (
+    (parentWeek as { status?: string } | null)?.status === "closed" &&
+    !input.allowClosedEdit
+  ) {
+    throw new Error(
+      "This week is closed. Turn on Edit week in History before changing it.",
+    );
   }
 
   const { data, error } = await supabase
@@ -215,6 +239,7 @@ export async function saveEarnSlotAction(
 
   const row = data as { id: string };
   revalidatePath("/");
+  revalidatePath("/history");
 
   return {
     ok: true,
@@ -224,6 +249,67 @@ export async function saveEarnSlotAction(
       source: "user",
     },
   };
+}
+
+// Capture a pre-edit recovery copy of a closed week's shifts before History
+// edits it. Append-only (state_snapshots is hardened against update/delete), so
+// it's a frozen forensic baseline — the deliberate edit is always recoverable.
+export async function snapshotClosedWeekAction(input: {
+  weekId: string;
+}): Promise<{ ok: true }> {
+  const { supabase, user } = await requireUser();
+  const weekId = requireUuid(input.weekId, "weekId");
+
+  const { data: week, error: weekError } = await supabase
+    .from("weeks")
+    .select("id,start_date,end_date,status,display_week_number")
+    .eq("id", weekId)
+    .maybeSingle();
+  if (weekError) {
+    throw new Error(`Unable to load week: ${weekError.message}`);
+  }
+  if (!week) {
+    throw new Error("Week not found.");
+  }
+
+  const { data: dayRows, error: daysError } = await supabase
+    .from("days")
+    .select("id,date,day_index")
+    .eq("week_id", weekId)
+    .order("day_index", { ascending: true });
+  if (daysError) {
+    throw new Error(`Unable to load days: ${daysError.message}`);
+  }
+  const dayIds = ((dayRows ?? []) as { id: string }[]).map((d) => d.id);
+
+  const { data: slotRows, error: slotsError } = dayIds.length
+    ? await supabase
+        .from("earn_slots")
+        .select(
+          "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,custom_job_id",
+        )
+        .in("day_id", dayIds)
+    : { data: [], error: null };
+  if (slotsError) {
+    throw new Error(`Unable to load shifts: ${slotsError.message}`);
+  }
+
+  const { error: insertError } = await supabase.from("state_snapshots").insert({
+    user_id: user.id,
+    snapshot_type: "history_edit",
+    week_id: weekId,
+    payload: {
+      reason: "pre_closed_week_edit",
+      week,
+      days: dayRows ?? [],
+      earn_slots: slotRows ?? [],
+    },
+  });
+  if (insertError) {
+    throw new Error(`Unable to snapshot week: ${insertError.message}`);
+  }
+
+  return { ok: true };
 }
 
 export async function closeWeekAction(

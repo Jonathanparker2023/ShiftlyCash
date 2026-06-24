@@ -21,6 +21,7 @@ import {
   refreshDashboardProjectionMaintenanceAction,
   renameTransactionAction,
   saveEarnSlotAction,
+  snapshotClosedWeekAction,
   toggleTransactionStatusAction,
   type SaveEarnSlotInput,
 } from "@/app/(protected)/actions";
@@ -70,6 +71,9 @@ const AUTO_SYNC_STORAGE_KEY = "shiftly:lastAutoSyncAt";
 
 type DashboardEditorProps = {
   initialData: DashboardData;
+  // "historical" renders a closed week from History using the SAME UI as the
+  // live dashboard (read-only until "Edit week" is turned on).
+  mode?: "active" | "historical";
 };
 
 type TimerMap = Record<string, ReturnType<typeof setTimeout>>;
@@ -78,9 +82,16 @@ type VersionMap = Record<string, number>;
 const CustomJobsContext = createContext<DashboardCustomJob[]>([]);
 // Built-in job keys the user "deleted" (hidden). Dropped from the job picker.
 const HiddenBuiltinsContext = createContext<string[]>([]);
+// False when viewing a closed week in History before "Edit week" is turned on —
+// shift inputs render disabled (identical look, just not editable).
+const ShiftsEditableContext = createContext<boolean>(true);
 
-export function DashboardEditor({ initialData }: DashboardEditorProps) {
+export function DashboardEditor({
+  initialData,
+  mode = "active",
+}: DashboardEditorProps) {
   const customJobs = initialData.customJobs;
+  const isHistorical = mode === "historical";
   const router = useRouter();
   const [days, setDays] = useState(initialData.days);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -104,6 +115,11 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     ),
   );
   const [expandedSlotIndex, setExpandedSlotIndex] = useState<number | null>(null);
+  // Historical mode is read-only until the user explicitly turns on editing
+  // (which first saves a recovery snapshot of the week).
+  const [editingClosed, setEditingClosed] = useState(false);
+  const [enablingEdit, setEnablingEdit] = useState(false);
+  const shiftsEditable = !isHistorical || editingClosed;
   const timers = useRef<TimerMap>({});
   const versions = useRef<VersionMap>({});
   const lastSavedAt = useRef<number | null>(null);
@@ -377,6 +393,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     transaction: DashboardTransaction,
     newStatus: "applied" | "excluded",
   ) {
+    if (isHistorical) return; // transactions are read-only in History
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -421,6 +438,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   async function deleteTransaction(transaction: DashboardTransaction) {
+    if (isHistorical) return; // transactions are read-only in History
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -458,6 +476,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   async function moveTransactionToYesterday(transaction: DashboardTransaction) {
+    if (isHistorical) return; // transactions are read-only in History
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -505,6 +524,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     transaction: DashboardTransaction,
     merchantName: string,
   ) {
+    if (isHistorical) return; // transactions are read-only in History
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -553,6 +573,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     transaction: DashboardTransaction,
     months: 1 | 3,
   ) {
+    if (isHistorical) return; // transactions are read-only in History
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -606,6 +627,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     gasAmountCents: number,
     previousFillDate: string | null,
   ) {
+    if (isHistorical) return; // transactions are read-only in History
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -651,6 +673,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     merchantName: string,
     amountCents: number,
   ) {
+    if (isHistorical) return; // transactions are read-only in History
     if (pendingManualDayIds.has(day.id)) {
       return;
     }
@@ -741,7 +764,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   }
 
   function addShift(day: DashboardDay) {
-    if (day.spendLocked) {
+    if (day.spendLocked || !shiftsEditable) {
       return;
     }
 
@@ -769,9 +792,40 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
     setTransactionError(null);
   }
 
+  // Turn on editing for a closed week: confirm, save a recovery snapshot, then
+  // unlock the shift inputs. Never auto-enabled.
+  async function enableClosedEdit() {
+    if (editingClosed || enablingEdit) {
+      return;
+    }
+    const confirmed = window.confirm(
+      `Edit closed Week ${initialData.week.displayWeekNumber}?\n\n` +
+        `Your changes recompute this week and shift the running balance for this week and every week after it. No earlier week changes. A recovery snapshot is saved first so this can be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+    setEnablingEdit(true);
+    setSaveError(null);
+    try {
+      await snapshotClosedWeekAction({ weekId: initialData.week.id });
+      setEditingClosed(true);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Unable to start editing.",
+      );
+    } finally {
+      setEnablingEdit(false);
+    }
+  }
+
   function scheduleSlotSave(slot: DashboardSlot) {
     // Synthetic Amortized Income rows are derived, never persisted as earn_slots.
     if (slot.kind === "bucket") {
+      return;
+    }
+    // Read-only history: never write (server also rejects without allowClosedEdit).
+    if (!shiftsEditable) {
       return;
     }
     const key = `slot:${slot.dayId}:${slot.slotIndex}`;
@@ -789,6 +843,7 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
       incentiveAmount: slot.incentiveAmount,
       label: slot.label,
       customJobId: slot.jobType === "custom" ? slot.customJobId : null,
+      allowClosedEdit: isHistorical,
     };
 
     clearTimeout(timers.current[key]);
@@ -870,7 +925,14 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
   return (
     <CustomJobsContext.Provider value={customJobs}>
     <HiddenBuiltinsContext.Provider value={initialData.hiddenBuiltins}>
-    <div className="min-h-screen bg-[var(--surface-base)] px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6">
+    <ShiftsEditableContext.Provider value={shiftsEditable}>
+    <div
+      className={
+        isHistorical
+          ? "min-h-screen bg-[var(--surface-hover)] px-3 py-4 text-[var(--text-primary)] ring-1 ring-inset ring-amber-300/20 sm:px-4 lg:px-6"
+          : "min-h-screen bg-[var(--surface-base)] px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6"
+      }
+    >
       {closeError ? (
         <div className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] p-3 text-sm font-medium text-[var(--accent-negative-text)]">
           {closeError}
@@ -912,22 +974,47 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
 
             <div>
               <div className="mb-3 flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-                <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
-                  Active week
-                </span>
-                <button
-                  className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={isSyncing}
-                  onClick={handleManualSync}
-                  type="button"
-                >
-                  {isSyncing ? "Syncing..." : "Sync now"}
-                </button>
-                {syncStatus ? (
-                  <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
-                    {syncStatus}
-                  </span>
-                ) : null}
+                {isHistorical ? (
+                  <>
+                    <span className="inline-flex rounded-full border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-xs font-semibold text-amber-100 shadow-sm">
+                      Closed week{editingClosed ? " - editing" : " - read only"}
+                    </span>
+                    <button
+                      className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70"
+                      disabled={enablingEdit || editingClosed}
+                      onClick={enableClosedEdit}
+                      type="button"
+                    >
+                      {editingClosed
+                        ? "Editing"
+                        : enablingEdit
+                          ? "Saving snapshot..."
+                          : "Edit week"}
+                    </button>
+                    {saveState !== "idle" ? (
+                      <SaveIndicator state={saveState} error={saveError} />
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
+                      Active week
+                    </span>
+                    <button
+                      className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-70"
+                      disabled={isSyncing}
+                      onClick={handleManualSync}
+                      type="button"
+                    >
+                      {isSyncing ? "Syncing..." : "Sync now"}
+                    </button>
+                    {syncStatus ? (
+                      <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
+                        {syncStatus}
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </div>
               <MetricStrip
                 cashflowCents={weekTotals.cashflowCents}
@@ -1005,20 +1092,23 @@ export function DashboardEditor({ initialData }: DashboardEditorProps) {
               hiddenBuiltins={initialData.hiddenBuiltins}
               prestigeNetCents={weekNetTotals.prestigeNetCents}
             />
-            <button
-              className="h-10 w-full rounded-md bg-[var(--surface-base)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:shadow-none sm:w-auto"
-              disabled={!canCloseWeek || isClosing}
-              onClick={closeWeek}
-              title={canCloseWeek ? "Close this week" : "Available after Saturday"}
-              type="button"
-            >
-              {isClosing ? "Closing..." : "Close week"}
-            </button>
+            {isHistorical ? null : (
+              <button
+                className="h-10 w-full rounded-md bg-[var(--surface-base)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:shadow-none sm:w-auto"
+                disabled={!canCloseWeek || isClosing}
+                onClick={closeWeek}
+                title={canCloseWeek ? "Close this week" : "Available after Saturday"}
+                type="button"
+              >
+                {isClosing ? "Closing..." : "Close week"}
+              </button>
+            )}
           </div>
           </div>
         </section>
       </main>
     </div>
+    </ShiftsEditableContext.Provider>
     </HiddenBuiltinsContext.Provider>
     </CustomJobsContext.Provider>
   );
@@ -2017,6 +2107,7 @@ function ShiftList({
     toSlotIndex: number,
   ) => void;
 }) {
+  const editable = useContext(ShiftsEditableContext);
   const [draggedSlotIndex, setDraggedSlotIndex] = useState<number | null>(null);
   // Bucket rows render in the list but must NOT count toward the 4-shift cap.
   const activeSlots = day.slots.filter((slot) => slot.jobType !== "none");
@@ -2063,7 +2154,7 @@ function ShiftList({
       </div>
       <button
         className="h-10 w-full rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={day.spendLocked || realActiveCount >= 4}
+        disabled={day.spendLocked || realActiveCount >= 4 || !editable}
         onClick={() => onAddShift(day)}
         type="button"
       >
@@ -2539,13 +2630,15 @@ function SelectField({
   formatOption?: (value: string) => string;
   onChange: (value: string) => void;
 }) {
+  const editable = useContext(ShiftsEditableContext);
   return (
     <label className="space-y-1">
       <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         {label}
       </span>
       <select
-        className="h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
+        className="h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!editable}
         onChange={(event) => onChange(event.target.value)}
         value={value}
       >
@@ -2575,6 +2668,7 @@ function JobPicker({
 }) {
   const customJobs = useContext(CustomJobsContext);
   const hiddenBuiltins = useContext(HiddenBuiltinsContext);
+  const editable = useContext(ShiftsEditableContext);
   const value =
     slot.jobType === "custom" && slot.customJobId
       ? `custom:${slot.customJobId}`
@@ -2616,7 +2710,8 @@ function JobPicker({
         Job
       </span>
       <select
-        className="h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
+        className="h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!editable}
         onChange={(event) => handleChange(event.target.value)}
         value={value}
       >
@@ -2662,6 +2757,8 @@ function NumberField({
   onChange?: (value: number) => void;
   readOnly?: boolean;
 }) {
+  const editable = useContext(ShiftsEditableContext);
+  const locked = readOnly || !editable;
   const [draftValue, setDraftValue] = useState(() => formatNumberInput(value));
   const [isEditing, setIsEditing] = useState(false);
   const displayValue = isEditing ? draftValue : formatNumberInput(value);
@@ -2697,7 +2794,7 @@ function NumberField({
           setDraftValue(formatNumberInput(value));
           setIsEditing(true);
         }}
-        readOnly={readOnly}
+        readOnly={locked}
         step="0.01"
         type="text"
         value={displayValue}

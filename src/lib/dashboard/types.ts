@@ -108,6 +108,7 @@ export type DashboardWeek = {
   id: string;
   startDate: string;
   endDate: string;
+  status: string;
   displayWeekNumber: number;
   payPeriodRole: "week_1" | "week_2";
   paycheckDueDate: string | null;

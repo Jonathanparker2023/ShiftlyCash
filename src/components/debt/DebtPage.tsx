@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 
 import {
   addDebtAction,
@@ -25,6 +26,46 @@ const RANGE_WEEKS: Record<ChartRange, number> = {
   "5y": 260,
   "10y": 520,
   full: Number.POSITIVE_INFINITY,
+};
+
+// Linear design tokens (see /DESIGN.md). These reference the
+// [data-theme="linear"] contract in globals.css, so the whole screen reskins
+// from one place — and could flip to the default shiftly-next theme by dropping
+// the data-theme attribute on the page root.
+const PANEL: CSSProperties = {
+  background: "var(--surface-elevated)",
+  border: "1px solid var(--border-subtle)",
+  borderRadius: "var(--radius-panel)",
+  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.55)",
+};
+
+const FIELD: CSSProperties = {
+  background: "var(--surface-base)",
+  border: "1px solid var(--border-default)",
+  borderRadius: "var(--radius-control)",
+  color: "var(--text-primary)",
+};
+
+const BRAND_BUTTON: CSSProperties = {
+  background: "var(--accent-brand)",
+  color: "#ffffff",
+  border: "1px solid var(--accent-brand-border)",
+};
+
+// SVG data-viz palette. SVG presentation attributes can't read CSS vars
+// reliably, so the chart carries Linear's hex values directly: lavender brand
+// for the invested line, muted ink for principal, red for debt, green for goal.
+const CHART = {
+  invested: "#5e6ad2",
+  investedSoft: "rgba(94, 106, 210, 0.22)",
+  principal: "#8a8f98",
+  principalSoft: "rgba(138, 143, 152, 0.12)",
+  debt: "#e5484d",
+  debtSoft: "rgba(229, 72, 77, 0.20)",
+  target: "#27a644",
+  grid: "rgba(255, 255, 255, 0.08)",
+  axis: "rgba(247, 248, 248, 0.55)",
+  zero: "rgba(255, 255, 255, 0.28)",
 };
 
 function buildChartTicks(yMin: number, yMax: number): number[] {
@@ -149,20 +190,36 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
     [chartWeekLimit, initialData.principalMillionaireBalances],
   );
   return (
-    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden  px-3 py-5 text-white sm:px-6 lg:px-8">
-      <header className="mx-auto mb-5 max-w-7xl border-b border-white/15 pb-4">
+    <div
+      data-theme="linear"
+      className="min-h-screen w-full max-w-[100vw] overflow-x-hidden px-3 py-5 sm:px-6 lg:px-8"
+      style={{ background: "var(--surface-base)", color: "var(--text-primary)" }}
+    >
+      <header
+        className="mx-auto mb-5 max-w-7xl pb-4"
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}
+      >
         <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_296px] lg:items-start">
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">
+            <p
+              className="text-xs font-semibold uppercase tracking-[0.18em]"
+              style={{ color: "var(--accent-brand-text)" }}
+            >
               ShiftlyCash
             </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">
+            <h1
+              className="mt-1 text-3xl font-semibold tracking-tight"
+              style={{ color: "var(--text-primary)" }}
+            >
               Debt Obligations
             </h1>
-            <p className="mt-2 text-sm text-white/75">
+            <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>
               Predict your future. Own your future.
             </p>
-            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/60">
+            <p
+              className="mt-2 text-xs font-semibold uppercase tracking-[0.12em]"
+              style={{ color: "var(--text-tertiary)" }}
+            >
               Pulling {initialData.projectionSource.closedWeekCount} closed
               weeks from week totals. Rolling window: wk{" "}
               {initialData.projectionSource.recentWeekNumbers.join(", ")}.
@@ -178,7 +235,15 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
       </header>
 
       {error ? (
-        <div className="mx-auto mb-4 max-w-7xl rounded-md border border-red-300/60 bg-red-500/15 p-3 text-sm font-medium text-red-300">
+        <div
+          className="mx-auto mb-4 max-w-7xl p-3 text-sm font-medium"
+          style={{
+            background: "var(--accent-negative-fill)",
+            border: "1px solid var(--accent-negative-border)",
+            borderRadius: "var(--radius-control)",
+            color: "var(--accent-negative-text)",
+          }}
+        >
           {error}
         </div>
       ) : null}
@@ -248,13 +313,16 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
         </section>
 
-        <section className="min-w-0 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3 shadow-lg shadow-black/20 sm:p-4">
+        <section className="min-w-0 p-3 sm:p-4" style={PANEL}>
           <div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white/85">
+              <h2
+                className="text-sm font-semibold uppercase tracking-[0.14em]"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Path to $1M
               </h2>
-              <p className="mt-1 text-sm text-white/70">
+              <p className="mt-1 text-sm" style={{ color: "var(--text-tertiary)" }}>
                 Starts at negative debt, invests post-tax weekly cashflow, and
                 compounds at 10%.
               </p>
@@ -264,10 +332,16 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                 <button
                   key={r}
                   onClick={() => setChartRange(r)}
-                  className={
+                  className="min-w-0 flex-1 px-2 py-1 text-xs font-semibold transition-colors sm:flex-none sm:px-3"
+                  style={
                     chartRange === r
-                      ? "min-w-0 flex-1 rounded bg-zinc-950 px-2 py-1 text-xs font-semibold text-white sm:flex-none sm:px-3"
-                      : "min-w-0 flex-1 rounded border border-white/20 px-2 py-1 text-xs font-medium text-white/70 hover:bg-white/10 sm:flex-none sm:px-3"
+                      ? { ...BRAND_BUTTON, borderRadius: "var(--radius-data)" }
+                      : {
+                          background: "transparent",
+                          color: "var(--text-tertiary)",
+                          border: "1px solid var(--border-default)",
+                          borderRadius: "var(--radius-data)",
+                        }
                   }
                 >
                   {r === "full" ? "$1M" : r.toUpperCase()}
@@ -282,12 +356,15 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
         </section>
 
-        <section className="min-w-0 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-4 shadow-lg shadow-black/20">
+        <section className="min-w-0 p-4" style={PANEL}>
           <div className="mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white/85">
+            <h2
+              className="text-sm font-semibold uppercase tracking-[0.14em]"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Debt breakdown
             </h2>
-            <p className="mt-1 text-sm text-white/70">
+            <p className="mt-1 text-sm" style={{ color: "var(--text-tertiary)" }}>
               Sorted by remaining balance, largest account first.
             </p>
           </div>
@@ -295,21 +372,35 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
         </section>
 
         {/* Debts list */}
-        <section className="min-w-0 rounded-md border border-white/15 bg-black/15 backdrop-blur-md shadow-lg shadow-black/20">
-          <div className="flex items-center justify-between border-b border-white/15 p-3">
-            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white/85">
+        <section className="min-w-0 overflow-hidden" style={PANEL}>
+          <div
+            className="flex items-center justify-between p-3"
+            style={{ borderBottom: "1px solid var(--border-subtle)" }}
+          >
+            <h2
+              className="text-sm font-semibold uppercase tracking-[0.14em]"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Debts ({debts.length})
             </h2>
             <button
               onClick={addDebt}
-              className="rounded-md bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+              className="px-3 py-1.5 text-xs font-semibold transition-colors"
+              style={{ ...BRAND_BUTTON, borderRadius: "var(--radius-control)" }}
             >
               + Add debt
             </button>
           </div>
           <div className="w-full max-w-full overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="border-b border-white/15 bg-white/10 text-xs uppercase tracking-[0.12em] text-white/85">
+            <thead
+              className="text-xs uppercase tracking-[0.12em]"
+              style={{
+                background: "var(--surface-hover)",
+                color: "var(--text-tertiary)",
+                borderBottom: "1px solid var(--border-subtle)",
+              }}
+            >
               <tr>
                 <th className="p-3 text-left font-semibold">Order</th>
                 <th className="p-3 text-left font-semibold">Name</th>
@@ -322,14 +413,19 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
             </thead>
             <tbody>
               {debts.map((debt, idx) => (
-                <tr key={debt.id} className="border-b border-white/10 last:border-0">
+                <tr
+                  key={debt.id}
+                  className="border-b last:border-0"
+                  style={{ borderColor: "var(--border-subtle)" }}
+                >
                   <td className="p-2">
                     <div className="flex flex-col gap-0.5">
                       <button
                         aria-label={`Move ${debt.name} up`}
                         disabled={idx === 0}
                         onClick={() => moveDebt(debt.id, "up")}
-                        className="text-xs text-white/70 disabled:opacity-30 hover:text-emerald-300"
+                        className="text-xs transition-colors disabled:opacity-30 hover:[color:var(--accent-brand-text)]"
+                        style={{ color: "var(--text-tertiary)" }}
                       >
                         ^
                       </button>
@@ -337,7 +433,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                         aria-label={`Move ${debt.name} down`}
                         disabled={idx === debts.length - 1}
                         onClick={() => moveDebt(debt.id, "down")}
-                        className="text-xs text-white/70 disabled:opacity-30 hover:text-emerald-300"
+                        className="text-xs transition-colors disabled:opacity-30 hover:[color:var(--accent-brand-text)]"
+                        style={{ color: "var(--text-tertiary)" }}
                       >
                         v
                       </button>
@@ -346,7 +443,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                   <td className="p-2">
                     <input
                       value={debt.name}
-                      className="w-full rounded border border-white/20 bg-black/20 backdrop-blur-md px-2 py-1 text-sm outline-none focus:border-white/60"
+                      className="w-full px-2 py-1 text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)]"
+                      style={FIELD}
                       onChange={(e) => {
                         const value = e.target.value;
                         patchDebtLocal(debt.id, { name: value });
@@ -360,7 +458,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       step="1"
                       min="0"
                       value={centsToDollars(debt.balanceCents)}
-                      className="w-full rounded border border-white/20 bg-black/20 backdrop-blur-md px-2 py-1 text-right text-sm outline-none focus:border-white/60"
+                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)]"
+                      style={FIELD}
                       onChange={(e) => {
                         const cents = dollarsToCents(parseFloat(e.target.value) || 0);
                         patchDebtLocal(debt.id, {
@@ -380,7 +479,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       step="1"
                       min="0"
                       value={centsToDollars(debt.minimumPaymentCents)}
-                      className="w-full rounded border border-white/20 bg-black/20 backdrop-blur-md px-2 py-1 text-right text-sm outline-none focus:border-white/60"
+                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)]"
+                      style={FIELD}
                       onChange={(e) => {
                         const cents = dollarsToCents(parseFloat(e.target.value) || 0);
                         patchDebtLocal(debt.id, { minimumPaymentCents: cents });
@@ -398,7 +498,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                       min="0"
                       max="100"
                       value={(debt.aprBps / 100).toFixed(2)}
-                      className="w-full rounded border border-white/20 bg-black/20 backdrop-blur-md px-2 py-1 text-right text-sm outline-none focus:border-white/60"
+                      className="w-full px-2 py-1 text-right text-sm outline-none transition-colors focus:[border-color:var(--accent-brand)]"
+                      style={FIELD}
                       onChange={(e) => {
                         const bps = Math.round((parseFloat(e.target.value) || 0) * 100);
                         patchDebtLocal(debt.id, { aprBps: bps });
@@ -408,10 +509,19 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                   </td>
                   <td className="p-2">
                     <span
-                      className={
+                      className="px-2 py-1 text-xs font-semibold"
+                      style={
                         debt.status === "paid"
-                          ? "rounded bg-sky-500/15 px-2 py-1 text-xs font-semibold text-emerald-300"
-                          : "rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white/70"
+                          ? {
+                              background: "var(--accent-primary-fill)",
+                              color: "var(--accent-primary-text)",
+                              borderRadius: "var(--radius-data)",
+                            }
+                          : {
+                              background: "var(--surface-hover)",
+                              color: "var(--text-tertiary)",
+                              borderRadius: "var(--radius-data)",
+                            }
                       }
                     >
                       {debt.status}
@@ -420,7 +530,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                   <td className="p-2 text-right">
                     <button
                       onClick={() => deleteDebt(debt.id)}
-                      className="text-xs font-medium text-red-300 hover:underline"
+                      className="text-xs font-medium hover:underline"
+                      style={{ color: "var(--accent-negative-text)" }}
                     >
                       Delete
                     </button>
@@ -429,7 +540,11 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
               ))}
               {debts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-sm text-white/70">
+                  <td
+                    colSpan={7}
+                    className="p-6 text-center text-sm"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
                     No debts tracked. Click &ldquo;Add debt&rdquo; to start.
                   </td>
                 </tr>
@@ -454,26 +569,33 @@ function Metric({
   value: string;
   tone?: "green" | "red" | "amber" | "purple";
 }) {
-  const valueClass =
+  const valueColor =
     tone === "green"
-      ? "text-emerald-300"
+      ? "var(--accent-primary-text)"
       : tone === "red"
-        ? "text-red-300"
-        : tone === "amber"
-          ? "text-amber-200"
-          : tone === "purple"
-            ? "text-violet-200"
-            : "text-white";
+        ? "var(--accent-negative-text)"
+        : tone === "amber" || tone === "purple"
+          ? "var(--accent-brand-text)"
+          : "var(--text-primary)";
   return (
-    <div className="min-h-[132px] min-w-0 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-4 shadow-lg shadow-black/20">
-      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/85">
+    <div className="min-h-[132px] min-w-0 p-4" style={PANEL}>
+      <div
+        className="text-[10px] font-semibold uppercase tracking-[0.14em]"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         {label}
       </div>
-      <div className={`mt-2 text-2xl font-semibold tracking-tight ${valueClass}`}>
+      <div
+        className="mt-2 text-2xl font-semibold tracking-tight"
+        style={{ color: valueColor }}
+      >
         {value}
       </div>
       {sub ? (
-        <div className="mt-2 min-w-0 break-words text-sm leading-snug text-white/70">
+        <div
+          className="mt-2 min-w-0 break-words text-sm leading-snug"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           {sub}
         </div>
       ) : null}
@@ -494,7 +616,10 @@ function Chart({
 }) {
   if (values.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-white/70">
+      <div
+        className="flex h-64 items-center justify-center text-sm"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         No data.
       </div>
     );
@@ -591,7 +716,7 @@ function Chart({
         <text
           x={PAD.l - 8}
           y={yy + 4}
-          fill="rgba(255,255,255,0.62)"
+          fill={CHART.axis}
           fontSize="10"
           textAnchor="end"
           fontFamily="ui-monospace, monospace"
@@ -603,7 +728,7 @@ function Chart({
           y1={yy}
           x2={W - PAD.r}
           y2={yy}
-          stroke="rgba(255,255,255,0.14)"
+          stroke={CHART.grid}
           strokeWidth="1"
         />
       </g>,
@@ -620,7 +745,7 @@ function Chart({
         key={`x-${year}`}
         x={px(wkIdx)}
         y={H - 8}
-        fill="rgba(255,255,255,0.62)"
+        fill={CHART.axis}
         fontSize="10"
         textAnchor="middle"
       >
@@ -635,7 +760,7 @@ function Chart({
         key="x-end"
         x={px(wkIdx)}
         y={H - 8}
-        fill="rgba(255,255,255,0.62)"
+        fill={CHART.axis}
         fontSize="10"
         textAnchor="middle"
       >
@@ -645,7 +770,7 @@ function Chart({
   }
 
   const endVal = series[series.length - 1];
-  const endColor = endVal >= 0 ? "#0e7490" : "#c2410c";
+  const endColor = endVal >= 0 ? CHART.invested : CHART.debt;
   const principalEnd = principalSeries[principalSeries.length - 1] ?? 0;
   const interestEarned = endVal - principalEnd;
   const visibleEvents = events.filter(
@@ -656,7 +781,10 @@ function Chart({
     <div className="relative">
       {/* Total above the chart — sits in HTML so it scales independently of
           the SVG and can never collide with the interest endpoint label. */}
-      <div className="mb-1 text-center text-sm font-extrabold tracking-tight text-white">
+      <div
+        className="mb-1 text-center text-sm font-extrabold tracking-tight"
+        style={{ color: "var(--text-primary)" }}
+      >
         Total {formatMoney(endVal)}
       </div>
       <svg
@@ -671,7 +799,7 @@ function Chart({
           y1={zero}
           x2={W - PAD.r}
           y2={zero}
-          stroke="rgba(255,255,255,0.48)"
+          stroke={CHART.zero}
           strokeWidth="1"
           strokeDasharray="4 4"
         />
@@ -682,14 +810,14 @@ function Chart({
               y1={py(targetCents)}
               x2={W - PAD.r}
               y2={py(targetCents)}
-              stroke="#7e22ce"
+              stroke={CHART.target}
               strokeDasharray="6 4"
               strokeWidth="1"
             />
             <text
               x={W - 10}
               y={py(targetCents) - 8}
-              fill="#7e22ce"
+              fill={CHART.target}
               fontSize="10"
               fontWeight="700"
               textAnchor="end"
@@ -698,23 +826,23 @@ function Chart({
             </text>
           </>
         ) : null}
-        {debtFillPath ? <path d={debtFillPath} fill="rgba(194,65,12,0.22)" /> : null}
+        {debtFillPath ? <path d={debtFillPath} fill={CHART.debtSoft} /> : null}
         {principalFillPath ? (
-          <path d={principalFillPath} fill="rgba(15,23,42,0.12)" />
+          <path d={principalFillPath} fill={CHART.principalSoft} />
         ) : null}
         {interestFillPath ? (
-          <path d={interestFillPath} fill="rgba(14,116,144,0.26)" />
+          <path d={interestFillPath} fill={CHART.investedSoft} />
         ) : null}
         {principalPath ? (
           <path
             d={principalPath}
             fill="none"
-            stroke="#18181b"
+            stroke={CHART.principal}
             strokeLinecap="round"
             strokeWidth="2.25"
           />
         ) : null}
-        <path d={linePath} fill="none" stroke="#0e7490" strokeWidth="2.5" strokeLinecap="round" />
+        <path d={linePath} fill="none" stroke={CHART.invested} strokeWidth="2.5" strokeLinecap="round" />
         {principalTargetIndex >= 0 ? (
           <g>
             <line
@@ -722,14 +850,14 @@ function Chart({
               y1={PAD.t}
               x2={px(principalTargetIndex)}
               y2={H - PAD.b}
-              stroke="#0f172a"
+              stroke={CHART.principal}
               strokeDasharray="3 4"
               strokeWidth="1"
             />
             <circle
               cx={px(principalTargetIndex)}
               cy={py(targetCents)}
-              fill="white"
+              fill="#ffffff"
               r="4"
               stroke="#fff"
               strokeWidth="2"
@@ -737,7 +865,7 @@ function Chart({
             <text
               x={px(principalTargetIndex) - 4}
               y={py(targetCents) + 16}
-              fill="white"
+              fill="#ffffff"
               fontSize="10"
               fontWeight="700"
               textAnchor="end"
@@ -753,14 +881,14 @@ function Chart({
               y1={PAD.t}
               x2={px(investedTargetIndex)}
               y2={H - PAD.b}
-              stroke="#0e7490"
+              stroke={CHART.invested}
               strokeDasharray="3 4"
               strokeWidth="1"
             />
             <circle
               cx={px(investedTargetIndex)}
               cy={py(targetCents)}
-              fill="#0e7490"
+              fill={CHART.invested}
               r="4"
               stroke="#fff"
               strokeWidth="2"
@@ -768,7 +896,7 @@ function Chart({
             <text
               x={Math.max(PAD.l + 120, px(investedTargetIndex) - 140)}
               y={py(targetCents) - 28}
-              fill="#0e7490"
+              fill={CHART.invested}
               fontSize="10"
               fontWeight="700"
               textAnchor="start"
@@ -784,14 +912,14 @@ function Chart({
               y1={PAD.t}
               x2={px(event.week)}
               y2={H - PAD.b}
-              stroke="#0e7490"
+              stroke={CHART.invested}
               strokeDasharray="4 4"
               strokeWidth="1"
             />
             <text
               x={px(event.week) + 4}
               y={PAD.t + 12}
-              fill="#0e7490"
+              fill={CHART.invested}
               fontSize="9"
               fontWeight="700"
             >
@@ -800,15 +928,15 @@ function Chart({
           </g>
         ))}
         {/* Now dot */}
-        <circle cx={px(0)} cy={py(series[0])} r="4" fill="#c2410c" stroke="#fff" strokeWidth="2" />
+        <circle cx={px(0)} cy={py(series[0])} r="4" fill={CHART.debt} stroke="#fff" strokeWidth="2" />
         {/* Crossover */}
         {crossIdx > 0 ? (
           <g>
-            <circle cx={px(crossIdx)} cy={zero} r="5" fill="#0e7490" stroke="#fff" strokeWidth="2" />
+            <circle cx={px(crossIdx)} cy={zero} r="5" fill={CHART.invested} stroke="#fff" strokeWidth="2" />
             <text
               x={px(crossIdx)}
               y={zero - 12}
-              fill="#0e7490"
+              fill={CHART.invested}
               fontSize="11"
               fontWeight="700"
               textAnchor="middle"
@@ -819,8 +947,8 @@ function Chart({
           </g>
         ) : null}
         {/* End markers — two endpoint labels matching their line colors:
-            • bottom line (slate) → principal end value
-            • top line (teal) → interest earned (invested − principal)
+            • bottom line (principal) → principal end value
+            • top line (invested) → interest earned (invested − principal)
             Total label lives in the HTML above the SVG. */}
         {(() => {
           const xEnd = px(series.length - 1);
@@ -828,19 +956,19 @@ function Chart({
           const principalLabelOffset = series.length - 1 <= 260 ? 40 : 24;
           return (
             <>
-              {/* Principal endpoint dot + label below the dot (slate) */}
+              {/* Principal endpoint dot + label below the dot */}
               <circle
                 cx={xEnd}
                 cy={py(principalEnd)}
                 r="4"
-                fill="#18181b"
+                fill={CHART.principal}
                 stroke="#fff"
                 strokeWidth="2"
               />
               <text
                 x={labelX}
                 y={py(principalEnd) + principalLabelOffset}
-                fill="#18181b"
+                fill={CHART.principal}
                 fontSize="10"
                 fontWeight="700"
                 textAnchor="end"
@@ -849,7 +977,7 @@ function Chart({
                 {formatMoney(principalEnd)} principal
               </text>
 
-              {/* Invested endpoint dot + interest-earned label above the dot (teal) */}
+              {/* Invested endpoint dot + interest-earned label above the dot */}
               <circle
                 cx={xEnd}
                 cy={py(endVal)}
@@ -873,16 +1001,19 @@ function Chart({
           );
         })()}
       </svg>
-      <div className="mt-2 flex items-center justify-between text-xs font-medium text-white/70">
+      <div
+        className="mt-2 flex items-center justify-between text-xs font-medium"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         <span className="flex flex-wrap items-center gap-3">
           <span className="flex items-center gap-1">
-            <span className="h-0.5 w-4 bg-zinc-950" /> Principal only
+            <span className="h-0.5 w-4" style={{ background: CHART.principal }} /> Principal only
           </span>
           <span className="flex items-center gap-1">
-            <span className="h-0.5 w-4 bg-[#0e7490]" /> Invested at 10%
+            <span className="h-0.5 w-4" style={{ background: CHART.invested }} /> Invested at 10%
           </span>
         </span>
-        <span className="text-white/70">
+        <span style={{ color: "var(--text-tertiary)" }}>
           {formatWeekDuration(series.length - 1)} projection
         </span>
       </div>
@@ -910,32 +1041,48 @@ function DebtBreakdown({ debts }: { debts: DebtRow[] }) {
     <div className="grid gap-3">
       {activeDebts.map((debt, index) => (
         <div key={debt.id} className="grid gap-2 sm:grid-cols-[180px_1fr_96px] sm:items-center">
-          <div className="text-sm font-medium text-white">{debt.name}</div>
-          <div className="h-3 overflow-hidden rounded-full bg-white/10">
+          <div className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            {debt.name}
+          </div>
+          <div
+            className="h-3 overflow-hidden rounded-full"
+            style={{ background: "var(--surface-hover)" }}
+          >
             <div
-              className="h-full rounded-full bg-[#0e7490]"
+              className="h-full rounded-full"
               style={{
+                background: "var(--accent-brand)",
                 opacity: Math.max(0.35, 1 - index * 0.07),
                 width: `${Math.max(2, (debt.balanceCents / max) * 100)}%`,
               }}
             />
           </div>
-          <div className="text-right text-sm font-semibold text-emerald-300">
+          <div
+            className="text-right text-sm font-semibold"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {formatMoney(debt.balanceCents)}
           </div>
         </div>
       ))}
-      <div className="mt-2 grid gap-1.5 border-t border-white/10 pt-3 text-sm">
+      <div
+        className="mt-2 grid gap-1.5 pt-3 text-sm"
+        style={{ borderTop: "1px solid var(--border-subtle)" }}
+      >
         <div className="flex items-center justify-between gap-3">
-          <span className="font-semibold text-white/80">Total</span>
-          <span className="font-bold text-white">{formatMoney(totalCents)}</span>
+          <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
+            Total
+          </span>
+          <span className="font-bold" style={{ color: "var(--text-primary)" }}>
+            {formatMoney(totalCents)}
+          </span>
         </div>
         {hasAutoLoan ? (
           <div className="flex items-center justify-between gap-3">
-            <span className="font-semibold text-white/65">
+            <span className="font-semibold" style={{ color: "var(--text-tertiary)" }}>
               Total minus auto loan
             </span>
-            <span className="font-bold text-emerald-300">
+            <span className="font-bold" style={{ color: "var(--accent-primary-text)" }}>
               {formatMoney(totalMinusAutoCents)}
             </span>
           </div>
@@ -996,5 +1143,3 @@ function weeksUntilLabel(iso: string | null): string {
 
   return `${weeks} wks`;
 }
-
-

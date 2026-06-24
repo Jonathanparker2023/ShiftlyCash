@@ -126,6 +126,67 @@
   --radius-panel: 12px;
 }
 
+/*
+  ============================================================
+  Linear theme — scoped via data-theme="linear"
+  ============================================================
+  Maps the shiftly-next token contract to Linear's design system
+  (see /DESIGN.md). Because it's keyed on [data-theme="linear"],
+  ONLY subtrees carrying that attribute pick these values up — the
+  rest of the app keeps the default shiftly-next theme. This is the
+  proof-of-concept skin for the debt page; remove the attribute on
+  the page root to revert it instantly.
+
+  Near-black canvas (#010102), a four-step charcoal surface ladder,
+  hairline borders, and the signature Linear lavender (#5e6ad2) as
+  the brand accent. Green/red are kept for finance semantics — Linear
+  drops them on marketing but keeps them in its product UI.
+*/
+[data-theme="linear"] {
+  --surface-base: #010102;       /* canvas */
+  --surface-elevated: #0f1011;   /* surface-1 — cards/panels */
+  --surface-overlay: #18191a;    /* surface-3 — menus/overlays */
+  --surface-hover: #141516;      /* surface-2 — hover/selected */
+
+  --border-subtle: #191a1e;
+  --border-default: #23252a;     /* hairline */
+  --border-strong: #34343a;      /* hairline-strong */
+
+  --text-primary: #f7f8f8;       /* ink */
+  --text-secondary: #d0d6e0;     /* ink-muted */
+  --text-tertiary: #8a8f98;      /* ink-subtle */
+  --text-muted: #62666d;         /* ink-tertiary */
+
+  /* Brand accent — Linear lavender. New family: the prior contract had no
+     dedicated brand hue (it reused the positive/emerald accent). */
+  --accent-brand: #5e6ad2;
+  --accent-brand-fill: rgba(94, 106, 210, 0.14);
+  --accent-brand-border: rgba(94, 106, 210, 0.34);
+  --accent-brand-text: #99a0ff;
+
+  /* Positive money — Linear's one sanctioned semantic, success green. */
+  --accent-primary: #27a644;
+  --accent-primary-fill: rgba(39, 166, 68, 0.14);
+  --accent-primary-border: rgba(39, 166, 68, 0.30);
+  --accent-primary-text: #4ade80;
+
+  /* Warning folds into brand lavender (Linear avoids amber). */
+  --accent-warning: #5e6ad2;
+  --accent-warning-fill: rgba(94, 106, 210, 0.14);
+  --accent-warning-border: rgba(94, 106, 210, 0.30);
+  --accent-warning-text: #99a0ff;
+
+  /* Liabilities — Linear product red. */
+  --accent-negative: #e5484d;
+  --accent-negative-fill: rgba(229, 72, 77, 0.14);
+  --accent-negative-border: rgba(229, 72, 77, 0.30);
+  --accent-negative-text: #ff6369;
+
+  --radius-data: 6px;     /* Linear sm */
+  --radius-control: 8px;  /* Linear md — buttons, inputs */
+  --radius-panel: 12px;   /* Linear lg — cards */
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

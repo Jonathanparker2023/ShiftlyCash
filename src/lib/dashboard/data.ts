@@ -48,6 +48,7 @@ type WeekRow = {
   id: string;
   start_date: string;
   end_date: string;
+  status: string;
 };
 
 type DayRow = {
@@ -182,7 +183,15 @@ type AdjacentAbilityPayPeriod = {
   hasAdjacentWeek: boolean;
 };
 
-export async function getDashboardData(): Promise<DashboardData> {
+export async function getWeekDashboardData(
+  weekId: string,
+): Promise<DashboardData> {
+  return getDashboardData({ weekId });
+}
+
+export async function getDashboardData(
+  options?: { weekId?: string },
+): Promise<DashboardData> {
   const tTotal = mark();
   const { supabase, user } = await timed("dashboard:auth", () =>
     requireUserWithBootstrapStatus(),
@@ -190,23 +199,32 @@ export async function getDashboardData(): Promise<DashboardData> {
   const startDate = getSundayOnOrBeforeTodayIso();
   const todayIso = getTodayIso();
 
-  const { data: weekId, error: ensureError } = await timed(
-    "dashboard:ensureWeek",
-    () =>
-      supabase.rpc("ensure_current_active_week", { p_start_date: startDate }),
-  );
+  let weekId: string;
+  if (options?.weekId) {
+    // Historical (read-only) load: use the requested week and DO NOT ensure an
+    // active week or run projection maintenance — those WRITE to live days.
+    weekId = options.weekId;
+  } else {
+    const { data: ensuredWeekId, error: ensureError } = await timed(
+      "dashboard:ensureWeek",
+      () =>
+        supabase.rpc("ensure_current_active_week", { p_start_date: startDate }),
+    );
 
-  if (ensureError) {
-    throw new Error(`Unable to ensure active week: ${ensureError.message}`);
+    if (ensureError) {
+      throw new Error(`Unable to ensure active week: ${ensureError.message}`);
+    }
+
+    if (typeof ensuredWeekId !== "string") {
+      throw new Error("Active week RPC did not return a week id.");
+    }
+
+    weekId = ensuredWeekId;
+
+    await timed("dashboard:projectionMaintenance", () =>
+      applyDashboardProjectionMaintenance(supabase, { weekId, todayIso }),
+    );
   }
-
-  if (typeof weekId !== "string") {
-    throw new Error("Active week RPC did not return a week id.");
-  }
-
-  await timed("dashboard:projectionMaintenance", () =>
-    applyDashboardProjectionMaintenance(supabase, { weekId, todayIso }),
-  );
 
   const tBatchA = mark();
   const [
@@ -227,7 +245,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       .single(),
     supabase
       .from("weeks")
-      .select("id,start_date,end_date")
+      .select("id,start_date,end_date,status")
       .eq("id", weekId)
       .single(),
     supabase
@@ -468,6 +486,7 @@ function mapDashboardData(input: {
     id: input.week.id,
     startDate: input.week.start_date,
     endDate: input.week.end_date,
+    status: input.week.status,
     displayWeekNumber: input.weekTotal.display_week_number,
     payPeriodRole: input.weekTotal.pay_period_role,
     paycheckDueDate: input.weekTotal.paycheck_due_date,
