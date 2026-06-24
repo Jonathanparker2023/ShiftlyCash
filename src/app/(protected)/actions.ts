@@ -240,6 +240,7 @@ export async function saveEarnSlotAction(
   const row = data as { id: string };
   revalidatePath("/");
   revalidatePath("/history");
+  revalidatePath("/history/[week_id]", "page");
 
   return {
     ok: true,

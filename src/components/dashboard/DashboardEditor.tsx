@@ -27,7 +27,7 @@ import {
 } from "@/app/(protected)/actions";
 import { syncTransactionsAction } from "@/app/(protected)/banking/actions";
 import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
-import { addDaysIso, formatDayLabel } from "@/lib/dashboard/dates";
+import { addDaysIso } from "@/lib/dashboard/dates";
 import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
 import type {
   DashboardCustomJob,
@@ -43,7 +43,6 @@ import {
   calculateEarnSlot,
   calculateDayTotals,
   calculateWeekTotals,
-  getPayPeriodInfo,
   netEarningsByBucket,
   type IncentiveMode,
   type JobType,
@@ -127,23 +126,64 @@ export function DashboardEditor({
   // button can flush them immediately instead of waiting on the debounce.
   const pendingSlotInputs = useRef<Map<string, SaveEarnSlotInput>>(new Map());
   const [finishingEdit, setFinishingEdit] = useState(false);
+  const [confirmingClose, setConfirmingClose] = useState(false);
   const canCloseWeek = initialData.todayIso >= initialData.week.endDate;
-  const nextWeekStart = addDaysIso(initialData.week.endDate, 1);
-  const nextWeekEnd = addDaysIso(nextWeekStart, 6);
-  const nextWeekInfo = getPayPeriodInfo(nextWeekStart);
 
   useEffect(() => {
     const scheduledTimers = timers.current;
+    const pending = pendingSlotInputs.current;
 
     return () => {
       Object.values(scheduledTimers).forEach(clearTimeout);
+      // Flush any debounced-but-unsaved slot edits so navigating away (Back to
+      // History) before the 1.2s debounce fires doesn't silently drop them.
+      for (const [, input] of pending) {
+        saveEarnSlotAction(input).catch(() => {});
+      }
+      pending.clear();
     };
   }, []);
+
+  // Also flush when the app is backgrounded/hidden (installed PWA), since an
+  // unmount may not happen before the OS suspends the tab.
+  useEffect(() => {
+    const flush = () => {
+      for (const [, input] of pendingSlotInputs.current) {
+        saveEarnSlotAction(input).catch(() => {});
+      }
+      pendingSlotInputs.current.clear();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  // After a refresh (e.g. Save & done), reconcile the grid to server truth so a
+  // save that didn't actually persist visibly reverts instead of looking saved.
+  // Historical only — the active dashboard keeps its optimistic-typing state.
+  useEffect(() => {
+    if (!isHistorical) {
+      return;
+    }
+    // Deliberate server->client sync after a refresh (not a render-loop).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDays(initialData.days);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData]);
 
   // Projection maintenance is intentionally post-render. It clears projected
   // spend that has reached today and fills future-day projections without
   // blocking dashboard navigation.
   useEffect(() => {
+    if (isHistorical) {
+      return; // historical pages are read-only; never maintain/refresh here
+    }
     const storageKey = `shiftly:projectionMaintenance:${initialData.todayIso}`;
 
     if (sessionStorage.getItem(storageKey)) {
@@ -168,12 +208,15 @@ export function DashboardEditor({
     return () => {
       cancelled = true;
     };
-  }, [initialData.todayIso, router]);
+  }, [initialData.todayIso, router, isHistorical]);
 
   // Auto-sync Plaid transactions on first dashboard load (fire-and-forget).
   // Throttled by sessionStorage so it only runs once per browser session per
   // 5-minute window, avoiding API spam during navigation.
   useEffect(() => {
+    if (isHistorical) {
+      return; // never sync/refresh from a historical page
+    }
     const THROTTLE_MS = 5 * 60 * 1000;
     const last = Number(sessionStorage.getItem(AUTO_SYNC_STORAGE_KEY) ?? "0");
     if (Date.now() - last < THROTTLE_MS) return;
@@ -197,7 +240,7 @@ export function DashboardEditor({
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, isHistorical]);
 
   const dayTotals = useMemo(
     () =>
@@ -770,6 +813,10 @@ export function DashboardEditor({
 
     clearSlot(slot);
     setExpandedSlotIndex(null);
+    // Persist the removal NOW rather than on the 1.2s debounce — a fast "Back to
+    // History" tap would otherwise cancel the pending write and the shift would
+    // reappear. flushPendingSaves also covers any other queued edits.
+    void flushPendingSaves().catch((error) => markError(error));
   }
 
   function addShift(day: DashboardDay) {
@@ -817,6 +864,8 @@ export function DashboardEditor({
       await snapshotClosedWeekAction({ weekId: initialData.week.id });
       setEditingClosed(true);
     } catch (error) {
+      // Surface loudly — a silent failure here reads as "Edit week does nothing".
+      setSaveState("error");
       setSaveError(
         error instanceof Error ? error.message : "Unable to start editing.",
       );
@@ -878,9 +927,20 @@ export function DashboardEditor({
     for (const [key] of entries) {
       clearTimeout(timers.current[key]);
     }
-    for (const [key, input] of entries) {
-      await saveEarnSlotAction(input);
-      pendingSlotInputs.current.delete(key);
+    // Attempt every save; delete only those that succeed so failures stay
+    // pending + retryable instead of one throw dropping the whole batch.
+    const results = await Promise.allSettled(
+      entries.map(([key, input]) =>
+        saveEarnSlotAction(input).then(() => {
+          pendingSlotInputs.current.delete(key);
+        }),
+      ),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      throw new Error(
+        `${failed} edit${failed > 1 ? "s" : ""} didn't save — still editing.`,
+      );
     }
   }
 
@@ -935,19 +995,14 @@ export function DashboardEditor({
       return;
     }
 
-    const confirmed = window.confirm(
-      `Close week ${initialData.week.displayWeekNumber} (${formatRangeForPrompt(
-        initialData.week.startDate,
-        initialData.week.endDate,
-      )}) and start week ${nextWeekInfo.displayWeekNumber} (${formatRangeForPrompt(
-        nextWeekStart,
-        nextWeekEnd,
-      )})? This is final until reopened from History.`,
-    );
-
-    if (!confirmed) {
+    // Two-tap inline confirm instead of window.confirm (suppressed on installed
+    // / mobile web apps). First tap arms; second tap within 5s closes.
+    if (!confirmingClose) {
+      setConfirmingClose(true);
+      window.setTimeout(() => setConfirmingClose(false), 5000);
       return;
     }
+    setConfirmingClose(false);
 
     setIsClosing(true);
     setCloseError(null);
@@ -1151,13 +1206,21 @@ export function DashboardEditor({
             />
             {isHistorical ? null : (
               <button
-                className="h-10 w-full rounded-md bg-[var(--surface-base)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:shadow-none sm:w-auto"
+                className={`h-10 w-full rounded-md px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:text-[var(--text-muted)] disabled:shadow-none sm:w-auto ${
+                  confirmingClose
+                    ? "bg-amber-500/90 text-white hover:bg-amber-500"
+                    : "bg-[var(--surface-base)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:bg-[var(--surface-hover)]"
+                }`}
                 disabled={!canCloseWeek || isClosing}
                 onClick={closeWeek}
                 title={canCloseWeek ? "Close this week" : "Available after Saturday"}
                 type="button"
               >
-                {isClosing ? "Closing..." : "Close week"}
+                {isClosing
+                  ? "Closing..."
+                  : confirmingClose
+                    ? "Tap again to close week"
+                    : "Close week"}
               </button>
             )}
           </div>
@@ -1889,6 +1952,7 @@ function TransactionRowButton({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(transaction.merchantName);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isGasEditing, setIsGasEditing] = useState(false);
   const [gasAmountValue, setGasAmountValue] = useState(
     formatCentsForInput(
@@ -2119,16 +2183,25 @@ function TransactionRowButton({
             </>
           ) : null}
           <button
-            className="rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-negative-text)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              confirmingDelete
+                ? "border-red-400 bg-red-500/90 text-white hover:bg-red-500"
+                : "border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] text-[var(--accent-negative-text)] hover:bg-[var(--surface-hover)]"
+            }`}
             disabled={disabled}
             onClick={() => {
-              if (window.confirm(`Delete ${transaction.merchantName}?`)) {
-                onDelete(transaction);
+              // Two-tap inline confirm (window.confirm is dead on installed apps).
+              if (!confirmingDelete) {
+                setConfirmingDelete(true);
+                window.setTimeout(() => setConfirmingDelete(false), 4000);
+                return;
               }
+              setConfirmingDelete(false);
+              onDelete(transaction);
             }}
             type="button"
           >
-            Delete
+            {confirmingDelete ? "Tap again" : "Delete"}
           </button>
           </div>
         </div>
@@ -2252,6 +2325,10 @@ function ShiftRow({
   onDrop: () => void;
   onDragEnd: () => void;
 }) {
+  const editable = useContext(ShiftsEditableContext);
+  // In read-only History the row must be truly inert (no expand, no drag, no
+  // Remove) — gate on editability, not just the day's spend lock.
+  const effectiveLocked = locked || !editable;
   // Synthetic Amortized Income credit: READ-ONLY. No expand, no Remove, not
   // draggable. The amount is formatted DIRECTLY from the signed creditCents,
   // bypassing formatShiftAmountValue (which blanks/clamps non-positive values).
@@ -2307,7 +2384,7 @@ function ShiftRow({
     <div
       className={rowClassName}
       style={customStyle}
-      draggable={!locked}
+      draggable={!effectiveLocked}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDragStart={onDragStart}
@@ -2315,7 +2392,7 @@ function ShiftRow({
     >
       <button
         className="flex min-h-11 w-full cursor-grab items-center gap-3 px-3 py-2 text-left active:cursor-grabbing disabled:cursor-not-allowed"
-        disabled={locked}
+        disabled={effectiveLocked}
         onClick={onToggle}
         type="button"
       >
@@ -2354,7 +2431,7 @@ function ShiftRow({
         ) : null}
       </button>
 
-      {expanded && !locked ? (
+      {expanded && !effectiveLocked ? (
         <div className="grid gap-3 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 sm:grid-cols-2">
           <JobPicker slot={slot} onSlotChange={onSlotChange} />
           {slot.payType === "unit" ? (
@@ -2869,14 +2946,16 @@ function TextField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const editable = useContext(ShiftsEditableContext);
   return (
     <label className="space-y-1">
       <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
+        className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition read-only:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white"
         onChange={(event) => onChange(event.target.value)}
+        readOnly={!editable}
         type="text"
         value={value}
       />
@@ -3585,14 +3664,6 @@ function formatFullRange(startDate: string, endDate: string): string {
   }).format(end);
 
   return `${startLabel} - ${endLabel}`;
-}
-
-function formatCompactRange(startDate: string, endDate: string): string {
-  return `${formatDayLabel(startDate)}-${formatDayOnly(endDate)}`;
-}
-
-function formatRangeForPrompt(startDate: string, endDate: string): string {
-  return formatCompactRange(startDate, endDate);
 }
 
 function formatDayOnly(value: string): string {
