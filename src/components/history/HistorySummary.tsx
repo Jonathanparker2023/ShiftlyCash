@@ -90,7 +90,12 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
       setWeekWindow(preferences.weekWindow);
       setHasHydrated(true);
     }, 0);
-  }, [defaultOrder]);
+    // Hydrate saved prefs ONCE on mount. The old [defaultOrder] dependency
+    // re-fired this effect on every week-window change (defaultOrder is sorted
+    // by value, so it changes with the data), re-applying saved prefs mid-edit
+    // and making the numbers twitch/jump.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!hasHydrated) {
@@ -365,7 +370,7 @@ function SummaryTileCard({ tile }: { tile: SummaryTile }) {
       <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/85">
         {tile.label}
       </p>
-      <p className="mt-3 rounded-md bg-black/25 px-2 py-1 text-3xl font-black leading-none tracking-tight text-white shadow-sm ring-1 ring-white/20 sm:text-4xl">
+      <p className="mt-3 rounded-md bg-black/25 px-2 py-1 text-3xl font-black leading-none tracking-tight tabular-nums text-white shadow-sm ring-1 ring-white/20 sm:text-4xl">
         {tile.displayValue}
       </p>
     </div>
