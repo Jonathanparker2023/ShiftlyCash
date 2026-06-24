@@ -1052,7 +1052,11 @@ export function DashboardEditor({
 
       <main className="mx-auto max-w-7xl">
         <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
-          <div className="h-2 bg-[var(--surface-elevated)]" />
+          {/* Mode cue: emerald top bar = editing (live week or an unlocked closed week); amber = read-only history */}
+          <div
+            className={shiftsEditable ? "h-2 bg-[var(--accent-primary)]" : "h-2 bg-amber-400/80"}
+            aria-hidden="true"
+          />
           <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
             <div>
@@ -1109,7 +1113,7 @@ export function DashboardEditor({
                   </>
                 ) : (
                   <>
-                    <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
+                    <span className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-2 py-1 text-xs font-semibold text-[var(--accent-primary-text)] shadow-sm">
                       Active week
                     </span>
                     <button
