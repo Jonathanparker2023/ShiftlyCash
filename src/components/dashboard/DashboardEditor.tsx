@@ -2022,7 +2022,7 @@ function TransactionRowButton({
           >
             {formatTransactionTime(transaction.time)}
             {transaction.isGasAllocated ? (
-              <span className="ml-1 text-[var(--accent-warning-text)]">
+              <span className="ml-1 text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.65)]">
                 Gas spread
               </span>
             ) : null}
@@ -2044,20 +2044,20 @@ function TransactionRowButton({
       {isExpanded ? (
         <div className="border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2">
           {transaction.isGasAllocated ? (
-            <div className="mb-2 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-2 py-1 text-[10px] font-semibold text-[var(--accent-warning-text)]">
-              Gas {formatMoneyExact(transaction.gasAllocatedCents)} spread as daily
-              spend; {formatMoneyExact(transaction.gasRemainderCents)} stays here.
+            <div className="mb-2 rounded-md border border-sky-400/40 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold text-sky-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]">
+              Gas {formatMoneyExact(transaction.gasAllocatedCents)} averaged across
+              your gas history as daily spend; {formatMoneyExact(transaction.gasRemainderCents)} stays here.
             </div>
           ) : null}
           {isGasEditing ? (
             <form
-              className="mb-2 grid gap-2 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] p-2 sm:grid-cols-[1fr_auto]"
+              className="mb-2 grid gap-2 rounded-md border border-sky-400/40 bg-sky-500/15 p-2 sm:grid-cols-[1fr_auto]"
               onSubmit={submitGasAllocation}
             >
-              <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-warning-text)]">
+              <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-200">
                 Gas $
                 <input
-                  className="mt-1 block h-8 w-full rounded-md border border-[var(--accent-warning-border)] bg-[var(--surface-base)] px-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--border-strong)]"
+                  className="mt-1 block h-8 w-full rounded-md border border-sky-400/40 bg-[var(--surface-base)] px-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-sky-300"
                   disabled={disabled}
                   inputMode="decimal"
                   onChange={(event) => setGasAmountValue(event.target.value)}
@@ -2066,22 +2066,22 @@ function TransactionRowButton({
               </label>
               <div className="flex items-end gap-2">
                 <button
-                  className="h-8 rounded-md border border-[var(--accent-warning-border)] bg-[var(--surface-base)] px-2.5 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="h-8 rounded-md border border-sky-400/40 bg-[var(--surface-base)] px-2.5 text-xs font-semibold text-[var(--text-primary)] transition hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={disabled || parsePositiveNumber(gasAmountValue) <= 0}
                   type="submit"
                 >
                   Save
                 </button>
                 <button
-                  className="h-8 rounded-md px-2.5 text-xs font-semibold text-[var(--accent-warning-text)] transition hover:text-[var(--text-primary)]"
+                  className="h-8 rounded-md px-2.5 text-xs font-semibold text-sky-200 transition hover:text-[var(--text-primary)]"
                   onClick={() => setIsGasEditing(false)}
                   type="button"
                 >
                   Cancel
                 </button>
               </div>
-              <p className="text-[10px] text-[var(--accent-warning-text)] sm:col-span-2">
-                Spreads as daily spend back to your last fill-up automatically.
+              <p className="text-[10px] text-sky-200 sm:col-span-2">
+                Averages across every day since your first fill — your true daily gas cost.
               </p>
             </form>
           ) : null}
