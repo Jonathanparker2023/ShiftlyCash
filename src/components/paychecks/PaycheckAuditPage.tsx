@@ -20,11 +20,18 @@ export function PaycheckAuditPage({
   initialData: PaycheckAuditData;
 }) {
   const [periods, setPeriods] = useState(initialData.periods);
-  const [activeJob, setActiveJob] = useState<PaycheckJobKey>("ability");
+  const jobList = periods[0]?.jobs ?? [];
+  const [activeJob, setActiveJob] = useState<PaycheckJobKey>(
+    jobList[0]?.key ?? "",
+  );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  async function saveActual(period: PaycheckPeriod, jobType: PaycheckJobKey, value: string) {
+  async function saveActual(
+    period: PaycheckPeriod,
+    jobKey: PaycheckJobKey,
+    value: string,
+  ) {
     if (!period.actualWeekId) {
       return;
     }
@@ -43,7 +50,7 @@ export function PaycheckAuditPage({
     try {
       await savePaycheckActualAction({
         weekId: period.actualWeekId,
-        jobType,
+        jobType: jobKey,
         actualCents,
       });
       setPeriods((current) =>
@@ -54,17 +61,18 @@ export function PaycheckAuditPage({
 
           return {
             ...item,
-            jobs: {
-              ...item.jobs,
-              [jobType]: {
-                ...item.jobs[jobType],
-                actualNetCents: actualCents,
-                differenceCents:
-                  actualCents === null
-                    ? null
-                    : actualCents - item.jobs[jobType].estimatedNetCents,
-              },
-            },
+            jobs: item.jobs.map((job) =>
+              job.key === jobKey
+                ? {
+                    ...job,
+                    actualNetCents: actualCents,
+                    differenceCents:
+                      actualCents === null
+                        ? null
+                        : actualCents - job.estimatedNetCents,
+                  }
+                : job,
+            ),
           };
         }),
       );
@@ -74,6 +82,9 @@ export function PaycheckAuditPage({
       setError(err instanceof Error ? err.message : "Unable to save paycheck.");
     }
   }
+
+  const activeExists = jobList.some((job) => job.key === activeJob);
+  const resolvedActiveJob = activeExists ? activeJob : (jobList[0]?.key ?? "");
 
   return (
     <main className="min-h-screen px-3 py-4 text-white sm:px-4 lg:px-6">
@@ -89,49 +100,66 @@ export function PaycheckAuditPage({
                 Pay-period check
               </h1>
               <p className="mt-1 text-sm text-white/70">
-                Compare expected take-home against what UKG actually paid.
+                Compare expected take-home against what the paycheck actually paid.
               </p>
             </div>
             <SaveBadge state={saveState} error={error} />
           </div>
 
-          <div className="mb-4 inline-flex rounded-md border border-white/20 bg-black/20 backdrop-blur-md p-1 shadow-sm">
-            {(["ability", "prestige"] as const).map((jobType) => (
-              <button
-                key={jobType}
-                className={[
-                  "rounded px-3 py-1.5 text-sm font-semibold transition",
-                  activeJob === jobType
-                    ? "bg-zinc-950 text-white"
-                    : "text-white/70 hover:bg-white/10",
-                ].join(" ")}
-                onClick={() => {
-                  setActiveJob(jobType);
-                  setSaveState("idle");
-                  setError(null);
-                }}
-                type="button"
-              >
-                {jobType === "ability" ? "Ability" : "Prestige"}
-              </button>
-            ))}
-          </div>
+          {jobList.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <>
+              {jobList.length > 1 ? (
+                <div className="mb-4 inline-flex flex-wrap gap-1 rounded-md border border-white/20 bg-black/20 backdrop-blur-md p-1 shadow-sm">
+                  {jobList.map((job) => (
+                    <button
+                      key={job.key}
+                      className={[
+                        "rounded px-3 py-1.5 text-sm font-semibold transition",
+                        resolvedActiveJob === job.key
+                          ? "bg-zinc-950 text-white"
+                          : "text-white/70 hover:bg-white/10",
+                      ].join(" ")}
+                      onClick={() => {
+                        setActiveJob(job.key);
+                        setSaveState("idle");
+                        setError(null);
+                      }}
+                      type="button"
+                    >
+                      {job.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            {periods.map((period) => (
-              <PaycheckPeriodCard
-                key={`${period.id}-${activeJob}`}
-                jobType={activeJob}
-                period={period}
-                onSaveActual={saveActual}
-              />
-            ))}
-          </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {periods.map((period) => (
+                  <PaycheckPeriodCard
+                    key={`${period.id}-${resolvedActiveJob}`}
+                    jobKey={resolvedActiveJob}
+                    period={period}
+                    onSaveActual={saveActual}
+                  />
+                ))}
+              </div>
 
-          <PeriodTotals periods={periods} />
+              <PeriodTotals periods={periods} />
+            </>
+          )}
         </div>
       </section>
     </main>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-6 text-center text-sm text-white/70">
+      No paycheck jobs logged for the current or previous pay period yet. Log
+      hours against a job and it shows up here automatically.
+    </div>
   );
 }
 
@@ -139,7 +167,7 @@ function PeriodTotals({ periods }: { periods: PaycheckPeriod[] }) {
   return (
     <div className="mt-6 border-t border-white/15 pt-5">
       <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/85">
-        Pay-period totals (Ability + Prestige)
+        Pay-period totals (all jobs)
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {periods.map((period) => (
@@ -151,13 +179,15 @@ function PeriodTotals({ periods }: { periods: PaycheckPeriod[] }) {
 }
 
 function PeriodTotalCard({ period }: { period: PaycheckPeriod }) {
-  const ability = period.jobs.ability;
-  const prestige = period.jobs.prestige;
-  const estimatedTotalCents = ability.estimatedNetCents + prestige.estimatedNetCents;
+  const estimatedTotalCents = period.jobs.reduce(
+    (total, job) => total + job.estimatedNetCents,
+    0,
+  );
   const hasActuals =
-    ability.actualNetCents !== null && prestige.actualNetCents !== null;
+    period.jobs.length > 0 &&
+    period.jobs.every((job) => job.actualNetCents !== null);
   const actualTotalCents = hasActuals
-    ? (ability.actualNetCents ?? 0) + (prestige.actualNetCents ?? 0)
+    ? period.jobs.reduce((total, job) => total + (job.actualNetCents ?? 0), 0)
     : null;
   const heading = period.id === "previous" ? "Total prev" : "Total current";
 
@@ -168,8 +198,13 @@ function PeriodTotalCard({ period }: { period: PaycheckPeriod }) {
         <span className="text-xs font-semibold text-white/70">{period.label}</span>
       </div>
       <div className="mt-3 grid gap-2 text-sm">
-        <MoneyLine label="Ability net" value={ability.estimatedNetCents} />
-        <MoneyLine label="Prestige net" value={prestige.estimatedNetCents} />
+        {period.jobs.map((job) => (
+          <MoneyLine
+            key={job.key}
+            label={`${job.label} net`}
+            value={job.estimatedNetCents}
+          />
+        ))}
         <MoneyLine strong label="Expected total" tone="positive" value={estimatedTotalCents} />
         {actualTotalCents !== null ? (
           <MoneyLine strong label="Actual total" value={actualTotalCents} />
@@ -180,24 +215,27 @@ function PeriodTotalCard({ period }: { period: PaycheckPeriod }) {
 }
 
 function PaycheckPeriodCard({
-  jobType,
+  jobKey,
   period,
   onSaveActual,
 }: {
-  jobType: PaycheckJobKey;
+  jobKey: PaycheckJobKey;
   period: PaycheckPeriod;
   onSaveActual: (
     period: PaycheckPeriod,
-    jobType: PaycheckJobKey,
+    jobKey: PaycheckJobKey,
     value: string,
   ) => Promise<void>;
 }) {
-  const job = period.jobs[jobType];
+  const job = period.jobs.find((item) => item.key === jobKey);
   const [actualValue, setActualValue] = useState(
-    job.actualNetCents === null
-      ? ""
-      : centsToDollars(job.actualNetCents).toFixed(2),
+    job?.actualNetCents == null ? "" : centsToDollars(job.actualNetCents).toFixed(2),
   );
+
+  if (!job) {
+    return null;
+  }
+
   const difference = job.differenceCents;
   const tone =
     difference === null
@@ -210,7 +248,7 @@ function PaycheckPeriodCard({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onSaveActual(period, jobType, actualValue);
+    await onSaveActual(period, jobKey, actualValue);
   }
 
   return (
@@ -244,7 +282,7 @@ function PaycheckPeriodCard({
         <p className="mt-1 text-xs text-white/70">{job.rateNote}</p>
         <div className="mt-3 grid gap-2">
           {period.weeks.map((week) => (
-            <WeekBreakdown key={week.id} jobType={jobType} week={week} />
+            <WeekBreakdown key={week.id} jobKey={jobKey} week={week} />
           ))}
         </div>
       </div>
@@ -292,7 +330,7 @@ function PaycheckPeriodCard({
           </button>
         </div>
         <p className="mt-2 text-xs text-white/70">
-          Paste the net {job.label} amount from UKG. ShiftlyCash compares it to expected take-home.
+          Paste the net {job.label} amount from your paystub. ShiftlyCash compares it to expected take-home.
         </p>
       </form>
     </article>
@@ -300,13 +338,17 @@ function PaycheckPeriodCard({
 }
 
 function WeekBreakdown({
-  jobType,
+  jobKey,
   week,
 }: {
-  jobType: PaycheckJobKey;
+  jobKey: PaycheckJobKey;
   week: PaycheckPeriod["weeks"][number];
 }) {
-  const job = week.jobs[jobType];
+  const job = week.jobs[jobKey];
+
+  if (!job) {
+    return null;
+  }
 
   return (
     <div className="grid gap-2 rounded-md border border-white/10 bg-black/20 backdrop-blur-md px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -353,11 +395,11 @@ function AuditRead({ job }: { job: PaycheckJobSummary }) {
           : "border-sky-300/50 bg-sky-500/15 text-sky-200";
   const message =
     difference === null
-      ? `Expected ${job.label} net is ${formatMoney(job.estimatedNetCents)} from ${formatHours(job.totalHours)} total hours. Add the UKG net check to see if the paycheck is short.`
+      ? `Expected ${job.label} net is ${formatMoney(job.estimatedNetCents)} from ${formatHours(job.totalHours)} total hours. Add the net check to see if the paycheck is short.`
       : difference < -100
-        ? `Short by ${formatMoney(Math.abs(difference))}. First compare UKG gross to ${formatMoney(job.grossCents)}; if gross matches, the gap is likely deductions or withholding.`
+        ? `Short by ${formatMoney(Math.abs(difference))}. First compare the paystub gross to ${formatMoney(job.grossCents)}; if gross matches, the gap is likely deductions or withholding.`
         : difference > 100
-          ? `Over by ${formatMoney(difference)}. Check UKG for extra pay, bonus pay, or lower withholding than the model expected.`
+          ? `Over by ${formatMoney(difference)}. Check the paystub for extra pay, bonus pay, or lower withholding than the model expected.`
           : `Within ${formatMoney(Math.abs(difference))} of the estimate. This paycheck is close enough to call matched.`;
 
   return (
