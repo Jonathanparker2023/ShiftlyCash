@@ -46,6 +46,12 @@ export type EarnSlotInput = {
   customRegularRateCents?: MoneyCents;
   customOvertimeRateCents?: MoneyCents;
   customColor?: string;
+  // Reconciliation override (Option A). When non-null, this REPLACES the slot's
+  // derived earningsCents (net) so rollups read the reconciled actual instead of
+  // the hours x rate base. Hours/bucket attribution (ability/prestige/wageHours)
+  // are LEFT AS DERIVED — only the net dollar contribution is overridden, exactly
+  // like v_day_totals overrides earnings_total but not the paycheck breakdowns.
+  reconciledNetCents?: MoneyCents | null;
 };
 
 export type NetEarningsBucketSlot = Pick<EarnSlotInput, "jobType"> & {
@@ -102,7 +108,26 @@ export const DEFAULT_PAY_SETTINGS: PaySettings = {
 
 // Live weeks compute Ability/Prestige splits here. Summary-only legacy imports
 // get a 68/32 fallback inside v_week_totals so projections can gross them up.
+//
+// Reconciliation (Option A): when slot.reconciledNetCents is non-null, the slot's
+// NET (earningsCents) is replaced by that override while wageHours and the
+// ability/prestige bucket attribution stay derived from hours. This mirrors
+// v_day_totals, where COALESCE(reconciled_net_cents, derived) replaces ONLY
+// earnings_total and leaves ability/prestige/wage_hours breakdowns untouched.
 export function calculateEarnSlot(
+  slot: EarnSlotInput,
+  settings: PaySettings = DEFAULT_PAY_SETTINGS,
+): EarnSlotTotals {
+  const base = calculateEarnSlotBase(slot, settings);
+
+  if (slot.reconciledNetCents == null) {
+    return base;
+  }
+
+  return { ...base, earningsCents: slot.reconciledNetCents };
+}
+
+function calculateEarnSlotBase(
   slot: EarnSlotInput,
   settings: PaySettings = DEFAULT_PAY_SETTINGS,
 ): EarnSlotTotals {

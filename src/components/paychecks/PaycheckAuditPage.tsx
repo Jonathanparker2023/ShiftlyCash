@@ -1,15 +1,20 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { savePaycheckActualAction } from "@/app/(protected)/paychecks/actions";
+import {
+  reconcilePaycheckAction,
+  revertPaycheckReconciliationAction,
+} from "@/app/(protected)/paychecks/reconcile-actions";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
 import type {
   PaycheckAuditData,
   PaycheckJobKey,
   PaycheckJobSummary,
   PaycheckPeriod,
+  PaycheckReconciliation,
 } from "@/lib/paychecks/data";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -83,6 +88,71 @@ export function PaycheckAuditPage({
     }
   }
 
+  async function reconcile(
+    period: PaycheckPeriod,
+    jobKey: PaycheckJobKey,
+    actualCents: number,
+  ) {
+    if (!period.actualWeekId) return;
+    setError(null);
+    setSaveState("saving");
+    try {
+      const { reconciliation } = await reconcilePaycheckAction({
+        weekId: period.actualWeekId,
+        jobType: jobKey,
+        actualCents,
+        confirmedCorrect: true,
+      });
+      setPeriods((current) =>
+        current.map((item) =>
+          item.id !== period.id
+            ? item
+            : {
+                ...item,
+                jobs: item.jobs.map((job) =>
+                  job.key === jobKey ? { ...job, reconciliation } : job,
+                ),
+              },
+        ),
+      );
+      setSaveState("saved");
+    } catch (err) {
+      setSaveState("error");
+      setError(err instanceof Error ? err.message : "Unable to reconcile paycheck.");
+    }
+  }
+
+  async function revertReconciliation(
+    period: PaycheckPeriod,
+    jobKey: PaycheckJobKey,
+  ) {
+    if (!period.actualWeekId) return;
+    setError(null);
+    setSaveState("saving");
+    try {
+      await revertPaycheckReconciliationAction({
+        weekId: period.actualWeekId,
+        jobType: jobKey,
+      });
+      setPeriods((current) =>
+        current.map((item) =>
+          item.id !== period.id
+            ? item
+            : {
+                ...item,
+                jobs: item.jobs.map((job) =>
+                  job.key === jobKey ? { ...job, reconciliation: null } : job,
+                ),
+              },
+        ),
+      );
+      setSaveState("saved");
+    } catch (err) {
+      setSaveState("error");
+      setError(err instanceof Error ? err.message : "Unable to revert reconciliation.");
+    }
+  }
+
   const activeExists = jobList.some((job) => job.key === activeJob);
   const resolvedActiveJob = activeExists ? activeJob : (jobList[0]?.key ?? "");
 
@@ -141,6 +211,8 @@ export function PaycheckAuditPage({
                     jobKey={resolvedActiveJob}
                     period={period}
                     onSaveActual={saveActual}
+                    onReconcile={reconcile}
+                    onRevert={revertReconciliation}
                   />
                 ))}
               </div>
@@ -218,6 +290,8 @@ function PaycheckPeriodCard({
   jobKey,
   period,
   onSaveActual,
+  onReconcile,
+  onRevert,
 }: {
   jobKey: PaycheckJobKey;
   period: PaycheckPeriod;
@@ -226,15 +300,41 @@ function PaycheckPeriodCard({
     jobKey: PaycheckJobKey,
     value: string,
   ) => Promise<void>;
+  onReconcile: (
+    period: PaycheckPeriod,
+    jobKey: PaycheckJobKey,
+    actualCents: number,
+  ) => Promise<void>;
+  onRevert: (period: PaycheckPeriod, jobKey: PaycheckJobKey) => Promise<void>;
 }) {
   const job = period.jobs.find((item) => item.key === jobKey);
   const [actualValue, setActualValue] = useState(
     job?.actualNetCents == null ? "" : centsToDollars(job.actualNetCents).toFixed(2),
   );
+  const [confirmedCorrect, setConfirmedCorrect] = useState(false);
+
+  // Editing the typed actual forces a fresh affirmation (never reuse an old
+  // confirmation; reconcile always recomputes from base).
+  useEffect(() => {
+    setConfirmedCorrect(false);
+  }, [actualValue]);
 
   if (!job) {
     return null;
   }
+
+  // Parse exactly like saveActual: integer cents, finite, >= 0.
+  const trimmedActual = actualValue.trim();
+  const parsedCents = trimmedActual ? dollarsToCents(Number(trimmedActual)) : null;
+  const actualIsValid =
+    parsedCents !== null && Number.isFinite(parsedCents) && parsedCents >= 0;
+  const actualIsZero = actualIsValid && parsedCents === 0;
+
+  const recon = job.reconciliation;
+  const isReconciled = recon?.status === "reconciled";
+  const isStale = isReconciled && recon?.stale === true;
+  const canReconcile =
+    Boolean(period.actualWeekId) && actualIsValid && confirmedCorrect;
 
   const difference = job.differenceCents;
   const tone =
@@ -333,8 +433,110 @@ function PaycheckPeriodCard({
           Paste the net {job.label} amount from your paystub. ShiftlyCash compares it to expected take-home.
         </p>
       </form>
+
+      {/* Reconcile — affirm the check, then scale this job's shifts to the actual. */}
+      <div className="mt-4 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-white">Reconcile to actual</h3>
+          {isReconciled && recon ? (
+            <ReconciledBadge recon={recon} stale={isStale} />
+          ) : null}
+        </div>
+
+        {isStale ? (
+          <div className="mt-2 rounded-md border border-amber-300/50 bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-200">
+            Stale — the shifts changed since this was reconciled. The old factor
+            no longer applies. Re-reconcile to scale the current shifts to the
+            actual.
+          </div>
+        ) : null}
+
+        <label className="mt-3 flex items-start gap-2 text-sm text-white/85">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-white/30 bg-black/20"
+            checked={confirmedCorrect}
+            disabled={!period.actualWeekId || !actualIsValid}
+            onChange={(event) => setConfirmedCorrect(event.target.checked)}
+          />
+          <span>This check is correct — no dispute.</span>
+        </label>
+
+        {actualIsZero ? (
+          <div className="mt-2 rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-xs font-medium text-red-200">
+            Reconciling to $0.00 zeroes the take-home for every {job.label} shift
+            in this period. Reversible with Undo, but it wipes this period&apos;s{" "}
+            {job.label} earnings in every rollup until reverted.
+          </div>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="h-10 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+            disabled={!canReconcile}
+            onClick={() => {
+              if (parsedCents === null) return;
+              void onReconcile(period, jobKey, parsedCents);
+            }}
+          >
+            {isReconciled ? "Re-reconcile" : "Reconcile"}
+          </button>
+
+          {isReconciled ? (
+            <button
+              type="button"
+              className="h-10 rounded-md border border-white/25 bg-black/20 px-3 text-sm font-semibold text-white/85 transition hover:bg-white/10"
+              onClick={() => void onRevert(period, jobKey)}
+            >
+              Undo
+            </button>
+          ) : null}
+        </div>
+
+        <p className="mt-2 text-xs text-white/70">
+          Distributes the actual net across every {job.label} shift in this period
+          so your daily and weekly rollups match the real paycheck. Reversible.
+        </p>
+      </div>
     </article>
   );
+}
+
+function ReconciledBadge({
+  recon,
+  stale,
+}: {
+  recon: PaycheckReconciliation;
+  stale: boolean;
+}) {
+  const factorLabel = formatFactor(recon.factor);
+  return (
+    <span
+      className={[
+        "inline-flex flex-col items-end rounded-md border px-3 py-1 text-right",
+        stale
+          ? "border-amber-300/50 bg-amber-500/15 text-amber-200"
+          : "border-emerald-300/50 bg-emerald-500/15 text-emerald-300",
+      ].join(" ")}
+    >
+      <span className="text-xs font-semibold">
+        Reconciled to actual — {formatMoney(recon.actualAmountCents)}
+      </span>
+      <span className="text-[0.65rem] font-medium opacity-90">
+        {stale ? "factor stale" : `${factorLabel} across all shifts`}
+      </span>
+    </span>
+  );
+}
+
+// Display-only. recon.factor is the float multiplier (actual/projected); null
+// means projected was $0 (equal split, no meaningful percentage).
+function formatFactor(factor: number | null): string {
+  if (factor === null) return "even split";
+  const pct = (factor - 1) * 100;
+  const sign = pct > 0 ? "+" : pct < 0 ? "" : "±";
+  return `${sign}${pct.toFixed(1)}%`;
 }
 
 function WeekBreakdown({

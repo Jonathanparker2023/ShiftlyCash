@@ -86,6 +86,30 @@ type PaycheckWeekJobSummary = {
   grossCents: number;
 };
 
+export type PaycheckReconciliationStatus = "reconciled" | "reverted" | "disputed";
+
+export type PaycheckReconciliation = {
+  status: "reconciled";
+  projectedAmountCents: number;
+  actualAmountCents: number;
+  factor: number | null;
+  stale: boolean;
+  reconciledAt: string;
+};
+
+type PaycheckReconciliationRow = {
+  week_id: string;
+  job_key: string;
+  projected_amount_cents: number;
+  actual_amount_cents: number;
+  factor: NumericValue;
+  status: PaycheckReconciliationStatus;
+  base_shift_ids: string[] | null;
+  base_amounts_cents: number[] | null;
+};
+
+type PeriodBaseSlotRow = { slot_id: string; base_net_cents: number };
+
 export type PaycheckJobSummary = {
   key: string;
   label: string;
@@ -101,6 +125,7 @@ export type PaycheckJobSummary = {
   estimatedNetCents: number;
   actualNetCents: number | null;
   differenceCents: number | null;
+  reconciliation: PaycheckReconciliation | null;
 };
 
 export type PaycheckWeekSummary = {
@@ -331,6 +356,54 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
 
   const actuals = (actualData ?? []) as PaycheckActualRow[];
 
+  // Reconciliation records for the period check-weeks (week_2 anchors). For each
+  // active record, staleness is computed against the LIVE base set (the single
+  // SQL source of truth, paycheck_period_base_slots) so a changed shift flips
+  // the period to "re-reconcile" and never silently keeps an old factor.
+  const { data: reconData, error: reconError } =
+    weekTwoIds.length > 0
+      ? await supabase
+          .from("paycheck_reconciliations")
+          .select(
+            "week_id,job_key,projected_amount_cents,actual_amount_cents,factor,status,base_shift_ids,base_amounts_cents",
+          )
+          .in("week_id", weekTwoIds)
+      : { data: [], error: null };
+
+  if (reconError) {
+    throw new Error(`Unable to load reconciliations: ${reconError.message}`);
+  }
+  const reconRows = (reconData ?? []) as PaycheckReconciliationRow[];
+
+  const reconByKey = new Map<string, PaycheckReconciliation>();
+  for (const row of reconRows) {
+    if (row.status !== "reconciled") {
+      continue;
+    }
+    const { data: liveBase } = await supabase.rpc("paycheck_period_base_slots", {
+      p_week_id: row.week_id,
+      p_job_key: row.job_key,
+    });
+    const live = ((liveBase ?? []) as PeriodBaseSlotRow[])
+      .map((r) => ({ id: r.slot_id, cents: Number(r.base_net_cents) }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const snapIds = row.base_shift_ids ?? [];
+    const snapAmts = (row.base_amounts_cents ?? []).map((n) => Number(n));
+    const stale =
+      live.length !== snapIds.length ||
+      live.some(
+        (s, i) => s.id !== snapIds[i] || s.cents !== Number(snapAmts[i]),
+      );
+    reconByKey.set(`${row.week_id}::${row.job_key}`, {
+      status: "reconciled",
+      projectedAmountCents: Number(row.projected_amount_cents),
+      actualAmountCents: Number(row.actual_amount_cents),
+      factor: row.factor == null ? null : Number(row.factor),
+      stale,
+      reconciledAt: new Date().toISOString(),
+    });
+  }
+
   return {
     periods: [
       buildPeriod({
@@ -340,6 +413,7 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
         weeks,
         jobSpecs,
         actuals,
+        reconByKey,
       }),
       buildPeriod({
         id: "current",
@@ -348,6 +422,7 @@ export async function getPaycheckAuditData(): Promise<PaycheckAuditData> {
         weeks,
         jobSpecs,
         actuals,
+        reconByKey,
       }),
     ],
   };
@@ -360,6 +435,7 @@ function buildPeriod({
   weeks,
   jobSpecs,
   actuals,
+  reconByKey,
 }: {
   id: "previous" | "current";
   label: string;
@@ -367,6 +443,7 @@ function buildPeriod({
   weeks: WeekTotalRow[];
   jobSpecs: JobSpec[];
   actuals: PaycheckActualRow[];
+  reconByKey: Map<string, PaycheckReconciliation>;
 }): PaycheckPeriod {
   const periodEnd = addDaysIso(periodStart, 13);
   const periodWeeks = weeks
@@ -431,6 +508,10 @@ function buildPeriod({
       actualNetCents,
       differenceCents:
         actualNetCents === null ? null : actualNetCents - estimatedNetCents,
+      reconciliation:
+        actualWeek == null
+          ? null
+          : reconByKey.get(`${actualWeek.week_id}::${spec.key}`) ?? null,
     };
   });
 

@@ -76,6 +76,7 @@ type EarnSlotRow = {
   label: string | null;
   source: EarnSlotSource;
   custom_job_id: string | null;
+  reconciled_net_cents: number | null;
 };
 
 type CustomJobRow = {
@@ -329,7 +330,7 @@ export async function getDashboardData(
           supabase
             .from("earn_slots")
             .select(
-              "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,source,custom_job_id",
+              "id,day_id,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,label,source,custom_job_id,reconciled_net_cents",
             )
             .in("day_id", dayIds)
             .order("slot_index", { ascending: true }),
@@ -823,6 +824,10 @@ function mapDashboardDay(
           label: slot?.label ?? "",
           source: slot?.source ?? "user",
           kind: "earn",
+          reconciledNetCents:
+            slot?.reconciled_net_cents == null
+              ? null
+              : Math.round(toNumber(slot.reconciled_net_cents)),
           customJobId: slot?.custom_job_id ?? null,
           customRegularRateCents: customJob
             ? Math.round(toNumber(customJob.regular_rate_cents))

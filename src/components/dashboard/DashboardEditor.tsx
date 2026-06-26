@@ -3166,6 +3166,7 @@ function toDayInput(day: DashboardDay) {
         label: slot.label,
         customRegularRateCents: slot.customRegularRateCents,
         customOvertimeRateCents: slot.customOvertimeRateCents,
+        reconciledNetCents: slot.reconciledNetCents,
       })),
     spendCents: day.spendCents + day.transactionSpendCents,
     baseCents: day.baseCents,
