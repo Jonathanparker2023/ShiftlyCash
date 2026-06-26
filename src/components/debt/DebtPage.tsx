@@ -19,7 +19,6 @@ import type { DebtRow } from "@/lib/domain/projections";
 import type { DebtPageData } from "@/lib/debt/data";
 
 type ChartRange = "1y" | "3y" | "5y" | "10y" | "full";
-type ThemePreview = "linear" | "apple";
 
 const RANGE_WEEKS: Record<ChartRange, number> = {
   "1y": 52,
@@ -79,7 +78,6 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
   const router = useRouter();
   const [debts, setDebts] = useState<DebtRow[]>(initialData.debts);
   const [chartRange, setChartRange] = useState<ChartRange>("full");
-  const [theme, setTheme] = useState<ThemePreview>("linear");
   const [error, setError] = useState<string | null>(null);
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -176,48 +174,9 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
   );
   return (
     <div
-      data-theme={theme}
       className="min-h-screen w-full max-w-[100vw] overflow-x-hidden px-3 py-5 sm:px-6 lg:px-8"
       style={{ background: "var(--surface-base)", color: "var(--text-primary)" }}
     >
-      <div className="mx-auto mb-4 flex max-w-7xl items-center justify-end gap-2">
-        <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-          Theme preview
-        </span>
-        <div
-          className="flex gap-1"
-          style={{
-            background: "var(--surface-elevated)",
-            border: "1px solid var(--border-default)",
-            borderRadius: "9999px",
-            padding: "3px",
-          }}
-        >
-          {(["linear", "apple"] as ThemePreview[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTheme(t)}
-              className="px-3 py-1 text-xs font-medium capitalize transition-colors"
-              style={
-                theme === t
-                  ? {
-                      background: "var(--accent-brand)",
-                      color: "#ffffff",
-                      borderRadius: "9999px",
-                    }
-                  : {
-                      background: "transparent",
-                      color: "var(--text-tertiary)",
-                      borderRadius: "9999px",
-                    }
-              }
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <header
         className="mx-auto mb-5 max-w-7xl pb-4"
         style={{ borderBottom: "1px solid var(--border-subtle)" }}

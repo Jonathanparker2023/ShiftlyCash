@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
+
 type NavItem = { href: string; label: string };
 
 function isActive(pathname: string | null, href: string): boolean {
@@ -24,7 +26,7 @@ export function AppNav({
 
   const logo = (
     <Link
-      className="flex shrink-0 items-center gap-2.5 text-sm font-semibold uppercase tracking-[0.2em]"
+      className="flex shrink-0 items-center gap-2.5 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-primary)]"
       href="/"
     >
       <Image
@@ -42,7 +44,7 @@ export function AppNav({
   const signOut = (
     <form action="/auth/logout" method="post">
       <button
-        className="h-9 w-full rounded-md border border-white/10 bg-white/[0.06] px-3 text-sm font-medium text-zinc-100 transition hover:border-white/30 hover:bg-white/[0.1]"
+        className="h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] px-3 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
         type="submit"
       >
         Sign Out
@@ -58,8 +60,8 @@ export function AppNav({
           className={
             "block rounded-lg px-3 py-2 text-sm transition " +
             (isActive(pathname, link.href)
-              ? "border border-white/40 bg-white/15 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
-              : "font-medium text-white/70 hover:bg-white/[0.1] hover:text-white")
+              ? "border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] font-semibold text-[var(--accent-brand-text)]"
+              : "font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]")
           }
           href={link.href}
           key={link.href}
@@ -71,23 +73,35 @@ export function AppNav({
     </nav>
   );
 
+  const footer = (
+    <div className="space-y-3 border-t border-[var(--border-subtle)] pt-3">
+      <div className="space-y-1.5">
+        <p className="px-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+          Theme
+        </p>
+        <ThemeToggle />
+      </div>
+      <p className="truncate px-1 text-xs text-[var(--text-tertiary)]">
+        {userEmail}
+      </p>
+      {signOut}
+    </div>
+  );
+
   return (
     <>
       {/* Desktop: fixed left side rail (all items visible, no cutoff). */}
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-60 flex-col gap-4 border-r border-white/15 bg-black/25 px-3 py-4 text-white backdrop-blur-xl lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-60 flex-col gap-4 border-r border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-4 text-[var(--text-primary)] lg:flex">
         <div className="px-1">{logo}</div>
         {navList}
-        <div className="space-y-2 border-t border-white/10 pt-3">
-          <p className="truncate px-1 text-xs text-zinc-400">{userEmail}</p>
-          {signOut}
-        </div>
+        {footer}
       </aside>
 
       {/* Mobile: sticky top bar with a hamburger that opens the drawer. */}
-      <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-white/15 bg-black/30 px-3 py-3 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-3 text-[var(--text-primary)] shadow-[0_10px_30px_rgba(0,0,0,0.18)] lg:hidden">
         <button
           aria-label="Open menu"
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.06] transition hover:bg-white/[0.12]"
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] transition hover:border-[var(--border-strong)]"
           onClick={() => setOpen(true)}
           type="button"
         >
@@ -106,7 +120,7 @@ export function AppNav({
         {logo}
         <form action="/auth/logout" method="post">
           <button
-            className="h-9 rounded-md border border-white/10 bg-white/[0.06] px-3 text-sm font-medium text-zinc-100 transition hover:border-white/30 hover:bg-white/[0.1]"
+            className="h-9 rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] px-3 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
             type="submit"
           >
             Sign Out
@@ -122,12 +136,12 @@ export function AppNav({
             className="absolute inset-0 bg-black/60"
             onClick={() => setOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-64 max-w-[80vw] flex-col gap-4 border-r border-white/15 bg-[#0b1220]/95 px-3 py-4 text-white shadow-2xl backdrop-blur-xl">
+          <aside className="absolute inset-y-0 left-0 flex w-64 max-w-[80vw] flex-col gap-4 border-r border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-4 text-[var(--text-primary)] shadow-2xl">
             <div className="flex items-center justify-between px-1">
               {logo}
               <button
                 aria-label="Close menu"
-                className="flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.06] transition hover:bg-white/[0.12]"
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] transition hover:border-[var(--border-strong)]"
                 onClick={() => setOpen(false)}
                 type="button"
               >
@@ -145,10 +159,7 @@ export function AppNav({
               </button>
             </div>
             {navList}
-            <div className="space-y-2 border-t border-white/10 pt-3">
-              <p className="truncate px-1 text-xs text-zinc-400">{userEmail}</p>
-              {signOut}
-            </div>
+            {footer}
           </aside>
         </div>
       ) : null}
