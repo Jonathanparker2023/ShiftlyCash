@@ -324,15 +324,9 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
           <Metric
             label="Millionaire date"
-            sub={`on ${formatShortDate(initialData.millionaireDateIso)} - ${formatMoney(initialData.investableWeeklyCashflowCents)}/wk - 10% return`}
+            sub={`on ${formatShortDate(initialData.millionaireDateIso)}${initialData.ageAtMillionaire != null ? ` - you'll be ${initialData.ageAtMillionaire} years old` : ""} - ${formatMoney(initialData.investableWeeklyCashflowCents)}/wk - 10% return`}
             tone="purple"
             value={initialData.millionaireDurationLabel}
-          />
-          <Metric
-            label="Age at millionaire"
-            sub={`on ${formatShortDate(initialData.millionaireDateIso)}`}
-            tone="purple"
-            value={initialData.ageAtMillionaire?.toString() ?? "-"}
           />
         </section>
 
