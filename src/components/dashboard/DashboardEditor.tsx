@@ -2644,6 +2644,14 @@ function TotalsPanel({
           tone="negative"
           value={formatMoney(spendCents)}
         />
+        {day.gasSpendCents > 0 ? (
+          <div className="flex items-center justify-between gap-3 py-0.5 pl-4 text-xs">
+            <span className="text-sky-500">↳ incl. Gas</span>
+            <span className="font-semibold tabular-nums text-sky-500">
+              {formatMoney(day.gasSpendCents)}
+            </span>
+          </div>
+        ) : null}
         <button
           aria-expanded={showBaseBreakdown}
           className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
