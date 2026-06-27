@@ -25,19 +25,29 @@ export function AppNav({
   const pathname = usePathname();
 
   const logo = (
-    <Link
-      className="flex shrink-0 items-center gap-2.5 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-primary)]"
-      href="/"
-    >
+    <Link className="flex shrink-0 items-center gap-2.5" href="/">
       <Image
         alt="Bashflow"
-        className="drop-shadow-[0_2px_8px_rgba(16,184,96,0.35)]"
+        className="drop-shadow-[0_2px_9px_rgba(212,175,55,0.45)]"
         height={30}
         priority
         src="/logo.svg"
         width={30}
       />
-      <span>Bashflow</span>
+      <span
+        className="text-xl font-semibold tracking-tight"
+        style={{
+          fontFamily: "var(--font-jost), sans-serif",
+          color: "#cba135",
+          backgroundImage:
+            "linear-gradient(120deg,#9c7a24 0%,#c8a32d 30%,#ecca5e 50%,#d4af37 70%,#a9842f 100%)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+        }}
+      >
+        Bashflow
+      </span>
     </Link>
   );
 
