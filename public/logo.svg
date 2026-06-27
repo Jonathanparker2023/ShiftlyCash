@@ -1,15 +1,12 @@
 <svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
   <!-- Gold-bar city skyline: metallic gold towers, dark window cutouts, a few lit windows. -->
   <defs>
-    <linearGradient id="bashflowGold" x1="0" y1="1" x2="0.3" y2="0">
-      <stop offset="0" stop-color="#6e5413"/>
-      <stop offset="0.16" stop-color="#bd942b"/>
-      <stop offset="0.33" stop-color="#fff7dc"/>
-      <stop offset="0.44" stop-color="#e6c14c"/>
-      <stop offset="0.57" stop-color="#876a1b"/>
-      <stop offset="0.72" stop-color="#fdf1c6"/>
-      <stop offset="0.86" stop-color="#c8a32d"/>
-      <stop offset="1" stop-color="#7a5f17"/>
+    <linearGradient id="bashflowGold" x1="0" y1="1" x2="0.22" y2="0">
+      <stop offset="0" stop-color="#7a5f17"/>
+      <stop offset="0.32" stop-color="#c8a32d"/>
+      <stop offset="0.5" stop-color="#f6e6a8"/>
+      <stop offset="0.7" stop-color="#d4af37"/>
+      <stop offset="1" stop-color="#9c7a24"/>
     </linearGradient>
   </defs>
 
