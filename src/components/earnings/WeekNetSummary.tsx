@@ -27,7 +27,7 @@ export function WeekNetSummary({
   const showAbility =
     !hiddenBuiltins.includes("ability") || abilityNetCents !== 0;
   return (
-    <div className="rounded-md border border-white/15 bg-black/15 px-3 py-2 shadow-sm backdrop-blur-md">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 shadow-sm backdrop-blur-md">
       <div className="flex flex-wrap gap-x-6 gap-y-2">
         {showPrestige ? (
           <NetLine label="Prestige net" value={formatMoney(prestigeNetCents)} />
@@ -65,10 +65,10 @@ function NetLine({
           style={{ backgroundColor: color }}
         />
       ) : null}
-      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/65">
+      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
         {label}
       </span>
-      <span className="text-base font-semibold tabular-nums text-white">
+      <span className="text-base font-semibold tabular-nums text-[var(--text-primary)]">
         {value}
       </span>
     </div>

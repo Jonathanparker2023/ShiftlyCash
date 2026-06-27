@@ -8,15 +8,15 @@ type Props = {
 export function ScreenerView({ state }: Props) {
   if (state.status === "empty") {
     return (
-      <main className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
+      <main className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 text-[var(--text-primary)] sm:px-6 lg:px-8">
         <AppPanel elevated>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
             Screener
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">
             Your practice portfolio
           </h1>
-          <p className="mt-2 text-sm text-zinc-300">
+          <p className="mt-2 text-sm text-[var(--text-tertiary)]">
             Nothing here yet — your picks show up after the next daily run.
           </p>
         </AppPanel>
@@ -63,21 +63,21 @@ export function ScreenerView({ state }: Props) {
   const excluded = payload.excluded;
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 text-zinc-100 sm:px-6 lg:px-8">
+    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 text-[var(--text-primary)] sm:px-6 lg:px-8">
       {health.ingestErrors7d !== null && health.ingestErrors7d > 0 ? (
-        <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <div className="rounded-2xl bg-[var(--accent-warning-fill)] px-4 py-3 text-sm text-[var(--accent-warning-text)]">
           Heads up — {formatInteger(health.ingestErrors7d)} data hiccup
           {health.ingestErrors7d === 1 ? "" : "s"} in the last 7 days. A few figures may be a little behind.
         </div>
       ) : null}
 
-      <section className="rounded-3xl bg-white/5 p-5 sm:p-6">
+      <section className="rounded-3xl bg-[var(--surface-hover)] p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-zinc-400">Your practice portfolio</p>
+          <p className="text-sm text-[var(--text-tertiary)]">Your practice portfolio</p>
           <div className="flex items-center gap-2">
             <span className={verdictChipClass(verdict)}>{verdictLabel(verdict)}</span>
             {stale ? (
-              <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-300">
+              <span className="rounded-full bg-[var(--accent-warning-fill)] px-3 py-1 text-xs font-medium text-[var(--accent-warning-text)]">
                 a bit stale
               </span>
             ) : null}
@@ -87,14 +87,14 @@ export function ScreenerView({ state }: Props) {
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">
           {statusHeadline(vs, verdict)}
         </h1>
-        <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+        <p className="mt-1 text-sm leading-relaxed text-[var(--text-tertiary)]">
           {statusSub(vs, payload.clock.day, verdict, fearEvents)}
         </p>
         {asOfLabel ? (
-          <p className="mt-2 text-xs text-zinc-500">{asOfLabel}</p>
+          <p className="mt-2 text-xs text-[var(--text-muted)]">{asOfLabel}</p>
         ) : null}
         {payload.scope ? (
-          <p className="mt-1 text-xs text-zinc-600">Testing: {payload.scope}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Testing: {payload.scope}</p>
         ) : null}
 
         <div className="mt-5 grid grid-cols-3 gap-3">
@@ -104,16 +104,16 @@ export function ScreenerView({ state }: Props) {
         </div>
 
         {budget !== null || drawdown !== null || volatility !== null ? (
-          <div className="mt-3 space-y-1.5 text-xs text-zinc-400">
+          <div className="mt-3 space-y-1.5 text-xs text-[var(--text-tertiary)]">
             {budget !== null && deployed !== null ? (
               <p>
-                Invested <span className="text-zinc-200">{formatMoney(deployed)}</span> of{" "}
-                <span className="text-zinc-200">{formatMoney(budget)}</span>
+                Invested <span className="text-[var(--text-primary)]">{formatMoney(deployed)}</span> of{" "}
+                <span className="text-[var(--text-primary)]">{formatMoney(budget)}</span>
                 {deployedPct !== null ? ` (${Math.round(deployedPct)}% in)` : ""}
                 {idleCash !== null && idleCash >= 1 ? (
                   <>
                     {" · "}
-                    <span className="text-zinc-200">{formatMoney(idleCash)}</span> waiting in cash
+                    <span className="text-[var(--text-primary)]">{formatMoney(idleCash)}</span> waiting in cash
                   </>
                 ) : null}
               </p>
@@ -123,13 +123,13 @@ export function ScreenerView({ state }: Props) {
                 {drawdown !== null ? (
                   <span>
                     Worst dip so far:{" "}
-                    <span className="text-zinc-200">{formatDip(drawdown)}</span>
+                    <span className="text-[var(--text-primary)]">{formatDip(drawdown)}</span>
                   </span>
                 ) : null}
                 {volatility !== null ? (
                   <span>
                     How bumpy:{" "}
-                    <span className="text-zinc-200">{formatBumpiness(volatility)}</span>
+                    <span className="text-[var(--text-primary)]">{formatBumpiness(volatility)}</span>
                   </span>
                 ) : null}
               </p>
@@ -138,10 +138,10 @@ export function ScreenerView({ state }: Props) {
         ) : null}
 
         <div className="mt-5">
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-sky-400" style={{ width: `${progress}%` }} />
+          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-hover)]">
+            <div className="h-full rounded-full bg-[var(--accent-brand)]" style={{ width: `${progress}%` }} />
           </div>
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
             Day {formatInteger(payload.clock.day)} of {formatInteger(payload.clock.of)} · {trialNote(verdict)}
             {cohort !== null && cohort > 1 ? ` · cohort ${formatInteger(cohort)} (clock was reset)` : ""}
           </p>
@@ -151,17 +151,17 @@ export function ScreenerView({ state }: Props) {
       {navSeries.length >= 2 ? (
         <section>
           <SectionHeader title="Picks vs. the market" meta={`${navSeries.length} days in`} />
-          <div className="mt-3 rounded-2xl bg-white/5 p-4">
+          <div className="mt-3 rounded-2xl bg-[var(--surface-hover)] p-4">
             <div className="h-32 w-full">
               <NavChart series={navSeries} />
             </div>
-            <div className="mt-3 flex items-center gap-4 text-xs text-zinc-400">
+            <div className="mt-3 flex items-center gap-4 text-xs text-[var(--text-tertiary)]">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-full bg-sky-400" />
+                <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent-brand)]" />
                 Your picks
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-full bg-zinc-500" />
+                <span className="inline-block h-2 w-2 rounded-full bg-[var(--text-muted)]" />
                 The market
               </span>
             </div>
@@ -186,23 +186,23 @@ export function ScreenerView({ state }: Props) {
               return (
                 <div
                   key={position.ticker}
-                  className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--surface-hover)] px-4 py-3"
                 >
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-base font-semibold">{position.ticker}</p>
                       {position.stale ? (
-                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">
+                        <span className="rounded-full bg-[var(--accent-warning-fill)] px-2 py-0.5 text-xs text-[var(--accent-warning-text)]">
                           price stale — check
                         </span>
                       ) : null}
                     </div>
                     {subline ? (
-                      <p className="mt-0.5 text-xs text-zinc-500">{subline}</p>
+                      <p className="mt-0.5 text-xs text-[var(--text-muted)]">{subline}</p>
                     ) : null}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-zinc-300">{formatMoney(value)}</span>
+                    <span className="text-sm font-medium text-[var(--text-tertiary)]">{formatMoney(value)}</span>
                     <span className={["min-w-[56px] text-right text-sm font-semibold", toneClass(position.pnlPct)].join(" ")}>
                       {friendlyPct(position.pnlPct)}
                     </span>
@@ -211,7 +211,7 @@ export function ScreenerView({ state }: Props) {
               );
             })
           ) : (
-            <p className="rounded-2xl bg-white/5 px-4 py-3 text-sm text-zinc-400">
+            <p className="rounded-2xl bg-[var(--surface-hover)] px-4 py-3 text-sm text-[var(--text-tertiary)]">
               Holding nothing right now — waiting for a good company to go on sale.
             </p>
           )}
@@ -229,22 +229,22 @@ export function ScreenerView({ state }: Props) {
               return (
                 <div
                   key={`${item.ticker}-${item.variant}-${item.kind}`}
-                  className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--surface-hover)] px-4 py-3"
                 >
                   <span className="text-base font-semibold">{item.ticker}</span>
                   <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5 text-sm">
                     {dd !== null ? (
-                      <span className={deep ? "text-rose-300" : "text-zinc-300"}>
+                      <span className={deep ? "text-[var(--accent-negative-text)]" : "text-[var(--text-tertiary)]"}>
                         down {Math.abs(Math.round(dd))}%
                       </span>
                     ) : null}
-                    {cheap ? <span className="text-emerald-300/90">{cheap}</span> : null}
+                    {cheap ? <span className="text-[var(--accent-primary-text)]">{cheap}</span> : null}
                   </div>
                 </div>
               );
             })
           ) : (
-            <p className="rounded-2xl bg-white/5 px-4 py-3 text-sm text-zinc-400">
+            <p className="rounded-2xl bg-[var(--surface-hover)] px-4 py-3 text-sm text-[var(--text-tertiary)]">
               Nothing&apos;s cheap enough today. Quiet markets — it just waits.
             </p>
           )}
@@ -266,17 +266,17 @@ export function ScreenerView({ state }: Props) {
                   research.bullCase.length > 0 ||
                   research.bearCase.length > 0);
               return (
-                <div key={item.ticker} className="rounded-2xl bg-white/5 px-4 py-3.5">
+                <div key={item.ticker} className="rounded-2xl bg-[var(--surface-hover)] px-4 py-3.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-base font-semibold">{item.ticker}</span>
                       {passes === 4 ? (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300/90">
+                        <span className="rounded-full bg-[var(--accent-primary-fill)] px-2 py-0.5 text-xs text-[var(--accent-primary-text)]">
                           passes all 4 tests
                         </span>
                       ) : null}
                       {item.shadowFlagged ? (
-                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">
+                        <span className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-xs text-[var(--text-muted)]">
                           flagged · not buyable
                         </span>
                       ) : null}
@@ -289,27 +289,27 @@ export function ScreenerView({ state }: Props) {
                     ) : null}
                   </div>
                   {research?.summary ? (
-                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                    <p className="mt-2 text-sm leading-relaxed text-[var(--text-tertiary)]">
                       {shortTake(research.summary)}
                     </p>
                   ) : null}
                   {hasThesis ? (
                     <div className="mt-2.5 space-y-1.5 text-xs">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        {moat ? <span className="text-zinc-300">{moat}</span> : null}
+                        {moat ? <span className="text-[var(--text-tertiary)]">{moat}</span> : null}
                         {research && research.bullCase[0] ? (
-                          <span className="line-clamp-1 max-w-[18rem] text-emerald-300/80">
+                          <span className="line-clamp-1 max-w-[18rem] text-[var(--accent-primary-text)]">
                             + {research.bullCase[0]}
                           </span>
                         ) : null}
                         {research && research.bearCase[0] ? (
-                          <span className="line-clamp-1 max-w-[18rem] text-amber-300/80">
+                          <span className="line-clamp-1 max-w-[18rem] text-[var(--accent-warning-text)]">
                             – {research.bearCase[0]}
                           </span>
                         ) : null}
                       </div>
                       {research && research.redFlags.length > 0 ? (
-                        <p className="line-clamp-2 text-rose-300/80">
+                        <p className="line-clamp-2 text-[var(--accent-negative-text)]">
                           ⚠ {research.redFlags.slice(0, 2).join(" · ")}
                         </p>
                       ) : null}
@@ -319,31 +319,31 @@ export function ScreenerView({ state }: Props) {
               );
             })
           ) : (
-            <p className="rounded-2xl bg-white/5 px-4 py-3 text-sm text-zinc-400">
+            <p className="rounded-2xl bg-[var(--surface-hover)] px-4 py-3 text-sm text-[var(--text-tertiary)]">
               The watchlist is empty right now.
             </p>
           )}
         </div>
         {nearMiss.length ? (
           <div className="mt-4">
-            <p className="text-sm text-zinc-500">Just missed the cut ({nearMiss.length}):</p>
+            <p className="text-sm text-[var(--text-muted)]">Just missed the cut ({nearMiss.length}):</p>
             <div className="mt-2 flex flex-col gap-1.5">
               {nearMiss.slice(0, 5).map((item) => {
                 const missed = missedTests(item.criteria);
                 return (
                   <div
                     key={item.ticker}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2"
+                    className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-hover)] px-3 py-2"
                   >
                     <span className="text-sm font-medium">{item.ticker}</span>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-[var(--text-muted)]">
                       {missed.length ? `missed: ${missed.join(", ")}` : "scored 3 of 4"}
                     </span>
                   </div>
                 );
               })}
               {nearMiss.length > 5 ? (
-                <p className="text-xs text-zinc-500">+{nearMiss.length - 5} more</p>
+                <p className="text-xs text-[var(--text-muted)]">+{nearMiss.length - 5} more</p>
               ) : null}
             </div>
           </div>
@@ -357,21 +357,21 @@ export function ScreenerView({ state }: Props) {
             {excluded.slice(0, 6).map((item) => (
               <div
                 key={`${item.ticker}-${item.ruleId ?? ""}`}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--surface-hover)] px-4 py-3"
               >
                 <div>
                   <p className="text-base font-semibold">{item.ticker}</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                     {excludedReason(item.reason, item.ruleId)}
                   </p>
                 </div>
                 {item.score !== null ? (
-                  <span className="text-xs text-zinc-500">scored {item.score}/4</span>
+                  <span className="text-xs text-[var(--text-muted)]">scored {item.score}/4</span>
                 ) : null}
               </div>
             ))}
             {excluded.length > 6 ? (
-              <p className="text-xs text-zinc-500">+{excluded.length - 6} more</p>
+              <p className="text-xs text-[var(--text-muted)]">+{excluded.length - 6} more</p>
             ) : null}
           </div>
         </section>
@@ -384,11 +384,11 @@ export function ScreenerView({ state }: Props) {
             {payload.closed.map((trade) => (
               <div
                 key={`${trade.ticker}-${trade.closedAt ?? "unknown"}`}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--surface-hover)] px-4 py-3"
               >
                 <div>
                   <p className="text-base font-semibold">{trade.ticker}</p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-[var(--text-muted)]">
                     {soldReason(trade.reason)} · {formatDate(trade.closedAt)}
                   </p>
                 </div>
@@ -417,11 +417,11 @@ function SectionHeader({
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <span
-        className={`inline-block h-2 w-2 rounded-full ${tone === "danger" ? "bg-rose-400" : "bg-zinc-500"}`}
+        className={`inline-block h-2 w-2 rounded-full ${tone === "danger" ? "bg-[var(--accent-negative-text)]" : "bg-[var(--text-muted)]"}`}
         aria-hidden="true"
       />
       <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-      <span className="text-xs text-zinc-500">— {meta}</span>
+      <span className="text-xs text-[var(--text-muted)]">— {meta}</span>
     </div>
   );
 }
@@ -437,13 +437,13 @@ function FriendlyStat({
 }) {
   const color =
     tone === "positive"
-      ? "text-emerald-300"
+      ? "text-[var(--accent-primary-text)]"
       : tone === "negative"
-        ? "text-rose-300"
-        : "text-zinc-100";
+        ? "text-[var(--accent-negative-text)]"
+        : "text-[var(--text-primary)]";
   return (
-    <div className="rounded-2xl bg-white/5 px-3 py-3">
-      <p className="text-xs text-zinc-400">{label}</p>
+    <div className="rounded-2xl bg-[var(--surface-hover)] px-3 py-3">
+      <p className="text-xs text-[var(--text-tertiary)]">{label}</p>
       <p className={["mt-1 text-xl font-semibold", color].join(" ")}>{value}</p>
     </div>
   );
@@ -585,15 +585,15 @@ function verdictLabel(verdict: string | null): string {
 function verdictChipClass(verdict: string | null): string {
   const base = "rounded-full px-3 py-1 text-xs font-medium ";
   if (verdict === "pass") {
-    return base + "bg-emerald-500/15 text-emerald-300";
+    return base + "bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]";
   }
   if (verdict === "fail") {
-    return base + "bg-rose-500/15 text-rose-300";
+    return base + "bg-[var(--accent-negative-fill)] text-[var(--accent-negative-text)]";
   }
   if (verdict === "inconclusive") {
-    return base + "bg-amber-500/15 text-amber-300";
+    return base + "bg-[var(--accent-warning-fill)] text-[var(--accent-warning-text)]";
   }
-  return base + "bg-sky-500/15 text-sky-300";
+  return base + "bg-[var(--accent-brand-fill)] text-[var(--accent-brand-text)]";
 }
 
 function trialNote(verdict: string | null): string {
@@ -707,9 +707,9 @@ function tone(value: number | null): "positive" | "negative" | "neutral" {
 
 function toneClass(value: number | null): string {
   if (value === null || Math.abs(value) < 0.05) {
-    return "text-zinc-400";
+    return "text-[var(--text-tertiary)]";
   }
-  return value > 0 ? "text-emerald-300" : "text-rose-300";
+  return value > 0 ? "text-[var(--accent-primary-text)]" : "text-[var(--accent-negative-text)]";
 }
 
 function friendlyPct(value: number | null): string {

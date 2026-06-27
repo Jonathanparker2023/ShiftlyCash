@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { centsToDollars } from "@/lib/domain/money";
@@ -112,15 +113,15 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
   }, [weeks]);
 
   return (
-    <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-8">
+    <main className="min-h-screen px-4 py-6 text-[var(--text-primary)] sm:px-6 lg:px-8">
       <section className="mx-auto max-w-5xl">
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
               ShiftlyCash
             </p>
             <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">Trends</h1>
-            <p className="mt-1.5 text-sm text-white/65">
+            <p className="mt-1.5 text-sm text-[var(--text-tertiary)]">
               How your weekly cashflow moves over time.
             </p>
           </div>
@@ -129,7 +130,7 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
             {range === "custom" ? (
               <div className="flex items-center gap-1.5">
                 <input
-                  className="h-9 w-16 rounded-lg border border-white/15 bg-white/[0.06] px-2 text-center text-sm font-semibold text-white outline-none backdrop-blur-md focus:border-white/40"
+                  className="h-9 w-16 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-2 text-center text-sm font-semibold text-[var(--text-primary)] outline-none backdrop-blur-md focus:border-[var(--border-default)]"
                   inputMode="numeric"
                   max={53}
                   min={2}
@@ -142,19 +143,19 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
                   type="number"
                   value={customWeeks}
                 />
-                <span className="text-xs font-semibold text-white/55">wks</span>
+                <span className="text-xs font-semibold text-[var(--text-tertiary)]">wks</span>
               </div>
             ) : null}
           </div>
         </header>
 
-        <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold tracking-tight">
                 Weekly cashflow
               </h2>
-              <p className="mt-0.5 text-xs text-white/55">
+              <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">
                 Earnings minus spending minus fixed, per week.
               </p>
             </div>
@@ -167,7 +168,7 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
           </div>
 
           {weeks.length === 0 ? (
-            <div className="py-16 text-center text-sm text-white/55">
+            <div className="py-16 text-center text-sm text-[var(--text-tertiary)]">
               No weeks in this range yet.
             </div>
           ) : (
@@ -176,25 +177,74 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
 
           <GasTracker tracker={initialData.gasTracker} />
         </section>
+
+        {weeks.length > 0 ? (
+          <section className="mt-5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+            <h2 className="text-base font-semibold tracking-tight">
+              Jump to a week
+            </h2>
+            <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">
+              Open any week&apos;s full history view.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {[...weeks].reverse().map((week) => (
+                <Link
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-overlay)]"
+                  href={`/history/${week.weekId}`}
+                  key={week.weekId}
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="font-semibold text-[var(--text-primary)]">
+                      Week {week.weekNumber}
+                    </span>
+                    <span className="ml-2 text-xs text-[var(--text-tertiary)]">
+                      {formatWeekRange(week.startDate, week.endDate)}
+                    </span>
+                  </span>
+                  <span
+                    className={`shrink-0 font-semibold tabular-nums ${
+                      week.cashflowCents >= 0
+                        ? "text-[var(--accent-primary-text)]"
+                        : "text-[var(--accent-negative-text)]"
+                    }`}
+                  >
+                    {formatMoney(week.cashflowCents)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </section>
     </main>
   );
 }
 
+function formatWeekRange(startIso: string, endIso: string): string {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  return `${fmt.format(new Date(`${startIso}T00:00:00.000Z`))} – ${fmt.format(
+    new Date(`${endIso}T00:00:00.000Z`),
+  )}`;
+}
+
 function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
   return (
-    <section className="mt-5 rounded-2xl border border-sky-300/20 bg-sky-950/30 p-4">
+    <section className="mt-5 rounded-2xl border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/75">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-brand-text)]">
             Gas tracker
           </p>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
+          <h2 className="mt-1 text-xl font-semibold tracking-tight text-[var(--text-primary)]">
             {tracker.status === "active"
               ? `${formatMoney(tracker.averageDailyGasCents)} per gas day`
               : "Waiting for today's fill"}
           </h2>
-          <p className="mt-1 text-sm text-white/65">
+          <p className="mt-1 text-sm text-[var(--text-tertiary)]">
             {tracker.status === "active"
               ? "Gas is tracked separately from total spend and added one day at a time."
               : "Once you fill the tank and hit Gas on that transaction, this shows the daily gas math."}
@@ -209,18 +259,18 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
           </div>
         ) : null}
       </div>
-      <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-white/60">
+      <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--text-tertiary)]">
         {tracker.status === "active" ? (
           <>
-            <span className="text-white/85">{formatMoney(tracker.gasAmountCents)}</span>
+            <span className="text-[var(--text-secondary)]">{formatMoney(tracker.gasAmountCents)}</span>
             {" gas / "}
-            <span className="text-white/85">{tracker.periodDays}</span>
+            <span className="text-[var(--text-secondary)]">{tracker.periodDays}</span>
             {" days = "}
-            <span className="text-sky-100">
+            <span className="text-[var(--accent-brand-text)]">
               {formatMoney(tracker.averageDailyGasCents)}
             </span>
             {" daily. Period: "}
-            <span className="text-white/85">
+            <span className="text-[var(--text-secondary)]">
               {shortDate(tracker.periodStartDate)} to {shortDate(tracker.fillDate)}
             </span>
             {"."}
@@ -230,7 +280,7 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
         )}
       </div>
       {tracker.status === "active" ? (
-        <p className="mt-2 text-xs text-white/45">
+        <p className="mt-2 text-xs text-[var(--text-muted)]">
           Previous gas: {shortDate(tracker.previousFillDate)}. Source:{" "}
           {tracker.merchantName}. Store extras stay normal spend.
         </p>
@@ -247,15 +297,15 @@ function RangeSelector({
   onChange: (range: RangeKey) => void;
 }) {
   return (
-    <div className="inline-flex rounded-full border border-white/15 bg-white/[0.06] p-1 backdrop-blur-md">
+    <div className="inline-flex rounded-full border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-1 backdrop-blur-md">
       {RANGES.map((option) => (
         <button
           key={option.key}
           className={[
             "rounded-full px-3.5 py-1.5 text-sm font-semibold transition",
             range === option.key
-              ? "bg-white/15 text-white"
-              : "text-white/55 hover:text-white",
+              ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
+              : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)]",
           ].join(" ")}
           onClick={() => onChange(option.key)}
           type="button"
@@ -270,7 +320,7 @@ function RangeSelector({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="text-right">
-      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-white/45">
+      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
         {label}
       </div>
       <div className="text-sm font-semibold tabular-nums">{value}</div>
@@ -388,7 +438,7 @@ function WeeklyCashflowChart({
           );
         })}
       </svg>
-      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-white/55">
+      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[var(--text-tertiary)]">
         <span className="inline-flex items-center gap-1.5">
           <span
             className="h-2.5 w-16 rounded-sm"
@@ -399,7 +449,7 @@ function WeeklyCashflowChart({
           />
           $0 → $650 → $950+
         </span>
-        <span className="text-white/40">
+        <span className="text-[var(--text-muted)]">
           Solid line = $1,000 · dashed = median · faded = current week · confetti = $1,500+
         </span>
       </div>

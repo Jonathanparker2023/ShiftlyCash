@@ -43,7 +43,7 @@ type BaselineEditorProps = {
 // Width-free base so callers set width explicitly (composing with w-full caused a
 // Tailwind precedence conflict that collapsed flex item rows).
 const FIELD_BASE =
-  "h-11 rounded-xl border border-white/10 bg-white/[0.05] px-3.5 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:bg-white/[0.08] focus:ring-2 focus:ring-white/10";
+  "h-11 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-3.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:bg-[var(--surface-hover)] focus:ring-2 focus:ring-[var(--surface-hover)]";
 const FIELD_CLASS = `${FIELD_BASE} w-full`;
 
 export function BaselineEditor({ initialData }: BaselineEditorProps) {
@@ -210,24 +210,24 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
   }
 
   return (
-    <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-8">
+    <main className="min-h-screen px-4 py-6 text-[var(--text-primary)] sm:px-6 lg:px-8">
       <section className="mx-auto max-w-7xl">
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
               ShiftlyCash
             </p>
             <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">
               Fixed Expenses
             </h1>
-            <p className="mt-1.5 text-sm text-white/65">
+            <p className="mt-1.5 text-sm text-[var(--text-tertiary)]">
               Monthly recurring costs converted into weekly and daily fixed cost.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <SaveIndicator state={saveState} error={saveError} />
             <button
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white shadow-sm backdrop-blur-md transition hover:border-white/30 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-hover)] px-4 text-sm font-semibold text-[var(--text-primary)] shadow-sm backdrop-blur-md transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isAdding}
               onClick={addExpense}
               type="button"
@@ -247,16 +247,16 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
 
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between px-1">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
               Expenses
             </h2>
-            <span className="text-xs font-medium text-white/45">
+            <span className="text-xs font-medium text-[var(--text-muted)]">
               {activeCount} active
             </span>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_30px_rgba(0,0,0,0.25)] backdrop-blur-xl">
-            <div className="hidden grid-cols-[minmax(200px,1fr)_140px_120px_170px_84px_84px] gap-3 border-b border-white/10 bg-white/[0.04] px-5 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.13em] text-white/50 md:grid">
+          <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] shadow-[0_8px_30px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+            <div className="hidden grid-cols-[minmax(200px,1fr)_140px_120px_170px_84px_84px] gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-hover)] px-5 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.13em] text-[var(--text-tertiary)] md:grid">
               <div>Name</div>
               <div>Monthly</div>
               <div>Withdraws</div>
@@ -267,16 +267,16 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
 
             {expenses.length === 0 ? (
               <div className="px-5 py-16 text-center">
-                <p className="text-sm font-medium text-white/70">
+                <p className="text-sm font-medium text-[var(--text-secondary)]">
                   No fixed expenses yet.
                 </p>
-                <p className="mt-1 text-xs text-white/45">
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
                   Add your rent, utilities, and subscriptions to build your daily
                   fixed cost.
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-white/[0.07]">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {expenses.map((expense) => (
                   <ExpenseRow
                     deleting={deletingIds.has(expense.id)}
@@ -365,27 +365,27 @@ function AmortizedExpensesSection({
     <section className="mt-10">
       <div className="mb-3 flex flex-col gap-3 px-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
             Amortized Expenses
           </h2>
-          <p className="mt-1 text-xs text-white/45">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             One-time costs spread across days — these add to your daily fixed
             cost and show in the dashboard Fixed breakdown.
           </p>
         </div>
         <div className="text-right">
-          <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/50">
+          <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
             Daily fixed today
           </div>
           <div className="text-2xl font-semibold tabular-nums">
             {formatMoney(headlineDaily)}
           </div>
-          <div className="text-xs text-white/45">
+          <div className="text-xs text-[var(--text-muted)]">
             {formatMoney(recurringDailyCents)} recurring +{" "}
             {formatMoney(amortizedTotal)} amortized
           </div>
           {drifts ? (
-            <div className="mt-1 text-xs font-semibold text-amber-300">
+            <div className="mt-1 text-xs font-semibold text-[var(--accent-warning-text)]">
               ⚠ components sum to {formatMoney(componentSum)}
             </div>
           ) : null}
@@ -393,18 +393,18 @@ function AmortizedExpensesSection({
       </div>
 
       {expenses.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-5 py-10 text-center">
-          <p className="text-sm font-medium text-white/70">
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-5 py-10 text-center">
+          <p className="text-sm font-medium text-[var(--text-secondary)]">
             No amortized expenses.
           </p>
-          <p className="mt-1 text-xs text-white/45">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             On a transaction, tap &quot;Spread this cost&quot; to amortize a
             one-time purchase across months.
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_30px_rgba(0,0,0,0.25)] backdrop-blur-xl">
-          <div className="divide-y divide-white/[0.07]">
+        <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] shadow-[0_8px_30px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+          <div className="divide-y divide-[var(--border-subtle)]">
             {expenses.map((expense) => (
               <div
                 className="flex items-center gap-3 px-5 py-3.5"
@@ -414,7 +414,7 @@ function AmortizedExpensesSection({
                   <p className="truncate text-sm font-semibold">
                     {expense.merchantName}
                   </p>
-                  <p className="mt-0.5 text-xs text-white/55">
+                  <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">
                     {formatMoney(expense.originalAmountCents)} over{" "}
                     {expense.periodDays}d · {expense.startDate} →{" "}
                     {expense.endDate}
@@ -423,14 +423,14 @@ function AmortizedExpensesSection({
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold tabular-nums">
                     {formatMoney(expense.todaySliceCents)}
-                    <span className="text-xs font-normal text-white/50">
+                    <span className="text-xs font-normal text-[var(--text-tertiary)]">
                       /day
                     </span>
                   </p>
                 </div>
                 {expense.sourceTransactionId ? (
                   <button
-                    className="h-9 shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="h-9 shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-3 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-negative-border)] hover:bg-[var(--accent-negative-fill)] hover:text-[var(--accent-negative-text)] disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={removingIds.has(expense.id)}
                     onClick={() => remove(expense)}
                     type="button"
@@ -443,7 +443,7 @@ function AmortizedExpensesSection({
           </div>
         </div>
       )}
-      {error ? <p className="mt-2 px-1 text-xs text-red-300">{error}</p> : null}
+      {error ? <p className="mt-2 px-1 text-xs text-[var(--accent-negative-text)]">{error}</p> : null}
     </section>
   );
 }
@@ -682,10 +682,10 @@ function AmortizedIncomeSection({
     <section className="mt-10">
       <div className="mb-3 flex flex-col gap-3 px-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
             Prorated Income
           </h2>
-          <p className="mt-1 text-xs text-white/45">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             One-time cash prorated evenly as daily &quot;Other&quot; earnings
             across a date range.
           </p>
@@ -693,7 +693,7 @@ function AmortizedIncomeSection({
         <div className="flex items-center gap-3">
           <SaveIndicator state={saveState} error={saveError} />
           <button
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-hover)] px-4 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={busy}
             onClick={addBucket}
             type="button"
@@ -704,11 +704,11 @@ function AmortizedIncomeSection({
       </div>
 
       {buckets.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-5 py-12 text-center">
-          <p className="text-sm font-medium text-white/70">
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-5 py-12 text-center">
+          <p className="text-sm font-medium text-[var(--text-secondary)]">
             No prorated income yet.
           </p>
-          <p className="mt-1 text-xs text-white/45">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             Add a bucket (e.g. &quot;Lean Break&quot;) and list the one-time
             amounts to smooth them into daily income.
           </p>
@@ -767,8 +767,8 @@ function BucketCard({
       className={[
         "rounded-2xl border p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl transition",
         isArchived
-          ? "border-white/10 bg-white/[0.02] opacity-60"
-          : "border-white/[0.12] bg-white/[0.045]",
+          ? "border-[var(--border-subtle)] bg-[var(--surface-hover)] opacity-60"
+          : "border-[var(--border-subtle)] bg-[var(--surface-hover)]",
       ].join(" ")}
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -816,14 +816,14 @@ function BucketCard({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
-            className="h-9 rounded-lg border border-white/12 bg-white/[0.05] px-3 text-xs font-semibold text-white/70 transition hover:bg-white/10"
+            className="h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)]"
             onClick={() => onToggleArchive(bucket.id, !isArchived)}
             type="button"
           >
             {isArchived ? "Unarchive" : "Archive"}
           </button>
           <button
-            className="h-9 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-3 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-negative-border)] hover:bg-[var(--accent-negative-fill)] hover:text-[var(--accent-negative-text)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={busy}
             onClick={() => onDeleteBucket(bucket.id)}
             type="button"
@@ -870,7 +870,7 @@ function BucketCard({
             />
             <button
               aria-label="Delete item"
-              className="h-11 w-11 shrink-0 rounded-xl border border-white/10 bg-white/[0.04] text-base text-white/60 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200"
+              className="h-11 w-11 shrink-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] text-base text-[var(--text-tertiary)] transition hover:border-[var(--accent-negative-border)] hover:bg-[var(--accent-negative-fill)] hover:text-[var(--accent-negative-text)]"
               onClick={() => onDeleteItem(bucket.id, item.itemIndex)}
               type="button"
             >
@@ -879,7 +879,7 @@ function BucketCard({
           </div>
         ))}
         <button
-          className="h-10 w-full rounded-xl border border-dashed border-white/15 bg-white/[0.03] text-sm font-semibold text-white/75 transition hover:bg-white/[0.06]"
+          className="h-10 w-full rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-hover)] text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)]"
           onClick={() => onAddItem(bucket.id)}
           type="button"
         >
@@ -892,8 +892,8 @@ function BucketCard({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
-      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/50">
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-4 py-3">
+      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
         {label}
       </div>
       <div className="mt-1 text-lg font-semibold tabular-nums">{value}</div>
@@ -952,22 +952,22 @@ function TotalCard({
       className={[
         "relative overflow-hidden rounded-2xl border p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl transition",
         hero
-          ? "border-white/20 bg-gradient-to-br from-white/[0.12] to-white/[0.04]"
-          : "border-white/10 bg-white/[0.04]",
+          ? "border-[var(--border-default)] bg-gradient-to-br from-[var(--surface-hover)] to-[var(--surface-hover)]"
+          : "border-[var(--border-subtle)] bg-[var(--surface-hover)]",
       ].join(" ")}
     >
       {hero ? (
-        <span className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+        <span className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[var(--surface-hover)] blur-2xl" />
       ) : null}
       <div className="relative">
-        <div className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-white/55">
+        <div className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
           {label}
         </div>
         <div className="mt-2.5 text-[2rem] font-semibold leading-none tracking-tight tabular-nums">
           {value}
         </div>
         {sublabel ? (
-          <div className="mt-2 text-xs font-medium text-white/55">{sublabel}</div>
+          <div className="mt-2 text-xs font-medium text-[var(--text-tertiary)]">{sublabel}</div>
         ) : null}
       </div>
     </div>
@@ -991,9 +991,9 @@ function ExpenseRow({
   const hasDatedExpiration = Boolean(expense.expirationDate);
   const isDatedActive = hasDatedExpiration && !expired;
   const rowClassName = [
-    "px-5 py-3.5 transition md:grid md:grid-cols-[minmax(200px,1fr)_140px_120px_170px_84px_84px] md:items-center md:gap-3 md:py-3.5 hover:bg-white/[0.025]",
+    "px-5 py-3.5 transition md:grid md:grid-cols-[minmax(200px,1fr)_140px_120px_170px_84px_84px] md:items-center md:gap-3 md:py-3.5 hover:bg-[var(--surface-hover)]",
     expired ? "opacity-45" : "",
-    isDatedActive ? "bg-sky-500/10 ring-1 ring-inset ring-sky-300/40" : "",
+    isDatedActive ? "bg-[var(--accent-brand-fill)] ring-1 ring-inset ring-[var(--accent-brand-border)]" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -1009,14 +1009,14 @@ function ExpenseRow({
             {expired ? <ExpiredBadge /> : null}
             {isDatedActive ? <ExpiresBadge /> : null}
           </div>
-          <p className="mt-1 text-xs font-medium text-white/60">
+          <p className="mt-1 text-xs font-medium text-[var(--text-tertiary)]">
             {formatMoney(expense.amountCents)}
             {expense.withdrawalDay ? ` · Day ${expense.withdrawalDay}` : ""}
             {!expense.isActive ? " · inactive" : ""}
           </p>
         </div>
         <button
-          className="h-9 shrink-0 rounded-lg border border-white/15 bg-white/10 px-3.5 text-xs font-semibold text-white transition hover:bg-white/20"
+          className="h-9 shrink-0 rounded-lg border border-[var(--border-default)] bg-[var(--surface-hover)] px-3.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]"
           onClick={() => setIsMobileExpanded((current) => !current)}
           type="button"
         >
@@ -1092,7 +1092,7 @@ function ExpenseRow({
             <input
               className={
                 isDatedActive
-                  ? "h-11 w-full rounded-xl border border-sky-300/50 bg-sky-500/15 px-3.5 text-sm text-sky-100 outline-none transition focus:border-sky-300/80 focus:ring-2 focus:ring-sky-300/20"
+                  ? "h-11 w-full rounded-xl border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] px-3.5 text-sm text-[var(--accent-brand-text)] outline-none transition focus:border-[var(--accent-brand-border)] focus:ring-2 focus:ring-[var(--accent-brand-fill)]"
                   : FIELD_CLASS
               }
               onChange={(event) =>
@@ -1106,7 +1106,7 @@ function ExpenseRow({
           </label>
           {hasDatedExpiration ? (
             <button
-              className="mt-1.5 text-xs font-semibold text-sky-300 underline-offset-2 transition hover:text-sky-200 hover:underline"
+              className="mt-1.5 text-xs font-semibold text-[var(--accent-brand-text)] underline-offset-2 transition hover:text-[var(--accent-brand-text)] hover:underline"
               onClick={() => onUpdate(expense.id, { expirationDate: null })}
               type="button"
             >
@@ -1118,7 +1118,7 @@ function ExpenseRow({
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
             checked={expense.isActive}
-            className="h-4 w-4 accent-emerald-400"
+            className="h-4 w-4 accent-[var(--accent-primary)]"
             onChange={(event) =>
               onUpdate(expense.id, { isActive: event.target.checked })
             }
@@ -1128,7 +1128,7 @@ function ExpenseRow({
         </label>
 
         <button
-          className="h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-sm font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60 md:h-9 md:justify-self-end md:px-3"
+          className="h-11 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-3.5 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-negative-border)] hover:bg-[var(--accent-negative-fill)] hover:text-[var(--accent-negative-text)] disabled:cursor-not-allowed disabled:opacity-60 md:h-9 md:justify-self-end md:px-3"
           disabled={deleting}
           onClick={() => onDelete(expense.id)}
           type="button"
@@ -1142,7 +1142,7 @@ function ExpenseRow({
 
 function MobileLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-[0.13em] text-white/50 md:hidden">
+    <span className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-[0.13em] text-[var(--text-tertiary)] md:hidden">
       {children}
     </span>
   );
@@ -1150,7 +1150,7 @@ function MobileLabel({ children }: { children: ReactNode }) {
 
 function ExpiredBadge() {
   return (
-    <span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-white/65">
+    <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-hover)] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
       Expired
     </span>
   );
@@ -1158,7 +1158,7 @@ function ExpiredBadge() {
 
 function ExpiresBadge() {
   return (
-    <span className="rounded-full border border-sky-300/50 bg-sky-500/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-sky-200">
+    <span className="rounded-full border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--accent-brand-text)]">
       Expires
     </span>
   );
@@ -1177,10 +1177,10 @@ function SaveIndicator({
 
   const dotClass =
     state === "error"
-      ? "bg-red-400"
+      ? "bg-[var(--accent-negative)]"
       : state === "saving"
-        ? "bg-amber-300 animate-pulse"
-        : "bg-emerald-400";
+        ? "bg-[var(--accent-warning)] animate-pulse"
+        : "bg-[var(--accent-primary)]";
   const label =
     state === "saving" ? "Saving..." : state === "saved" ? "Saved" : "Save failed";
 
@@ -1190,15 +1190,15 @@ function SaveIndicator({
         className={[
           "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold backdrop-blur-md",
           state === "error"
-            ? "border-red-400/40 bg-red-500/10 text-red-200"
-            : "border-white/15 bg-white/[0.06] text-white/75",
+            ? "border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] text-[var(--accent-negative-text)]"
+            : "border-[var(--border-default)] bg-[var(--surface-hover)] text-[var(--text-secondary)]",
         ].join(" ")}
       >
         <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
         {label}
       </div>
       {error ? (
-        <div className="mt-1 max-w-64 text-xs text-red-300">{error}</div>
+        <div className="mt-1 max-w-64 text-xs text-[var(--accent-negative-text)]">{error}</div>
       ) : null}
     </div>
   );

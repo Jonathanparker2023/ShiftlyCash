@@ -435,7 +435,7 @@ export function ShiftlyCalView({
           </div>
 
           {error ? (
-            <p className="mt-4 rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-200">
+            <p className="mt-4 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-3 py-2 text-sm font-medium text-[var(--accent-negative-text)]">
               {error}
             </p>
           ) : null}
@@ -607,13 +607,13 @@ function TopMetric({
 }) {
   const accentClass =
     accent === "green"
-      ? "before:bg-green-600"
+      ? "before:bg-[var(--accent-primary)]"
       : accent === "blue"
         ? "before:bg-[var(--accent-primary)]"
         : accent === "amber"
           ? "before:bg-[var(--accent-warning)]"
           : accent === "negative"
-            ? "before:bg-red-600"
+            ? "before:bg-[var(--accent-negative)]"
             : "before:bg-[var(--border-strong)]";
 
   return (
@@ -770,7 +770,7 @@ function RemainingBadge({ remaining }: { remaining: number }) {
 
   if (remaining < 0) {
     return (
-      <span className="rounded-full border border-red-300/50 bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-red-300">
+      <span className="rounded-full border border-[var(--accent-negative-border)] bg-[var(--surface-elevated)] px-3 py-1 text-sm font-semibold text-[var(--accent-negative-text)]">
         {Math.abs(remaining).toLocaleString()} cal over
       </span>
     );
@@ -868,14 +868,14 @@ function FoodEntryRow({
     entry.verdictSource === "pending" &&
     nowMs - new Date(entry.updatedAt).getTime() > 60_000;
   const rowClass = isStuck
-    ? "rounded-md border border-zinc-600 bg-zinc-700 p-3 text-sm text-[var(--text-primary)]"
+    ? "rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 text-sm text-[var(--text-primary)]"
     : verdictBarClass(entry);
 
   if (isEditing) {
     return (
       <form className={rowClass} onSubmit={submitEdit}>
         <button
-          className="mb-3 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 text-left transition hover:bg-[var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-white/60"
+          className="mb-3 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 text-left transition hover:bg-[var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]"
           onClick={() => setIsEditing(false)}
           type="button"
         >
@@ -892,7 +892,7 @@ function FoodEntryRow({
             </span>
           </div>
           {entry.verdictSource === "unscored" && entry.verdictError ? (
-            <p className="mt-2 rounded-md border border-red-300/50 bg-red-500/15 px-2 py-1 text-xs font-semibold text-red-200">
+            <p className="mt-2 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-2 py-1 text-xs font-semibold text-[var(--accent-negative-text)]">
               Scoring failed: {entry.verdictError}
             </p>
           ) : null}
@@ -997,7 +997,7 @@ function FoodEntryRow({
           </p>
           <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
             <select
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]"
               disabled={disabled || isVerdictSaving}
               onChange={(event) => setOverrideValue(event.target.value as FoodVerdict)}
               value={overrideValue}
@@ -1006,7 +1006,7 @@ function FoodEntryRow({
               <option value="bad">Bad</option>
             </select>
             <input
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]"
               disabled={disabled || isVerdictSaving}
               onChange={(event) => setOverrideReason(event.target.value)}
               placeholder="Reason"
@@ -1042,7 +1042,7 @@ function FoodEntryRow({
   if (!isExpanded) {
     return (
       <button
-        className={`${rowClass} flex w-full items-center justify-between gap-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-white/60`}
+        className={`${rowClass} flex w-full items-center justify-between gap-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]`}
         onClick={() => setIsExpanded(true)}
         type="button"
       >
@@ -1075,7 +1075,7 @@ function FoodEntryRow({
   return (
     <div className={`${rowClass} transition-colors`}>
       <button
-        className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
+        className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]"
         onClick={() => setIsExpanded(false)}
         type="button"
         aria-label={`Collapse ${title}`}
@@ -1096,7 +1096,7 @@ function FoodEntryRow({
       <div className="mt-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-2 text-xs text-[var(--text-secondary)]">
         <p className="line-clamp-2 italic">{entry.verdictReason ?? verdictStatus}</p>
         {entry.verdictSource === "unscored" && entry.verdictError ? (
-          <p className="mt-2 rounded-md border border-red-300/50 bg-red-500/15 px-2 py-1 font-semibold text-red-200">
+          <p className="mt-2 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-2 py-1 font-semibold text-[var(--accent-negative-text)]">
             Scoring failed: {entry.verdictError}
           </p>
         ) : null}
@@ -1419,7 +1419,7 @@ function WeightPanel({
         <label className="min-w-0 flex-1 text-sm font-semibold text-[var(--text-secondary)]">
           {focusedDayLabel(day.date, todayIso)}
           <input
-            className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
+            className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-ring)]"
             min={1}
             onChange={(event) => setWeightValue(event.target.value)}
             step="0.1"
@@ -1500,7 +1500,7 @@ function MobileSavedFoodsDropdown({
               </button>
               <button
                 aria-label={`Delete ${food.name}`}
-                className="shrink-0 rounded px-1.5 py-1 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="shrink-0 rounded px-1.5 py-1 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-[var(--accent-negative-text)] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled}
                 onClick={() => {
                   if (window.confirm(`Delete saved food "${food.name}"?`)) {
@@ -1615,7 +1615,7 @@ function SavedFoodRow({
       </button>
       <button
         aria-label={`Delete ${food.name}`}
-        className="shrink-0 rounded px-1.5 py-1 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+        className="shrink-0 rounded px-1.5 py-1 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-[var(--accent-negative-text)] disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
         onClick={() => {
           if (window.confirm(`Delete saved food "${food.name}"?`)) {
@@ -1643,7 +1643,7 @@ function CategorySelect({
     <label className="block text-sm font-semibold text-[var(--text-secondary)]">
       {label}
       <select
-        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-ring)]"
         onChange={(event) => onChange(event.target.value as FoodCategory)}
         value={value}
       >
@@ -1676,7 +1676,7 @@ function TextInput({
     <label className={`block text-sm font-semibold text-[var(--text-secondary)] ${className}`}>
       {label}
       <input
-        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-ring)]"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -1704,7 +1704,7 @@ function NumberInput({
       {label}
       <span className="relative mt-1 block">
         <input
-          className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40"
+          className="h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-ring)]"
           min={0}
           onChange={(event) => onChange(event.target.value)}
           required={required}
@@ -1932,7 +1932,7 @@ function metricTextClass(tone: "green" | "amber" | "red" | "neutral"): string {
     case "amber":
       return "text-[var(--accent-warning-text)]";
     case "red":
-      return "text-red-300";
+      return "text-[var(--accent-negative-text)]";
     case "neutral":
       return "text-[var(--text-primary)]";
   }
@@ -1949,7 +1949,7 @@ function metricFillClass(tone: "green" | "amber" | "red" | "neutral"): string {
     case "amber":
       return "bg-[var(--accent-warning-text)]";
     case "red":
-      return "bg-red-300";
+      return "bg-[var(--accent-negative-text)]";
     case "neutral":
       return "bg-[var(--surface-hover)]";
   }

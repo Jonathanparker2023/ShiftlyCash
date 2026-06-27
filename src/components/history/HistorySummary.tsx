@@ -115,13 +115,13 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
   const visibleTiles = orderedTiles.filter((tile) => !hidden.has(tile.id));
 
   return (
-    <section className="mx-auto mb-5 max-w-7xl rounded-md border border-white/15 bg-black/15 p-4 shadow-sm backdrop-blur-md">
+    <section className="mx-auto mb-5 max-w-7xl rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-sm backdrop-blur-md">
       {weeks.length === 0 ? (
-        <div className="rounded-md border border-white/15 bg-black/20 p-4 backdrop-blur-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
+        <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-overlay)] p-4 backdrop-blur-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
             No history yet
           </p>
-          <p className="mt-2 text-sm text-white/85">
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Close your first week from the dashboard to start filling in metrics.
           </p>
         </div>
@@ -129,10 +129,10 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
                 History summary
               </p>
-              <p className="mt-1 text-sm text-white/85">
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
                 Totals, averages, and medians across{" "}
                 {weekWindow === "all"
                   ? "all closed weeks"
@@ -143,7 +143,7 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
             <div className="flex items-center gap-2">
               <select
                 aria-label="Weeks to summarize"
-                className="rounded-md border border-white/20 bg-black/40 px-2.5 py-2 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] px-2.5 py-2 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]"
                 onChange={(event) =>
                   setWeekWindow(
                     event.target.value === "all"
@@ -163,7 +163,7 @@ export function HistorySummary({ weeks }: { weeks: HistoryWeek[] }) {
                 )}
               </select>
               <button
-                className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/40"
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]"
                 onClick={() => setIsCustomizing((current) => !current)}
                 type="button"
               >
@@ -274,7 +274,7 @@ function CustomizePanel({
   }
 
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 p-3 backdrop-blur-md">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-overlay)] p-3 backdrop-blur-md">
       <DndContext
         collisionDetection={closestCenter}
         onDragEnd={reorderTiles}
@@ -295,7 +295,7 @@ function CustomizePanel({
       </DndContext>
       <div className="mt-3 flex justify-end">
         <button
-          className="rounded-md bg-zinc-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-white/40"
+          className="rounded-md bg-[var(--accent-brand)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]"
           onClick={onClose}
           type="button"
         >
@@ -332,15 +332,15 @@ function SortableCustomizeRow({
     <div
       className={
         isDragging
-          ? "flex items-center gap-3 rounded-md border border-white/60 bg-white/15 p-2 opacity-80 shadow-sm"
-          : "flex items-center gap-3 rounded-md border border-white/15 bg-white/10 p-2 shadow-sm"
+          ? "flex items-center gap-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] p-2 opacity-80 shadow-sm"
+          : "flex items-center gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-2 shadow-sm"
       }
       ref={setNodeRef}
       style={style}
     >
       <button
         aria-label={`Drag ${tile.label}`}
-        className="h-8 w-8 touch-none rounded-md border border-white/20 bg-white/10 text-sm font-bold text-white transition hover:border-white/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+        className="h-8 w-8 touch-none rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]"
         title="Drag to reorder"
         type="button"
         {...attributes}
@@ -348,7 +348,7 @@ function SortableCustomizeRow({
       >
         ::
       </button>
-      <label className="flex min-w-0 flex-1 items-center gap-3 text-sm font-semibold text-white">
+      <label className="flex min-w-0 flex-1 items-center gap-3 text-sm font-semibold text-[var(--text-primary)]">
         <input
           checked={!hidden}
           className="h-4 w-4 accent-white"
@@ -357,7 +357,7 @@ function SortableCustomizeRow({
         />
         <span className="truncate">{tile.label}</span>
       </label>
-      <span className="text-sm font-bold tabular-nums text-white">
+      <span className="text-sm font-bold tabular-nums text-[var(--text-primary)]">
         {tile.displayValue}
       </span>
     </div>
@@ -366,11 +366,11 @@ function SortableCustomizeRow({
 
 function SummaryTileCard({ tile }: { tile: SummaryTile }) {
   return (
-    <div className="rounded-md border-2 border-white/30 bg-black/25 p-4 shadow-sm backdrop-blur-md">
-      <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/85">
+    <div className="rounded-md border-2 border-[var(--border-default)] bg-[var(--surface-overlay)] p-4 shadow-sm backdrop-blur-md">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
         {tile.label}
       </p>
-      <p className="mt-3 rounded-md bg-black/25 px-2 py-1 text-3xl font-black leading-none tracking-tight tabular-nums text-white shadow-sm ring-1 ring-white/20 sm:text-4xl">
+      <p className="mt-3 rounded-md bg-[var(--surface-overlay)] px-2 py-1 text-3xl font-black leading-none tracking-tight tabular-nums text-[var(--text-primary)] shadow-sm ring-1 ring-[var(--border-subtle)] sm:text-4xl">
         {tile.displayValue}
       </p>
     </div>

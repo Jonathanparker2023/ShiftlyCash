@@ -21,46 +21,46 @@ export function ChimeCapturesSection({ captures }: { captures: ChimeCapture[] })
   }, [captures]);
 
   return (
-    <section className="rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold">Chime email captures</h2>
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-sm">
+      <h2 className="text-base font-semibold text-[var(--text-primary)]">Chime email captures</h2>
       {captures.length === 0 ? (
-        <p className="mt-3 text-sm text-zinc-600">No Chime emails captured yet.</p>
+        <p className="mt-3 text-sm text-[var(--text-tertiary)]">No Chime emails captured yet.</p>
       ) : (
         <div className="mt-3 space-y-4">
           {groups.map(([date, dateCapturesDesc]) => (
-            <div key={date} className="border-t border-zinc-100 pt-3 first:border-0 first:pt-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
+            <div key={date} className="border-t border-[var(--border-subtle)] pt-3 first:border-0 first:pt-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                 {date}
               </p>
               <div className="mt-2 space-y-2">
                 {dateCapturesDesc.map((capture) => (
-                  <div key={capture.id} className="rounded-md bg-zinc-50 p-3 text-sm">
+                  <div key={capture.id} className="rounded-md bg-[var(--surface-hover)] p-3 text-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         {capture.rawTitle && (
-                          <p className="font-medium text-zinc-950">{capture.rawTitle}</p>
+                          <p className="font-medium text-[var(--text-primary)]">{capture.rawTitle}</p>
                         )}
-                        <p className="mt-1 break-words text-zinc-600 text-xs leading-relaxed">
+                        <p className="mt-1 break-words text-[var(--text-tertiary)] text-xs leading-relaxed">
                           {capture.rawText}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-2 items-center">
                           {capture.parsedTransactionId ? (
-                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                            <span className="inline-flex items-center rounded-full bg-[var(--accent-primary-fill)] px-2.5 py-0.5 text-xs font-medium text-[var(--accent-primary-text)]">
                               ✓ Parsed to transaction
                             </span>
                           ) : capture.parseFailureReason ? (
                             <span
-                              className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700"
+                              className="inline-flex items-center rounded-full bg-[var(--accent-warning-fill)] px-2.5 py-0.5 text-xs font-medium text-[var(--accent-warning-text)]"
                               title={capture.parseFailureReason}
                             >
                               ⚠ {capture.parseFailureReason}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center rounded-full bg-zinc-200 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
+                            <span className="inline-flex items-center rounded-full bg-[var(--surface-hover)] px-2.5 py-0.5 text-xs font-medium text-[var(--text-tertiary)]">
                               — No parse status
                             </span>
                           )}
-                          <span className="text-xs text-zinc-400">
+                          <span className="text-xs text-[var(--text-muted)]">
                             {formatTime(capture.receivedAt)}
                           </span>
                         </div>

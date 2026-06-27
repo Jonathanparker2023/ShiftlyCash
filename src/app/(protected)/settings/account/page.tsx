@@ -15,15 +15,15 @@ export default async function AccountSettingsPage({
   const params = await searchParams;
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-5 text-zinc-950 sm:px-6 lg:px-8">
-      <section className="mx-auto max-w-xl rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-500">
+    <main className="min-h-screen bg-[var(--surface-base)] px-4 py-5 text-[var(--text-primary)] sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-xl rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 shadow-sm">
+        <p className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
           ShiftlyCash
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           Account password
         </h1>
-        <p className="mt-2 text-sm text-zinc-600">
+        <p className="mt-2 text-sm text-[var(--text-tertiary)]">
           Signed in as {user.email}. Set a password here, then production login
           will stop using magic links.
         </p>
@@ -33,7 +33,7 @@ export default async function AccountSettingsPage({
             <span className="mb-2 block text-sm font-medium">New password</span>
             <input
               autoComplete="new-password"
-              className="h-12 w-full rounded-md border border-zinc-300 bg-white px-3 text-base outline-none transition focus:border-zinc-950 focus:ring-4 focus:ring-zinc-200"
+              className="h-12 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-base outline-none transition focus:border-[var(--border-strong)] focus:ring-4 focus:ring-[var(--accent-ring)]"
               minLength={10}
               name="password"
               required
@@ -45,7 +45,7 @@ export default async function AccountSettingsPage({
             <span className="mb-2 block text-sm font-medium">Confirm password</span>
             <input
               autoComplete="new-password"
-              className="h-12 w-full rounded-md border border-zinc-300 bg-white px-3 text-base outline-none transition focus:border-zinc-950 focus:ring-4 focus:ring-zinc-200"
+              className="h-12 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-base outline-none transition focus:border-[var(--border-strong)] focus:ring-4 focus:ring-[var(--accent-ring)]"
               minLength={10}
               name="confirmPassword"
               required
@@ -54,7 +54,7 @@ export default async function AccountSettingsPage({
           </label>
 
           <button
-            className="h-12 w-full rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
+            className="h-12 w-full rounded-md bg-[var(--accent-brand)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)]"
             type="submit"
           >
             Save password
@@ -62,13 +62,13 @@ export default async function AccountSettingsPage({
         </form>
 
         {params.message ? (
-          <p className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <p className="mt-5 rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-3 py-2 text-sm text-[var(--accent-primary-text)]">
             {params.message}
           </p>
         ) : null}
 
         {params.error ? (
-          <p className="mt-5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <p className="mt-5 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-3 py-2 text-sm text-[var(--accent-negative-text)]">
             {params.error}
           </p>
         ) : null}

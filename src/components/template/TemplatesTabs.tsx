@@ -26,7 +26,7 @@ export function TemplatesTabs({
   return (
     <div className="space-y-5">
       {showJobs ? (
-        <div className="inline-flex rounded-xl border border-white/12 bg-white/[0.05] p-1">
+        <div className="inline-flex rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-1">
           <TabButton active={active === "template"} onClick={() => setTab("template")}>
             Weekly template
           </TabButton>
@@ -58,8 +58,8 @@ function TabButton({
     <button
       className={
         active
-          ? "h-9 rounded-lg bg-white/15 px-4 text-sm font-semibold text-white"
-          : "h-9 rounded-lg px-4 text-sm font-medium text-white/60 transition hover:text-white"
+          ? "h-9 rounded-lg bg-[var(--surface-hover)] px-4 text-sm font-semibold text-[var(--text-primary)]"
+          : "h-9 rounded-lg px-4 text-sm font-medium text-[var(--text-tertiary)] transition hover:text-[var(--text-primary)]"
       }
       onClick={onClick}
       type="button"

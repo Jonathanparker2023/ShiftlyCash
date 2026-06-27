@@ -14,13 +14,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="min-h-screen bg-background text-foreground">
       <section className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
         <div className="mb-8">
-          <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-zinc-500">
+          <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             ShiftlyCash
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">
             Sign in
           </h1>
-          <p className="mt-2 text-sm text-zinc-500">
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
             No email links. Just your app password.
           </p>
         </div>
@@ -29,7 +29,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <label className="block">
             <span className="mb-2 block text-sm font-medium">Password</span>
             <input
-              className="h-12 w-full rounded-md border border-zinc-300 bg-white px-3 text-base outline-none transition focus:border-zinc-950 focus:ring-4 focus:ring-zinc-200"
+              className="h-12 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-base text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)] focus:ring-4 focus:ring-[var(--accent-ring)]"
               name="password"
               type="password"
               autoComplete="current-password"
@@ -37,7 +37,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             />
           </label>
           <button
-            className="h-12 w-full rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
+            className="h-12 w-full rounded-md bg-[var(--accent-brand)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)]"
             type="submit"
           >
             Unlock ShiftlyCash

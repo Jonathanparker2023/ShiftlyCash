@@ -33,7 +33,7 @@ export default async function ShiftlyCalPage({
   ]);
 
   return (
-    <main className="min-h-screen px-3 py-4 text-white sm:px-4 lg:px-6">
+    <main className="min-h-screen px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6">
       <div className="mx-auto max-w-7xl">
         <ShiftlyCalView
           initialData={data}

@@ -33,7 +33,7 @@ export default async function HistoryDetailPage({
     <div>
       <div className="mx-auto max-w-7xl px-3 pt-4 sm:px-4 lg:px-6">
         <Link
-          className="inline-flex h-9 items-center rounded-md border border-white/25 bg-black/20 px-3 text-sm font-semibold text-white backdrop-blur-md transition hover:border-white/50"
+          className="inline-flex h-9 items-center rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] backdrop-blur-md transition hover:border-[var(--border-strong)]"
           href="/history"
         >
           ← Back to History

@@ -21,7 +21,7 @@ import {
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const FIELD =
-  "h-10 w-full rounded-lg border border-white/12 bg-white/[0.05] px-3 text-sm text-white outline-none transition focus:border-white/30";
+  "h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)]";
 
 function dollars(cents: number): string {
   return (cents / 100).toFixed(2);
@@ -166,14 +166,14 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <p className="text-xs text-white/45">
+        <p className="text-xs text-[var(--text-muted)]">
           Gross hourly rate + withholding. Overtime is auto 1.5x. These jobs show
           up wherever you add a shift.
         </p>
         <div className="flex items-center gap-3">
           <Status state={state} error={error} />
           <button
-            className="h-10 shrink-0 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
+            className="h-10 shrink-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-4 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:opacity-60"
             disabled={busy}
             onClick={addJob}
             type="button"
@@ -225,7 +225,7 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
         ))}
       </div>
 
-      <p className="px-1 text-xs text-white/40">
+      <p className="px-1 text-xs text-[var(--text-muted)]">
         Editing a built-in rate re-prices every shift that uses it, past and
         future. Deleting a job only removes it from the pickers — past shifts keep
         their earnings.
@@ -235,7 +235,7 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
 }
 
 const ROW =
-  "flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 lg:flex-row lg:items-center";
+  "flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-3 lg:flex-row lg:items-center";
 
 function Swatch({ color, text }: { color: string; text: string }) {
   return (
@@ -260,7 +260,7 @@ function FieldBox({
   children: React.ReactNode;
 }) {
   return (
-    <label className="grid w-24 gap-1 text-[11px] text-white/55">
+    <label className="grid w-24 gap-1 text-[11px] text-[var(--text-tertiary)]">
       {label}
       {children}
     </label>
@@ -297,7 +297,7 @@ function CustomRow({
         />
         <input
           aria-label="Color"
-          className="h-9 w-12 shrink-0 cursor-pointer rounded-lg border border-white/12 bg-transparent"
+          className="h-9 w-12 shrink-0 cursor-pointer rounded-lg border border-[var(--border-subtle)] bg-transparent"
           onChange={(e) => onColor(e.target.value)}
           type="color"
           value={job.color}
@@ -324,9 +324,9 @@ function CustomRow({
             type="number"
           />
         </FieldBox>
-        <div className="grid w-28 gap-1 text-[11px] text-white/45">
+        <div className="grid w-28 gap-1 text-[11px] text-[var(--text-muted)]">
           Net reg / OT
-          <span className="flex h-10 items-center rounded-lg border border-white/10 bg-black/10 px-3 text-sm font-semibold text-white/75">
+          <span className="flex h-10 items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-secondary)]">
             {`$${dollars(job.regularRateCents)} / $${dollars(job.otRateCents)}`}
           </span>
         </div>
@@ -353,9 +353,9 @@ function BuiltinRow({
     <div className={ROW} style={job.hidden ? { opacity: 0.5 } : undefined}>
       <div className="flex min-w-0 items-center gap-3 lg:flex-1">
         <Swatch color={job.color} text={job.label} />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
           {job.label}
-          <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/45">
+          <span className="ml-2 rounded bg-[var(--surface-hover)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
             built-in
           </span>
         </span>
@@ -400,7 +400,7 @@ function DeleteButton({
 }) {
   return (
     <button
-      className="h-10 shrink-0 self-end rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/70 transition hover:border-red-300/60 hover:bg-red-500/10 hover:text-red-200"
+      className="h-10 shrink-0 self-end rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-3 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-negative-border)] hover:bg-[var(--accent-negative-fill)] hover:text-[var(--accent-negative-text)]"
       onClick={active ? onDelete : onRestore}
       type="button"
     >
@@ -417,8 +417,8 @@ function Status({ state, error }: { state: SaveState; error: string | null }) {
     <span
       className={
         state === "error"
-          ? "text-xs font-semibold text-red-300"
-          : "text-xs font-medium text-white/60"
+          ? "text-xs font-semibold text-[var(--accent-negative-text)]"
+          : "text-xs font-medium text-[var(--text-tertiary)]"
       }
     >
       {error && state === "error" ? error : label}

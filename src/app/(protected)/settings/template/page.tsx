@@ -25,16 +25,16 @@ export default async function TemplateSettingsPage() {
   ].join("|");
 
   return (
-    <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-8">
+    <main className="min-h-screen px-4 py-6 text-[var(--text-primary)] sm:px-6 lg:px-8">
       <section className="mx-auto max-w-3xl">
         <header className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
             ShiftlyCash
           </p>
           <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">
             Templates
           </h1>
-          <p className="mt-1.5 text-sm text-white/65">
+          <p className="mt-1.5 text-sm text-[var(--text-tertiary)]">
             The shifts that autofill into every new week, and the jobs they use.
           </p>
         </header>

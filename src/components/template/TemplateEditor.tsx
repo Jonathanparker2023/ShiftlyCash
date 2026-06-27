@@ -121,10 +121,10 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
     <HiddenBuiltinsContext.Provider value={initialData.hiddenBuiltins}>
     <CustomJobsContext.Provider value={initialData.customJobs}>
     <div className="space-y-4">
-      <section className="flex flex-col gap-3 rounded-2xl border border-white/12 bg-white/[0.045] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-white">Weekly template</h2>
-          <p className="mt-1 text-sm text-white/55">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Weekly template</h2>
+          <p className="mt-1 text-sm text-[var(--text-tertiary)]">
             {filledSlotCount} shifts prefilled into every new week. Tap a day,
             then tap a bar to edit.
           </p>
@@ -132,7 +132,7 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
         <div className="flex items-center gap-3">
           <SaveStatus state={saveState} message={saveError} />
           <button
-            className="h-10 rounded-xl border border-white/15 bg-white/10 px-5 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={saveState === "saving"}
             onClick={saveTemplate}
             type="button"
@@ -160,8 +160,8 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
       </div>
 
       {/* Focused day — its shift bars, editable. */}
-      <section className="rounded-2xl border border-white/12 bg-white/[0.045] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+      <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
           {WEEKDAY_FULL[focusedDay.dayIndex]}
         </h3>
         <div className="space-y-2">
@@ -181,13 +181,13 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
               />
             ))
           ) : (
-            <div className="rounded-xl border border-dashed border-white/20 bg-white/[0.03] p-4 text-sm text-white/55">
+            <div className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--surface-hover)] p-4 text-sm text-[var(--text-tertiary)]">
               No shifts on {WEEKDAY_FULL[focusedDay.dayIndex]}.
             </div>
           )}
         </div>
         <button
-          className="mt-2 h-10 w-full rounded-xl border border-dashed border-white/20 bg-white/[0.03] text-sm font-semibold text-white/75 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-2 h-10 w-full rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--surface-hover)] text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
           disabled={activeFocusedSlots.length >= 4}
           onClick={() => addShift(focusedDay.dayIndex)}
           type="button"
@@ -216,13 +216,13 @@ function WeekDayButton({
       className={[
         "flex min-w-[68px] flex-col items-center gap-1.5 rounded-xl border px-3 py-2.5 transition",
         active
-          ? "border-white/35 bg-white/[0.12]"
-          : "border-white/12 bg-white/[0.04] hover:bg-white/[0.07]",
+          ? "border-[var(--border-default)] bg-[var(--surface-hover)]"
+          : "border-[var(--border-subtle)] bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]",
       ].join(" ")}
       onClick={onSelect}
       type="button"
     >
-      <span className="text-xs font-semibold uppercase tracking-wide text-white/80">
+      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
         {day.label}
       </span>
       <span className="flex h-2.5 items-center gap-1">
@@ -231,7 +231,7 @@ function WeekDayButton({
             <span className={shiftDotClass(slot.jobType)} key={slot.slotIndex} />
           ))
         ) : (
-          <span className="h-1 w-1 rounded-full bg-white/20" />
+          <span className="h-1 w-1 rounded-full bg-[var(--surface-hover)]" />
         )}
       </span>
     </button>
@@ -570,7 +570,7 @@ function SaveStatus({
 }) {
   if (state === "idle") {
     return (
-      <span className="text-sm text-white/45">Tap Save to apply changes</span>
+      <span className="text-sm text-[var(--text-muted)]">Tap Save to apply changes</span>
     );
   }
   const label =
@@ -583,8 +583,8 @@ function SaveStatus({
     <span
       className={
         state === "error"
-          ? "max-w-56 text-right text-sm font-medium text-red-300"
-          : "text-sm font-medium text-white/70"
+          ? "max-w-56 text-right text-sm font-medium text-[var(--accent-negative-text)]"
+          : "text-sm font-medium text-[var(--text-secondary)]"
       }
     >
       {label}

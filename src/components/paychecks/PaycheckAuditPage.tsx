@@ -157,19 +157,19 @@ export function PaycheckAuditPage({
   const resolvedActiveJob = activeExists ? activeJob : (jobList[0]?.key ?? "");
 
   return (
-    <main className="min-h-screen px-3 py-4 text-white sm:px-4 lg:px-6">
-      <section className="mx-auto max-w-7xl rounded-xl border border-white/15 bg-black/15 backdrop-blur-md shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
-        <div className="h-2 bg-zinc-950" />
+    <main className="min-h-screen px-3 py-4 text-[var(--text-primary)] sm:px-4 lg:px-6">
+      <section className="mx-auto max-w-7xl rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
+        <div className="h-2 bg-[var(--accent-brand)]" />
         <div className="p-4 sm:p-5">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/85">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                 Paycheck audit
               </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
                 Pay-period check
               </h1>
-              <p className="mt-1 text-sm text-white/70">
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
                 Compare expected take-home against what the paycheck actually paid.
               </p>
             </div>
@@ -181,15 +181,15 @@ export function PaycheckAuditPage({
           ) : (
             <>
               {jobList.length > 1 ? (
-                <div className="mb-4 inline-flex flex-wrap gap-1 rounded-md border border-white/20 bg-black/20 backdrop-blur-md p-1 shadow-sm">
+                <div className="mb-4 inline-flex flex-wrap gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] backdrop-blur-md p-1 shadow-sm">
                   {jobList.map((job) => (
                     <button
                       key={job.key}
                       className={[
                         "rounded px-3 py-1.5 text-sm font-semibold transition",
                         resolvedActiveJob === job.key
-                          ? "bg-zinc-950 text-white"
-                          : "text-white/70 hover:bg-white/10",
+                          ? "bg-[var(--accent-brand)] text-white"
+                          : "text-[var(--text-tertiary)] hover:bg-[var(--surface-hover)]",
                       ].join(" ")}
                       onClick={() => {
                         setActiveJob(job.key);
@@ -228,7 +228,7 @@ export function PaycheckAuditPage({
 
 function EmptyState() {
   return (
-    <div className="rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-6 text-center text-sm text-white/70">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-overlay)] backdrop-blur-md p-6 text-center text-sm text-[var(--text-tertiary)]">
       No paycheck jobs logged for the current or previous pay period yet. Log
       hours against a job and it shows up here automatically.
     </div>
@@ -237,8 +237,8 @@ function EmptyState() {
 
 function PeriodTotals({ periods }: { periods: PaycheckPeriod[] }) {
   return (
-    <div className="mt-6 border-t border-white/15 pt-5">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/85">
+    <div className="mt-6 border-t border-[var(--border-subtle)] pt-5">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         Pay-period totals (all jobs)
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -264,10 +264,10 @@ function PeriodTotalCard({ period }: { period: PaycheckPeriod }) {
   const heading = period.id === "previous" ? "Total prev" : "Total current";
 
   return (
-    <article className="rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-4 shadow-sm">
+    <article className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-overlay)] backdrop-blur-md p-4 shadow-sm">
       <div className="flex items-baseline justify-between">
-        <h3 className="text-base font-semibold text-white">{heading}</h3>
-        <span className="text-xs font-semibold text-white/70">{period.label}</span>
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">{heading}</h3>
+        <span className="text-xs font-semibold text-[var(--text-tertiary)]">{period.label}</span>
       </div>
       <div className="mt-3 grid gap-2 text-sm">
         {period.jobs.map((job) => (
@@ -352,11 +352,11 @@ function PaycheckPeriodCard({
   }
 
   return (
-    <article className="rounded-md border border-white/15 bg-black/20 backdrop-blur-md p-4 shadow-sm">
+    <article className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-overlay)] backdrop-blur-md p-4 shadow-sm">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">{period.label}</h2>
-          <p className="mt-1 text-sm text-white/70">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{period.label}</h2>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             {formatDate(period.startDate)} - {formatDate(period.endDate)}
           </p>
         </div>
@@ -370,16 +370,16 @@ function PaycheckPeriodCard({
         <Metric label="Pay date" value={period.paycheckDueDate ? formatDate(period.paycheckDueDate) : "Not ready"} />
       </div>
 
-      <div className="my-4 border-t border-white/10" />
+      <div className="my-4 border-t border-[var(--border-subtle)]" />
 
-      <div className="rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3">
+      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md p-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-sm font-semibold text-white">{job.label} hours by week</h3>
-          <span className="text-xs font-semibold text-white/70">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{job.label} hours by week</h3>
+          <span className="text-xs font-semibold text-[var(--text-tertiary)]">
             {formatRate(job.regularRate)} base / {formatRate(job.overtimeRate)} OT
           </span>
         </div>
-        <p className="mt-1 text-xs text-white/70">{job.rateNote}</p>
+        <p className="mt-1 text-xs text-[var(--text-tertiary)]">{job.rateNote}</p>
         <div className="mt-3 grid gap-2">
           {period.weeks.map((week) => (
             <WeekBreakdown key={week.id} jobKey={jobKey} week={week} />
@@ -387,7 +387,7 @@ function PaycheckPeriodCard({
         </div>
       </div>
 
-      <div className="my-4 border-t border-white/10" />
+      <div className="my-4 border-t border-[var(--border-subtle)]" />
 
       <div className="grid gap-2 text-sm">
         <MoneyLine label="Expected gross" value={job.grossCents} />
@@ -407,13 +407,13 @@ function PaycheckPeriodCard({
 
       <AuditRead job={job} />
 
-      <form className="mt-4 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3" onSubmit={submit}>
-        <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-white/85">
+      <form className="mt-4 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md p-3" onSubmit={submit}>
+        <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
           Actual {job.label} check
         </label>
         <div className="mt-2 flex gap-2">
           <input
-            className="h-10 min-w-0 flex-1 rounded-md border border-white/20 bg-black/20 backdrop-blur-md px-3 text-sm outline-none transition focus:border-white/60 focus:ring-2 focus:ring-white/40"
+            className="h-10 min-w-0 flex-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] backdrop-blur-md px-3 text-sm outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-ring)]"
             disabled={!period.actualWeekId}
             inputMode="decimal"
             onChange={(event) => setActualValue(event.target.value)}
@@ -422,39 +422,39 @@ function PaycheckPeriodCard({
             value={actualValue}
           />
           <button
-            className="h-10 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+            className="h-10 rounded-md bg-[var(--accent-brand)] px-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
             disabled={!period.actualWeekId}
             type="submit"
           >
             Save
           </button>
         </div>
-        <p className="mt-2 text-xs text-white/70">
+        <p className="mt-2 text-xs text-[var(--text-tertiary)]">
           Paste the net {job.label} amount from your paystub. ShiftlyCash compares it to expected take-home.
         </p>
       </form>
 
       {/* Reconcile — affirm the check, then scale this job's shifts to the actual. */}
-      <div className="mt-4 rounded-md border border-white/15 bg-black/15 backdrop-blur-md p-3">
+      <div className="mt-4 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md p-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-white">Reconcile to actual</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Reconcile to actual</h3>
           {isReconciled && recon ? (
             <ReconciledBadge recon={recon} stale={isStale} />
           ) : null}
         </div>
 
         {isStale ? (
-          <div className="mt-2 rounded-md border border-amber-300/50 bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-200">
+          <div className="mt-2 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-warning-text)]">
             Stale — the shifts changed since this was reconciled. The old factor
             no longer applies. Re-reconcile to scale the current shifts to the
             actual.
           </div>
         ) : null}
 
-        <label className="mt-3 flex items-start gap-2 text-sm text-white/85">
+        <label className="mt-3 flex items-start gap-2 text-sm text-[var(--text-secondary)]">
           <input
             type="checkbox"
-            className="mt-0.5 h-4 w-4 rounded border-white/30 bg-black/20"
+            className="mt-0.5 h-4 w-4 rounded border-[var(--border-default)] bg-[var(--surface-overlay)]"
             checked={confirmedCorrect}
             disabled={!period.actualWeekId || !actualIsValid}
             onChange={(event) => setConfirmedCorrect(event.target.checked)}
@@ -463,7 +463,7 @@ function PaycheckPeriodCard({
         </label>
 
         {actualIsZero ? (
-          <div className="mt-2 rounded-md border border-red-300/60 bg-red-500/15 px-3 py-2 text-xs font-medium text-red-200">
+          <div className="mt-2 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-negative-text)]">
             Reconciling to $0.00 zeroes the take-home for every {job.label} shift
             in this period. Reversible with Undo, but it wipes this period&apos;s{" "}
             {job.label} earnings in every rollup until reverted.
@@ -473,7 +473,7 @@ function PaycheckPeriodCard({
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            className="h-10 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-white/20"
+            className="h-10 rounded-md bg-[var(--accent-brand)] px-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
             disabled={!canReconcile}
             onClick={() => {
               if (parsedCents === null) return;
@@ -486,7 +486,7 @@ function PaycheckPeriodCard({
           {isReconciled ? (
             <button
               type="button"
-              className="h-10 rounded-md border border-white/25 bg-black/20 px-3 text-sm font-semibold text-white/85 transition hover:bg-white/10"
+              className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] px-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)]"
               onClick={() => void onRevert(period, jobKey)}
             >
               Undo
@@ -494,7 +494,7 @@ function PaycheckPeriodCard({
           ) : null}
         </div>
 
-        <p className="mt-2 text-xs text-white/70">
+        <p className="mt-2 text-xs text-[var(--text-tertiary)]">
           Distributes the actual net across every {job.label} shift in this period
           so your daily and weekly rollups match the real paycheck. Reversible.
         </p>
@@ -516,8 +516,8 @@ function ReconciledBadge({
       className={[
         "inline-flex flex-col items-end rounded-md border px-3 py-1 text-right",
         stale
-          ? "border-amber-300/50 bg-amber-500/15 text-amber-200"
-          : "border-emerald-300/50 bg-emerald-500/15 text-emerald-300",
+          ? "border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] text-[var(--accent-warning-text)]"
+          : "border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]",
       ].join(" ")}
     >
       <span className="text-xs font-semibold">
@@ -553,15 +553,15 @@ function WeekBreakdown({
   }
 
   return (
-    <div className="grid gap-2 rounded-md border border-white/10 bg-black/20 backdrop-blur-md px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+    <div className="grid gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-overlay)] backdrop-blur-md px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
       <div>
-        <p className="font-semibold text-white">
+        <p className="font-semibold text-[var(--text-primary)]">
           Week {week.displayWeekNumber}{" "}
-          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-white/70">
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
             {week.role === "week_1" ? "first week" : "second week"}
           </span>
         </p>
-        <p className="text-xs text-white/70">
+        <p className="text-xs text-[var(--text-tertiary)]">
           {formatDate(week.startDate)} - {formatDate(week.endDate)}
         </p>
       </div>
@@ -577,10 +577,10 @@ function WeekBreakdown({
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-white/70">
+      <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
         {label}
       </span>
-      <span className="font-semibold text-white">{value}</span>
+      <span className="font-semibold text-[var(--text-primary)]">{value}</span>
     </div>
   );
 }
@@ -589,12 +589,12 @@ function AuditRead({ job }: { job: PaycheckJobSummary }) {
   const difference = job.differenceCents;
   const classes =
     difference === null
-      ? "border-white/15 bg-black/15 backdrop-blur-md text-white/70"
+      ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md text-[var(--text-tertiary)]"
       : difference < -100
-        ? "border-red-300/60 bg-red-500/15 text-red-200"
+        ? "border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] text-[var(--accent-negative-text)]"
         : difference > 100
-          ? "border-emerald-300/50 bg-emerald-500/15 text-emerald-300"
-          : "border-sky-300/50 bg-sky-500/15 text-sky-200";
+          ? "border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]"
+          : "border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] text-[var(--accent-brand-text)]";
   const message =
     difference === null
       ? `Expected ${job.label} net is ${formatMoney(job.estimatedNetCents)} from ${formatHours(job.totalHours)} total hours. Add the net check to see if the paycheck is short.`
@@ -613,11 +613,11 @@ function AuditRead({ job }: { job: PaycheckJobSummary }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/10 bg-black/15 backdrop-blur-md px-3 py-2">
-      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-white/70">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md px-3 py-2">
+      <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
         {label}
       </span>
-      <span className="text-base font-semibold text-white">{value}</span>
+      <span className="text-base font-semibold text-[var(--text-primary)]">{value}</span>
     </div>
   );
 }
@@ -635,15 +635,15 @@ function MoneyLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className={strong ? "font-semibold" : "text-white/70"}>{label}</span>
+      <span className={strong ? "font-semibold" : "text-[var(--text-tertiary)]"}>{label}</span>
       <span
         className={[
           strong ? "text-base font-bold" : "font-semibold",
           tone === "negative"
-            ? "text-red-300"
+            ? "text-[var(--accent-negative-text)]"
             : tone === "positive"
-              ? "text-emerald-300 drop-shadow-[0_0_12px_rgba(110,231,183,0.6)]"
-              : "text-white",
+              ? "text-[var(--accent-primary-text)] drop-shadow-[0_0_12px_rgba(110,231,183,0.6)]"
+              : "text-[var(--text-primary)]",
         ].join(" ")}
       >
         {tone === "negative" ? "-" : ""}
@@ -661,10 +661,10 @@ function StatusPill({
   differenceCents: number | null;
 }) {
   const classes = {
-    neutral: "border-white/15 bg-black/15 backdrop-blur-md text-white/70",
-    short: "border-red-300/60 bg-red-500/15 text-red-300",
-    over: "border-emerald-300/50 bg-emerald-500/15 text-emerald-300",
-    match: "border-sky-300/50 bg-sky-500/15 text-emerald-300",
+    neutral: "border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md text-[var(--text-tertiary)]",
+    short: "border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] text-[var(--accent-negative-text)]",
+    over: "border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]",
+    match: "border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] text-[var(--accent-primary-text)]",
   };
   const label =
     differenceCents === null
@@ -691,8 +691,8 @@ function SaveBadge({ state, error }: { state: SaveState; error: string | null })
     <span
       className={
         state === "error"
-          ? "rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-300"
-          : "rounded-full bg-sky-500/15 px-3 py-1 text-xs font-semibold text-emerald-300"
+          ? "rounded-full bg-[var(--accent-negative-fill)] px-3 py-1 text-xs font-semibold text-[var(--accent-negative-text)]"
+          : "rounded-full bg-[var(--accent-brand-fill)] px-3 py-1 text-xs font-semibold text-[var(--accent-primary-text)]"
       }
     >
       {state === "saving" ? "Saving..." : state === "saved" ? "Saved" : error}

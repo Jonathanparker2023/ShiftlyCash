@@ -61,13 +61,13 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
   }
 
   return (
-    <div className="min-h-screen px-4 py-5 text-white sm:px-6 lg:px-8">
-      <header className="mx-auto mb-5 max-w-7xl border-b border-white/15 pb-4">
-        <p className="text-sm font-medium uppercase tracking-[0.18em] text-white/70">
+    <div className="min-h-screen px-4 py-5 text-[var(--text-primary)] sm:px-6 lg:px-8">
+      <header className="mx-auto mb-5 max-w-7xl border-b border-[var(--border-subtle)] pb-4">
+        <p className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
           ShiftlyCash
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">History</h1>
-        <p className="mt-1 text-sm text-white/85">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Closed and archived weeks, with projection exclusions. Excluded values
           are ignored by projection averages, not deleted.
         </p>
@@ -76,24 +76,24 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
       <HistorySummary weeks={weeks} />
 
       {error ? (
-        <div className="mx-auto mb-4 max-w-7xl rounded-md border border-red-300/60 bg-red-500/15 p-3 text-sm font-medium text-red-200 backdrop-blur-md">
+        <div className="mx-auto mb-4 max-w-7xl rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] p-3 text-sm font-medium text-[var(--accent-negative-text)] backdrop-blur-md">
           {error}
         </div>
       ) : null}
 
       <main className="mx-auto max-w-7xl">
         {weeks.length === 0 ? (
-          <section className="rounded-md border border-white/15 bg-black/15 p-6 text-sm text-white/85 shadow-sm backdrop-blur-md">
+          <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 text-sm text-[var(--text-secondary)] shadow-sm backdrop-blur-md">
             No closed weeks yet. Once you close your first week, it will appear here.
           </section>
         ) : (
           <div
-            className="overflow-x-auto rounded-md border border-white/15 bg-black/15 shadow-sm backdrop-blur-md"
+            className="overflow-x-auto rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-sm backdrop-blur-md"
             data-no-page-swipe="true"
             style={{ touchAction: "pan-x" }}
           >
             <table className="min-w-[980px] w-full border-collapse text-left text-sm">
-              <thead className="border-b border-white/15 bg-white/10 text-xs uppercase tracking-[0.12em] text-white/70">
+              <thead className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)] text-xs uppercase tracking-[0.12em] text-[var(--text-secondary)]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Week #</th>
                   <th className="px-4 py-3 font-semibold">Date range</th>
@@ -110,18 +110,18 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
               <tbody>
                 {weeks.map((week) => (
                   <tr
-                    className="border-b border-white/10 last:border-0"
+                    className="border-b border-[var(--border-subtle)] last:border-0"
                     key={week.id}
                   >
                     <td className="px-4 py-3 font-medium">
                       Week {week.displayWeekNumber}
                       {week.archivedAt ? (
-                        <span className="ml-2 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80">
+                        <span className="ml-2 rounded bg-[var(--surface-hover)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
                           Archived
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 text-white/85">
+                    <td className="px-4 py-3 text-[var(--text-secondary)]">
                       {formatDateRange(week.startDate, week.endDate)}
                     </td>
                     <ProjectionCell
@@ -129,7 +129,7 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                       isPending={isPending(pendingAction, week.id, "earnings")}
                       isExcluded={week.exclusions.earnings}
                       value={week.earningsCents}
-                      colorClass="text-emerald-300"
+                      colorClass="text-[var(--accent-primary-text)]"
                       week={week}
                       onToggle={toggleExclusion}
                     />
@@ -138,11 +138,11 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                       isPending={isPending(pendingAction, week.id, "spend")}
                       isExcluded={week.exclusions.spend}
                       value={week.spendCents}
-                      colorClass="text-red-300"
+                      colorClass="text-[var(--accent-negative-text)]"
                       week={week}
                       onToggle={toggleExclusion}
                     />
-                    <td className="px-4 py-3 text-right font-medium text-white/60">
+                    <td className="px-4 py-3 text-right font-medium text-[var(--text-tertiary)]">
                       {formatMoney(week.baseCents)}
                     </td>
                     <ProjectionCell
@@ -164,7 +164,7 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Link
-                          className="h-8 rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white/85 transition hover:border-white/50 hover:text-white"
+                          className="h-8 rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
                           href={`/history/${week.id}`}
                         >
                           View
@@ -204,7 +204,7 @@ function ProjectionCell({
       <button
         className={
           isExcluded
-            ? "inline-flex items-center justify-end gap-2 font-medium text-white/50 line-through transition hover:text-white/80"
+            ? "inline-flex items-center justify-end gap-2 font-medium text-[var(--text-tertiary)] line-through transition hover:text-[var(--text-secondary)]"
             : `inline-flex items-center justify-end gap-2 font-semibold ${colorClass} transition hover:opacity-80`
         }
         disabled={isPending}
@@ -214,7 +214,7 @@ function ProjectionCell({
       >
         {formatMoney(value)}
         {isExcluded ? (
-          <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80 no-underline">
+          <span className="rounded bg-[var(--surface-hover)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] no-underline">
             EXCL
           </span>
         ) : null}
@@ -224,7 +224,7 @@ function ProjectionCell({
 }
 
 function runningColor(cents: number): string {
-  return cents < 0 ? "text-red-300" : "text-white";
+  return cents < 0 ? "text-[var(--accent-negative-text)]" : "text-[var(--text-primary)]";
 }
 
 function isPending(

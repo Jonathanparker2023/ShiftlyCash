@@ -146,14 +146,14 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 py-5 text-zinc-950 sm:px-6 lg:px-8">
-      <header className="mx-auto mb-5 flex max-w-7xl flex-col gap-4 border-b border-zinc-200 pb-4 md:flex-row md:items-end md:justify-between">
+    <div className="min-h-screen bg-[var(--surface-base)] px-4 py-5 text-[var(--text-primary)] sm:px-6 lg:px-8">
+      <header className="mx-auto mb-5 flex max-w-7xl flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-500">
+          <p className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             ShiftlyCash
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Banking</h1>
-          <p className="mt-1 text-sm text-zinc-600">
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             Connect Plaid, sync transactions, and review anything that should not
             auto-apply.
           </p>
@@ -161,7 +161,7 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
 
         <div className="flex flex-wrap gap-2">
           <button
-            className="h-10 rounded-md bg-zinc-950 px-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            className="h-10 rounded-md bg-[var(--accent-brand)] px-3 text-sm font-medium text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:bg-zinc-300"
             disabled={!isConfigured || status === "loading"}
             onClick={connectBank}
             type="button"
@@ -169,7 +169,7 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
             Connect bank
           </button>
           <button
-            className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium transition hover:border-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-medium transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!isConfigured || status === "loading" || initialData.items.length === 0}
             onClick={syncNow}
             type="button"
@@ -177,7 +177,7 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
             Sync now
           </button>
           <button
-            className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium transition hover:border-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-medium transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={status === "loading"}
             onClick={cleanMerchantNames}
             type="button"
@@ -189,7 +189,7 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
 
       <main className="mx-auto max-w-7xl space-y-5">
         {!isConfigured ? (
-          <section className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm">
+          <section className="rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] p-4 text-sm text-[var(--accent-warning-text)] shadow-sm">
             <h2 className="font-semibold">Plaid is not configured</h2>
             <p className="mt-1">
               Add these server-only env vars before connecting a bank:{" "}
@@ -202,23 +202,23 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
           <section
             className={
               status === "error"
-                ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700"
-                : "rounded-md border border-zinc-200 bg-white p-3 text-sm font-medium text-zinc-700"
+                ? "rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] p-3 text-sm font-medium text-[var(--accent-negative-text)]"
+                : "rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-sm font-medium text-[var(--text-secondary)]"
             }
           >
             {message}
           </section>
         ) : null}
 
-        <section className="rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+        <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-sm">
           <h2 className="text-base font-semibold">Connected items</h2>
           {initialData.items.length === 0 ? (
-            <p className="mt-3 text-sm text-zinc-600">No banks connected yet.</p>
+            <p className="mt-3 text-sm text-[var(--text-secondary)]">No banks connected yet.</p>
           ) : (
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               {initialData.items.map((item) => (
                 <div
-                  className="rounded-md border border-zinc-200 bg-zinc-50 p-3"
+                  className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-3"
                   key={item.id}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -226,7 +226,7 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
                       <p className="font-medium">
                         {item.institutionName ?? "Plaid item"}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500" suppressHydrationWarning>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]" suppressHydrationWarning>
                         {item.lastSyncedAt
                           ? `Last synced ${formatTimestamp(item.lastSyncedAt)}`
                           : "Not synced yet"}
@@ -278,14 +278,14 @@ function PendingTransactionsTable({
   );
 
   return (
-    <section className="rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-sm">
       <h2 className="text-base font-semibold">Pending review</h2>
       {pendingTransactions.length === 0 ? (
-        <p className="mt-3 text-sm text-zinc-600">No pending transactions.</p>
+        <p className="mt-3 text-sm text-[var(--text-secondary)]">No pending transactions.</p>
       ) : (
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-[900px] w-full text-left text-sm">
-            <thead className="border-b border-zinc-200 text-xs uppercase tracking-[0.12em] text-zinc-500">
+            <thead className="border-b border-[var(--border-subtle)] text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">
               <tr>
                 <th className="py-2 pr-3 font-semibold">Date</th>
                 <th className="py-2 pr-3 font-semibold">Merchant</th>
@@ -298,13 +298,13 @@ function PendingTransactionsTable({
             <tbody>
               {pendingTransactions.map((transaction) => (
                 <tr
-                  className="border-b border-zinc-100 last:border-0"
+                  className="border-b border-[var(--border-subtle)] last:border-0"
                   key={transaction.id}
                 >
-                  <td className="py-3 pr-3 text-zinc-600">
+                  <td className="py-3 pr-3 text-[var(--text-secondary)]">
                     <div>{transaction.date}</div>
                     {transaction.time ? (
-                      <div className="text-xs text-zinc-400">
+                      <div className="text-xs text-[var(--text-muted)]">
                         {formatTransactionTime(transaction.time)}
                       </div>
                     ) : null}
@@ -313,12 +313,12 @@ function PendingTransactionsTable({
                   <td className="py-3 pr-3 text-right font-medium">
                     {formatMoney(transaction.amountCents)}
                   </td>
-                  <td className="py-3 pr-3 text-zinc-600">
+                  <td className="py-3 pr-3 text-[var(--text-secondary)]">
                     {transaction.reviewReason ?? "review"}
                   </td>
                   <td className="py-3 pr-3">
                     <select
-                      className="h-9 min-w-48 rounded-md border border-zinc-300 bg-white px-2 text-sm"
+                      className="h-9 min-w-48 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-sm"
                       onChange={(event) =>
                         onSelectedDayChange(transaction.id, event.target.value)
                       }
@@ -335,14 +335,14 @@ function PendingTransactionsTable({
                   <td className="py-3 pr-3">
                     <div className="flex gap-2">
                       <button
-                        className="h-8 rounded-md border border-zinc-300 bg-white px-2.5 text-xs font-medium transition hover:border-zinc-950"
+                        className="h-8 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 text-xs font-medium transition hover:border-[var(--border-strong)]"
                         onClick={() => onApply(transaction)}
                         type="button"
                       >
                         Apply
                       </button>
                       <button
-                        className="h-8 rounded-md border border-zinc-300 bg-white px-2.5 text-xs font-medium text-zinc-600 transition hover:border-red-700 hover:text-red-700"
+                        className="h-8 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-negative-border)] hover:text-[var(--accent-negative-text)]"
                         onClick={() => onExclude(transaction)}
                         type="button"
                       >
@@ -362,14 +362,14 @@ function PendingTransactionsTable({
 
 function statusBadgeClass(status: string): string {
   if (status === "active") {
-    return "rounded bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700";
+    return "rounded bg-[var(--accent-primary-fill)] px-2 py-1 text-xs font-semibold text-[var(--accent-primary-text)]";
   }
 
   if (status === "login_required") {
-    return "rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700";
+    return "rounded bg-[var(--accent-warning-fill)] px-2 py-1 text-xs font-semibold text-[var(--accent-warning-text)]";
   }
 
-  return "rounded bg-red-100 px-2 py-1 text-xs font-semibold text-red-700";
+  return "rounded bg-[var(--accent-negative-fill)] px-2 py-1 text-xs font-semibold text-[var(--accent-negative-text)]";
 }
 
 function formatMoney(value: number): string {

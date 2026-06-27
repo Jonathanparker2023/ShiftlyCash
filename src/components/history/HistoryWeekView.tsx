@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
@@ -91,7 +92,13 @@ export function HistoryWeekView({ data }: { data: HistoryDetailData }) {
 
   return (
     <main className="mx-auto max-w-7xl space-y-5">
-      <section className="rounded-md border border-white/20 bg-black/15 p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
+      <Link
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-brand-text)] transition hover:opacity-80"
+        href="/trends"
+      >
+        <span aria-hidden="true">←</span> Back to Trends
+      </Link>
+      <section className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {metrics.map((metric) => (
             <TopMetric
@@ -105,7 +112,7 @@ export function HistoryWeekView({ data }: { data: HistoryDetailData }) {
         </div>
       </section>
 
-      <section className="overflow-x-auto rounded-md border border-white/20 bg-black/15 p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
+      <section className="overflow-x-auto rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
         <div className="grid min-w-[760px] grid-cols-7 gap-2 sm:gap-3">
           {data.days.map((day, index) => (
             <WeekStripCell
@@ -155,16 +162,16 @@ function TopMetric({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-md border-2 border-white/35 bg-black/25 px-3 py-3 text-white shadow-[0_10px_24px_rgba(8,15,28,0.16)] backdrop-blur-md before:absolute before:inset-x-0 before:top-0 before:h-1 ${accentClass}`}
+      className={`relative overflow-hidden rounded-md border-2 border-[var(--border-default)] bg-[var(--surface-overlay)] px-3 py-3 text-[var(--text-primary)] shadow-[0_10px_24px_rgba(8,15,28,0.16)] backdrop-blur-md before:absolute before:inset-x-0 before:top-0 before:h-1 ${accentClass}`}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/85">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
         {label}
       </p>
       <p
         className={
           tone
             ? `mt-1 text-lg font-semibold ${cashflowColorFromTone(tone)}`
-            : "mt-1 text-lg font-semibold text-white"
+            : "mt-1 text-lg font-semibold text-[var(--text-primary)]"
         }
       >
         {value}
@@ -186,25 +193,25 @@ function WeekStripCell({
     <button
       className={
         isFocused
-          ? "min-w-0 rounded-md border-2 border-white/90 bg-black/30 px-2 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-lg transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+          ? "min-w-0 rounded-md border-2 border-[var(--border-default)] bg-[var(--surface-overlay)] px-2 py-2 text-left shadow-[0_10px_24px_rgba(8,15,28,0.18)] backdrop-blur-lg transition focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
           : day.spendLocked
-            ? "min-w-0 rounded-md border-2 border-white/30 bg-black/15 px-2 py-2 text-left opacity-80 shadow-sm backdrop-blur-md transition hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
-            : "min-w-0 rounded-md border-2 border-white/40 bg-black/20 px-2 py-2 text-left shadow-sm backdrop-blur-md transition hover:border-white/50 hover:bg-black/25 focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            ? "min-w-0 rounded-md border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-2 text-left opacity-80 shadow-sm backdrop-blur-md transition hover:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
+            : "min-w-0 rounded-md border-2 border-[var(--border-default)] bg-[var(--surface-overlay)] px-2 py-2 text-left shadow-sm backdrop-blur-md transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-overlay)] focus:outline-none focus:ring-2 focus:ring-white sm:p-3"
       }
       onClick={onFocus}
       type="button"
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <span className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+        <span className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)]">
           {shortDayName(day.date)}
         </span>
         {day.spendLocked ? (
-          <span className="hidden rounded-full bg-black/20 backdrop-blur-md px-1.5 py-0.5 text-[10px] font-semibold text-white sm:inline-flex">
+          <span className="hidden rounded-full bg-[var(--surface-overlay)] backdrop-blur-md px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-primary)] sm:inline-flex">
             Locked
           </span>
         ) : null}
       </div>
-      <div className="mt-3 text-2xl font-semibold text-white">
+      <div className="mt-3 text-2xl font-semibold text-[var(--text-primary)]">
         {dayOfMonth(day.date)}
       </div>
       <div
@@ -220,23 +227,23 @@ function WeekStripCell({
 
 function FocusedDayPanel({ day }: { day: HistoryDetailDay }) {
   return (
-    <section className="rounded-md border border-white/20 bg-black/15 p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-black/20 backdrop-blur-md px-3 py-1 text-sm font-bold uppercase text-white">
+          <span className="rounded-full bg-[var(--surface-overlay)] backdrop-blur-md px-3 py-1 text-sm font-bold uppercase text-[var(--text-primary)]">
             {shortDayName(day.date)}
           </span>
           <div>
-            <h2 className="text-2xl font-semibold text-white">
+            <h2 className="text-2xl font-semibold text-[var(--text-primary)]">
               {formatLongDate(day.date)}
             </h2>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
               Read-only history
             </p>
           </div>
         </div>
         {day.spendLocked ? (
-          <span className="rounded-full border border-white/20 bg-black/20 backdrop-blur-md px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-white">
+          <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-overlay)] backdrop-blur-md px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-primary)]">
             Locked
           </span>
         ) : null}
@@ -252,7 +259,7 @@ function FocusedDayPanel({ day }: { day: HistoryDetailDay }) {
             );
             if (realSlots.length === 0) {
               return (
-                <div className="rounded-md border border-dashed border-white/20 bg-black/15 p-3 text-sm text-white/60">
+                <div className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 text-sm text-[var(--text-tertiary)]">
                   No earn slots.
                 </div>
               );
@@ -277,7 +284,7 @@ function ShiftRow({ slot }: { slot: HistoryDetailSlot }) {
       <div className={historyShiftBarClass(slot.jobType)}>
         <div className="flex min-w-0 items-center gap-2">
           <span className="shrink-0 text-xs font-semibold">Other</span>
-          <span className="shrink-0 rounded bg-black/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
+          <span className="shrink-0 rounded bg-[var(--surface-overlay)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
             Prorated
           </span>
           <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
@@ -339,7 +346,7 @@ function ShiftRow({ slot }: { slot: HistoryDetailSlot }) {
 
 function TotalsPanel({ day }: { day: HistoryDetailDay }) {
   return (
-    <div className="rounded-md border border-white/15 bg-black/15 p-3 text-sm backdrop-blur-md">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-sm backdrop-blur-md">
       <TotalLine label="Earn" value={formatMoney(day.earningsCents)} />
       <TotalLine
         label="Spend"
@@ -347,7 +354,7 @@ function TotalsPanel({ day }: { day: HistoryDetailDay }) {
         value={formatMoney(day.spendCents)}
       />
       <TotalLine label="Base" value={formatMoney(day.baseCents)} />
-      <div className="my-2 border-t border-white/20" />
+      <div className="my-2 border-t border-[var(--border-default)]" />
       <TotalLine
         strong
         label="Cashflow"
@@ -371,7 +378,7 @@ function TotalLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <span className={strong ? "font-semibold text-white" : "text-white/75"}>
+      <span className={strong ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}>
         {label}
       </span>
       <span
@@ -379,8 +386,8 @@ function TotalLine({
           tone
             ? `font-semibold ${cashflowColorFromTone(tone)}`
             : strong
-              ? "font-semibold text-white"
-              : "font-medium text-white"
+              ? "font-semibold text-[var(--text-primary)]"
+              : "font-medium text-[var(--text-primary)]"
         }
       >
         {value}
@@ -399,25 +406,25 @@ function TransactionPanel({
   );
 
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-3 shadow-sm backdrop-blur-md">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-sm backdrop-blur-md">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-white/80">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
           Transactions
         </h3>
-        <span className="rounded-full bg-black/20 backdrop-blur-md px-2 py-0.5 text-xs font-semibold text-white">
+        <span className="rounded-full bg-[var(--surface-overlay)] backdrop-blur-md px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
           {visible.length}
         </span>
       </div>
 
       {visible.length === 0 ? (
-        <p className="rounded-md border border-dashed border-white/15 bg-black/15 p-3 text-sm text-white/60">
+        <p className="rounded-md border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-sm text-[var(--text-tertiary)]">
           No transactions for this day.
         </p>
       ) : (
         <div className="space-y-1.5">
           {visible.map((transaction) => (
             <div
-              className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/15 px-3 py-2 text-xs text-white"
+              className="flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
               key={transaction.id}
             >
               <p className="min-w-0 truncate text-sm font-semibold">
@@ -436,31 +443,31 @@ function TransactionPanel({
 
 function SnapshotSection({ snapshots }: { snapshots: SnapshotSummary[] }) {
   return (
-    <section className="rounded-md border border-white/15 bg-black/15 p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
-      <h2 className="text-base font-semibold text-white">Recovery snapshots</h2>
-      <p className="mt-1 text-sm text-white/65">
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
+      <h2 className="text-base font-semibold text-[var(--text-primary)]">Recovery snapshots</h2>
+      <p className="mt-1 text-sm text-[var(--text-tertiary)]">
         Snapshots are recovery insurance before and after destructive week operations.
       </p>
 
       {snapshots.length === 0 ? (
-        <p className="mt-4 rounded-md border border-dashed border-white/15 bg-black/15 p-4 text-sm text-white/60">
+        <p className="mt-4 rounded-md border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-tertiary)]">
           No snapshots captured for this week yet.
         </p>
       ) : (
         <div className="mt-4 space-y-3">
           {snapshots.map((snapshot) => (
             <details
-              className="rounded-md border border-white/15 bg-black/15 p-3 text-white"
+              className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)]"
               key={snapshot.id}
             >
               <summary className="cursor-pointer text-sm font-medium">
                 {snapshot.snapshotType} / {formatTimestamp(snapshot.createdAt)}
-                <span className="ml-2 text-xs font-normal text-white/60">
+                <span className="ml-2 text-xs font-normal text-[var(--text-tertiary)]">
                   {snapshot.dayCount} days, {snapshot.earnSlotCount} slots,{" "}
                   {snapshot.transactionCount} transactions
                 </span>
               </summary>
-              <pre className="mt-3 max-h-96 overflow-auto rounded-md bg-zinc-950 p-3 text-xs text-zinc-50">
+              <pre className="mt-3 max-h-96 overflow-auto rounded-md bg-[var(--accent-brand)] p-3 text-xs text-zinc-50">
                 {snapshot.payloadJson}
               </pre>
             </details>
@@ -482,19 +489,19 @@ function historyShiftBarClass(jobType: string): string {
     return `${base} border-[#d97706] bg-[#facc15] text-[#1f2937]`;
   }
 
-  return `${base} border-white/20 bg-black/20 backdrop-blur-md text-white`;
+  return `${base} border-[var(--border-default)] bg-[var(--surface-overlay)] backdrop-blur-md text-[var(--text-primary)]`;
 }
 
 function payTypeBadgeClass(payType: string): string {
   if (payType === "split") {
-    return "rounded-full bg-black/20 backdrop-blur-md px-2 py-0.5 text-[10px] font-bold uppercase text-white";
+    return "rounded-full bg-[var(--surface-overlay)] backdrop-blur-md px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--text-primary)]";
   }
 
   if (payType === "overtime") {
     return "rounded-full bg-[#22c55e] px-2 py-0.5 text-[10px] font-bold uppercase text-white";
   }
 
-  return "rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-200";
+  return "rounded-full bg-[var(--accent-brand-fill)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--accent-brand-text)]";
 }
 
 function formatPayBadge(payType: string): string {

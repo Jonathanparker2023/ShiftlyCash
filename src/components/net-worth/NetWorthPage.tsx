@@ -37,20 +37,20 @@ export function NetWorthPage({ initialData }: { initialData: NetWorthPageData })
       : 0;
 
   return (
-    <div className="min-h-screen px-4 py-5 text-white sm:px-6 lg:px-8">
-      <header className="mx-auto mb-5 max-w-7xl border-b border-white/15 pb-4">
+    <div className="min-h-screen px-4 py-5 text-[var(--text-primary)] sm:px-6 lg:px-8">
+      <header className="mx-auto mb-5 max-w-7xl border-b border-[var(--border-subtle)] pb-4">
         <div className="grid gap-4 lg:grid-cols-[1fr_300px] lg:items-start">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
               ShiftlyCash
             </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
               Net Worth
             </h1>
-            <p className="mt-2 text-sm text-white/75">
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
               Turn weekly surplus into a clean principal versus compounding view.
             </p>
-            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/60">
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
               Pulling {initialData.projectionSource.closedWeekCount} closed weeks.
               Contribution = cashflow avg{" "}
               {formatMoney(initialData.projectionSource.cashflowAverageCents)} -
@@ -95,23 +95,23 @@ export function NetWorthPage({ initialData }: { initialData: NetWorthPageData })
           />
         </section>
 
-        <section className="overflow-hidden rounded-lg border border-white/15 bg-black/15 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
-          <div className="flex flex-col gap-4 border-b border-white/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+          <div className="flex flex-col gap-4 border-b border-[var(--border-default)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-white">
+              <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
                 Projection chart
               </h2>
-              <p className="mt-1 text-sm text-white/70">
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
                 Principal is the base layer. Interest stacks on top as compounding takes over.
               </p>
             </div>
-            <div className="flex w-max rounded-full border border-white/20 bg-black/20 backdrop-blur-md p-1">
+            <div className="flex w-max rounded-full border border-[var(--border-default)] bg-[var(--surface-overlay)] backdrop-blur-md p-1">
               {TIMEFRAMES.map((item) => (
                 <button
                   className={
                     item.id === timeframe
-                      ? "rounded-full bg-zinc-950 px-3 py-1.5 text-sm font-bold text-white"
-                      : "rounded-full px-3 py-1.5 text-sm font-bold text-white/70 transition hover:bg-white/10"
+                      ? "rounded-full bg-[var(--accent-brand)] px-3 py-1.5 text-sm font-bold text-white"
+                      : "rounded-full px-3 py-1.5 text-sm font-bold text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)]"
                   }
                   key={item.id}
                   onClick={() => setTimeframe(item.id)}
@@ -129,11 +129,11 @@ export function NetWorthPage({ initialData }: { initialData: NetWorthPageData })
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <div className="rounded-lg border border-white/15 bg-black/15 backdrop-blur-md p-4 text-white shadow-sm">
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md p-4 text-[var(--text-primary)] shadow-sm">
             <h2 className="text-lg font-bold">Assets</h2>
-            <div className="mt-3 divide-y divide-white/10">
+            <div className="mt-3 divide-y divide-[var(--border-subtle)]">
               {initialData.assets.length === 0 ? (
-                <p className="py-6 text-sm text-white/70">No assets recorded yet.</p>
+                <p className="py-6 text-sm text-[var(--text-secondary)]">No assets recorded yet.</p>
               ) : (
                 initialData.assets.map((asset) => (
                   <div
@@ -142,11 +142,11 @@ export function NetWorthPage({ initialData }: { initialData: NetWorthPageData })
                   >
                     <div>
                       <div className="font-semibold">{asset.name}</div>
-                      <div className="text-xs font-bold uppercase tracking-[0.12em] text-white/70">
+                      <div className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
                         {asset.category}
                       </div>
                     </div>
-                    <div className="font-bold text-emerald-300">
+                    <div className="font-bold text-[var(--accent-primary-text)]">
                       {formatMoney(asset.valueCents)}
                     </div>
                   </div>
@@ -155,7 +155,7 @@ export function NetWorthPage({ initialData }: { initialData: NetWorthPageData })
             </div>
           </div>
 
-          <div className="rounded-lg border border-white/15 bg-zinc-950 p-4 text-white shadow-sm">
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--accent-brand)] p-4 text-white shadow-sm">
             <h2 className="text-lg font-bold">Model inputs</h2>
             <dl className="mt-4 grid gap-3 text-sm">
               <InputRow label="Starting balance" value={formatMoney(initialData.startingBalanceCents)} />
@@ -359,7 +359,7 @@ function StackedProjectionChart({
           {formatMoney(points.at(-1)?.totalCents ?? 0)}
         </text>
       </svg>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm font-bold text-white/70">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm font-bold text-[var(--text-secondary)]">
         <div className="flex flex-wrap gap-4">
           <span className="inline-flex items-center gap-2">
             <span className="h-1 w-8 rounded-full bg-[#475569]" />
@@ -389,24 +389,24 @@ function Metric({
 }) {
   const color =
     tone === "green"
-      ? "text-emerald-300"
+      ? "text-[var(--accent-primary-text)]"
       : tone === "red"
-        ? "text-red-300"
+        ? "text-[var(--accent-negative-text)]"
         : tone === "amber"
-          ? "text-amber-200"
+          ? "text-[var(--accent-warning-text)]"
           : tone === "purple"
             ? "text-violet-200"
-            : "text-sky-200";
+            : "text-[var(--accent-brand-text)]";
 
   return (
-    <div className="rounded-lg border border-white/20 bg-black/15 backdrop-blur-md p-4 text-white shadow-sm">
-      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/85">
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] backdrop-blur-md p-4 text-[var(--text-primary)] shadow-sm">
+      <div className="text-xs font-black uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         {label}
       </div>
       <div className={`mt-3 text-3xl font-black tracking-tight ${color}`}>
         {value}
       </div>
-      <div className="mt-2 text-sm font-medium leading-snug text-white/70">{sub}</div>
+      <div className="mt-2 text-sm font-medium leading-snug text-[var(--text-secondary)]">{sub}</div>
     </div>
   );
 }

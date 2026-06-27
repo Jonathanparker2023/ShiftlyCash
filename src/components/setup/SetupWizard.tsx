@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 const FIELD =
-  "h-11 w-full rounded-xl border border-white/10 bg-white/[0.05] px-3.5 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:bg-white/[0.08] focus:ring-2 focus:ring-white/10";
+  "h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-3.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:bg-[var(--surface-hover)] focus:ring-2 focus:ring-[var(--accent-ring)]";
 
 type IncomeKind = "hourly" | "salary";
 
@@ -16,22 +16,22 @@ export function SetupWizard() {
   const next = useRowCounter();
 
   return (
-    <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-8">
+    <main className="min-h-screen px-4 py-6 text-[var(--text-primary)] sm:px-6 lg:px-8">
       <section className="mx-auto max-w-3xl">
         <header className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
             Welcome
           </p>
           <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">
             Let&apos;s set up your money
           </h1>
-          <p className="mt-1.5 text-sm text-white/65">
+          <p className="mt-1.5 text-sm text-[var(--text-tertiary)]">
             Tell us how you earn and what you owe. We&apos;ll turn it into a
             simple daily picture of your cashflow.
           </p>
         </header>
 
-        <div className="mb-5 rounded-xl border border-sky-300/30 bg-sky-500/10 px-4 py-3 text-xs font-medium text-sky-100">
+        <div className="mb-5 rounded-xl border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] px-4 py-3 text-xs font-medium text-[var(--accent-brand-text)]">
           Preview — this is the consumer setup flow. Saving gets wired up in the
           next build phase; nothing here is stored yet.
         </div>
@@ -85,7 +85,7 @@ export function SetupWizard() {
             blurb="Optionally connect your bank so transactions flow in automatically. You can skip this and add it later."
           >
             <button
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/15"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-4 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
               type="button"
             >
               Connect a bank
@@ -105,11 +105,11 @@ export function SetupWizard() {
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-white/45">
+          <p className="text-xs text-[var(--text-muted)]">
             You can change any of this later in settings.
           </p>
           <Link
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 bg-white/10 px-5 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/15"
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
             href="/"
           >
             Finish setup
@@ -140,14 +140,14 @@ function SetupCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
       <div className="flex items-start gap-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-hover)] text-sm font-semibold">
           {step}
         </span>
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-          <p className="mt-1 text-sm text-white/60">{blurb}</p>
+          <p className="mt-1 text-sm text-[var(--text-tertiary)]">{blurb}</p>
         </div>
       </div>
       <div className="mt-4 space-y-3">{children}</div>
@@ -159,7 +159,7 @@ function IncomeSourceRow() {
   const [kind, setKind] = useState<IncomeKind>("hourly");
 
   return (
-    <div className="grid gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 sm:grid-cols-2">
+    <div className="grid gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-3 sm:grid-cols-2">
       <label className="block">
         <FieldLabel>Name</FieldLabel>
         <input className={FIELD} placeholder="Main job" />
@@ -189,7 +189,7 @@ function IncomeSourceRow() {
 
 function ExpenseRow() {
   return (
-    <div className="grid gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 sm:grid-cols-3">
+    <div className="grid gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-3 sm:grid-cols-3">
       <label className="block sm:col-span-1">
         <FieldLabel>Name</FieldLabel>
         <input className={FIELD} placeholder="Rent" />
@@ -208,7 +208,7 @@ function ExpenseRow() {
 
 function DebtRow() {
   return (
-    <div className="grid gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 sm:grid-cols-4">
+    <div className="grid gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-3 sm:grid-cols-4">
       <label className="block">
         <FieldLabel>Name</FieldLabel>
         <input className={FIELD} placeholder="Car loan" />
@@ -238,7 +238,7 @@ function AddRowButton({
 }) {
   return (
     <button
-      className="inline-flex h-10 items-center gap-2 rounded-xl border border-dashed border-white/20 bg-transparent px-3.5 text-sm font-semibold text-white/70 transition hover:border-white/40 hover:text-white"
+      className="inline-flex h-10 items-center gap-2 rounded-xl border border-dashed border-[var(--border-default)] bg-transparent px-3.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
       onClick={onClick}
       type="button"
     >
@@ -250,7 +250,7 @@ function AddRowButton({
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-[0.13em] text-white/50">
+    <span className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-[0.13em] text-[var(--text-tertiary)]">
       {children}
     </span>
   );
