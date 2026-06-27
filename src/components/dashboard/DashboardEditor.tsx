@@ -1808,6 +1808,7 @@ function TransactionDrawer({
       <div className="grid gap-3 lg:grid-cols-2">
         <TransactionColumn
           heading="SPENDING"
+          gasSpendCents={day.gasSpendCents}
           pendingTransactionIds={pendingTransactionIds}
           transactions={appliedTransactions}
           variant="spending"
@@ -1900,6 +1901,7 @@ function TransactionColumn({
   onToggle,
   onAllocateGas,
   onAmortize,
+  gasSpendCents,
 }: {
   heading: string;
   pendingTransactionIds: Set<string>;
@@ -1915,7 +1917,10 @@ function TransactionColumn({
     previousFillDate: string | null,
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
+  gasSpendCents?: number;
 }) {
+  const showGasRow =
+    variant === "spending" && !!gasSpendCents && gasSpendCents > 0;
   return (
     <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -1923,11 +1928,26 @@ function TransactionColumn({
           {heading}
         </h3>
         <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
-          {transactions.length}
+          {transactions.length + (showGasRow ? 1 : 0)}
         </span>
       </div>
 
       <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+        {showGasRow ? (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium text-sky-500">
+                Gas
+              </div>
+              <div className="text-[11px] text-[var(--text-tertiary)]">
+                daily average spread
+              </div>
+            </div>
+            <div className="shrink-0 text-sm font-semibold tabular-nums text-sky-500">
+              {formatMoney(gasSpendCents ?? 0)}
+            </div>
+          </div>
+        ) : null}
         {transactions.map((transaction) => (
           <TransactionRowButton
             key={transaction.id}
@@ -2646,14 +2666,6 @@ function TotalsPanel({
           tone="negative"
           value={formatMoney(spendCents)}
         />
-        {day.gasSpendCents > 0 ? (
-          <div className="flex items-center justify-between gap-3 py-0.5 pl-4 text-xs">
-            <span className="text-sky-500">↳ incl. Gas</span>
-            <span className="font-semibold tabular-nums text-sky-500">
-              {formatMoney(day.gasSpendCents)}
-            </span>
-          </div>
-        ) : null}
         <button
           aria-expanded={showBaseBreakdown}
           className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
