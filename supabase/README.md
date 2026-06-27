@@ -1,6 +1,6 @@
-# ShiftlyCash Database Layer
+# Bashflow Database Layer
 
-This folder contains the Supabase/Postgres schema for the ShiftlyCash rebuild. It is intentionally database-only: no Next.js app code, no Firebase writes, and no live state mutation.
+This folder contains the Supabase/Postgres schema for the Bashflow rebuild. It is intentionally database-only: no Next.js app code, no Firebase writes, and no live state mutation.
 
 ## Migration Files
 
@@ -40,7 +40,7 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-Review the SQL diff that Supabase prints before confirming. Do not run this against a project that already contains production ShiftlyCash data.
+Review the SQL diff that Supabase prints before confirming. Do not run this against a project that already contains production Bashflow data.
 
 ## Magic-Link Bootstrap
 

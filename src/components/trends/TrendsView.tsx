@@ -118,7 +118,7 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-              ShiftlyCash
+              Bashflow
             </p>
             <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">Trends</h1>
             <p className="mt-1.5 text-sm text-[var(--text-tertiary)]">

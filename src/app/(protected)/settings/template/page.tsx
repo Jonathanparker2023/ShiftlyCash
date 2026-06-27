@@ -29,7 +29,7 @@ export default async function TemplateSettingsPage() {
       <section className="mx-auto max-w-3xl">
         <header className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-            ShiftlyCash
+            Bashflow
           </p>
           <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">
             Templates

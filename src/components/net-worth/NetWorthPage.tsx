@@ -42,7 +42,7 @@ export function NetWorthPage({ initialData }: { initialData: NetWorthPageData })
         <div className="grid gap-4 lg:grid-cols-[1fr_300px] lg:items-start">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-              ShiftlyCash
+              Bashflow
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
               Net Worth

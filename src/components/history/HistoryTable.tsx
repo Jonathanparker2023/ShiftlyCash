@@ -64,7 +64,7 @@ export function HistoryTable({ initialData }: { initialData: HistoryData }) {
     <div className="min-h-screen px-4 py-5 text-[var(--text-primary)] sm:px-6 lg:px-8">
       <header className="mx-auto mb-5 max-w-7xl border-b border-[var(--border-subtle)] pb-4">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-          ShiftlyCash
+          Bashflow
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">History</h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">

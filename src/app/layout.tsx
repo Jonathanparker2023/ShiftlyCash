@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ShiftlyCash",
+  title: "Bashflow",
   description: "Personal cashflow tracking for shift work.",
 };
 

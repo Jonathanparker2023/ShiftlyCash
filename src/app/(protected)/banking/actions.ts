@@ -86,7 +86,7 @@ export async function createLinkTokenAction(): Promise<CreateLinkTokenResult> {
   const config = getPlaidServerEnv();
   const client = getPlaidClient();
   const response = await client.linkTokenCreate({
-    client_name: "ShiftlyCash",
+    client_name: "Bashflow",
     country_codes: toPlaidCountryCodes(config),
     language: "en",
     products: toPlaidProducts(config),

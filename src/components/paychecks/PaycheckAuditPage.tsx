@@ -430,7 +430,7 @@ function PaycheckPeriodCard({
           </button>
         </div>
         <p className="mt-2 text-xs text-[var(--text-tertiary)]">
-          Paste the net {job.label} amount from your paystub. ShiftlyCash compares it to expected take-home.
+          Paste the net {job.label} amount from your paystub. Bashflow compares it to expected take-home.
         </p>
       </form>
 

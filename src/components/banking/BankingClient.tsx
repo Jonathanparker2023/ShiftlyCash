@@ -150,7 +150,7 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
       <header className="mx-auto mb-5 flex max-w-7xl flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            ShiftlyCash
+            Bashflow
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Banking</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">

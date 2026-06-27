@@ -11,7 +11,7 @@ export default function Error({
     <main className="flex min-h-screen items-center justify-center bg-[var(--surface-base)] px-4 text-[var(--text-primary)]">
       <section className="w-full max-w-lg rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-          ShiftlyCash
+          Bashflow
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">
           Dashboard could not load.

@@ -1,6 +1,6 @@
-# ShiftlyCash
+# Bashflow
 
-Next.js App Router scaffold for the ShiftlyCash rebuild. This step only covers Supabase magic-link auth and the protected signed-in landing page.
+Next.js App Router scaffold for the Bashflow rebuild. This step only covers Supabase magic-link auth and the protected signed-in landing page.
 
 ## Environment
 

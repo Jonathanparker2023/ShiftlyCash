@@ -1,6 +1,6 @@
 # Net Worth System Spec
 
-**Audience:** an AI coding agent implementing the future Net Worth page in ShiftlyCash.
+**Audience:** an AI coding agent implementing the future Net Worth page in Bashflow.
 
 This page is not the Debt page. It may reuse projection primitives, but its visual contract and data contract live here.
 

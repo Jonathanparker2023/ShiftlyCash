@@ -30,14 +30,14 @@ export function AppNav({
       href="/"
     >
       <Image
-        alt="ShiftlyCash"
+        alt="Bashflow"
         className="drop-shadow-[0_2px_8px_rgba(16,184,96,0.35)]"
         height={30}
         priority
         src="/logo.svg"
         width={30}
       />
-      <span>ShiftlyCash</span>
+      <span>Bashflow</span>
     </Link>
   );
 

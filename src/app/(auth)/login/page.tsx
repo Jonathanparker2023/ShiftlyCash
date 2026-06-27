@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <section className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
         <div className="mb-8">
           <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            ShiftlyCash
+            Bashflow
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">
             Sign in
@@ -40,7 +40,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             className="h-12 w-full rounded-md bg-[var(--accent-brand)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)]"
             type="submit"
           >
-            Unlock ShiftlyCash
+            Unlock Bashflow
           </button>
         </form>
 

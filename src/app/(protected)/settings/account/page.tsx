@@ -18,7 +18,7 @@ export default async function AccountSettingsPage({
     <main className="min-h-screen bg-[var(--surface-base)] px-4 py-5 text-[var(--text-primary)] sm:px-6 lg:px-8">
       <section className="mx-auto max-w-xl rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-          ShiftlyCash
+          Bashflow
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           Account password

@@ -187,7 +187,7 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
               className="text-xs font-semibold uppercase tracking-[0.18em]"
               style={{ color: "var(--accent-brand-text)" }}
             >
-              ShiftlyCash
+              Bashflow
             </p>
             <h1
               className="mt-1 text-3xl font-semibold"
