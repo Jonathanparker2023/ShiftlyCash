@@ -278,7 +278,7 @@ function ShiftRow({ slot }: { slot: HistoryDetailSlot }) {
         <div className="flex min-w-0 items-center gap-2">
           <span className="shrink-0 text-xs font-semibold">Other</span>
           <span className="shrink-0 rounded bg-black/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
-            Amortized
+            Prorated
           </span>
           <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
             {slot.label || ""}

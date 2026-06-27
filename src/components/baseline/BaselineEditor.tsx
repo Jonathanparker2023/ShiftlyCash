@@ -683,11 +683,11 @@ function AmortizedIncomeSection({
       <div className="mb-3 flex flex-col gap-3 px-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
-            Amortized Income
+            Prorated Income
           </h2>
           <p className="mt-1 text-xs text-white/45">
-            One-time cash spread evenly as daily &quot;Other&quot; earnings across
-            a date range.
+            One-time cash prorated evenly as daily &quot;Other&quot; earnings
+            across a date range.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -706,7 +706,7 @@ function AmortizedIncomeSection({
       {buckets.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-5 py-12 text-center">
           <p className="text-sm font-medium text-white/70">
-            No amortized income yet.
+            No prorated income yet.
           </p>
           <p className="mt-1 text-xs text-white/45">
             Add a bucket (e.g. &quot;Lean Break&quot;) and list the one-time
