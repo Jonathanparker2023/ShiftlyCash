@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: "/baseline", label: "Fixed", capability: "showFixed" },
   { href: "/history", label: "History", capability: "showHistory" },
   { href: "/trends", label: "Trends", capability: "showTrends" },
+  { href: "/goals", label: "Goals", capability: "showGoals" },
   { href: "/paychecks", label: "Paychecks", capability: "showPaycheckAudit" },
   { href: "/debt", label: "Debt", capability: "showDebt" },
   { href: "/net-worth", label: "Net Worth", capability: "showNetWorth" },

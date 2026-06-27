@@ -4,6 +4,7 @@ export type EditionCapabilities = {
   showDashboard: boolean;
   showFixed: boolean;
   showHistory: boolean;
+  showGoals: boolean;
   showDebt: boolean;
   showBanking: boolean;
   showNetWorth: boolean;
@@ -24,6 +25,7 @@ export const EDITION_CAPABILITIES = {
     showDashboard: true,
     showFixed: true,
     showHistory: true,
+    showGoals: true,
     showDebt: true,
     showBanking: true,
     showNetWorth: true,
@@ -42,6 +44,7 @@ export const EDITION_CAPABILITIES = {
     showDashboard: true,
     showFixed: true,
     showHistory: true,
+    showGoals: false,
     showDebt: true,
     showBanking: true,
     showNetWorth: true,
