@@ -31,12 +31,18 @@ export default async function HistoryDetailPage({
 
   return (
     <div>
-      <div className="mx-auto max-w-7xl px-3 pt-4 sm:px-4 lg:px-6">
+      <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 pt-4 sm:px-4 lg:px-6">
         <Link
           className="inline-flex h-9 items-center rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] backdrop-blur-md transition hover:border-[var(--border-strong)]"
+          href="/trends"
+        >
+          ← Back to Trends
+        </Link>
+        <Link
+          className="inline-flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-tertiary)] backdrop-blur-md transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
           href="/history"
         >
-          ← Back to History
+          History
         </Link>
       </div>
       <DashboardEditor initialData={data} key={data.week.id} mode="historical" />

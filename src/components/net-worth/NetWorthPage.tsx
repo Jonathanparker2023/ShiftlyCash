@@ -228,7 +228,7 @@ function StackedProjectionChart({
           return (
             <g key={ratio}>
               <line
-                stroke="rgba(255,255,255,0.14)"
+                className="stroke-[var(--chart-grid)]"
                 strokeWidth="1"
                 x1={PAD.left}
                 x2={W - PAD.right}
@@ -236,7 +236,7 @@ function StackedProjectionChart({
                 y2={yy}
               />
               <text
-                fill="rgba(255,255,255,0.62)"
+                className="fill-[var(--chart-axis)]"
                 fontSize="12"
                 fontWeight="700"
                 textAnchor="end"
@@ -250,7 +250,7 @@ function StackedProjectionChart({
         })}
 
         <line
-          stroke="rgba(255,255,255,0.48)"
+          className="stroke-[var(--chart-zero)]"
           strokeDasharray="5 5"
           x1={PAD.left}
           x2={W - PAD.right}
@@ -260,13 +260,13 @@ function StackedProjectionChart({
 
         <path d={principalArea} fill="rgba(100,116,139,0.24)" />
         <path d={interestArea} fill="rgba(20,184,166,0.32)" />
-        <path d={principalPath} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2.5" />
+        <path className="stroke-[var(--chart-principal)]" d={principalPath} fill="none" strokeWidth="2.5" />
         <path d={totalPath} fill="none" stroke="#0f766e" strokeWidth="3" />
 
         {labelPoint ? (
           <>
             <text
-              fill="rgba(255,255,255,0.62)"
+              className="fill-[var(--chart-principal)]"
               fontSize="13"
               fontWeight="800"
               textAnchor="end"
@@ -336,7 +336,7 @@ function StackedProjectionChart({
               <title>{tooltipText(point)}</title>
             </circle>
             <text
-              fill="rgba(255,255,255,0.62)"
+              className="fill-[var(--chart-axis)]"
               fontSize="12"
               fontWeight="700"
               textAnchor="middle"
@@ -395,7 +395,7 @@ function Metric({
         : tone === "amber"
           ? "text-[var(--accent-warning-text)]"
           : tone === "purple"
-            ? "text-violet-200"
+            ? "text-[var(--accent-brand-text)]"
             : "text-[var(--accent-brand-text)]";
 
   return (

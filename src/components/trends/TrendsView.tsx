@@ -315,7 +315,7 @@ function WeeklyCashflowChart({
       >
         {/* zero baseline */}
         <line
-          stroke="rgba(255,255,255,0.25)"
+          className="stroke-[var(--chart-zero)]"
           strokeWidth={1}
           x1={0}
           x2={VBW}
@@ -324,7 +324,7 @@ function WeeklyCashflowChart({
         />
         {/* $1,000 target line */}
         <line
-          stroke="rgba(255,255,255,0.45)"
+          className="stroke-[var(--chart-axis)]"
           strokeWidth={1.25}
           x1={0}
           x2={VBW}
@@ -332,7 +332,7 @@ function WeeklyCashflowChart({
           y2={targetY}
         />
         <text
-          fill="rgba(255,255,255,0.55)"
+          className="fill-[var(--chart-axis)]"
           fontSize={11}
           x={6}
           y={targetY - 5}
@@ -342,7 +342,7 @@ function WeeklyCashflowChart({
         {/* median guide */}
         {medianCents !== 0 ? (
           <line
-            stroke="rgba(255,255,255,0.18)"
+            className="stroke-[var(--chart-grid)]"
             strokeDasharray="4 5"
             strokeWidth={1}
             x1={0}
@@ -364,7 +364,14 @@ function WeeklyCashflowChart({
               className="cursor-pointer"
               key={week.weekId}
               onClick={() => router.push(`/history/${week.weekId}`)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  router.push(`/history/${week.weekId}`);
+                }
+              }}
               role="link"
+              tabIndex={0}
             >
               {/* full-column transparent hit area so the whole week is clickable */}
               <rect fill="transparent" height={VBH} width={slot} x={i * slot} y={0} />
@@ -384,7 +391,7 @@ function WeeklyCashflowChart({
               ) : null}
               {i % labelEvery === 0 ? (
                 <text
-                  fill="rgba(255,255,255,0.5)"
+                  className="fill-[var(--chart-axis)]"
                   fontSize={11}
                   textAnchor="middle"
                   x={cx}

@@ -422,7 +422,7 @@ function PaycheckPeriodCard({
             value={actualValue}
           />
           <button
-            className="h-10 rounded-md bg-[var(--accent-brand)] px-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
+            className="h-10 rounded-md bg-[var(--accent-brand)] px-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)]"
             disabled={!period.actualWeekId}
             type="submit"
           >
@@ -473,7 +473,7 @@ function PaycheckPeriodCard({
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            className="h-10 rounded-md bg-[var(--accent-brand)] px-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)]"
+            className="h-10 rounded-md bg-[var(--accent-brand)] px-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)]"
             disabled={!canReconcile}
             onClick={() => {
               if (parsedCents === null) return;
@@ -664,7 +664,7 @@ function StatusPill({
     neutral: "border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md text-[var(--text-tertiary)]",
     short: "border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] text-[var(--accent-negative-text)]",
     over: "border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] text-[var(--accent-primary-text)]",
-    match: "border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] text-[var(--accent-primary-text)]",
+    match: "border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] text-[var(--accent-brand-text)]",
   };
   const label =
     differenceCents === null
@@ -692,7 +692,7 @@ function SaveBadge({ state, error }: { state: SaveState; error: string | null })
       className={
         state === "error"
           ? "rounded-full bg-[var(--accent-negative-fill)] px-3 py-1 text-xs font-semibold text-[var(--accent-negative-text)]"
-          : "rounded-full bg-[var(--accent-brand-fill)] px-3 py-1 text-xs font-semibold text-[var(--accent-primary-text)]"
+          : "rounded-full bg-[var(--accent-brand-fill)] px-3 py-1 text-xs font-semibold text-[var(--accent-brand-text)]"
       }
     >
       {state === "saving" ? "Saving..." : state === "saved" ? "Saved" : error}

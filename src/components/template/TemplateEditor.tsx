@@ -216,8 +216,8 @@ function WeekDayButton({
       className={[
         "flex min-w-[68px] flex-col items-center gap-1.5 rounded-xl border px-3 py-2.5 transition",
         active
-          ? "border-[var(--border-default)] bg-[var(--surface-hover)]"
-          : "border-[var(--border-subtle)] bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]",
+          ? "border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] text-[var(--accent-brand-text)]"
+          : "border-[var(--border-subtle)] bg-[var(--surface-hover)] hover:bg-[var(--surface-overlay)]",
       ].join(" ")}
       onClick={onSelect}
       type="button"

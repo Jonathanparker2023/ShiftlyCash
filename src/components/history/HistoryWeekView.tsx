@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
@@ -92,12 +91,6 @@ export function HistoryWeekView({ data }: { data: HistoryDetailData }) {
 
   return (
     <main className="mx-auto max-w-7xl space-y-5">
-      <Link
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-brand-text)] transition hover:opacity-80"
-        href="/trends"
-      >
-        <span aria-hidden="true">←</span> Back to Trends
-      </Link>
       <section className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[0_14px_36px_rgba(8,15,28,0.24)] backdrop-blur-md">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {metrics.map((metric) => (

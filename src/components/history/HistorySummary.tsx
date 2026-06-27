@@ -351,7 +351,7 @@ function SortableCustomizeRow({
       <label className="flex min-w-0 flex-1 items-center gap-3 text-sm font-semibold text-[var(--text-primary)]">
         <input
           checked={!hidden}
-          className="h-4 w-4 accent-white"
+          className="h-4 w-4 accent-[var(--accent-brand)]"
           onChange={onToggle}
           type="checkbox"
         />
