@@ -114,6 +114,11 @@ type TransactionRow = {
   review_reason: string | null;
 };
 
+type GasSpreadRow = {
+  day_id: string;
+  gas_spend_cents: NumericValue;
+};
+
 type GasAllocationRow = {
   source_transaction_id: string;
   gas_amount_cents: NumericValue;
@@ -378,6 +383,22 @@ export async function getDashboardData(
     }
   }
 
+  // Per-day gas SPREAD (the converging daily slice). Surfaced so the dashboard
+  // shows a visible "Gas" line on every day in the spread window, not only the
+  // fill-day transaction. Soft-fail like the other overlays.
+  let gasSpread: GasSpreadRow[] = [];
+  if (dayIds.length > 0) {
+    const { data: gasSpreadData, error: gasSpreadError } = await supabase
+      .from("v_day_gas_spend_totals")
+      .select("day_id,gas_spend_cents")
+      .in("day_id", dayIds);
+    if (gasSpreadError) {
+      console.warn(`[dashboard] gas spread unavailable: ${gasSpreadError.message}`);
+    } else {
+      gasSpread = (gasSpreadData ?? []) as GasSpreadRow[];
+    }
+  }
+
   // Per-day fixed-cost breakdown (the "Fixed" drill-down). Soft-fail: if the
   // derivation view isn't present yet (pre-migration) the dashboard still
   // renders, just with empty breakdowns.
@@ -454,6 +475,7 @@ export async function getDashboardData(
     projectionWeeks: (projectionWeekData ?? []) as ProjectionWeekRow[],
     baseAllocations,
     bucketCredits,
+    gasSpread,
     customJobs,
     todayIso,
   });
@@ -476,6 +498,7 @@ function mapDashboardData(input: {
   projectionWeeks: ProjectionWeekRow[];
   baseAllocations: BaseAllocationRow[];
   bucketCredits: AmortizationCreditRow[];
+  gasSpread: GasSpreadRow[];
   customJobs: CustomJobRow[];
   todayIso: string;
 }): DashboardData {
@@ -536,6 +559,12 @@ function mapDashboardData(input: {
     list.push(row);
     creditsByDay.set(row.day_id, list);
   }
+  const gasSpendByDay = new Map(
+    input.gasSpread.map((row) => [
+      row.day_id,
+      Math.round(toNumber(row.gas_spend_cents)),
+    ]),
+  );
   const days = input.days.map((day) =>
     mapDashboardDay(
       day,
@@ -544,6 +573,7 @@ function mapDashboardData(input: {
       totalsByDay.get(day.id),
       allocationsByDay.get(day.id) ?? [],
       creditsByDay.get(day.id) ?? [],
+      gasSpendByDay.get(day.id) ?? 0,
       customJobsById,
     ),
   );
@@ -741,6 +771,7 @@ function mapDashboardDay(
   totals: DayTotalRow | undefined,
   allocations: BaseAllocationRow[],
   credits: AmortizationCreditRow[],
+  gasSpendCents: number,
   customJobsById: Map<string, CustomJobRow>,
 ): DashboardDay {
   const existingSlots = new Map(slots.map((slot) => [slot.slot_index, slot]));
@@ -766,6 +797,7 @@ function mapDashboardDay(
     baseCents,
     spendCents,
     transactionSpendCents,
+    gasSpendCents,
     spendLocked: day.spend_locked,
     baseBreakdown: allocations
       .map((row) => ({

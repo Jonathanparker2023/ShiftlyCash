@@ -96,6 +96,7 @@ export type DashboardDay = {
   baseCents: number;
   spendCents: number;
   transactionSpendCents: number;
+  gasSpendCents: number;
   spendLocked: boolean;
   baseBreakdown: DashboardBaseAllocation[];
   totals: DayTotals;
