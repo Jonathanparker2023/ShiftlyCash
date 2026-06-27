@@ -15,14 +15,21 @@
 --
 -- Slices use a cumulative-floor (Bresenham) split over [first_date .. today] so
 -- they sum EXACTLY to the gas total (no rounding drift). Order-independent: a
--- pure function of the set of active (gas_amount_cents, fill_date) rows + today.
--- The legacy per-fill columns (previous_fill_date, generated start_date,
--- remainder_amount_cents) no longer feed the math (left in place, dead).
+-- pure function of the set of active (gas_amount_cents, start_date) rows + today.
+-- The legacy per-fill columns (previous_fill_date, remainder_amount_cents) no
+-- longer feed the math (left in place, dead).
+--
+-- first_date = the earliest tank START (previous_fill_date+1, stored as
+-- start_date), NOT the earliest fill_date. This way a SINGLE fill still spreads
+-- back across its tank period instead of dumping the whole amount on the fill
+-- day with $0 on the days around it (the original min(fill_date) made one fill
+-- collapse to a single day). As more fills land, the average converges over the
+-- whole history from that first tank start. coalesce() guards a null start_date.
 create or replace view public.v_day_gas_spend_totals as
 with agg as (
   select ga.user_id,
          sum(ga.gas_amount_cents)::numeric as numerator,
-         min(ga.fill_date) as first_date,
+         min(coalesce(ga.start_date, ga.fill_date)) as first_date,
          (now() at time zone 'America/New_York')::date as today
   from gas_allocations ga
   where ga.is_active
