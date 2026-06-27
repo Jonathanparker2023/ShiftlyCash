@@ -1305,14 +1305,27 @@ function SpendBreakdownPanel({
   breakdown: SpendBreakdown;
   totalCents: number;
 }) {
-  const rows: { key: string; label: string; cents: number; muted?: boolean }[] =
-    [
-      ...breakdown.categories.map((category) => ({
-        key: category.key,
-        label: category.label,
-        cents: category.cents,
-      })),
-    ];
+  const rows: {
+    key: string;
+    label: string;
+    cents: number;
+    muted?: boolean;
+    gas?: boolean;
+  }[] = [
+    ...breakdown.categories.map((category) => ({
+      key: category.key,
+      label: category.label,
+      cents: category.cents,
+    })),
+  ];
+  if (breakdown.gasCents !== 0) {
+    rows.push({
+      key: "__gas",
+      label: "Incl. Gas",
+      cents: breakdown.gasCents,
+      gas: true,
+    });
+  }
   if (breakdown.otherCents !== 0) {
     rows.push({
       key: "__other",
@@ -1352,14 +1365,18 @@ function SpendBreakdownPanel({
             >
               <span
                 className={
-                  row.muted
-                    ? "text-[var(--text-secondary)]"
-                    : "text-[var(--text-primary)]"
+                  row.gas
+                    ? "font-medium text-sky-500"
+                    : row.muted
+                      ? "text-[var(--text-secondary)]"
+                      : "text-[var(--text-primary)]"
                 }
               >
                 {row.label}
               </span>
-              <span className="font-medium tabular-nums">
+              <span
+                className={`font-medium tabular-nums ${row.gas ? "text-sky-500" : ""}`}
+              >
                 {formatMoney(row.cents)}
                 {totalCents > 0 ? (
                   <span className="ml-2 text-[11px] text-[var(--text-tertiary)]">
@@ -2627,16 +2644,6 @@ function TotalsPanel({
           tone="negative"
           value={formatMoney(spendCents)}
         />
-        {day.gasSpendCents > 0 ? (
-          <div className="flex items-center justify-between gap-3 py-0.5 pl-3 text-xs">
-            <span className="text-sky-300 drop-shadow-[0_0_6px_rgba(56,189,248,0.5)]">
-              incl. Gas
-            </span>
-            <span className="font-semibold tabular-nums text-sky-200">
-              {formatMoney(day.gasSpendCents)}
-            </span>
-          </div>
-        ) : null}
         <button
           aria-expanded={showBaseBreakdown}
           className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
@@ -3199,6 +3206,7 @@ type SpendBreakdown = {
   transactionsCents: number;
   manualCents: number;
   otherCents: number;
+  gasCents: number;
 };
 
 // Decompose the week's Spend into the parts that produce it. The displayed Spend
@@ -3209,10 +3217,12 @@ type SpendBreakdown = {
 function buildSpendBreakdown(days: DashboardDay[]): SpendBreakdown {
   let transactionsCents = 0;
   let manualCents = 0;
+  let gasCents = 0;
   const byCategory = new Map<string, number>();
   for (const day of days) {
     transactionsCents += day.transactionSpendCents;
     manualCents += day.spendCents;
+    gasCents += day.gasSpendCents;
     for (const transaction of day.appliedTransactions) {
       const key = transaction.category ?? "UNCATEGORIZED";
       byCategory.set(key, (byCategory.get(key) ?? 0) + transaction.amountCents);
@@ -3230,7 +3240,12 @@ function buildSpendBreakdown(days: DashboardDay[]): SpendBreakdown {
     categories,
     transactionsCents,
     manualCents,
-    otherCents: transactionsCents - categorizedCents,
+    gasCents,
+    // transaction_spend_total already folds in the daily gas slice (the fill's gas
+    // is carved out of its source transaction and redistributed across the tank's
+    // days), so gas lives inside the transactions component. Surface it as its own
+    // "Incl. Gas" row and subtract it from Other so the rows still reconcile.
+    otherCents: transactionsCents - categorizedCents - gasCents,
   };
 }
 
