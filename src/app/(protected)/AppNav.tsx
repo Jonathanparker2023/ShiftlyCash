@@ -40,7 +40,7 @@ export function AppNav({
           fontFamily: "var(--font-jost), sans-serif",
           color: "#cba135",
           backgroundImage:
-            "linear-gradient(120deg,#9c7a24 0%,#c8a32d 30%,#ecca5e 50%,#d4af37 70%,#a9842f 100%)",
+            "linear-gradient(120deg,#9c7a24 0%,#c8a32d 24%,#f7e39a 44%,#e8c45a 56%,#b8902a 74%,#f0dd95 90%,#9c7a24 100%)",
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           WebkitTextFillColor: "transparent",
