@@ -1194,13 +1194,15 @@ export function DashboardEditor({
             {(() => {
               const wage = buildWageJobHours(days);
               return (
-                <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[var(--text-primary)]">
+                <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-[var(--text-primary)]">
                   {wage.jobs.map((job) => (
-                    <span key={job.key}>
+                    <span key={job.key} style={{ color: job.color }}>
                       {job.label}: {job.hours.toFixed(2)}h
                     </span>
                   ))}
-                  <span>Total: {wage.total.toFixed(2)}h</span>
+                  <span className="text-[var(--accent-primary-text)]">
+                    Total: {wage.total.toFixed(2)}h
+                  </span>
                 </div>
               );
             })()}
@@ -3458,7 +3460,7 @@ function formatNumberInput(value: number): string {
 // line by its name (e.g. "CCF"). Jobs with zero hours are dropped (so Ability
 // disappears the moment it's not worked), and Total is the sum of what's shown.
 function buildWageJobHours(days: DashboardDay[]): {
-  jobs: { key: string; label: string; hours: number }[];
+  jobs: { key: string; label: string; hours: number; color: string }[];
   total: number;
 } {
   const sumTypes = (types: string[]): number => {
@@ -3475,17 +3477,31 @@ function buildWageJobHours(days: DashboardDay[]): {
     );
   };
 
-  const jobs: { key: string; label: string; hours: number }[] = [];
+  const jobs: { key: string; label: string; hours: number; color: string }[] =
+    [];
   const prestige = sumTypes(["prestige", "prestige_ilst"]);
   if (prestige > 0) {
-    jobs.push({ key: "prestige", label: "Prestige", hours: prestige });
+    jobs.push({
+      key: "prestige",
+      label: "Prestige",
+      hours: prestige,
+      color: "#facc15",
+    });
   }
   const ability = sumTypes(["ability", "ability_incentive"]);
   if (ability > 0) {
-    jobs.push({ key: "ability", label: "Ability", hours: ability });
+    jobs.push({
+      key: "ability",
+      label: "Ability",
+      hours: ability,
+      color: "#1d4ed8",
+    });
   }
 
-  const customById = new Map<string, { label: string; hours: number }>();
+  const customById = new Map<
+    string,
+    { label: string; hours: number; color: string }
+  >();
   for (const day of days) {
     for (const slot of day.slots) {
       if (
@@ -3500,13 +3516,19 @@ function buildWageJobHours(days: DashboardDay[]): {
           customById.set(slot.customJobId, {
             label: slot.customName ?? "Custom",
             hours: slot.hoursOrUnits,
+            color: slot.customColor ?? "#3b82f6",
           });
         }
       }
     }
   }
   for (const [id, value] of customById) {
-    jobs.push({ key: `custom:${id}`, label: value.label, hours: value.hours });
+    jobs.push({
+      key: `custom:${id}`,
+      label: value.label,
+      hours: value.hours,
+      color: value.color,
+    });
   }
 
   const total = jobs.reduce((sum, job) => sum + job.hours, 0);
