@@ -1191,17 +1191,19 @@ export function DashboardEditor({
           ) : null}
 
           <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border-default)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[var(--text-primary)]">
-              <span>
-                Prestige:{" "}
-                {formatHoursFromSlots(days, ["prestige", "prestige_ilst"])}h
-              </span>
-              <span>
-                Ability:{" "}
-                {formatHoursFromSlots(days, ["ability", "ability_incentive"])}h
-              </span>
-              <span>Total: {weekTotals.wageHours.toFixed(2)}h</span>
-            </div>
+            {(() => {
+              const wage = buildWageJobHours(days);
+              return (
+                <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[var(--text-primary)]">
+                  {wage.jobs.map((job) => (
+                    <span key={job.key}>
+                      {job.label}: {job.hours.toFixed(2)}h
+                    </span>
+                  ))}
+                  <span>Total: {wage.total.toFixed(2)}h</span>
+                </div>
+              );
+            })()}
             <WeekNetSummary
               abilityNetCents={weekNetTotals.abilityNetCents}
               customNets={customNets}
@@ -3438,26 +3440,65 @@ function formatNumberInput(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatHoursFromSlots(
-  days: DashboardDay[],
-  jobTypes: JobType | JobType[],
-): string {
-  const selectedJobTypes = new Set(
-    Array.isArray(jobTypes) ? jobTypes : [jobTypes],
-  );
-  const hours = days.reduce((total, day) => {
-    const dayHours = day.slots.reduce((slotTotal, slot) => {
-      if (!selectedJobTypes.has(slot.jobType)) {
-        return slotTotal;
+// The week's hours readout, one line per job that ACTUALLY has hours this week.
+// Built-in Prestige (prestige + ILST) and Ability (ability + incentive variant)
+// are each folded into one line; every custom job that has hours gets its own
+// line by its name (e.g. "CCF"). Jobs with zero hours are dropped (so Ability
+// disappears the moment it's not worked), and Total is the sum of what's shown.
+function buildWageJobHours(days: DashboardDay[]): {
+  jobs: { key: string; label: string; hours: number }[];
+  total: number;
+} {
+  const sumTypes = (types: string[]): number => {
+    const set = new Set(types);
+    return days.reduce(
+      (total, day) =>
+        total +
+        day.slots.reduce(
+          (slotTotal, slot) =>
+            set.has(slot.jobType) ? slotTotal + slot.hoursOrUnits : slotTotal,
+          0,
+        ),
+      0,
+    );
+  };
+
+  const jobs: { key: string; label: string; hours: number }[] = [];
+  const prestige = sumTypes(["prestige", "prestige_ilst"]);
+  if (prestige > 0) {
+    jobs.push({ key: "prestige", label: "Prestige", hours: prestige });
+  }
+  const ability = sumTypes(["ability", "ability_incentive"]);
+  if (ability > 0) {
+    jobs.push({ key: "ability", label: "Ability", hours: ability });
+  }
+
+  const customById = new Map<string, { label: string; hours: number }>();
+  for (const day of days) {
+    for (const slot of day.slots) {
+      if (
+        slot.jobType === "custom" &&
+        slot.customJobId &&
+        slot.hoursOrUnits > 0
+      ) {
+        const existing = customById.get(slot.customJobId);
+        if (existing) {
+          existing.hours += slot.hoursOrUnits;
+        } else {
+          customById.set(slot.customJobId, {
+            label: slot.customName ?? "Custom",
+            hours: slot.hoursOrUnits,
+          });
+        }
       }
+    }
+  }
+  for (const [id, value] of customById) {
+    jobs.push({ key: `custom:${id}`, label: value.label, hours: value.hours });
+  }
 
-      return slotTotal + slot.hoursOrUnits;
-    }, 0);
-
-    return total + dayHours;
-  }, 0);
-
-  return hours.toFixed(2);
+  const total = jobs.reduce((sum, job) => sum + job.hours, 0);
+  return { jobs, total };
 }
 
 function formatJobLabel(value: string): string {
