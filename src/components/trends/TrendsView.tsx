@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { centsToDollars } from "@/lib/domain/money";
@@ -177,58 +177,9 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
 
           <GasTracker tracker={initialData.gasTracker} />
         </section>
-
-        {weeks.length > 0 ? (
-          <section className="mt-5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-            <h2 className="text-base font-semibold tracking-tight">
-              Jump to a week
-            </h2>
-            <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">
-              Open any week&apos;s full history view.
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {[...weeks].reverse().map((week) => (
-                <Link
-                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-overlay)]"
-                  href={`/history/${week.weekId}`}
-                  key={week.weekId}
-                >
-                  <span className="min-w-0 truncate">
-                    <span className="font-semibold text-[var(--text-primary)]">
-                      Week {week.weekNumber}
-                    </span>
-                    <span className="ml-2 text-xs text-[var(--text-tertiary)]">
-                      {formatWeekRange(week.startDate, week.endDate)}
-                    </span>
-                  </span>
-                  <span
-                    className={`shrink-0 font-semibold tabular-nums ${
-                      week.cashflowCents >= 0
-                        ? "text-[var(--accent-primary-text)]"
-                        : "text-[var(--accent-negative-text)]"
-                    }`}
-                  >
-                    {formatMoney(week.cashflowCents)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ) : null}
       </section>
     </main>
   );
-}
-
-function formatWeekRange(startIso: string, endIso: string): string {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-  return `${fmt.format(new Date(`${startIso}T00:00:00.000Z`))} – ${fmt.format(
-    new Date(`${endIso}T00:00:00.000Z`),
-  )}`;
 }
 
 function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
@@ -340,6 +291,7 @@ function WeeklyCashflowChart({
   weeks: TrendsWeek[];
   medianCents: number;
 }) {
+  const router = useRouter();
   const maxPos = Math.max(
     TARGET_LINE_CENTS,
     ...weeks.map((w) => w.cashflowCents),
@@ -408,7 +360,14 @@ function WeeklyCashflowChart({
           const barY = week.cashflowCents >= 0 ? valueY : zeroY;
 
           return (
-            <g key={week.weekId}>
+            <g
+              className="cursor-pointer"
+              key={week.weekId}
+              onClick={() => router.push(`/history/${week.weekId}`)}
+              role="link"
+            >
+              {/* full-column transparent hit area so the whole week is clickable */}
+              <rect fill="transparent" height={VBH} width={slot} x={i * slot} y={0} />
               <rect
                 fill={fill}
                 height={barH}
@@ -418,7 +377,7 @@ function WeeklyCashflowChart({
                 x={cx - barW / 2}
                 y={barY}
               >
-                <title>{`${week.startDate} · ${formatMoney(week.cashflowCents)}`}</title>
+                <title>{`${week.startDate} · ${formatMoney(week.cashflowCents)} — open week`}</title>
               </rect>
               {week.cashflowCents >= CONFETTI_CENTS ? (
                 <ConfettiBurst cx={cx} seed={i + 1} spread={barW} topY={valueY} />
