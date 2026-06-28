@@ -66,6 +66,7 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
   const [state, setState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   function ok() {
     setState("saved");
@@ -163,6 +164,55 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
     }
   }
 
+  // Render helpers so active + archived sections share identical row wiring.
+  const renderBuiltin = (job: JobsBuiltin) => (
+    <BuiltinRow
+      job={job}
+      key={job.key}
+      onHide={(hidden) => setBuiltinHidden(job.key, hidden)}
+      onRate={(reg, ot) => setBuiltinRate(job.key, reg, ot)}
+    />
+  );
+
+  const renderCustom = (job: JobsCustomJob) => (
+    <CustomRow
+      job={job}
+      key={job.id}
+      onColor={(color) => {
+        patchLocal(job.id, { color });
+        saveJob(job.id, { color });
+      }}
+      onDelete={() => {
+        patchLocal(job.id, { active: false });
+        deleteJob(job.id);
+      }}
+      onName={(name) => {
+        patchLocal(job.id, { name });
+        saveJob(job.id, { name });
+      }}
+      onRegular={(regularGrossRateCents) => {
+        patchLocal(job.id, computedRatePatch(job, { regularGrossRateCents }));
+        saveJob(job.id, { regularGrossRateCents });
+      }}
+      onRestore={() => {
+        patchLocal(job.id, { active: true });
+        saveJob(job.id, { active: true });
+      }}
+      onWithholding={(withholdingRate) => {
+        patchLocal(job.id, computedRatePatch(job, { withholdingRate }));
+        saveJob(job.id, { withholdingRate });
+      }}
+    />
+  );
+
+  // Archived = hidden built-ins + deleted (inactive) custom jobs. Their rates
+  // stay in the DB — this only controls whether they show in this list.
+  const activeBuiltins = builtins.filter((job) => !job.hidden);
+  const archivedBuiltins = builtins.filter((job) => job.hidden);
+  const activeCustom = customJobs.filter((job) => job.active);
+  const archivedCustom = customJobs.filter((job) => !job.active);
+  const archivedCount = archivedBuiltins.length + archivedCustom.length;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
@@ -184,46 +234,27 @@ export function JobsEditor({ initialData }: { initialData: JobsData }) {
       </div>
 
       <div className="space-y-2">
-        {builtins.map((job) => (
-          <BuiltinRow
-            job={job}
-            key={job.key}
-            onHide={(hidden) => setBuiltinHidden(job.key, hidden)}
-            onRate={(reg, ot) => setBuiltinRate(job.key, reg, ot)}
-          />
-        ))}
-
-        {customJobs.map((job) => (
-          <CustomRow
-            job={job}
-            key={job.id}
-            onColor={(color) => {
-              patchLocal(job.id, { color });
-              saveJob(job.id, { color });
-            }}
-            onDelete={() => {
-              patchLocal(job.id, { active: false });
-              deleteJob(job.id);
-            }}
-            onName={(name) => {
-              patchLocal(job.id, { name });
-              saveJob(job.id, { name });
-            }}
-            onRegular={(regularGrossRateCents) => {
-              patchLocal(job.id, computedRatePatch(job, { regularGrossRateCents }));
-              saveJob(job.id, { regularGrossRateCents });
-            }}
-            onRestore={() => {
-              patchLocal(job.id, { active: true });
-              saveJob(job.id, { active: true });
-            }}
-            onWithholding={(withholdingRate) => {
-              patchLocal(job.id, computedRatePatch(job, { withholdingRate }));
-              saveJob(job.id, { withholdingRate });
-            }}
-          />
-        ))}
+        {activeBuiltins.map(renderBuiltin)}
+        {activeCustom.map(renderCustom)}
       </div>
+
+      {archivedCount > 0 ? (
+        <div className="space-y-2">
+          <button
+            className="flex items-center gap-1 px-1 text-xs font-medium text-[var(--text-tertiary)] transition hover:text-[var(--text-secondary)]"
+            onClick={() => setShowArchived((value) => !value)}
+            type="button"
+          >
+            {showArchived ? "Hide" : "Show"} archived ({archivedCount})
+          </button>
+          {showArchived ? (
+            <div className="space-y-2">
+              {archivedBuiltins.map(renderBuiltin)}
+              {archivedCustom.map(renderCustom)}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <p className="px-1 text-xs text-[var(--text-muted)]">
         Editing a built-in rate re-prices every shift that uses it, past and
