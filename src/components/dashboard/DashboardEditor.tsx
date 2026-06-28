@@ -1195,15 +1195,18 @@ export function DashboardEditor({
             {(() => {
               const wage = buildWageJobHours(days);
               return (
-                <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-[var(--text-primary)]">
-                  {wage.jobs.map((job) => (
-                    <span key={job.key} style={{ color: job.color }}>
-                      {job.label}: {job.hours.toFixed(2)}h
-                    </span>
-                  ))}
-                  <span className="text-[var(--accent-primary-text)]">
-                    Total: {wage.total.toFixed(2)}h
-                  </span>
+                <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 shadow-sm backdrop-blur-md">
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {wage.jobs.map((job) => (
+                      <StatLine
+                        color={job.color}
+                        key={job.key}
+                        label={job.label}
+                        value={formatHours(job.hours)}
+                      />
+                    ))}
+                    <StatLine label="Total" value={formatHours(wage.total)} />
+                  </div>
                 </div>
               );
             })()}
@@ -3456,6 +3459,38 @@ function parsePositiveNumber(value: string): number {
 
 function formatNumberInput(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+// Round to the nearest half hour; whole numbers show no decimals ("76h", "65.5h").
+function formatHours(hours: number): string {
+  const rounded = Math.round(hours * 2) / 2;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}h`;
+}
+
+// A footer stat row: colored uppercase label + white value (matches WeekNetSummary
+// exactly). A label with no color (e.g. "Total") renders white.
+function StatLine({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span
+        className="text-[10px] font-bold uppercase tracking-[0.14em]"
+        style={{ color: color ?? "var(--text-primary)" }}
+      >
+        {label}
+      </span>
+      <span className="text-base font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </span>
+    </div>
+  );
 }
 
 // The week's hours readout, one line per job that ACTUALLY has hours this week.

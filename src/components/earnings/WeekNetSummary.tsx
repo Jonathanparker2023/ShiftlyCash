@@ -26,6 +26,12 @@ export function WeekNetSummary({
     !hiddenBuiltins.includes("prestige") || prestigeNetCents !== 0;
   const showAbility =
     !hiddenBuiltins.includes("ability") || abilityNetCents !== 0;
+  // Total NET shift income = the jobs shown here (Prestige + Ability + customs).
+  // Excludes "other" / amortized income, which isn't a job.
+  const totalShiftNetCents =
+    prestigeNetCents +
+    abilityNetCents +
+    customNets.reduce((sum, net) => sum + net.netCents, 0);
   return (
     <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 shadow-sm backdrop-blur-md">
       <div className="flex flex-wrap gap-x-6 gap-y-2">
@@ -51,6 +57,11 @@ export function WeekNetSummary({
             value={formatMoney(net.netCents)}
           />
         ))}
+        <NetLine
+          color="var(--text-primary)"
+          label="Total"
+          value={formatMoney(totalShiftNetCents)}
+        />
       </div>
     </div>
   );
