@@ -57,9 +57,10 @@ import {
   earningsWeeklyTone,
   spendWeeklyTone,
 } from "@/lib/domain/legacyRules";
+// Ability is retired — never offered for a NEW shift. An existing Ability slot
+// still shows its value via the fallback <option> in JobPicker.
 const JOB_OPTIONS: JobType[] = [
   "none",
-  "ability",
   "prestige",
   "prestige_ilst",
   "other",
@@ -832,7 +833,7 @@ export function DashboardEditor({
 
     setExpandedSlotIndex(emptySlot.slotIndex);
     updateSlot(day.id, emptySlot.slotIndex, {
-      jobType: "ability",
+      jobType: "prestige",
       payType: "regular",
       hoursOrUnits: 0,
       incentiveMode: "none",
@@ -2902,6 +2903,9 @@ function JobPicker({
           <option value={`custom:${slot.customJobId}`}>
             {`${slot.customName ?? "Custom"} (inactive)`}
           </option>
+        ) : null}
+        {slot.jobType === "ability" || slot.jobType === "ability_incentive" ? (
+          <option value={slot.jobType}>{formatJobLabel(slot.jobType)}</option>
         ) : null}
         {JOB_OPTIONS.filter(
           (jobType) =>
