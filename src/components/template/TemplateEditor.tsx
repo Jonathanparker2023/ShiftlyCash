@@ -3,8 +3,10 @@
 import { createContext, useContext, useMemo, useState } from "react";
 
 import { saveDefaultTemplateAction } from "@/app/(protected)/settings/template/actions";
+import { centsToDollars } from "@/lib/domain/money";
 import { contrastText, darken } from "@/lib/domain/jobColor";
 import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
+import type { JobsData } from "@/lib/jobs/data";
 import type {
   TemplateCustomJob,
   TemplateDayDraft,
@@ -25,15 +27,82 @@ const PAY_OPTIONS: PayType[] = ["regular", "overtime", "split"];
 const CustomJobsContext = createContext<TemplateCustomJob[]>([]);
 // Built-in job keys the user hid — dropped from the template job picker.
 const HiddenBuiltinsContext = createContext<string[]>([]);
+// Net pay rates (built-ins + custom jobs) so a shift bar can show the money it
+// generates without threading jobsData through every nested component.
+const RatesContext = createContext<JobsData | null>(null);
+
+// Net cents/hr for a slot's job: custom jobs by id, built-ins by key (incentive
+// variants ride the base job's rate). Returns null for non-wage jobs (other).
+function slotRateCents(
+  slot: TemplateSlotDraft,
+  jobsData: JobsData | null,
+): { reg: number; ot: number } | null {
+  if (!jobsData) return null;
+  if (slot.jobType === "custom") {
+    const job = jobsData.customJobs.find((entry) => entry.id === slot.customJobId);
+    return job ? { reg: job.regularRateCents, ot: job.otRateCents } : null;
+  }
+  const key =
+    slot.jobType === "prestige" ||
+    slot.jobType === "prestige_ilst" ||
+    slot.jobType === "ability"
+      ? slot.jobType
+      : slot.jobType === "ability_incentive"
+        ? "ability"
+        : null;
+  if (!key) return null;
+  const builtin = jobsData.builtins.find((entry) => entry.key === key);
+  return builtin ? { reg: builtin.regularRateCents, ot: builtin.otRateCents } : null;
+}
+
+// Net dollars (cents) a single template shift generates: hours × rate, splitting
+// regular vs overtime the same way the dashboard pay engine does.
+function slotNetCents(slot: TemplateSlotDraft, jobsData: JobsData | null): number {
+  const rate = slotRateCents(slot, jobsData);
+  if (!rate) return 0;
+  let regular: number;
+  let overtime: number;
+  if (slot.payType === "split") {
+    regular = slot.regularHours;
+    overtime = slot.overtimeHours;
+  } else if (slot.payType === "overtime") {
+    regular = 0;
+    overtime = slot.hoursOrUnits;
+  } else {
+    regular = slot.hoursOrUnits;
+    overtime = 0;
+  }
+  return Math.round(regular * rate.reg + overtime * rate.ot);
+}
+
+// Hours a wage shift contributes (units-based jobs don't count toward hours).
+function slotWageHours(slot: TemplateSlotDraft, jobsData: JobsData | null): number {
+  return slotRateCents(slot, jobsData) ? Math.max(0, slot.hoursOrUnits) : 0;
+}
+
+function formatTemplateHours(hours: number): string {
+  const rounded = Math.round(hours * 2) / 2;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}h`;
+}
+
+function formatTemplateMoney(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(centsToDollars(cents)));
+}
 const INCENTIVE_MODE_OPTIONS: IncentiveMode[] = ["rate", "lump_sum"];
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 type TemplateEditorProps = {
   initialData: TemplateEditorData;
+  jobsData: JobsData | null;
 };
 
-export function TemplateEditor({ initialData }: TemplateEditorProps) {
+export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
   const [days, setDays] = useState(initialData.days);
   const [focusedDayIndex, setFocusedDayIndex] = useState(() => {
     const firstWithShift = initialData.days.findIndex((day) =>
@@ -54,6 +123,18 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
         .filter((slot) => slot.jobType !== "none").length,
     [days],
   );
+
+  // Week totals — hours and the net money the whole template generates per week.
+  const { totalHours, totalNetCents } = useMemo(() => {
+    let hours = 0;
+    let cents = 0;
+    for (const slot of days.flatMap((day) => day.slots)) {
+      if (slot.jobType === "none") continue;
+      hours += slotWageHours(slot, jobsData);
+      cents += slotNetCents(slot, jobsData);
+    }
+    return { totalHours: hours, totalNetCents: cents };
+  }, [days, jobsData]);
 
   const focusedDay = days[focusedDayIndex] ?? days[0];
 
@@ -118,6 +199,7 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
   );
 
   return (
+    <RatesContext.Provider value={jobsData}>
     <HiddenBuiltinsContext.Provider value={initialData.hiddenBuiltins}>
     <CustomJobsContext.Provider value={initialData.customJobs}>
     <div className="space-y-4">
@@ -128,6 +210,26 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
             {filledSlotCount} shifts prefilled into every new week. Tap a day,
             then tap a bar to edit.
           </p>
+          {jobsData ? (
+            <div className="mt-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+              <span className="flex items-baseline gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+                  Total hours
+                </span>
+                <span className="text-base font-semibold tabular-nums text-[var(--text-primary)]">
+                  {formatTemplateHours(totalHours)}
+                </span>
+              </span>
+              <span className="flex items-baseline gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+                  Net / week
+                </span>
+                <span className="text-base font-semibold tabular-nums text-[var(--text-primary)]">
+                  {formatTemplateMoney(totalNetCents)}
+                </span>
+              </span>
+            </div>
+          ) : null}
         </div>
         <div className="flex items-center gap-3">
           <SaveStatus state={saveState} message={saveError} />
@@ -198,6 +300,7 @@ export function TemplateEditor({ initialData }: TemplateEditorProps) {
     </div>
     </CustomJobsContext.Provider>
     </HiddenBuiltinsContext.Provider>
+    </RatesContext.Provider>
   );
 }
 
@@ -257,6 +360,8 @@ function TemplateShiftBar({
 }) {
   const customJobs = useContext(CustomJobsContext);
   const hiddenBuiltins = useContext(HiddenBuiltinsContext);
+  const jobsData = useContext(RatesContext);
+  const netCents = slotNetCents(slot, jobsData);
   const isCustom = slot.jobType === "custom";
   const customColor = slot.customColor ?? "#3b82f6";
   const customStyle = isCustom
@@ -302,6 +407,11 @@ function TemplateShiftBar({
           <span className="text-xs font-semibold opacity-90">
             {formatNumberInput(slot.hoursOrUnits)}h
           </span>
+          {jobsData && netCents > 0 ? (
+            <span className="text-xs font-semibold tabular-nums opacity-90">
+              {formatTemplateMoney(netCents)}
+            </span>
+          ) : null}
         </span>
         <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
           {slot.label ?? ""}

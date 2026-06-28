@@ -39,7 +39,7 @@ export function TemplatesTabs({
       {active === "jobs" && jobsData ? (
         <JobsEditor initialData={jobsData} />
       ) : (
-        <TemplateEditor initialData={templateData} key={editorKey} />
+        <TemplateEditor initialData={templateData} jobsData={jobsData} key={editorKey} />
       )}
     </div>
   );
