@@ -1033,7 +1033,7 @@ export function DashboardEditor({
       const greenLineCents =
         storedLine != null && Number.isFinite(Number(storedLine)) && Number(storedLine) > 0
           ? Number(storedLine)
-          : null;
+          : DEFAULT_GREEN_LINE_CENTS;
       const gasDays = days.filter((day) => day.gasSpendCents > 0);
       const gasPerDayCents =
         gasDays.length > 0
@@ -2118,18 +2118,21 @@ function RecapStat({ label, value }: { label: string; value: string }) {
 }
 
 const GREEN_LINE_KEY = "bashflow.greenLineCents";
+// Default weekly cashflow target ($900 — the locked plan rule). The bar shows
+// with this by default; tap it to change (stored per-device).
+const DEFAULT_GREEN_LINE_CENTS = 90_000;
 
-// Your personal weekly cashflow target ("green line"), stored on this device.
-// Set once, sticks until you change it; the bar fills green when the week
-// clears it, amber when it hasn't. Device-local for now (no server round-trip).
+// Your personal weekly cashflow target ("green line"). Defaults to $900 and
+// always shows the bar — the bar fills green when the week clears the line,
+// amber when it hasn't. Device-local for now (no server round-trip).
 function GreenLineBar({ cashflowCents }: { cashflowCents: number }) {
-  const [hydrated, setHydrated] = useState(false);
-  const [greenLineCents, setGreenLineCents] = useState<number | null>(null);
+  const [greenLineCents, setGreenLineCents] = useState<number>(
+    DEFAULT_GREEN_LINE_CENTS,
+  );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
   useEffect(() => {
-    setHydrated(true);
     const stored = window.localStorage.getItem(GREEN_LINE_KEY);
     if (stored != null) {
       const parsed = Number(stored);
@@ -2150,13 +2153,7 @@ function GreenLineBar({ cashflowCents }: { cashflowCents: number }) {
     setEditing(false);
   }
 
-  // Avoid an SSR/client hydration mismatch — render nothing until localStorage
-  // has been read on the client.
-  if (!hydrated) {
-    return null;
-  }
-
-  if (editing || greenLineCents === null) {
+  if (editing) {
     return (
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 shadow-sm">
         <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
@@ -2183,19 +2180,13 @@ function GreenLineBar({ cashflowCents }: { cashflowCents: number }) {
         >
           Set
         </button>
-        {greenLineCents !== null ? (
-          <button
-            className="h-8 rounded-md px-2 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-[var(--text-primary)]"
-            onClick={() => setEditing(false)}
-            type="button"
-          >
-            Cancel
-          </button>
-        ) : (
-          <span className="text-[11px] text-[var(--text-tertiary)]">
-            Set your green line once — it sticks every week.
-          </span>
-        )}
+        <button
+          className="h-8 rounded-md px-2 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-[var(--text-primary)]"
+          onClick={() => setEditing(false)}
+          type="button"
+        >
+          Cancel
+        </button>
       </div>
     );
   }
