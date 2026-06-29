@@ -74,6 +74,17 @@ export type NextPaycheck = {
   netCents: number;
 };
 
+// Snapshot shown after a week closes — captured before the refresh swaps in the
+// new active week.
+type WeekRecap = {
+  weekLabel: string;
+  cashflowCents: number;
+  spendCents: number;
+  earningsCents: number;
+  gasPerDayCents: number;
+  greenLineCents: number | null;
+};
+
 type DashboardEditorProps = {
   initialData: DashboardData;
   // "historical" renders a closed week from History using the SAME UI as the
@@ -137,6 +148,7 @@ export function DashboardEditor({
   const pendingSlotInputs = useRef<Map<string, SaveEarnSlotInput>>(new Map());
   const [finishingEdit, setFinishingEdit] = useState(false);
   const [confirmingClose, setConfirmingClose] = useState(false);
+  const [recap, setRecap] = useState<WeekRecap | null>(null);
   const canCloseWeek = initialData.todayIso >= initialData.week.endDate;
 
   useEffect(() => {
@@ -1015,6 +1027,29 @@ export function DashboardEditor({
     try {
       await closeWeekAction({ weekId: initialData.week.id });
       setCloseToast("Week closed.");
+      // Snapshot the just-closed week for the recap BEFORE refresh swaps in the
+      // new active week. Green line comes from this device's stored target.
+      const storedLine = window.localStorage.getItem(GREEN_LINE_KEY);
+      const greenLineCents =
+        storedLine != null && Number.isFinite(Number(storedLine)) && Number(storedLine) > 0
+          ? Number(storedLine)
+          : null;
+      const gasDays = days.filter((day) => day.gasSpendCents > 0);
+      const gasPerDayCents =
+        gasDays.length > 0
+          ? Math.round(
+              gasDays.reduce((sum, day) => sum + day.gasSpendCents, 0) /
+                gasDays.length,
+            )
+          : 0;
+      setRecap({
+        weekLabel: `Week of ${formatShortDate(initialData.week.startDate)}`,
+        cashflowCents: weekTotals.cashflowCents,
+        spendCents: weekTotals.spendCents,
+        earningsCents: weekTotals.earningsCents,
+        gasPerDayCents,
+        greenLineCents,
+      });
       router.refresh();
     } catch (error) {
       setCloseError(error instanceof Error ? error.message : "Unable to close week.");
@@ -1027,6 +1062,9 @@ export function DashboardEditor({
     <CustomJobsContext.Provider value={customJobs}>
     <HiddenBuiltinsContext.Provider value={initialData.hiddenBuiltins}>
     <ShiftsEditableContext.Provider value={shiftsEditable}>
+    {recap ? (
+      <WeekRecapModal recap={recap} onClose={() => setRecap(null)} />
+    ) : null}
     <div
       className={
         isHistorical
@@ -1151,6 +1189,10 @@ export function DashboardEditor({
               nextPaycheck={nextPaycheck}
               todayIso={initialData.todayIso}
             />
+          ) : null}
+
+          {!isHistorical ? (
+            <GreenLineBar cashflowCents={weekTotals.cashflowCents} />
           ) : null}
 
           <div className="pb-2">
@@ -1999,6 +2041,207 @@ function TransactionColumn({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function WeekRecapModal({
+  recap,
+  onClose,
+}: {
+  recap: WeekRecap;
+  onClose: () => void;
+}) {
+  const cleared =
+    recap.greenLineCents !== null &&
+    recap.cashflowCents >= recap.greenLineCents;
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+          Week wrapped
+        </p>
+        <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+          {recap.weekLabel}
+        </h2>
+        {recap.greenLineCents !== null ? (
+          <p
+            className={`mt-2 text-sm font-semibold ${cleared ? "text-emerald-500" : "text-amber-500"}`}
+          >
+            {cleared
+              ? `Cleared your green line by ${formatMoney(recap.cashflowCents - recap.greenLineCents)}`
+              : `${formatMoney(recap.greenLineCents - recap.cashflowCents)} under your green line`}
+          </p>
+        ) : (
+          <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+            Cashflow {formatMoney(recap.cashflowCents)}
+          </p>
+        )}
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <RecapStat label="Earned" value={formatMoney(recap.earningsCents)} />
+          <RecapStat label="Spent" value={formatMoney(recap.spendCents)} />
+          <RecapStat label="Cashflow" value={formatMoney(recap.cashflowCents)} />
+        </div>
+        {recap.gasPerDayCents > 0 ? (
+          <p className="mt-3 text-xs text-[var(--text-tertiary)]">
+            Gas ran {formatMoney(recap.gasPerDayCents)}/day this week.
+          </p>
+        ) : null}
+        <button
+          className="mt-5 h-10 w-full rounded-xl border border-[var(--border-default)] bg-[var(--surface-hover)] text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)]"
+          onClick={onClose}
+          type="button"
+        >
+          Nice
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RecapStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2 text-center">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
+        {label}
+      </div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+const GREEN_LINE_KEY = "bashflow.greenLineCents";
+
+// Your personal weekly cashflow target ("green line"), stored on this device.
+// Set once, sticks until you change it; the bar fills green when the week
+// clears it, amber when it hasn't. Device-local for now (no server round-trip).
+function GreenLineBar({ cashflowCents }: { cashflowCents: number }) {
+  const [hydrated, setHydrated] = useState(false);
+  const [greenLineCents, setGreenLineCents] = useState<number | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    setHydrated(true);
+    const stored = window.localStorage.getItem(GREEN_LINE_KEY);
+    if (stored != null) {
+      const parsed = Number(stored);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        setGreenLineCents(parsed);
+      }
+    }
+  }, []);
+
+  function saveLine() {
+    const dollars = parsePositiveNumber(draft);
+    if (dollars <= 0) {
+      return;
+    }
+    const cents = Math.round(dollars * 100);
+    setGreenLineCents(cents);
+    window.localStorage.setItem(GREEN_LINE_KEY, String(cents));
+    setEditing(false);
+  }
+
+  // Avoid an SSR/client hydration mismatch — render nothing until localStorage
+  // has been read on the client.
+  if (!hydrated) {
+    return null;
+  }
+
+  if (editing || greenLineCents === null) {
+    return (
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 shadow-sm">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+          Weekly target
+        </span>
+        <span className="text-xs text-[var(--text-tertiary)]">$</span>
+        <input
+          className="h-8 w-24 rounded-md border border-[var(--border-default)] bg-[var(--surface-base)] px-2 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--border-strong)]"
+          inputMode="decimal"
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              saveLine();
+            }
+          }}
+          placeholder="900"
+          value={draft}
+        />
+        <button
+          className="h-8 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={parsePositiveNumber(draft) <= 0}
+          onClick={saveLine}
+          type="button"
+        >
+          Set
+        </button>
+        {greenLineCents !== null ? (
+          <button
+            className="h-8 rounded-md px-2 text-xs font-semibold text-[var(--text-tertiary)] transition hover:text-[var(--text-primary)]"
+            onClick={() => setEditing(false)}
+            type="button"
+          >
+            Cancel
+          </button>
+        ) : (
+          <span className="text-[11px] text-[var(--text-tertiary)]">
+            Set your green line once — it sticks every week.
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  const cleared = cashflowCents >= greenLineCents;
+  const pct =
+    greenLineCents > 0
+      ? Math.max(0, Math.min(1, cashflowCents / greenLineCents))
+      : 0;
+
+  return (
+    <button
+      className="mb-3 block w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-left shadow-sm transition hover:border-[var(--border-strong)]"
+      onClick={() => {
+        setDraft(formatCentsForInput(greenLineCents));
+        setEditing(true);
+      }}
+      title="Tap to change your weekly target"
+      type="button"
+    >
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+          Green line
+        </span>
+        <span className="text-xs font-semibold tabular-nums text-[var(--text-secondary)]">
+          {formatMoney(cashflowCents)} / {formatMoney(greenLineCents)}
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--surface-base)]">
+        <div
+          className={`h-full rounded-full ${cleared ? "bg-emerald-500" : "bg-amber-500"}`}
+          style={{ width: `${Math.round(pct * 100)}%` }}
+        />
+      </div>
+      <div className="mt-1 text-[11px] font-medium">
+        {cleared ? (
+          <span className="text-emerald-500">
+            Cleared by {formatMoney(cashflowCents - greenLineCents)}
+          </span>
+        ) : (
+          <span className="text-amber-500">
+            {formatMoney(greenLineCents - cashflowCents)} to go
+          </span>
+        )}
+      </div>
+    </button>
   );
 }
 
