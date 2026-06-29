@@ -1927,6 +1927,12 @@ function TransactionColumn({
 }) {
   const showGasRow =
     variant === "spending" && !!gasSpendCents && gasSpendCents > 0;
+  // A transaction whose entire amount was spread into the gas average leaves no
+  // remainder — drop it instead of showing a $0 spending item.
+  const visibleTransactions = transactions.filter(
+    (transaction) =>
+      !(transaction.isGasAllocated && transaction.gasRemainderCents <= 0),
+  );
   return (
     <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -1934,7 +1940,7 @@ function TransactionColumn({
           {heading}
         </h3>
         <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
-          {transactions.length + (showGasRow ? 1 : 0)}
+          {visibleTransactions.length + (showGasRow ? 1 : 0)}
         </span>
       </div>
 
@@ -1954,7 +1960,7 @@ function TransactionColumn({
             </div>
           </div>
         ) : null}
-        {transactions.map((transaction) => (
+        {visibleTransactions.map((transaction) => (
           <TransactionRowButton
             key={transaction.id}
             transaction={transaction}
@@ -2066,11 +2072,6 @@ function TransactionRowButton({
             }
           >
             {formatTransactionTime(transaction.time)}
-            {transaction.isGasAllocated ? (
-              <span className="ml-1 text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.65)]">
-                Gas spread
-              </span>
-            ) : null}
           </span>
         </span>
         <span
