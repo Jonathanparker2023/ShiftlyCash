@@ -1979,16 +1979,12 @@ function TransactionColumn({
 }) {
   const showGasRow =
     variant === "spending" && !!gasSpendCents && gasSpendCents > 0;
-  const [showFullySpread, setShowFullySpread] = useState(false);
   // A transaction whose entire amount was spread into the gas average leaves no
-  // remainder — drop it instead of showing a $0 spending item. A toggle below
-  // brings them back so an over-allocation can still be tapped to fix.
+  // remainder — drop it instead of showing a $0 spending item.
   const visibleTransactions = transactions.filter(
     (transaction) =>
       !(transaction.isGasAllocated && transaction.gasRemainderCents <= 0),
   );
-  const fullySpreadCount = transactions.length - visibleTransactions.length;
-  const rowsToRender = showFullySpread ? transactions : visibleTransactions;
   return (
     <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -2016,7 +2012,7 @@ function TransactionColumn({
             </div>
           </div>
         ) : null}
-        {rowsToRender.map((transaction) => (
+        {visibleTransactions.map((transaction) => (
           <TransactionRowButton
             key={transaction.id}
             transaction={transaction}
@@ -2030,15 +2026,6 @@ function TransactionColumn({
             onAmortize={onAmortize}
           />
         ))}
-        {fullySpreadCount > 0 ? (
-          <button
-            className="w-full px-1 py-1 text-left text-[11px] font-medium text-[var(--text-tertiary)] transition hover:text-[var(--text-secondary)]"
-            onClick={() => setShowFullySpread((value) => !value)}
-            type="button"
-          >
-            {showFullySpread ? "Hide" : "Show"} fully-spread ({fullySpreadCount})
-          </button>
-        ) : null}
       </div>
     </div>
   );
