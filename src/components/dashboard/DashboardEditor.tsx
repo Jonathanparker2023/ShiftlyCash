@@ -804,14 +804,8 @@ export function DashboardEditor({
     if (!shiftsEditable) {
       return;
     }
-    // window.confirm is suppressed in installed/mobile contexts; skip the
-    // blocking prompt when editing History so removal isn't silently dead.
-    const confirmed = isHistorical ? true : window.confirm("Remove this shift?");
-
-    if (!confirmed) {
-      return;
-    }
-
+    // Confirmation now happens at the Remove button (two-tap inline) — the old
+    // window.confirm here was silently dead on the installed/mobile web app.
     clearSlot(slot);
     setExpandedSlotIndex(null);
     // Persist the removal NOW rather than on the 1.2s debounce — a fast "Back to
@@ -1927,12 +1921,16 @@ function TransactionColumn({
 }) {
   const showGasRow =
     variant === "spending" && !!gasSpendCents && gasSpendCents > 0;
+  const [showFullySpread, setShowFullySpread] = useState(false);
   // A transaction whose entire amount was spread into the gas average leaves no
-  // remainder — drop it instead of showing a $0 spending item.
+  // remainder — drop it instead of showing a $0 spending item. A toggle below
+  // brings them back so an over-allocation can still be tapped to fix.
   const visibleTransactions = transactions.filter(
     (transaction) =>
       !(transaction.isGasAllocated && transaction.gasRemainderCents <= 0),
   );
+  const fullySpreadCount = transactions.length - visibleTransactions.length;
+  const rowsToRender = showFullySpread ? transactions : visibleTransactions;
   return (
     <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -1960,7 +1958,7 @@ function TransactionColumn({
             </div>
           </div>
         ) : null}
-        {visibleTransactions.map((transaction) => (
+        {rowsToRender.map((transaction) => (
           <TransactionRowButton
             key={transaction.id}
             transaction={transaction}
@@ -1974,6 +1972,15 @@ function TransactionColumn({
             onAmortize={onAmortize}
           />
         ))}
+        {fullySpreadCount > 0 ? (
+          <button
+            className="w-full px-1 py-1 text-left text-[11px] font-medium text-[var(--text-tertiary)] transition hover:text-[var(--text-secondary)]"
+            onClick={() => setShowFullySpread((value) => !value)}
+            type="button"
+          >
+            {showFullySpread ? "Hide" : "Show"} fully-spread ({fullySpreadCount})
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -2376,6 +2383,7 @@ function ShiftRow({
   onDragEnd: () => void;
 }) {
   const editable = useContext(ShiftsEditableContext);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   // In read-only History the row must be truly inert (no expand, no drag, no
   // Remove) — gate on editability, not just the day's spend lock.
   const effectiveLocked = locked || !editable;
@@ -2586,11 +2594,24 @@ function ShiftRow({
               Auto-saves after edits.
             </span>
             <button
-              className="text-xs font-medium text-[var(--accent-negative-text)] hover:underline"
-              onClick={() => onRemove(slot)}
+              className={
+                confirmingRemove
+                  ? "text-xs font-semibold text-red-500 hover:underline"
+                  : "text-xs font-medium text-[var(--accent-negative-text)] hover:underline"
+              }
+              onClick={() => {
+                // Two-tap inline confirm (window.confirm is dead on installed apps).
+                if (!confirmingRemove) {
+                  setConfirmingRemove(true);
+                  window.setTimeout(() => setConfirmingRemove(false), 4000);
+                  return;
+                }
+                setConfirmingRemove(false);
+                onRemove(slot);
+              }}
               type="button"
             >
-              Remove
+              {confirmingRemove ? "Tap again to remove" : "Remove"}
             </button>
           </div>
         </div>
