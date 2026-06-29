@@ -354,6 +354,90 @@ export function simulateDebtFree(
   return { weeklyBalances: balances, weeksToPayoff: null };
 }
 
+export type CatchUpResult = {
+  /** Minimum weekly cashflow (cents) that clears all debt within targetWeeks. */
+  requiredWeeklyCashflowCents: number;
+  /** How much MORE than the current pace that requires (>= 0). */
+  extraWeeklyCashflowCents: number;
+  /** Weeks-to-payoff at the current pace (null if it never clears in range). */
+  currentWeeksToPayoff: number | null;
+  /** True when the current pace already hits the target. */
+  onTrack: boolean;
+};
+
+/**
+ * Find the minimum weekly cashflow that clears all active debt within
+ * `targetWeeks`, via binary search over `simulateDebtFree`. More cashflow means
+ * fewer weeks (monotonic), so binary search is valid. Reuses the same avalanche
+ * model as the debt-free projection, so the answer is consistent with the
+ * dashboard's debt-free date — this is the "what would it take to get back on
+ * the locked target" calc.
+ */
+export function weeklyCashflowToHitDebtFreeBy(
+  debts: DebtRow[],
+  currentWeeklyCashflowCents: number,
+  targetWeeks: number,
+): CatchUpResult {
+  const activeBalanceCents = debts
+    .filter((d) => d.status === "active" && d.balanceCents > 0)
+    .reduce((s, d) => s + d.balanceCents, 0);
+
+  const currentWeeksToPayoff = simulateDebtFree(
+    debts,
+    currentWeeklyCashflowCents,
+  ).weeksToPayoff;
+
+  // No debt, or a non-positive target window: nothing to chase.
+  if (activeBalanceCents <= 0 || targetWeeks <= 0) {
+    return {
+      requiredWeeklyCashflowCents: Math.max(0, currentWeeklyCashflowCents),
+      extraWeeklyCashflowCents: 0,
+      currentWeeksToPayoff,
+      onTrack: true,
+    };
+  }
+
+  const hits = (cashflowCents: number): boolean => {
+    const weeks = simulateDebtFree(
+      debts,
+      cashflowCents,
+      targetWeeks + 1,
+    ).weeksToPayoff;
+    return weeks !== null && weeks <= targetWeeks;
+  };
+
+  // Paying the whole balance (plus an interest + minimums cushion) in one week
+  // always clears within the window, so it's a safe upper bound.
+  let hi = activeBalanceCents + Math.ceil(activeBalanceCents * 0.05) + 100_00;
+  let lo = 0;
+  // Binary search down to the nearest dollar.
+  while (hi - lo > 100) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (hits(mid)) hi = mid;
+    else lo = mid;
+  }
+
+  return {
+    requiredWeeklyCashflowCents: hi,
+    extraWeeklyCashflowCents: Math.max(0, hi - currentWeeklyCashflowCents),
+    currentWeeksToPayoff,
+    onTrack:
+      currentWeeksToPayoff !== null && currentWeeksToPayoff <= targetWeeks,
+  };
+}
+
+/**
+ * Translate an extra-weekly-cashflow gap into a whole number of shifts to pick
+ * up (rounded up). Returns 0 when there's no gap or no per-shift figure.
+ */
+export function extraShiftsToCloseGap(
+  extraWeeklyCashflowCents: number,
+  avgNetPerShiftCents: number,
+): number {
+  if (extraWeeklyCashflowCents <= 0 || avgNetPerShiftCents <= 0) return 0;
+  return Math.ceil(extraWeeklyCashflowCents / avgNetPerShiftCents);
+}
+
 /**
  * Simulate weekly investment balance growth toward $1M.
  * Contributions are expected to already be net of weekly tax set-aside.

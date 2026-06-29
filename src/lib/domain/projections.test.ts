@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   calcWeeklyProjection,
   ctTax2025,
+  type DebtRow,
+  extraShiftsToCloseGap,
   fedTax2025,
   grossUpNetWageCents,
+  simulateDebtFree,
   simulateLegacyMillionaire,
+  weeklyCashflowToHitDebtFreeBy,
 } from "@/lib/domain/projections";
 
 describe("projection math", () => {
@@ -151,5 +155,58 @@ describe("projection math", () => {
       { week: 2, name: "Auto Loan", freedCents: 5_000 },
     ]);
     expect(result.weeksToTarget).toBe(4);
+  });
+});
+
+describe("debt-free catch-up", () => {
+  const debt = (over: Partial<DebtRow> = {}): DebtRow => ({
+    id: "d1",
+    name: "Test debt",
+    balanceCents: 100_000, // $1,000
+    minimumPaymentCents: 0,
+    aprBps: 0,
+    status: "active",
+    priorityOrder: 0,
+    ...over,
+  });
+
+  it("finds the weekly cashflow to clear a 0% debt by the target week", () => {
+    // $1,000 at 0% APR, no minimums -> $200/wk clears it in exactly 5 weeks.
+    const debts = [debt()];
+    const res = weeklyCashflowToHitDebtFreeBy(debts, 10_000, 5);
+
+    expect(res.onTrack).toBe(false); // $100/wk would take 10 weeks
+    // ~$200/wk clears in 5 weeks; search lands within $1, biased to over-ask.
+    expect(res.requiredWeeklyCashflowCents).toBeGreaterThan(19_900);
+    expect(res.requiredWeeklyCashflowCents).toBeLessThanOrEqual(20_100);
+    expect(res.extraWeeklyCashflowCents).toBe(
+      res.requiredWeeklyCashflowCents - 10_000,
+    );
+    // The required pace actually hits the target.
+    expect(
+      simulateDebtFree(debts, res.requiredWeeklyCashflowCents).weeksToPayoff,
+    ).toBeLessThanOrEqual(5);
+  });
+
+  it("reports onTrack with no extra needed when already ahead of target", () => {
+    // $250/wk clears $1,000 in 4 weeks, target is 5 -> already on track.
+    const res = weeklyCashflowToHitDebtFreeBy([debt()], 25_000, 5);
+    expect(res.onTrack).toBe(true);
+    expect(res.extraWeeklyCashflowCents).toBe(0);
+    expect(res.currentWeeksToPayoff).toBe(4);
+  });
+
+  it("treats a cleared / empty debt set as on-track", () => {
+    expect(weeklyCashflowToHitDebtFreeBy([], 0, 15)).toMatchObject({
+      extraWeeklyCashflowCents: 0,
+      onTrack: true,
+    });
+  });
+
+  it("converts a cashflow gap into whole shifts (rounded up)", () => {
+    expect(extraShiftsToCloseGap(50_000, 18_000)).toBe(3); // 2.78 -> 3
+    expect(extraShiftsToCloseGap(36_000, 18_000)).toBe(2); // exact
+    expect(extraShiftsToCloseGap(0, 18_000)).toBe(0);
+    expect(extraShiftsToCloseGap(50_000, 0)).toBe(0);
   });
 });
