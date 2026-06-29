@@ -69,11 +69,19 @@ const PAY_OPTIONS: PayType[] = ["none", "regular", "overtime", "split", "unit"];
 const INCENTIVE_MODE_OPTIONS: IncentiveMode[] = ["rate", "lump_sum"];
 const AUTO_SYNC_STORAGE_KEY = "shiftly:lastAutoSyncAt";
 
+export type NextPaycheck = {
+  dueDateIso: string;
+  netCents: number;
+};
+
 type DashboardEditorProps = {
   initialData: DashboardData;
   // "historical" renders a closed week from History using the SAME UI as the
   // live dashboard (read-only until "Edit week" is turned on).
   mode?: "active" | "historical";
+  // Upcoming paycheck (date + projected net) for the countdown card. Optional —
+  // History doesn't pass it.
+  nextPaycheck?: NextPaycheck | null;
 };
 
 type TimerMap = Record<string, ReturnType<typeof setTimeout>>;
@@ -89,6 +97,7 @@ const ShiftsEditableContext = createContext<boolean>(true);
 export function DashboardEditor({
   initialData,
   mode = "active",
+  nextPaycheck = null,
 }: DashboardEditorProps) {
   const customJobs = initialData.customJobs;
   const isHistorical = mode === "historical";
@@ -1137,6 +1146,13 @@ export function DashboardEditor({
             </div>
           </div>
 
+          {!isHistorical && nextPaycheck ? (
+            <NextPaycheckCard
+              nextPaycheck={nextPaycheck}
+              todayIso={initialData.todayIso}
+            />
+          ) : null}
+
           <div className="pb-2">
             <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
               {days.map((day, dayIndex) => (
@@ -1984,6 +2000,51 @@ function TransactionColumn({
       </div>
     </div>
   );
+}
+
+function NextPaycheckCard({
+  nextPaycheck,
+  todayIso,
+}: {
+  nextPaycheck: NextPaycheck;
+  todayIso: string;
+}) {
+  const days = daysBetweenIso(todayIso, nextPaycheck.dueDateIso);
+  const when = days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 shadow-sm">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+          Next check
+        </span>
+        <span className="text-sm font-semibold text-[var(--text-primary)]">
+          {formatShortDate(nextPaycheck.dueDateIso)}
+        </span>
+        <span className="text-xs font-medium text-[var(--text-tertiary)]">
+          {when}
+        </span>
+      </div>
+      <span className="shrink-0 text-base font-semibold tabular-nums text-emerald-500">
+        ~{formatMoney(nextPaycheck.netCents)}
+      </span>
+    </div>
+  );
+}
+
+function daysBetweenIso(fromIso: string, toIso: string): number {
+  const [fy, fm, fd] = fromIso.split("-").map(Number);
+  const [ty, tm, td] = toIso.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000,
+  );
+}
+
+function formatShortDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
 function TransactionRowButton({
