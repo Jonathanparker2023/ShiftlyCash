@@ -330,9 +330,21 @@ function WeekDayButton({
       </span>
       <span className="flex h-2.5 items-center gap-1">
         {shifts.length > 0 ? (
-          shifts.map((slot) => (
-            <span className={shiftDotClass(slot.jobType)} key={slot.slotIndex} />
-          ))
+          // Up to 3 dots; a custom job uses ITS color (not the fallback teal).
+          shifts.slice(0, 3).map((slot) =>
+            slot.jobType === "custom" && slot.customColor ? (
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                key={slot.slotIndex}
+                style={{
+                  backgroundColor: slot.customColor,
+                  boxShadow: `0 0 0 3px ${slot.customColor}29`,
+                }}
+              />
+            ) : (
+              <span className={shiftDotClass(slot.jobType)} key={slot.slotIndex} />
+            ),
+          )
         ) : (
           <span className="h-1 w-1 rounded-full bg-[var(--surface-hover)]" />
         )}
