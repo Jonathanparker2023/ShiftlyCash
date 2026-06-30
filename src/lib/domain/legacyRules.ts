@@ -36,11 +36,14 @@ export const LEGACY_EXEMPT_NAMES: readonly string[] = [
   "platinum car wash",
 ];
 
-// Exact category match (case-insensitive).
+// Exact category match (case-insensitive). Includes Plaid's
+// `personal_finance_category.primary` keys (e.g. LOAN_PAYMENTS) so loan/debt
+// payments auto-exempt — they're debt paydown, not consumption spending.
 export const LEGACY_EXEMPT_CATS: readonly string[] = [
   "subscription",
   "recurring",
   "loan payment",
+  "loan_payments",
   "mortgage",
   "insurance",
   "utilities",
