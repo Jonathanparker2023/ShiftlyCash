@@ -222,7 +222,7 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
             </span>
             {" daily. Period: "}
             <span className="text-[var(--text-secondary)]">
-              {shortDate(tracker.periodStartDate)} to {shortDate(tracker.fillDate)}
+              {shortDate(tracker.periodStartDate)} to {shortDate(tracker.periodEndDate)}
             </span>
             {"."}
           </>

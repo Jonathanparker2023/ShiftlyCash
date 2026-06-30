@@ -1,5 +1,5 @@
 import { requireUserWithBootstrapStatus } from "@/lib/auth";
-import { addDaysIso } from "@/lib/dashboard/dates";
+import { getTodayIso } from "@/lib/dashboard/dates";
 import { dollarsToCents } from "@/lib/domain/money";
 
 type NumericValue = number | string | null;
@@ -33,6 +33,7 @@ type GasAllocationRow = {
   merchant_name: string;
   fill_date: string;
   previous_fill_date: string;
+  start_date: string | null;
   gas_amount_cents: NumericValue;
   original_amount_cents: NumericValue;
   remainder_amount_cents: NumericValue;
@@ -51,7 +52,7 @@ export type TrendsGasTracker =
       merchantName: string;
       previousFillDate: string;
       periodStartDate: string;
-      fillDate: string;
+      periodEndDate: string;
       periodDays: number;
       gasAmountCents: number;
       averageDailyGasCents: number;
@@ -81,13 +82,12 @@ export async function getTrendsData(): Promise<TrendsData> {
     supabase
       .from("gas_allocations")
       .select(
-        "id,merchant_name,fill_date,previous_fill_date,gas_amount_cents,original_amount_cents,remainder_amount_cents,is_active,created_at,updated_at",
+        "id,merchant_name,fill_date,previous_fill_date,start_date,gas_amount_cents,original_amount_cents,remainder_amount_cents,is_active,created_at,updated_at",
       )
       .eq("user_id", user.id)
       .eq("is_active", true)
       .order("fill_date", { ascending: false })
-      .order("updated_at", { ascending: false })
-      .limit(1),
+      .order("updated_at", { ascending: false }),
   ]);
 
   if (error) {
@@ -99,7 +99,7 @@ export async function getTrendsData(): Promise<TrendsData> {
 
   return {
     weeks: ((data ?? []) as WeekTotalRow[]).map(mapTrendsWeek),
-    gasTracker: mapGasTracker(((gasData ?? []) as GasAllocationRow[])[0]),
+    gasTracker: mapGasTracker((gasData ?? []) as GasAllocationRow[]),
   };
 }
 
@@ -126,28 +126,45 @@ function toNumber(value: NumericValue): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function mapGasTracker(row: GasAllocationRow | undefined): TrendsGasTracker {
-  if (!row) {
+// Mirrors v_day_gas_spend_totals: the gas tracker is the whole-history
+// CONVERGING daily average — total active gas / inclusive days from the FIRST
+// tank start to today — NOT a single fill's window (which collapses to ~1 day
+// and shows the entire tank as the "daily" rate).
+function mapGasTracker(rows: GasAllocationRow[]): TrendsGasTracker {
+  if (rows.length === 0) {
     return { status: "waiting_for_fill" };
   }
 
-  const periodStartDate = addDaysIso(row.previous_fill_date, 1);
-  const periodDays = inclusiveDateDiff(periodStartDate, row.fill_date);
-  const gasAmountCents = Math.round(toNumber(row.gas_amount_cents));
+  // Rows are ordered fill_date desc — [0] is the most recent fill (used for the
+  // merchant + previous-fill context lines).
+  const latest = rows[0];
+  const sum = (pick: (row: GasAllocationRow) => NumericValue) =>
+    rows.reduce((total, row) => total + Math.round(toNumber(pick(row))), 0);
+  const gasAmountCents = sum((row) => row.gas_amount_cents);
+  const remainderAmountCents = sum((row) => row.remainder_amount_cents);
+  const originalAmountCents = sum((row) => row.original_amount_cents);
+
+  // first_date = earliest tank START across active fills (start_date, falling
+  // back to fill_date). ISO dates compare chronologically as strings.
+  const firstDate = rows
+    .map((row) => row.start_date ?? row.fill_date)
+    .reduce((min, date) => (date < min ? date : min));
+  const today = getTodayIso();
+  const periodDays = inclusiveDateDiff(firstDate, today);
 
   return {
     status: "active",
-    allocationId: row.id,
-    merchantName: row.merchant_name,
-    previousFillDate: row.previous_fill_date,
-    periodStartDate,
-    fillDate: row.fill_date,
+    allocationId: latest.id,
+    merchantName: latest.merchant_name,
+    previousFillDate: latest.previous_fill_date,
+    periodStartDate: firstDate,
+    periodEndDate: today,
     periodDays,
     gasAmountCents,
     averageDailyGasCents: Math.round(gasAmountCents / periodDays),
-    originalAmountCents: Math.round(toNumber(row.original_amount_cents)),
-    remainderAmountCents: Math.round(toNumber(row.remainder_amount_cents)),
-    updatedAt: row.updated_at ?? row.created_at,
+    originalAmountCents,
+    remainderAmountCents,
+    updatedAt: latest.updated_at ?? latest.created_at,
   };
 }
 
