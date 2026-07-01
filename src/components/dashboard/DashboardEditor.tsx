@@ -149,8 +149,8 @@ export function DashboardEditor({
   const [finishingEdit, setFinishingEdit] = useState(false);
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [recap, setRecap] = useState<WeekRecap | null>(null);
-  // "Two-eyes" hours verification — the next day, confirm a past day's hours
-  // with fresh eyes (green = checked twice). Device-local for now.
+  // "Two-eyes" day verification — the next day, confirm a past day's hours AND
+  // spending with fresh eyes (green = checked twice). Device-local for now.
   const [verifiedDays, setVerifiedDays] = useState<Record<string, string>>({});
   useEffect(() => {
     try {
@@ -163,31 +163,22 @@ export function DashboardEditor({
       // ignore malformed storage
     }
   }, []);
-  function toggleVerifyDay(dayId: string) {
-    setVerifiedDays((current) => {
-      const next = { ...current };
-      if (next[dayId]) {
-        delete next[dayId];
-      } else {
-        next[dayId] = new Date().toISOString();
-      }
-      try {
-        window.localStorage.setItem(VERIFIED_DAYS_KEY, JSON.stringify(next));
-      } catch {
-        // ignore storage failures
-      }
-      return next;
-    });
+  // A day counts as verified only while its stored signature still matches its
+  // current hours + spending. So any later change — editing a shift, exempting
+  // a charge, or a background Plaid sync adding a transaction — automatically
+  // drops it back to "needs a second look." No stale green checks.
+  function isDayVerified(day: DashboardDay): boolean {
+    return verifiedDays[day.id] === dayVerifySignature(day);
   }
-  // Editing a day's shifts invalidates a prior verification — clear it so green
-  // always means "confirmed since the last change."
-  function unverifyDay(dayId: string) {
+  function toggleVerifyDay(day: DashboardDay) {
     setVerifiedDays((current) => {
-      if (!current[dayId]) {
-        return current;
-      }
+      const signature = dayVerifySignature(day);
       const next = { ...current };
-      delete next[dayId];
+      if (next[day.id] === signature) {
+        delete next[day.id];
+      } else {
+        next[day.id] = signature;
+      }
       try {
         window.localStorage.setItem(VERIFIED_DAYS_KEY, JSON.stringify(next));
       } catch {
@@ -430,8 +421,6 @@ export function DashboardEditor({
         };
       }),
     );
-
-    unverifyDay(nextSlot.dayId);
 
     const key = `slot:${nextSlot.dayId}:${nextSlot.slotIndex}`;
     if (isIncompleteSplitSlot(nextSlot)) {
@@ -1255,18 +1244,15 @@ export function DashboardEditor({
                   key={day.id}
                   needsVerify={
                     day.date < initialData.todayIso &&
-                    !verifiedDays[day.id] &&
-                    day.slots.some(
-                      (slot) =>
-                        slot.jobType !== "none" && slot.kind !== "bucket",
-                    )
+                    !isDayVerified(day) &&
+                    dayHasVerifiableContent(day)
                   }
                   projectedDailySpendCents={
                     initialData.spendProjection.projectedDailySpendCents
                   }
                   todayIso={initialData.todayIso}
                   totals={dayTotals.get(day.id)}
-                  verified={!!verifiedDays[day.id]}
+                  verified={isDayVerified(day)}
                   onFocus={focusDay}
                 />
               ))}
@@ -1276,15 +1262,15 @@ export function DashboardEditor({
           {focusedDay ? (
             <FocusedDayEditor
               day={focusedDay}
+              dayVerified={isDayVerified(focusedDay)}
               expandedSlotIndex={expandedSlotIndex}
-              hoursVerified={!!verifiedDays[focusedDay.id]}
               isManualTransactionPending={pendingManualDayIds.has(focusedDay.id)}
               pendingTransactionIds={pendingTransactionIds}
               settings={initialData.settings}
               todayIso={initialData.todayIso}
               transactionError={transactionError}
               totals={focusedDayTotals}
-              onToggleVerify={() => toggleVerifyDay(focusedDay.id)}
+              onToggleVerify={() => toggleVerifyDay(focusedDay)}
               onAddShift={addShift}
               onAddManualTransaction={addManualTransaction}
               onAmortizeTransaction={amortizeTransaction}
@@ -1777,7 +1763,7 @@ function FocusedDayEditor({
   day,
   totals,
   expandedSlotIndex,
-  hoursVerified,
+  dayVerified,
   isManualTransactionPending,
   pendingTransactionIds,
   settings,
@@ -1800,7 +1786,7 @@ function FocusedDayEditor({
   day: DashboardDay;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
   expandedSlotIndex: number | null;
-  hoursVerified: boolean;
+  dayVerified: boolean;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
   settings: PaySettings;
@@ -1848,49 +1834,61 @@ function FocusedDayEditor({
   return (
     <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
       {(() => {
-        // Two-eyes check: only a PAST day with logged shifts can be verified
-        // (the next-day fresh-eyes pass). Today/future days show nothing.
+        // Two-eyes check: only a PAST day with logged hours OR spending can be
+        // verified (the next-day fresh-eyes pass). Today/future show nothing.
         const realShifts = day.slots.filter(
           (slot) => slot.jobType !== "none" && slot.kind !== "bucket",
         );
-        if (day.date >= todayIso || realShifts.length === 0) {
-          return null;
-        }
-        const hours = realShifts.reduce(
-          (sum, slot) => sum + Math.max(0, slot.hoursOrUnits),
+        const spendCents = day.appliedTransactions.reduce(
+          (sum, tx) => sum + tx.amountCents,
           0,
         );
-        const hoursLabel = `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
-        const shiftLabel = `${realShifts.length} shift${realShifts.length === 1 ? "" : "s"}`;
+        const hasSpend = day.appliedTransactions.length > 0 || spendCents > 0;
+        if (day.date >= todayIso || (realShifts.length === 0 && !hasSpend)) {
+          return null;
+        }
+        const bits: string[] = [];
+        if (realShifts.length > 0) {
+          const hours = realShifts.reduce(
+            (sum, slot) => sum + Math.max(0, slot.hoursOrUnits),
+            0,
+          );
+          const hoursLabel = `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
+          bits.push(
+            `${hoursLabel} · ${realShifts.length} shift${realShifts.length === 1 ? "" : "s"}`,
+          );
+        }
+        if (hasSpend) {
+          bits.push(`${formatMoney(spendCents)} spent`);
+        }
+        const summary = bits.join("   ·   ");
         return (
           <div
             className={`mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 ${
-              hoursVerified
+              dayVerified
                 ? "border-emerald-500/40 bg-emerald-500/10"
                 : "border-amber-500/40 bg-amber-500/10"
             }`}
           >
             <span className="text-xs font-semibold">
-              {hoursVerified ? (
-                <span className="text-emerald-500">
-                  ✓ Hours verified — {hoursLabel} · {shiftLabel}
-                </span>
+              {dayVerified ? (
+                <span className="text-emerald-500">✓ Verified — {summary}</span>
               ) : (
                 <span className="text-amber-500">
-                  Second look: confirm {hoursLabel} · {shiftLabel}
+                  Second look: confirm {summary}
                 </span>
               )}
             </span>
             <button
               className={
-                hoursVerified
+                dayVerified
                   ? "rounded-md border border-emerald-500/50 px-2.5 py-1 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/15"
                   : "rounded-md border border-emerald-500 bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white transition hover:bg-emerald-600"
               }
               onClick={onToggleVerify}
               type="button"
             >
-              {hoursVerified ? "Unverify" : "Verify ✓"}
+              {dayVerified ? "Unverify" : "Verify ✓"}
             </button>
           </div>
         );
@@ -2237,8 +2235,34 @@ function RecapStat({ label, value }: { label: string; value: string }) {
 }
 
 const GREEN_LINE_KEY = "bashflow.greenLineCents";
-// Device-local set of hours-verified day ids → ISO timestamp of the check.
+// Device-local map of day id → the content signature that was verified.
 const VERIFIED_DAYS_KEY = "bashflow.verifiedDays";
+
+// A day's hours + spending fingerprint. If any of it changes (a shift edit, an
+// exempt, a new synced charge), the signature changes and the day's green
+// verification lapses back to "needs a second look."
+function dayVerifySignature(day: DashboardDay): string {
+  const slotKey = day.slots
+    .filter((slot) => slot.jobType !== "none" && slot.kind !== "bucket")
+    .map((slot) => `${slot.jobType}:${slot.payType}:${slot.hoursOrUnits}`)
+    .sort()
+    .join(",");
+  const spendKey = day.appliedTransactions
+    .map((tx) => `${tx.id}:${tx.amountCents}`)
+    .sort()
+    .join(",");
+  return `${slotKey}#${spendKey}`;
+}
+
+// Does a past day have anything worth a second look (shifts or spending)?
+function dayHasVerifiableContent(day: DashboardDay): boolean {
+  return (
+    day.appliedTransactions.length > 0 ||
+    day.slots.some(
+      (slot) => slot.jobType !== "none" && slot.kind !== "bucket",
+    )
+  );
+}
 // Default weekly cashflow target ($900 — the locked plan rule). The bar shows
 // with this by default; tap it to change (stored per-device).
 const DEFAULT_GREEN_LINE_CENTS = 90_000;
