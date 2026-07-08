@@ -114,7 +114,6 @@ export function DashboardEditor({
   const isHistorical = mode === "historical";
   const router = useRouter();
   const [days, setDays] = useState(initialData.days);
-  const [gasMetrics, setGasMetrics] = useState(initialData.gasMetrics);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
@@ -755,7 +754,6 @@ export function DashboardEditor({
         previousFillDate,
       });
       setDays(result.dashboardData.days);
-      setGasMetrics(result.dashboardData.gasMetrics);
       lastSavedAt.current = Date.now();
       setSaveState("saved");
       router.refresh();
@@ -1218,7 +1216,6 @@ export function DashboardEditor({
               <MetricStrip
                 cashflowCents={weekTotals.cashflowCents}
                 earningsCents={weekTotals.earningsCents}
-                gasMetrics={gasMetrics}
                 medians={initialData.metricMedians}
                 spendBreakdown={spendBreakdown}
                 spendCents={weekTotals.spendCents}
@@ -1355,14 +1352,12 @@ function MetricStrip({
   cashflowCents,
   medians,
   spendBreakdown,
-  gasMetrics,
 }: {
   earningsCents: number;
   spendCents: number;
   cashflowCents: number;
   medians: DashboardData["metricMedians"];
   spendBreakdown: SpendBreakdown;
-  gasMetrics: DashboardData["gasMetrics"];
 }) {
   const [spendOpen, setSpendOpen] = useState(false);
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
@@ -1405,81 +1400,6 @@ function MetricStrip({
       {spendOpen ? (
         <SpendBreakdownPanel breakdown={spendBreakdown} totalCents={spendCents} />
       ) : null}
-      <GasTrendPanel metrics={gasMetrics} />
-    </div>
-  );
-}
-
-function GasTrendPanel({ metrics }: { metrics: DashboardData["gasMetrics"] }) {
-  const hasGas = metrics.rolling30TotalCents > 0 || metrics.rolling7TotalCents > 0;
-  const trendCopy =
-    metrics.trend === "above_average"
-      ? "above average"
-      : metrics.trend === "under_average"
-        ? "under average"
-        : metrics.trend === "normal"
-          ? "normal"
-          : "waiting";
-  const trendTone =
-    metrics.trend === "above_average"
-      ? "text-[var(--accent-warning-text)]"
-      : metrics.trend === "under_average"
-        ? "text-[var(--accent-primary-text)]"
-        : "text-[var(--text-secondary)]";
-
-  return (
-    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-3 text-sm text-[var(--text-primary)]">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-          Gas tracker
-        </span>
-        <span className={`text-xs font-semibold ${trendTone}`}>{trendCopy}</span>
-      </div>
-      {hasGas ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-          <GasTrendStat
-            label="7d gas"
-            value={formatMoney(metrics.rolling7TotalCents)}
-          />
-          <GasTrendStat
-            label="30d gas"
-            value={formatMoney(metrics.rolling30TotalCents)}
-          />
-          <GasTrendStat
-            label="daily avg"
-            value={formatMoney(metrics.rolling30DailyAverageCents)}
-          />
-          <GasTrendStat
-            label="avg fill"
-            value={formatMoney(metrics.averageFillUpCents)}
-          />
-          <GasTrendStat
-            label="high fill"
-            value={formatMoney(metrics.highestFillUpCents)}
-          />
-          <GasTrendStat
-            label="fills / wk"
-            value={`${metrics.fillUps7d}`}
-          />
-        </div>
-      ) : (
-        <p className="text-xs text-[var(--text-tertiary)]">
-          Mark a gas transaction to start the rolling gas tracker.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function GasTrendStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2.5 py-2">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-        {label}
-      </div>
-      <div className="mt-1 text-base font-bold tabular-nums text-[var(--text-primary)]">
-        {value}
-      </div>
     </div>
   );
 }

@@ -129,18 +129,6 @@ export type DashboardMetricMedians = {
   cashflowCents: number;
 };
 
-export type DashboardGasMetrics = {
-  rolling7TotalCents: number;
-  rolling30TotalCents: number;
-  rolling7DailyAverageCents: number;
-  rolling30DailyAverageCents: number;
-  averageFillUpCents: number;
-  highestFillUpCents: number;
-  fillUps7d: number;
-  fillUps30d: number;
-  trend: "under_average" | "normal" | "above_average" | "none";
-};
-
 export type DashboardAbilityPayPeriod = {
   adjacentWeekAbilityHours: number;
   adjacentWeekAbilityRegularHours: number;
@@ -160,7 +148,6 @@ export type DashboardData = {
   hiddenBuiltins: string[];
   baselineTotals: DashboardBaselineTotals;
   metricMedians: DashboardMetricMedians;
-  gasMetrics: DashboardGasMetrics;
   abilityPayPeriod: DashboardAbilityPayPeriod;
   spendProjection: DashboardSpendProjection;
 };
