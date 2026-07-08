@@ -10,6 +10,7 @@ import type {
   AmortizationCreditRow,
   DashboardData,
   DashboardDay,
+  DashboardGasMetrics,
   DashboardSlot,
   DashboardTransaction,
   DashboardTransactionSource,
@@ -117,6 +118,11 @@ type TransactionRow = {
 type GasSpreadRow = {
   day_id: string;
   gas_spend_cents: NumericValue;
+};
+
+type GasMetricRow = {
+  fill_date: string;
+  gas_amount_cents: NumericValue;
 };
 
 type GasAllocationRow = {
@@ -242,6 +248,7 @@ export async function getDashboardData(
     { data: baselineTotalData, error: baselineTotalError },
     { data: closedWeekMetricData, error: closedWeekMetricError },
     { data: projectionWeekData, error: projectionWeekError },
+    { data: gasMetricData, error: gasMetricError },
   ] = await Promise.all([
     supabase
       .from("settings")
@@ -289,6 +296,12 @@ export async function getDashboardData(
       .eq("user_id", user.id)
       .not("spend_for_projection", "is", null)
       .order("start_date", { ascending: true }),
+    supabase
+      .from("gas_allocations")
+      .select("fill_date,gas_amount_cents")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .lte("fill_date", todayIso),
   ]);
   since("dashboard:batchA(settings+week+days+totals+baseline+closed)", tBatchA);
 
@@ -321,6 +334,9 @@ export async function getDashboardData(
     throw new Error(
       `Unable to load spend projection weeks: ${projectionWeekError.message}`,
     );
+  }
+  if (gasMetricError) {
+    console.warn(`[dashboard] gas metrics unavailable: ${gasMetricError.message}`);
   }
 
   const days = (dayData ?? []) as DayRow[];
@@ -473,6 +489,9 @@ export async function getDashboardData(
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
     closedWeekMetrics: (closedWeekMetricData ?? []) as ClosedWeekMetricRow[],
     projectionWeeks: (projectionWeekData ?? []) as ProjectionWeekRow[],
+    gasMetricRows: gasMetricError
+      ? []
+      : ((gasMetricData ?? []) as GasMetricRow[]),
     baseAllocations,
     bucketCredits,
     gasSpread,
@@ -496,6 +515,7 @@ function mapDashboardData(input: {
   baselineTotal: BaselineTotalRow | null;
   closedWeekMetrics: ClosedWeekMetricRow[];
   projectionWeeks: ProjectionWeekRow[];
+  gasMetricRows: GasMetricRow[];
   baseAllocations: BaseAllocationRow[];
   bucketCredits: AmortizationCreditRow[];
   gasSpread: GasSpreadRow[];
@@ -615,6 +635,7 @@ function mapDashboardData(input: {
         input.closedWeekMetrics.map((row) => row.cashflow_total),
       ),
     },
+    gasMetrics: deriveGasMetrics(input.gasMetricRows, input.todayIso),
     abilityPayPeriod: input.adjacentAbilityPayPeriod,
     spendProjection: deriveSpendProjection(
       input.projectionWeeks.map((row) => ({
@@ -721,6 +742,66 @@ function medianCents(values: NumericValue[]): number {
   }
 
   return Math.round((cents[middle - 1] + cents[middle]) / 2);
+}
+
+function deriveGasMetrics(
+  rows: GasMetricRow[],
+  todayIso: string,
+): DashboardGasMetrics {
+  const today = parseIsoDay(todayIso);
+  const activeRows = rows.filter((row) => {
+    const day = parseIsoDay(row.fill_date);
+    return Number.isFinite(day) && day <= today;
+  });
+  const inLastDays = (days: number) =>
+    activeRows.filter((row) => {
+      const day = parseIsoDay(row.fill_date);
+      return today - day <= days - 1;
+    });
+
+  const rows7 = inLastDays(7);
+  const rows30 = inLastDays(30);
+  const rolling7TotalCents = sumGasCents(rows7);
+  const rolling30TotalCents = sumGasCents(rows30);
+  const rolling7DailyAverageCents = Math.round(rolling7TotalCents / 7);
+  const rolling30DailyAverageCents = Math.round(rolling30TotalCents / 30);
+  const averageFillUpCents =
+    rows30.length > 0 ? Math.round(rolling30TotalCents / rows30.length) : 0;
+  const highestFillUpCents = rows30.reduce((highest, row) => {
+    const amount = Math.max(0, Math.round(toNumber(row.gas_amount_cents)));
+    return Math.max(highest, amount);
+  }, 0);
+
+  let trend: DashboardGasMetrics["trend"] = "none";
+  if (rolling30DailyAverageCents > 0) {
+    const ratio = rolling7DailyAverageCents / rolling30DailyAverageCents;
+    trend =
+      ratio > 1.1 ? "above_average" : ratio < 0.9 ? "under_average" : "normal";
+  }
+
+  return {
+    rolling7TotalCents,
+    rolling30TotalCents,
+    rolling7DailyAverageCents,
+    rolling30DailyAverageCents,
+    averageFillUpCents,
+    highestFillUpCents,
+    fillUps7d: rows7.length,
+    fillUps30d: rows30.length,
+    trend,
+  };
+}
+
+function sumGasCents(rows: GasMetricRow[]): number {
+  return rows.reduce(
+    (sum, row) => sum + Math.round(toNumber(row.gas_amount_cents)),
+    0,
+  );
+}
+
+function parseIsoDay(value: string): number {
+  const time = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isFinite(time) ? Math.floor(time / 86_400_000) : Number.NaN;
 }
 
 function sumAbilityHours(slots: AdjacentEarnSlotRow[]): {

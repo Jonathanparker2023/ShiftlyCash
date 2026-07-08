@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
+import { getWeekDashboardData } from "@/lib/dashboard/data";
 import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
+import type { DashboardData } from "@/lib/dashboard/types";
 import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 
 const JOB_TYPES = [
@@ -647,7 +649,12 @@ export async function amortizeTransactionAction(
 
 export async function allocateGasTransactionAction(
   input: AllocateGasTransactionInput,
-): Promise<{ ok: true; allocationId: string; previousFillDate: string }> {
+): Promise<{
+  ok: true;
+  allocationId: string;
+  previousFillDate: string;
+  dashboardData: DashboardData;
+}> {
   const { supabase, user } = await requireUser();
   const transactionId = requireUuid(input.transactionId, "transactionId");
   const gasAmountCents = requirePositiveInteger(
@@ -729,12 +736,24 @@ export async function allocateGasTransactionAction(
     );
   }
 
+  const { data: day, error: dayError } = await supabase
+    .from("days")
+    .select("week_id")
+    .eq("id", row.day_id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (dayError) {
+    throw new Error(`Unable to reload gas allocation week: ${dayError.message}`);
+  }
+
   revalidatePath("/");
   revalidatePath("/history");
   return {
     ok: true,
     allocationId: String((allocation as { id: string }).id),
     previousFillDate,
+    dashboardData: await getWeekDashboardData(String((day as { week_id: string }).week_id)),
   };
 }
 
