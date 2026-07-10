@@ -182,6 +182,18 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
   );
 }
 
+const STATUS_LABEL_CLASS: Record<string, string> = {
+  "above average": "text-red-500",
+  normal: "text-[var(--accent-brand-text)]",
+  "under average": "text-emerald-500",
+};
+
+const TREND_ARROW: Record<string, string> = {
+  rising: "↑",
+  falling: "↓",
+  steady: "→",
+};
+
 function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
   return (
     <section className="mt-5 rounded-2xl border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] p-4">
@@ -196,20 +208,35 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
               : "Waiting for today's fill"}
           </h2>
           <p className="mt-1 text-sm text-[var(--text-tertiary)]">
-            {tracker.status === "active"
-              ? "Gas is tracked separately from total spend and added one day at a time."
-              : "Once you fill the tank and hit Gas on that transaction, this shows the daily gas math."}
+            {tracker.status === "active" ? (
+              <>
+                {TREND_ARROW[tracker.trend]}{" "}
+                <span className={STATUS_LABEL_CLASS[tracker.statusLabel]}>
+                  {tracker.statusLabel}
+                </span>{" "}
+                — 7-day pace {formatMoney(tracker.last7d.avgPerDayCents)}/day vs 30-day{" "}
+                {formatMoney(tracker.last30d.avgPerDayCents)}/day.
+              </>
+            ) : (
+              "Once you fill the tank and hit Gas on that transaction, this shows the daily gas math."
+            )}
           </p>
         </div>
-        {tracker.status === "active" ? (
-          <div className="grid grid-cols-2 gap-3 text-right sm:grid-cols-4">
-            <Stat label="Gas total" value={formatMoney(tracker.gasAmountCents)} />
-            <Stat label="Days" value={String(tracker.periodDays)} />
-            <Stat label="Daily" value={formatMoney(tracker.averageDailyGasCents)} />
-            <Stat label="Extra" value={formatMoney(tracker.remainderAmountCents)} />
-          </div>
-        ) : null}
       </div>
+
+      {tracker.status === "active" ? (
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Spent · 7d" value={formatMoney(tracker.last7d.totalCents)} />
+          <Stat label="Spent · 30d" value={formatMoney(tracker.last30d.totalCents)} />
+          <Stat label="Fill-ups · 7d" value={String(tracker.last7d.fillUps)} />
+          <Stat label="Avg / fill-up" value={formatMoney(tracker.last30d.avgPerFillCents)} />
+          <Stat label="Avg / day · 7d" value={formatMoney(tracker.last7d.avgPerDayCents)} />
+          <Stat label="Avg / day · 30d" value={formatMoney(tracker.last30d.avgPerDayCents)} />
+          <Stat label="Fill-ups · 30d" value={String(tracker.last30d.fillUps)} />
+          <Stat label="Highest fill · 30d" value={formatMoney(tracker.last30d.highestFillCents)} />
+        </div>
+      ) : null}
+
       <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--text-tertiary)]">
         {tracker.status === "active" ? (
           <>
@@ -220,7 +247,7 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
             <span className="text-[var(--accent-brand-text)]">
               {formatMoney(tracker.averageDailyGasCents)}
             </span>
-            {" daily. Period: "}
+            {" whole-history daily average. Period: "}
             <span className="text-[var(--text-secondary)]">
               {shortDate(tracker.periodStartDate)} to {shortDate(tracker.periodEndDate)}
             </span>
@@ -232,8 +259,7 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
       </div>
       {tracker.status === "active" ? (
         <p className="mt-2 text-xs text-[var(--text-muted)]">
-          Previous gas: {shortDate(tracker.previousFillDate)}. Source:{" "}
-          {tracker.merchantName}. Store extras stay normal spend.
+          Previous gas: {shortDate(tracker.previousFillDate)}. Source: {tracker.merchantName}.
         </p>
       ) : null}
     </section>

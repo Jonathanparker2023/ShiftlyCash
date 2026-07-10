@@ -5,6 +5,7 @@ import type { Transaction } from "plaid";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireUser } from "@/lib/auth";
+import { addDaysIso } from "@/lib/dashboard/dates";
 import { getOptionalSupabaseServiceRoleKey, getPlaidServerEnv } from "@/lib/env";
 import { getPlaidClient, toPlaidCountryCodes, toPlaidProducts } from "@/lib/plaid/client";
 import { decryptAccessToken, encryptAccessToken } from "@/lib/plaid/crypto";
@@ -214,6 +215,7 @@ export async function syncTransactionsAction(
   );
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/banking");
 
   return { ok: true, added, modified, removed, normalized };
@@ -558,10 +560,22 @@ async function findExistingPlaidTransaction(
 }
 
 // Cross-source dedup: when Plaid sync sees a transaction, check whether a
-// Chime push capture already landed for the same date + amount. If so, we
-// stamp the existing Chime row with the Plaid id so future Plaid syncs
-// match it and we skip the duplicate insert. The Chime push captures
-// faster, so it usually wins the race.
+// Chime push capture already landed for the same real-world purchase. If so,
+// we stamp the existing Chime row with the Plaid id so future Plaid syncs
+// match it and we skip the duplicate insert. The Chime push captures faster,
+// so it usually wins the race.
+//
+// Matched on amount + a DATE WINDOW, not exact date equality: Chime's date is
+// the instant local-time capture (card swipe), while Plaid's `date` is the
+// bank's POSTED date, which routinely lands 1-3 days later (weekends/holidays
+// push it further). An exact-date match silently misses these and both a
+// Chime row and a Plaid row get created for the same purchase -- this was the
+// main source of duplicate spending/transfer transactions. Plaid's post date
+// is virtually never earlier than the swipe date, so the window is asymmetric
+// (a few days back, one day forward for rare early-posting cases).
+const CROSS_SOURCE_MATCH_DAYS_BACK = 3;
+const CROSS_SOURCE_MATCH_DAYS_FORWARD = 1;
+
 async function findChimeMatchForPlaid(
   context: PlaidSyncContext,
   date: string,
@@ -569,10 +583,11 @@ async function findChimeMatchForPlaid(
 ) {
   const { data, error } = await context.supabase
     .from("transactions")
-    .select("id,day_id,status,merchant_name")
+    .select("id,day_id,status,merchant_name,date")
     .eq("user_id", context.userId)
     .eq("source", "chime")
-    .eq("date", date)
+    .gte("date", addDaysIso(date, -CROSS_SOURCE_MATCH_DAYS_BACK))
+    .lte("date", addDaysIso(date, CROSS_SOURCE_MATCH_DAYS_FORWARD))
     .eq("amount", amount)
     .is("plaid_transaction_id", null)
     .order("created_at", { ascending: true })
@@ -588,6 +603,7 @@ async function findChimeMatchForPlaid(
     day_id: string | null;
     status: "applied" | "pending_review" | "excluded";
     merchant_name: string | null;
+    date: string;
   } | null;
 }
 
@@ -787,6 +803,7 @@ export async function applyPendingTransactionAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/banking");
 
   return { ok: true };
@@ -810,6 +827,7 @@ export async function excludePendingTransactionAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/banking");
 
   return { ok: true };
@@ -849,6 +867,7 @@ export async function excludeOldNoMatchingTransactionsAction(): Promise<ExcludeO
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/banking");
 
   return {
@@ -919,6 +938,7 @@ export async function cleanUglyMerchantNamesAction(): Promise<CleanUglyMerchantN
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/banking");
 
   return { ok: true, scannedCount, cleanedCount };

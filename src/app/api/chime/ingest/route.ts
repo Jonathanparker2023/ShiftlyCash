@@ -6,7 +6,7 @@ import {
   type ChimeParseKind,
   type ChimeParseResult,
 } from "@/lib/domain/chime-parser";
-import { toLocalIsoDate } from "@/lib/dashboard/dates";
+import { addDaysIso, toLocalIsoDate } from "@/lib/dashboard/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const SECRET_ENV = "CHIME_INGEST_SECRET";
@@ -117,29 +117,40 @@ export async function POST(request: Request) {
           ? "day_locked"
           : "no_matching_day";
 
-    // Cross-source dedup: if a Plaid sync already landed this exact
-    // transaction (same date + amount), don't double-write — just note
-    // the chime capture in the existing row's notes for traceability.
+    // Cross-source dedup: if a Plaid sync already landed this transaction,
+    // don't double-write -- just note the chime capture in the existing
+    // row's notes for traceability. Matched on amount + a DATE WINDOW, not
+    // exact equality: Chime's date is the instant capture (swipe time), while
+    // Plaid's posted date routinely lands 1-3 days later. An exact-date match
+    // silently missed this and let both a Chime row and a Plaid row get
+    // created for the same purchase -- the main source of duplicate
+    // transactions. Plaid rarely posts BEFORE the swipe, so the window looks
+    // mostly backward from today's capture date.
     const { data: existingPlaid } = await supabase
       .from("transactions")
       .select("id")
       .eq("user_id", userId)
       .eq("source", "plaid")
-      .eq("date", todayDate)
+      .gte("date", addDaysIso(todayDate, -3))
+      .lte("date", addDaysIso(todayDate, 1))
       .eq("amount", amount)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
-    // Same-source dedup: if a prior Chime capture (e.g. from Make.com)
-    // already created a transaction for the same date + amount, don't
-    // double-write when Tasker fires for the same real-world event.
+    // Same-source dedup: if a prior Chime capture (e.g. from the Gmail
+    // backfill cron replaying the same email Tasker already pushed) already
+    // created a transaction for this purchase, don't double-write. A small
+    // +/-1 day window (rather than exact date equality) covers the rare case
+    // where the two capture paths round the local date differently right at
+    // a midnight boundary.
     const { data: existingChime } = await supabase
       .from("transactions")
       .select("id")
       .eq("user_id", userId)
       .eq("source", "chime")
-      .eq("date", todayDate)
+      .gte("date", addDaysIso(todayDate, -1))
+      .lte("date", addDaysIso(todayDate, 1))
       .eq("amount", amount)
       .order("created_at", { ascending: true })
       .limit(1)
@@ -214,6 +225,7 @@ export async function POST(request: Request) {
 
   if (parsedTransactionId) {
     revalidatePath("/");
+    revalidatePath("/trends");
   }
 
   // Always log parseFailureReason when present, even on parsed.ok=true —

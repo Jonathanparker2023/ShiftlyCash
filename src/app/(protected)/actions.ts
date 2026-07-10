@@ -160,6 +160,7 @@ export async function saveDayAction(input: SaveDayInput): Promise<SaveDayResult>
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
 
   return {
     ok: true,
@@ -241,6 +242,7 @@ export async function saveEarnSlotAction(
 
   const row = data as { id: string };
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/history");
   revalidatePath("/history/[week_id]", "page");
 
@@ -333,6 +335,7 @@ export async function closeWeekAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
 
   return {
     ok: true,
@@ -372,6 +375,7 @@ export async function refreshDashboardProjectionMaintenanceAction(): Promise<Ref
 
   if (cleaned > 0 || projected > 0) {
     revalidatePath("/");
+  revalidatePath("/trends");
   }
 
   return {
@@ -446,6 +450,7 @@ export async function toggleTransactionStatusAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   revalidatePath("/history");
   return { ok: true };
@@ -467,6 +472,7 @@ export async function deleteTransactionAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   return { ok: true };
 }
 
@@ -526,6 +532,7 @@ export async function moveTransactionToYesterdayAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/history");
   return { ok: true, dayId: String(day.id), date: String(day.date) };
 }
@@ -548,6 +555,7 @@ export async function renameTransactionAction(
 
   // /baseline shows the amortized expense whose name derives from this txn.
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   return { ok: true, merchantName };
 }
@@ -641,6 +649,7 @@ export async function amortizeTransactionAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   revalidatePath("/history");
 
@@ -748,6 +757,7 @@ export async function allocateGasTransactionAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/history");
   return {
     ok: true,
@@ -797,6 +807,7 @@ export async function reAmortizeTransactionAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   return { ok: true };
 }
@@ -832,6 +843,7 @@ export async function removeAmortizationAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   return { ok: true };
 }
@@ -913,6 +925,7 @@ export async function createAmortizationBucketAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   return { ok: true, bucketId: String((data as { id: string }).id) };
 }
@@ -973,6 +986,7 @@ export async function updateAmortizationBucketAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   return { ok: true };
 }
@@ -1004,6 +1018,7 @@ export async function upsertAmortizationItemAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   return { ok: true };
 }
@@ -1027,6 +1042,7 @@ export async function deleteAmortizationItemAction(input: {
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   return { ok: true };
 }
@@ -1049,6 +1065,7 @@ export async function deleteAmortizationBucketAction(input: {
   }
 
   revalidatePath("/");
+  revalidatePath("/trends");
   revalidatePath("/baseline");
   return { ok: true };
 }
