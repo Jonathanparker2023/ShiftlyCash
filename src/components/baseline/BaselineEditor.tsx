@@ -262,7 +262,7 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
 
         <section className="mt-4">
           <div className="mb-2 flex items-center justify-between px-1">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--accent-brand-text)]">
               Recurring expenses
             </h2>
             <span className="text-xs font-medium text-[var(--text-muted)]">
@@ -401,7 +401,7 @@ function AmortizedExpensesSection({
       <details className="group overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]">
         <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-3 py-2.5 marker:hidden hover:bg-[var(--surface-hover)]">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+            <h2 className="text-sm font-semibold text-[var(--accent-brand-text)]">
               Temporary costs
             </h2>
             <p className="mt-0.5 text-xs text-[var(--text-muted)]">
@@ -721,7 +721,7 @@ function AmortizedIncomeSection({
     <section className="mt-6 pb-8">
       <div className="mb-2 flex items-center justify-between gap-3 px-1">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--accent-brand-text)]">
             Planned buckets
           </h2>
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">
