@@ -296,9 +296,7 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
         </section>
 
         <AmortizedExpensesSection
-          canonicalDailyCents={initialData.dailyFixedTodayCents}
           initialExpenses={initialData.amortizedExpenses}
-          recurringDailyCents={totals.projectedDailyBaseCents}
         />
 
         <AmortizedIncomeSection
@@ -312,14 +310,8 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
 
 function AmortizedExpensesSection({
   initialExpenses,
-  recurringDailyCents,
-  canonicalDailyCents,
 }: {
   initialExpenses: BaselineAmortizedExpense[];
-  recurringDailyCents: number;
-  // The dashboard's exact daily-fixed value (from v_day_totals). When present it
-  // IS the headline — same source as the dashboard, so they can't disagree.
-  canonicalDailyCents: number | null;
 }) {
   const [expenses, setExpenses] = useState(initialExpenses);
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
@@ -330,13 +322,6 @@ function AmortizedExpensesSection({
     (sum, expense) => sum + expense.todaySliceCents,
     0,
   );
-  const componentSum = recurringDailyCents + amortizedTotal;
-  // If the component sum ever drifts from the canonical value, surface it loudly
-  // (within a couple cents of rounding) instead of letting it pass silently.
-  const drifts =
-    canonicalDailyCents !== null &&
-    Math.abs(canonicalDailyCents - componentSum) > 2;
-
   async function remove(expense: BaselineAmortizedExpense) {
     if (!expense.sourceTransactionId) {
       return;
@@ -432,12 +417,6 @@ function AmortizedExpensesSection({
               ))}
             </div>
           )}
-          {drifts ? (
-            <p className="border-t border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--accent-warning-text)]">
-              Fixed-cost components total {formatMoney(componentSum)}, which
-              differs from the dashboard value.
-            </p>
-          ) : null}
           {error ? (
             <p className="border-t border-[var(--border-subtle)] px-3 py-2 text-xs text-[var(--accent-negative-text)]">
               {error}
