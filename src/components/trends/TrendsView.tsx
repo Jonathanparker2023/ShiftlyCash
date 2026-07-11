@@ -190,10 +190,10 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-brand-text)]">
-            Gas pace
+            Average gas / day
           </p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="text-2xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+            <h2 className="text-3xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)] sm:text-4xl">
               {isActive
                 ? `${formatMoney(tracker.averageDailyGasCents)} / day`
                 : "Waiting for a fill"}
