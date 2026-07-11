@@ -1969,7 +1969,19 @@ function TransactionDrawer({
   const [isAdding, setIsAdding] = useState(false);
   const [merchantName, setMerchantName] = useState("");
   const [amount, setAmount] = useState("");
-  const appliedTransactions = sortDashboardTransactions(day.appliedTransactions);
+  // Gas-allocated transactions get pulled out of SPENDING into their own
+  // always-visible blue bucket -- never hidden (even at $0 remainder), so a
+  // duplicate of an already-gas'd purchase can never be mistaken for a fresh,
+  // un-handled one and get gas'd a second time (which would double-count it
+  // into the whole-history daily average). Status stays "applied" underneath;
+  // this is purely a display grouping, so the remainder still counts as spend
+  // exactly as before.
+  const plainSpendingTransactions = sortDashboardTransactions(
+    day.appliedTransactions.filter((transaction) => !transaction.isGasAllocated),
+  );
+  const gasAllocatedTransactions = sortDashboardTransactions(
+    day.appliedTransactions.filter((transaction) => transaction.isGasAllocated),
+  );
   const excludedTransactions = sortDashboardTransactions(day.excludedTransactions);
 
   function submitManualTransaction(event: FormEvent<HTMLFormElement>) {
@@ -1994,12 +2006,16 @@ function TransactionDrawer({
         </div>
       ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div
+        className={`grid gap-3 lg:grid-cols-2 ${
+          gasAllocatedTransactions.length > 0 ? "xl:grid-cols-3" : ""
+        }`}
+      >
         <TransactionColumn
           heading="SPENDING"
           gasSpendCents={day.gasSpendCents}
           pendingTransactionIds={pendingTransactionIds}
-          transactions={appliedTransactions}
+          transactions={plainSpendingTransactions}
           variant="spending"
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
@@ -2010,6 +2026,24 @@ function TransactionDrawer({
             onToggleTransactionStatus(transaction, "excluded")
           }
         />
+        {gasAllocatedTransactions.length > 0 ? (
+          <TransactionColumn
+            accent="gas"
+            heading="GAS"
+            note="Already gas-tagged. The remainder still counts as spend — don't allocate a duplicate of one of these."
+            pendingTransactionIds={pendingTransactionIds}
+            transactions={gasAllocatedTransactions}
+            variant="spending"
+            onDelete={onDeleteTransaction}
+            onMoveToYesterday={onMoveTransactionToYesterday}
+            onRename={onRenameTransaction}
+            onAllocateGas={onAllocateGasTransaction}
+            onAmortize={onAmortizeTransaction}
+            onToggle={(transaction) =>
+              onToggleTransactionStatus(transaction, "excluded")
+            }
+          />
+        ) : null}
         <TransactionColumn
           heading="EXEMPT"
           pendingTransactionIds={pendingTransactionIds}
@@ -2091,6 +2125,8 @@ function TransactionColumn({
   onAllocateGas,
   onAmortize,
   gasSpendCents,
+  accent,
+  note,
 }: {
   heading: string;
   pendingTransactionIds: Set<string>;
@@ -2107,25 +2143,46 @@ function TransactionColumn({
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
   gasSpendCents?: number;
+  // "gas" gives the whole card a blue accent so an already-gas-tagged
+  // transaction is unmistakable at a glance, never mixed anonymously into
+  // ordinary spending.
+  accent?: "gas";
+  note?: string;
 }) {
   const showGasRow =
-    variant === "spending" && !!gasSpendCents && gasSpendCents > 0;
-  // A transaction whose entire amount was spread into the gas average leaves no
-  // remainder — drop it instead of showing a $0 spending item.
-  const visibleTransactions = transactions.filter(
-    (transaction) =>
-      !(transaction.isGasAllocated && transaction.gasRemainderCents <= 0),
-  );
+    variant === "spending" && !accent && !!gasSpendCents && gasSpendCents > 0;
   return (
-    <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
+    <div
+      className={
+        accent === "gas"
+          ? "min-h-0 rounded-md border border-sky-400/50 bg-sky-500/10 p-3"
+          : "min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3"
+      }
+    >
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+        <h3
+          className={
+            accent === "gas"
+              ? "text-xs font-semibold uppercase tracking-[0.14em] text-sky-500"
+              : "text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]"
+          }
+        >
           {heading}
         </h3>
-        <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
-          {visibleTransactions.length + (showGasRow ? 1 : 0)}
+        <span
+          className={
+            accent === "gas"
+              ? "rounded-full bg-sky-500/20 px-2 py-0.5 text-xs font-semibold text-sky-500"
+              : "rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]"
+          }
+        >
+          {transactions.length + (showGasRow ? 1 : 0)}
         </span>
       </div>
+
+      {note ? (
+        <p className="mb-2 text-[11px] leading-snug text-sky-500">{note}</p>
+      ) : null}
 
       <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
         {showGasRow ? (
@@ -2143,7 +2200,7 @@ function TransactionColumn({
             </div>
           </div>
         ) : null}
-        {visibleTransactions.map((transaction) => (
+        {transactions.map((transaction) => (
           <TransactionRowButton
             key={transaction.id}
             transaction={transaction}
