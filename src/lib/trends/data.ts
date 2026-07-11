@@ -62,6 +62,12 @@ export type TrendsGasTracker =
       gasAmountCents: number;
       averageDailyGasCents: number;
       updatedAt: string;
+      fills: Array<{
+        id: string;
+        fillDate: string;
+        merchantName: string;
+        gasAmountCents: number;
+      }>;
       // Rolling-window practical metrics (task: gas metrics upgrade).
       last7d: {
         totalCents: number;
@@ -273,6 +279,12 @@ function mapGasTracker(
     gasAmountCents,
     averageDailyGasCents: Math.round(gasAmountCents / periodDays),
     updatedAt: latest.updated_at ?? latest.created_at,
+    fills: rows.map((row) => ({
+      id: row.id,
+      fillDate: row.fill_date,
+      merchantName: row.merchant_name,
+      gasAmountCents: fillAmount(row),
+    })),
     last7d: {
       totalCents: last7dTotalCents,
       avgPerDayCents: last7dAvgPerDayCents,

@@ -247,10 +247,41 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
       </div>
 
       {isActive ? (
-        <p className="mt-4 text-xs text-[var(--text-muted)]">
-          {formatMoney(tracker.gasAmountCents)} spread across {tracker.periodDays} days since{" "}
-          {shortDate(tracker.periodStartDate)}. Latest source: {tracker.merchantName}.
-        </p>
+        <>
+          <p className="mt-4 text-xs text-[var(--text-muted)]">
+            {formatMoney(tracker.gasAmountCents)} spread across {tracker.periodDays} days since{" "}
+            {shortDate(tracker.periodStartDate)}. Latest source: {tracker.merchantName}.
+          </p>
+          <details className="group mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold text-[var(--text-secondary)] marker:hidden">
+              <span>Fill-up history</span>
+              <span className="text-xs font-medium text-[var(--text-muted)] group-open:hidden">
+                {tracker.fills.length} tagged fills
+              </span>
+              <span className="hidden text-xs font-medium text-[var(--text-muted)] group-open:inline">
+                Hide history
+              </span>
+            </summary>
+            <div className="border-t border-[var(--border-subtle)] px-3 py-1">
+              {tracker.fills.map((fill) => (
+                <div
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-[var(--border-subtle)] py-2.5 last:border-b-0"
+                  key={fill.id}
+                >
+                  <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+                    {shortDate(fill.fillDate)}
+                  </span>
+                  <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+                    {fill.merchantName}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+                    {formatMoney(fill.gasAmountCents)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </details>
+        </>
       ) : null}
     </section>
   );
