@@ -195,74 +195,77 @@ const TREND_ARROW: Record<string, string> = {
 };
 
 function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
+  const isActive = tracker.status === "active";
+
   return (
-    <section className="mt-5 rounded-2xl border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-brand-text)]">
-            Gas tracker
+    <section className="mt-5 border-t border-[var(--border-subtle)] pt-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-brand-text)]">
+            Gas pace
           </p>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight text-[var(--text-primary)]">
-            {tracker.status === "active"
-              ? `${formatMoney(tracker.averageDailyGasCents)} per gas day`
-              : "Waiting for today's fill"}
-          </h2>
-          <p className="mt-1 text-sm text-[var(--text-tertiary)]">
-            {tracker.status === "active" ? (
-              <>
-                {TREND_ARROW[tracker.trend]}{" "}
-                <span className={STATUS_LABEL_CLASS[tracker.statusLabel]}>
-                  {tracker.statusLabel}
-                </span>{" "}
-                — 7-day pace {formatMoney(tracker.last7d.avgPerDayCents)}/day vs 30-day{" "}
-                {formatMoney(tracker.last30d.avgPerDayCents)}/day.
-              </>
-            ) : (
-              "Once you fill the tank and hit Gas on that transaction, this shows the daily gas math."
-            )}
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 className="text-2xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+              {isActive
+                ? `${formatMoney(tracker.averageDailyGasCents)} / day`
+                : "Waiting for a fill"}
+            </h2>
+            {isActive ? (
+              <span
+                className={[
+                  "text-sm font-semibold",
+                  STATUS_LABEL_CLASS[tracker.statusLabel],
+                ].join(" ")}
+              >
+                {TREND_ARROW[tracker.trend]} {tracker.statusLabel}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1.5 max-w-xl text-sm text-[var(--text-tertiary)]">
+            {isActive
+              ? "Your all time daily gas set aside, with the recent pace beside it."
+              : "Tag your next fill as Gas. It becomes the anchor for the daily set aside."}
           </p>
         </div>
+
+        {isActive ? (
+          <div className="grid grid-cols-3 divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+            <GasMetric
+              label="7 day pace"
+              value={`${formatMoney(tracker.last7d.avgPerDayCents)}/d`}
+            />
+            <GasMetric
+              label="30 day pace"
+              value={`${formatMoney(tracker.last30d.avgPerDayCents)}/d`}
+            />
+            <GasMetric
+              label="Avg fill up"
+              value={formatMoney(tracker.last30d.avgPerFillCents)}
+            />
+          </div>
+        ) : null}
       </div>
 
-      {tracker.status === "active" ? (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Spent · 7d" value={formatMoney(tracker.last7d.totalCents)} />
-          <Stat label="Spent · 30d" value={formatMoney(tracker.last30d.totalCents)} />
-          <Stat label="Fill-ups · 7d" value={String(tracker.last7d.fillUps)} />
-          <Stat label="Avg / fill-up" value={formatMoney(tracker.last30d.avgPerFillCents)} />
-          <Stat label="Avg / day · 7d" value={formatMoney(tracker.last7d.avgPerDayCents)} />
-          <Stat label="Avg / day · 30d" value={formatMoney(tracker.last30d.avgPerDayCents)} />
-          <Stat label="Fill-ups · 30d" value={String(tracker.last30d.fillUps)} />
-          <Stat label="Highest fill · 30d" value={formatMoney(tracker.last30d.highestFillCents)} />
-        </div>
-      ) : null}
-
-      <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--text-tertiary)]">
-        {tracker.status === "active" ? (
-          <>
-            <span className="text-[var(--text-secondary)]">{formatMoney(tracker.gasAmountCents)}</span>
-            {" gas / "}
-            <span className="text-[var(--text-secondary)]">{tracker.periodDays}</span>
-            {" days = "}
-            <span className="text-[var(--accent-brand-text)]">
-              {formatMoney(tracker.averageDailyGasCents)}
-            </span>
-            {" whole-history daily average. Period: "}
-            <span className="text-[var(--text-secondary)]">
-              {shortDate(tracker.periodStartDate)} to {shortDate(tracker.periodEndDate)}
-            </span>
-            {"."}
-          </>
-        ) : (
-          "No gas fill logged yet. Use the Gas button after today's fill; the prior fill date is just the anchor."
-        )}
-      </div>
-      {tracker.status === "active" ? (
-        <p className="mt-2 text-xs text-[var(--text-muted)]">
-          Previous gas: {shortDate(tracker.previousFillDate)}. Source: {tracker.merchantName}.
+      {isActive ? (
+        <p className="mt-4 text-xs text-[var(--text-muted)]">
+          {formatMoney(tracker.gasAmountCents)} spread across {tracker.periodDays} days since{" "}
+          {shortDate(tracker.periodStartDate)}. Latest source: {tracker.merchantName}.
         </p>
       ) : null}
     </section>
+  );
+}
+
+function GasMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 px-3 py-2.5 text-right first:pl-3 last:pr-3">
+      <div className="whitespace-nowrap text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+        {label}
+      </div>
+      <div className="mt-1 whitespace-nowrap text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
   );
 }
 
