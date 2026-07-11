@@ -3,7 +3,6 @@ import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { dollarsToCents } from "@/lib/domain/money";
 
 const ROLLING_WINDOW_DAYS = 30; // covers both the 7d and 30d windows below
-const TREND_THRESHOLD_PCT = 0.1; // +/-10% moves the trend/status label
 
 type NumericValue = number | string | null;
 
@@ -43,9 +42,6 @@ type GasAllocationRow = {
   updated_at: string;
 };
 
-export type GasTrendDirection = "rising" | "falling" | "steady";
-export type GasStatusLabel = "under average" | "normal" | "above average";
-
 export type TrendsGasTracker =
   | {
       status: "waiting_for_fill";
@@ -81,8 +77,6 @@ export type TrendsGasTracker =
         highestFillCents: number;
         avgPerFillCents: number;
       };
-      trend: GasTrendDirection;
-      statusLabel: GasStatusLabel;
     };
 
 export type TrendsData = {
@@ -250,24 +244,6 @@ function mapGasTracker(
       ? Math.round(fills30d.reduce((sum, row) => sum + fillAmount(row), 0) / fills30d.length)
       : Math.round(gasAmountCents / rows.length);
 
-  // Trend/status: current 7-day pace vs the 30-day pace. Guard divide-by-zero
-  // when the 30-day average is $0 (e.g. gas only just started being tracked).
-  let trend: GasTrendDirection = "steady";
-  let statusLabel: GasStatusLabel = "normal";
-  if (last30dAvgPerDayCents > 0) {
-    const delta = (last7dAvgPerDayCents - last30dAvgPerDayCents) / last30dAvgPerDayCents;
-    if (delta > TREND_THRESHOLD_PCT) {
-      trend = "rising";
-      statusLabel = "above average";
-    } else if (delta < -TREND_THRESHOLD_PCT) {
-      trend = "falling";
-      statusLabel = "under average";
-    }
-  } else if (last7dAvgPerDayCents > 0) {
-    trend = "rising";
-    statusLabel = "above average";
-  }
-
   return {
     status: "active",
     allocationId: latest.id,
@@ -297,8 +273,6 @@ function mapGasTracker(
       highestFillCents: highestFillCents30d,
       avgPerFillCents: avgPerFillCents30d,
     },
-    trend,
-    statusLabel,
   };
 }
 

@@ -182,18 +182,6 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
   );
 }
 
-const STATUS_LABEL_CLASS: Record<string, string> = {
-  "above average": "text-red-500",
-  normal: "text-[var(--accent-brand-text)]",
-  "under average": "text-emerald-500",
-};
-
-const TREND_ARROW: Record<string, string> = {
-  rising: "↑",
-  falling: "↓",
-  steady: "→",
-};
-
 function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
   const isActive = tracker.status === "active";
 
@@ -210,20 +198,10 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
                 ? `${formatMoney(tracker.averageDailyGasCents)} / day`
                 : "Waiting for a fill"}
             </h2>
-            {isActive ? (
-              <span
-                className={[
-                  "text-sm font-semibold",
-                  STATUS_LABEL_CLASS[tracker.statusLabel],
-                ].join(" ")}
-              >
-                {TREND_ARROW[tracker.trend]} {tracker.statusLabel}
-              </span>
-            ) : null}
           </div>
           <p className="mt-1.5 max-w-xl text-sm text-[var(--text-tertiary)]">
             {isActive
-              ? "Your all time daily gas set aside, with the recent pace beside it."
+              ? "Your all time daily gas set aside. The recent pace is shown beside it."
               : "Tag your next fill as Gas. It becomes the anchor for the daily set aside."}
           </p>
         </div>
