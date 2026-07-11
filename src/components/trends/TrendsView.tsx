@@ -199,11 +199,11 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
                 : "Waiting for a fill"}
             </h2>
           </div>
-          <p className="mt-1.5 max-w-xl text-sm text-[var(--text-tertiary)]">
-            {isActive
-              ? "Your all time daily gas set aside. The recent pace is shown beside it."
-              : "Tag your next fill as Gas. It becomes the anchor for the daily set aside."}
-          </p>
+          {!isActive ? (
+            <p className="mt-1.5 max-w-xl text-sm text-[var(--text-tertiary)]">
+              Tag your next fill as Gas. It becomes the anchor for the daily set aside.
+            </p>
+          ) : null}
         </div>
 
         {isActive ? (
