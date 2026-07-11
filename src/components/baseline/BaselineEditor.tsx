@@ -90,6 +90,22 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
     [expenses, initialData.todayIso],
   );
 
+  const expiredExpenses = useMemo(
+    () =>
+      expenses.filter((expense) =>
+        isExpenseExpired(expense.expirationDate, initialData.todayIso),
+      ),
+    [expenses, initialData.todayIso],
+  );
+  const currentExpenses = useMemo(
+    () =>
+      expenses.filter(
+        (expense) =>
+          !isExpenseExpired(expense.expirationDate, initialData.todayIso),
+      ),
+    [expenses, initialData.todayIso],
+  );
+
   function updateExpense(id: string, patch: Partial<BaselineExpense>) {
     const currentExpense = expenses.find((expense) => expense.id === id);
 
@@ -264,10 +280,10 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
               <div />
             </div>
 
-            {expenses.length === 0 ? (
+            {currentExpenses.length === 0 ? (
               <div className="px-5 py-16 text-center">
                 <p className="text-sm font-medium text-[var(--text-secondary)]">
-                  No fixed expenses yet.
+                  No active recurring expenses.
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
                   Add your rent, utilities, and subscriptions to build your
@@ -276,7 +292,7 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
               </div>
             ) : (
               <div className="divide-y divide-[var(--border-subtle)]">
-                {expenses.map((expense) => (
+                {currentExpenses.map((expense) => (
                   <ExpenseRow
                     deleting={deletingIds.has(expense.id)}
                     expense={expense}
@@ -294,6 +310,42 @@ export function BaselineEditor({ initialData }: BaselineEditorProps) {
             )}
           </div>
         </section>
+
+        {expiredExpenses.length > 0 ? (
+          <section className="mt-2">
+            <details className="group overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-3 py-2 marker:hidden hover:bg-[var(--surface-hover)]">
+                <div>
+                  <h2 className="text-sm font-semibold text-[var(--text-secondary)]">
+                    Expired expenses
+                  </h2>
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                    {expiredExpenses.length} archived from active totals
+                  </p>
+                </div>
+                <span
+                  aria-hidden="true"
+                  className="text-xs text-[var(--text-muted)] transition group-open:rotate-180"
+                >
+                  ▾
+                </span>
+              </summary>
+              <div className="divide-y divide-[var(--border-subtle)] border-t border-[var(--border-subtle)]">
+                {expiredExpenses.map((expense) => (
+                  <ExpenseRow
+                    deleting={deletingIds.has(expense.id)}
+                    expense={expense}
+                    expired
+                    key={expense.id}
+                    onDelete={deleteExpense}
+                    onUpdate={updateExpense}
+                    shouldFocus={pendingFocusExpenseId === expense.id}
+                  />
+                ))}
+              </div>
+            </details>
+          </section>
+        ) : null}
 
         <AmortizedExpensesSection
           initialExpenses={initialData.amortizedExpenses}
