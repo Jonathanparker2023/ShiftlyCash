@@ -1,7 +1,25 @@
 "use client";
 
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DraggableAttributes,
+  type DraggableSyntheticListeners,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
-import type { DragEvent, FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import {
   createContext,
   useContext,
@@ -2711,49 +2729,73 @@ function ShiftList({
   ) => void;
 }) {
   const editable = useContext(ShiftsEditableContext);
-  const [draggedSlotIndex, setDraggedSlotIndex] = useState<number | null>(null);
-  // Bucket rows render in the list but must NOT count toward the 4-shift cap.
+  const dragDisabled = day.spendLocked || !editable;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  // Bucket rows render in the list but must NOT count toward the 4-shift cap,
+  // and are never draggable (synthetic, read-only, slotIndex >= 4 -- see
+  // reorderSlots above).
   const activeSlots = day.slots.filter((slot) => slot.jobType !== "none");
-  const realActiveCount = activeSlots.filter(
-    (slot) => slot.kind !== "bucket",
-  ).length;
+  const sortableSlots = activeSlots.filter((slot) => slot.kind !== "bucket");
+  const bucketSlots = activeSlots.filter((slot) => slot.kind === "bucket");
+  const sortableIds = sortableSlots.map((slot) => slot.slotIndex);
+  const realActiveCount = sortableSlots.length;
 
-  function handleDrop(targetSlotIndex: number) {
-    if (draggedSlotIndex === null || draggedSlotIndex === targetSlotIndex) {
-      setDraggedSlotIndex(null);
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
       return;
     }
 
-    onReorderSlots(day.id, draggedSlotIndex, targetSlotIndex);
-    setDraggedSlotIndex(null);
+    onReorderSlots(day.id, Number(active.id), Number(over.id));
   }
 
   return (
     <div className="space-y-2">
       <div className="space-y-2">
         {activeSlots.length > 0 ? (
-          activeSlots.map((slot) => (
-            <ShiftRow
-              expanded={expandedSlotIndex === slot.slotIndex}
-              isDragging={draggedSlotIndex === slot.slotIndex}
-              key={`${slot.dayId}-${slot.slotIndex}`}
-              locked={day.spendLocked}
-              settings={settings}
-              slot={slot}
-              onDragEnd={() => setDraggedSlotIndex(null)}
-              onDragOver={(event) => event.preventDefault()}
-              onDragStart={() => setDraggedSlotIndex(slot.slotIndex)}
-              onDrop={() => handleDrop(slot.slotIndex)}
-              onRemove={onRemoveSlot}
-              onSlotChange={onSlotChange}
-              onToggle={() => onToggleSlot(slot.slotIndex)}
-            />
-          ))
-        ) : (
+          <DndContext
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+            sensors={sensors}
+          >
+            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+              {sortableSlots.map((slot) => (
+                <SortableShiftRow
+                  disabled={dragDisabled}
+                  expanded={expandedSlotIndex === slot.slotIndex}
+                  key={`${slot.dayId}-${slot.slotIndex}`}
+                  locked={day.spendLocked}
+                  settings={settings}
+                  slot={slot}
+                  onRemove={onRemoveSlot}
+                  onSlotChange={onSlotChange}
+                  onToggle={() => onToggleSlot(slot.slotIndex)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        ) : null}
+        {bucketSlots.map((slot) => (
+          <ShiftRow
+            expanded={expandedSlotIndex === slot.slotIndex}
+            isDragging={false}
+            key={`${slot.dayId}-${slot.slotIndex}`}
+            locked={day.spendLocked}
+            settings={settings}
+            slot={slot}
+            onRemove={onRemoveSlot}
+            onSlotChange={onSlotChange}
+            onToggle={() => onToggleSlot(slot.slotIndex)}
+          />
+        ))}
+        {activeSlots.length === 0 ? (
           <div className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-secondary)]">
             No shifts logged for this day.
           </div>
-        )}
+        ) : null}
       </div>
       <button
         className="h-10 w-full rounded-md border border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-subtle)]0 hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -2767,6 +2809,54 @@ function ShiftList({
   );
 }
 
+function SortableShiftRow({
+  slot,
+  expanded,
+  locked,
+  disabled,
+  settings,
+  onToggle,
+  onSlotChange,
+  onRemove,
+}: {
+  slot: DashboardSlot;
+  expanded: boolean;
+  locked: boolean;
+  disabled: boolean;
+  settings: PaySettings;
+  onToggle: () => void;
+  onSlotChange: (
+    dayId: string,
+    slotIndex: number,
+    patch: Partial<DashboardSlot>,
+  ) => void;
+  onRemove: (slot: DashboardSlot) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: slot.slotIndex, disabled });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <ShiftRow
+      dragAttributes={attributes}
+      dragListeners={listeners}
+      expanded={expanded}
+      isDragging={isDragging}
+      locked={locked}
+      setNodeRef={setNodeRef}
+      settings={settings}
+      slot={slot}
+      style={style}
+      onRemove={onRemove}
+      onSlotChange={onSlotChange}
+      onToggle={onToggle}
+    />
+  );
+}
+
 function ShiftRow({
   slot,
   expanded,
@@ -2776,15 +2866,15 @@ function ShiftRow({
   onToggle,
   onSlotChange,
   onRemove,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
+  dragAttributes,
+  dragListeners,
+  setNodeRef,
+  style,
 }: {
   slot: DashboardSlot;
   expanded: boolean;
   locked: boolean;
-  isDragging: boolean;
+  isDragging?: boolean;
   settings: PaySettings;
   onToggle: () => void;
   onSlotChange: (
@@ -2793,10 +2883,10 @@ function ShiftRow({
     patch: Partial<DashboardSlot>,
   ) => void;
   onRemove: (slot: DashboardSlot) => void;
-  onDragStart: () => void;
-  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
+  dragAttributes?: DraggableAttributes;
+  dragListeners?: DraggableSyntheticListeners;
+  setNodeRef?: (node: HTMLElement | null) => void;
+  style?: CSSProperties;
 }) {
   const editable = useContext(ShiftsEditableContext);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
@@ -2857,19 +2947,26 @@ function ShiftRow({
   return (
     <div
       className={rowClassName}
-      style={customStyle}
-      draggable={!effectiveLocked}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDragStart={onDragStart}
-      onDrop={onDrop}
+      ref={setNodeRef}
+      style={{ ...customStyle, ...style }}
     >
-      <button
-        className="flex min-h-11 w-full cursor-grab items-center gap-3 px-3 py-2 text-left active:cursor-grabbing disabled:cursor-not-allowed"
-        disabled={effectiveLocked}
-        onClick={onToggle}
-        type="button"
-      >
+      <div className="flex min-h-11 w-full items-center gap-1 pl-1 pr-3 py-2">
+        <button
+          aria-label="Drag to reorder"
+          className="flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-current opacity-50 transition hover:opacity-90 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
+          disabled={effectiveLocked}
+          type="button"
+          {...dragAttributes}
+          {...dragListeners}
+        >
+          ⠿
+        </button>
+        <button
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-2 text-left disabled:cursor-not-allowed"
+          disabled={effectiveLocked}
+          onClick={onToggle}
+          type="button"
+        >
         <span className="flex shrink-0 items-center gap-2">
           <span
             className={shiftDotClass(slot.jobType)}
@@ -2903,7 +3000,8 @@ function ShiftRow({
             {shiftAmountLabel}
           </span>
         ) : null}
-      </button>
+        </button>
+      </div>
 
       {expanded && !effectiveLocked ? (
         <div className="grid gap-3 border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 sm:grid-cols-2">

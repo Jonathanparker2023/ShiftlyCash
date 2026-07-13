@@ -1,5 +1,24 @@
 "use client";
 
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DraggableAttributes,
+  type DraggableSyntheticListeners,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { CSSProperties } from "react";
 import { createContext, useContext, useMemo, useState } from "react";
 
 import { saveDefaultTemplateAction } from "@/app/(protected)/settings/template/actions";
@@ -180,6 +199,55 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
     setExpandedSlotIndex(null);
   }
 
+  function reorderSlots(
+    dayIndex: number,
+    fromSlotIndex: number,
+    toSlotIndex: number,
+  ) {
+    const day = days.find((current) => current.dayIndex === dayIndex);
+    if (!day || fromSlotIndex === toSlotIndex) {
+      return;
+    }
+
+    const activeSlots = day.slots
+      .filter((slot) => slot.jobType !== "none")
+      .sort((a, b) => a.slotIndex - b.slotIndex);
+    const emptySlots = day.slots.filter((slot) => slot.jobType === "none");
+    const fromPosition = activeSlots.findIndex(
+      (slot) => slot.slotIndex === fromSlotIndex,
+    );
+    const toPosition = activeSlots.findIndex(
+      (slot) => slot.slotIndex === toSlotIndex,
+    );
+
+    if (fromPosition < 0 || toPosition < 0 || fromPosition === toPosition) {
+      return;
+    }
+
+    const reorderedActiveSlots = [...activeSlots];
+    const [movedSlot] = reorderedActiveSlots.splice(fromPosition, 1);
+    reorderedActiveSlots.splice(toPosition, 0, movedSlot);
+
+    const nextSlots = Array.from({ length: day.slots.length }, (_, slotIndex) => {
+      const activeSlot = reorderedActiveSlots[slotIndex];
+      if (activeSlot) {
+        return normalizeSlot({ ...activeSlot, slotIndex });
+      }
+      const emptySlot = emptySlots[slotIndex - reorderedActiveSlots.length];
+      return normalizeSlot({ ...emptySlot, slotIndex });
+    });
+
+    setDays((currentDays) =>
+      currentDays.map((current) =>
+        current.dayIndex === dayIndex
+          ? { ...current, slots: nextSlots }
+          : current,
+      ),
+    );
+    setSaveState("idle");
+    setSaveError(null);
+  }
+
   async function saveTemplate() {
     setSaveState("saving");
     setSaveError(null);
@@ -268,20 +336,19 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
         </h3>
         <div className="space-y-2">
           {activeFocusedSlots.length > 0 ? (
-            activeFocusedSlots.map((slot) => (
-              <TemplateShiftBar
-                expanded={expandedSlotIndex === slot.slotIndex}
-                key={slot.slotIndex}
-                onRemove={() => removeShift(focusedDay.dayIndex, slot.slotIndex)}
-                onSlotChange={updateSlot}
-                onToggle={() =>
-                  setExpandedSlotIndex((current) =>
-                    current === slot.slotIndex ? null : slot.slotIndex,
-                  )
-                }
-                slot={slot}
-              />
-            ))
+            <TemplateShiftList
+              activeFocusedSlots={activeFocusedSlots}
+              dayIndex={focusedDay.dayIndex}
+              expandedSlotIndex={expandedSlotIndex}
+              onRemove={(slot) => removeShift(focusedDay.dayIndex, slot.slotIndex)}
+              onReorder={reorderSlots}
+              onSlotChange={updateSlot}
+              onToggle={(slotIndex) =>
+                setExpandedSlotIndex((current) =>
+                  current === slotIndex ? null : slotIndex,
+                )
+              }
+            />
           ) : (
             <div className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--surface-hover)] p-4 text-sm text-[var(--text-tertiary)]">
               No shifts on {WEEKDAY_FULL[focusedDay.dayIndex]}.
@@ -353,7 +420,65 @@ function WeekDayButton({
   );
 }
 
-function TemplateShiftBar({
+function TemplateShiftList({
+  activeFocusedSlots,
+  dayIndex,
+  expandedSlotIndex,
+  onRemove,
+  onReorder,
+  onSlotChange,
+  onToggle,
+}: {
+  activeFocusedSlots: TemplateSlotDraft[];
+  dayIndex: number;
+  expandedSlotIndex: number | null;
+  onRemove: (slot: TemplateSlotDraft) => void;
+  onReorder: (dayIndex: number, fromSlotIndex: number, toSlotIndex: number) => void;
+  onSlotChange: (
+    dayIndex: number,
+    slotIndex: number,
+    patch: Partial<TemplateSlotDraft>,
+  ) => void;
+  onToggle: (slotIndex: number) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const sortableIds = activeFocusedSlots.map((slot) => slot.slotIndex);
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    onReorder(dayIndex, Number(active.id), Number(over.id));
+  }
+
+  return (
+    <DndContext
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+      sensors={sensors}
+    >
+      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+        {activeFocusedSlots.map((slot) => (
+          <SortableTemplateShiftBar
+            expanded={expandedSlotIndex === slot.slotIndex}
+            key={slot.slotIndex}
+            onRemove={() => onRemove(slot)}
+            onSlotChange={onSlotChange}
+            onToggle={() => onToggle(slot.slotIndex)}
+            slot={slot}
+          />
+        ))}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+function SortableTemplateShiftBar({
   slot,
   expanded,
   onToggle,
@@ -370,6 +495,56 @@ function TemplateShiftBar({
   ) => void;
   onRemove: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: slot.slotIndex });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <TemplateShiftBar
+      dragAttributes={attributes}
+      dragListeners={listeners}
+      expanded={expanded}
+      isDragging={isDragging}
+      onRemove={onRemove}
+      onSlotChange={onSlotChange}
+      onToggle={onToggle}
+      setNodeRef={setNodeRef}
+      slot={slot}
+      style={style}
+    />
+  );
+}
+
+function TemplateShiftBar({
+  slot,
+  expanded,
+  isDragging,
+  onToggle,
+  onSlotChange,
+  onRemove,
+  dragAttributes,
+  dragListeners,
+  setNodeRef,
+  style,
+}: {
+  slot: TemplateSlotDraft;
+  expanded: boolean;
+  isDragging?: boolean;
+  onToggle: () => void;
+  onSlotChange: (
+    dayIndex: number,
+    slotIndex: number,
+    patch: Partial<TemplateSlotDraft>,
+  ) => void;
+  onRemove: () => void;
+  dragAttributes?: DraggableAttributes;
+  dragListeners?: DraggableSyntheticListeners;
+  setNodeRef?: (node: HTMLElement | null) => void;
+  style?: CSSProperties;
+}) {
   const customJobs = useContext(CustomJobsContext);
   const hiddenBuiltins = useContext(HiddenBuiltinsContext);
   const jobsData = useContext(RatesContext);
@@ -385,14 +560,25 @@ function TemplateShiftBar({
     : undefined;
   return (
     <div
-      className={`rounded-xl border shadow-sm transition ${isCustom ? "" : shiftBarClass(slot.jobType)}`}
-      style={customStyle}
+      className={`rounded-xl border shadow-sm transition ${isCustom ? "" : shiftBarClass(slot.jobType)} ${isDragging ? "scale-[0.99] opacity-70 ring-2 ring-[var(--accent-primary)]" : ""}`}
+      ref={setNodeRef}
+      style={{ ...customStyle, ...style }}
     >
-      <button
-        className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left"
-        onClick={onToggle}
-        type="button"
-      >
+      <div className="flex min-h-11 w-full items-center gap-1 pl-1 pr-3 py-2">
+        <button
+          aria-label="Drag to reorder"
+          className="flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-current opacity-50 transition hover:opacity-90 active:cursor-grabbing"
+          type="button"
+          {...dragAttributes}
+          {...dragListeners}
+        >
+          ⠿
+        </button>
+        <button
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-2 text-left"
+          onClick={onToggle}
+          type="button"
+        >
         <span className="flex shrink-0 items-center gap-2">
           <span
             className={
@@ -428,7 +614,8 @@ function TemplateShiftBar({
         <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
           {slot.label ?? ""}
         </span>
-      </button>
+        </button>
+      </div>
 
       {expanded ? (
         <div className="grid gap-3 border-t border-black/10 bg-black/5 p-3 sm:grid-cols-2">
