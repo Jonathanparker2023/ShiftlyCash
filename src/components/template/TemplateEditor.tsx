@@ -564,10 +564,10 @@ function TemplateShiftBar({
       ref={setNodeRef}
       style={{ ...customStyle, ...style }}
     >
-      <div className="flex min-h-11 w-full items-center gap-1 pl-1 pr-3 py-2">
+      <div className="flex min-h-8 w-full items-center gap-1 pl-1 pr-3 py-1">
         <button
           aria-label="Drag to reorder"
-          className="flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-current opacity-50 transition hover:opacity-90 active:cursor-grabbing"
+          className="flex h-6 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-current opacity-50 transition hover:opacity-90 active:cursor-grabbing"
           type="button"
           {...dragAttributes}
           {...dragListeners}
@@ -575,7 +575,7 @@ function TemplateShiftBar({
           ⠿
         </button>
         <button
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-2 text-left"
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
           onClick={onToggle}
           type="button"
         >
