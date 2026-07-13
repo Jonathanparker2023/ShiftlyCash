@@ -2899,7 +2899,7 @@ function ShiftRow({
     return (
       <div
         className={[
-          "flex min-h-8 w-full items-center gap-3 rounded-md border px-3 py-1 shadow-sm",
+          "flex min-h-10 w-full items-center gap-3 rounded-md border px-3 py-1.5 shadow-sm",
           shiftBarClass(slot.jobType),
           locked ? "opacity-60" : "",
         ]
@@ -2949,10 +2949,10 @@ function ShiftRow({
       ref={setNodeRef}
       style={{ ...customStyle, ...style }}
     >
-      <div className="flex min-h-8 w-full items-center gap-1 pl-1 pr-3 py-1">
+      <div className="flex min-h-10 w-full items-center gap-1 pl-1 pr-3 py-1.5">
         <button
           aria-label="Drag to reorder"
-          className="flex h-6 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-current opacity-50 transition hover:opacity-90 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-current opacity-50 transition hover:opacity-90 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
           disabled={effectiveLocked}
           type="button"
           {...dragAttributes}
