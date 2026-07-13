@@ -115,6 +115,7 @@ export type ManualTransactionResult = {
     isGasAllocated: boolean;
     gasAllocatedCents: number;
     gasRemainderCents: number;
+    wasMovedToYesterday: boolean;
     date: string;
     time: string | null;
     createdAt: string;
@@ -515,6 +516,7 @@ export async function moveTransactionToYesterdayAction(
     .update({
       day_id: day.id,
       date: day.date,
+      moved_to_yesterday: true,
     })
     .eq("id", transactionId);
 
@@ -544,7 +546,7 @@ export async function moveTransactionToTomorrowAction(
   const transactionId = requireUuid(input.transactionId, "transactionId");
   const { data: transaction, error: transactionError } = await supabase
     .from("transactions")
-    .select("id,date")
+    .select("id,date,moved_to_yesterday")
     .eq("id", transactionId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -555,6 +557,10 @@ export async function moveTransactionToTomorrowAction(
 
   if (!transaction) {
     throw new Error("Transaction not found.");
+  }
+
+  if (transaction.moved_to_yesterday !== true) {
+    throw new Error("Only transactions moved to yesterday can be moved to tomorrow.");
   }
 
   const tomorrowIso = addDaysIso(String(transaction.date), 1);
@@ -578,6 +584,7 @@ export async function moveTransactionToTomorrowAction(
     .update({
       day_id: day.id,
       date: day.date,
+      moved_to_yesterday: false,
     })
     .eq("id", transactionId)
     .eq("user_id", user.id);
@@ -1199,6 +1206,7 @@ export async function addManualTransactionAction(
       isGasAllocated: false,
       gasAllocatedCents: 0,
       gasRemainderCents: dollarsToCents(Number(row.amount)),
+      wasMovedToYesterday: false,
       date: row.date,
       time: null,
       createdAt: row.created_at,

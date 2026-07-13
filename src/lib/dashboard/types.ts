@@ -24,6 +24,7 @@ export type DashboardTransaction = {
   isGasAllocated: boolean;
   gasAllocatedCents: number;
   gasRemainderCents: number;
+  wasMovedToYesterday: boolean;
   date: string;
   time: string | null;
   createdAt: string;

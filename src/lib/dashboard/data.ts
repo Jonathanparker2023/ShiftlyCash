@@ -112,6 +112,7 @@ type TransactionRow = {
   source: DashboardTransactionSource;
   status: DashboardTransactionStatus | "pending_review";
   review_reason: string | null;
+  moved_to_yesterday: boolean;
 };
 
 type GasSpreadRow = {
@@ -342,7 +343,7 @@ export async function getDashboardData(
           supabase
             .from("transactions")
             .select(
-              "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,category,source,status,review_reason",
+              "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,category,source,status,review_reason,moved_to_yesterday",
             )
             .in("day_id", dayIds)
             .in("status", ["applied", "excluded"])
@@ -999,6 +1000,7 @@ function mapDashboardTransaction(
     isGasAllocated: hasActiveGasAllocation,
     gasAllocatedCents,
     gasRemainderCents,
+    wasMovedToYesterday: row.moved_to_yesterday === true,
     date: row.date,
     time: row.datetime ?? row.legacy_time,
     createdAt: row.created_at,

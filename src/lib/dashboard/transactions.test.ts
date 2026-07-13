@@ -63,6 +63,7 @@ function transaction(
     isGasAllocated: false,
     gasAllocatedCents: 0,
     gasRemainderCents: 1_00,
+    wasMovedToYesterday: false,
     date: "2026-05-02",
     time: "12:00",
     createdAt: "2026-05-02T12:00:00.000Z",

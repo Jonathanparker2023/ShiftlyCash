@@ -561,7 +561,9 @@ export function DashboardEditor({
 
     if (targetDay) {
       setDays((currentDays) =>
-        moveTransactionToDay(currentDays, transaction, targetDay),
+        moveTransactionToDay(currentDays, transaction, targetDay, {
+          wasMovedToYesterday: true,
+        }),
       );
     }
 
@@ -592,6 +594,7 @@ export function DashboardEditor({
 
   async function moveTransactionToTomorrow(transaction: DashboardTransaction) {
     if (isHistorical) return; // transactions are read-only in History
+    if (!transaction.wasMovedToYesterday) return; // only reverses a yesterday move
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -606,7 +609,9 @@ export function DashboardEditor({
 
     if (targetDay) {
       setDays((currentDays) =>
-        moveTransactionToDay(currentDays, transaction, targetDay),
+        moveTransactionToDay(currentDays, transaction, targetDay, {
+          wasMovedToYesterday: false,
+        }),
       );
     }
 
@@ -808,6 +813,7 @@ export function DashboardEditor({
       isGasAllocated: false,
       gasAllocatedCents: 0,
       gasRemainderCents: amountCents,
+      wasMovedToYesterday: false,
       date: day.date,
       time: null,
       createdAt: new Date().toISOString(),
@@ -2593,14 +2599,16 @@ function TransactionRowButton({
           >
             Move to yesterday
           </button>
-          <button
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={disabled}
-            onClick={() => onMoveToTomorrow(transaction)}
-            type="button"
-          >
-            Move to tomorrow
-          </button>
+          {transaction.wasMovedToYesterday ? (
+            <button
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={disabled}
+              onClick={() => onMoveToTomorrow(transaction)}
+              type="button"
+            >
+              Move to tomorrow
+            </button>
+          ) : null}
           {variant === "spending" && onAllocateGas ? (
             <button
               className="rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-warning-text)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -3574,11 +3582,13 @@ function moveTransactionToDay(
   days: DashboardDay[],
   transaction: DashboardTransaction,
   targetDay: DashboardDay,
+  overrides?: Partial<DashboardTransaction>,
 ): DashboardDay[] {
   const movedTransaction = {
     ...transaction,
     dayId: targetDay.id,
     date: targetDay.date,
+    ...overrides,
   };
 
   return days.map((day) => {
