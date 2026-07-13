@@ -1977,7 +1977,6 @@ function TransactionDrawer({
           <TransactionColumn
             accent="gas"
             heading="GAS"
-            note="Already gas-tagged. The remainder still counts as spend — don't allocate a duplicate of one of these."
             pendingTransactionIds={pendingTransactionIds}
             transactions={gasAllocatedTransactions}
             variant="spending"
