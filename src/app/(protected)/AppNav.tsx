@@ -29,10 +29,10 @@ export function AppNav({
       <Image
         alt="Bashflow"
         className="drop-shadow-[0_2px_9px_rgba(212,175,55,0.45)]"
-        height={30}
+        height={36}
         priority
         src="/logo.svg"
-        width={30}
+        width={36}
       />
       <span
         className="text-xl font-semibold tracking-tight"
