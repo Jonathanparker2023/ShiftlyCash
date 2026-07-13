@@ -537,6 +537,70 @@ export async function moveTransactionToYesterdayAction(
   return { ok: true, dayId: String(day.id), date: String(day.date) };
 }
 
+export async function moveTransactionToTomorrowAction(
+  input: TransactionIdInput,
+): Promise<{ ok: true; dayId: string; date: string }> {
+  const { supabase, user } = await requireUser();
+  const transactionId = requireUuid(input.transactionId, "transactionId");
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id,date")
+    .eq("id", transactionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (transactionError) {
+    throw new Error(`Unable to validate transaction: ${transactionError.message}`);
+  }
+
+  if (!transaction) {
+    throw new Error("Transaction not found.");
+  }
+
+  const tomorrowIso = addDaysIso(String(transaction.date), 1);
+  const { data: day, error: dayError } = await supabase
+    .from("days")
+    .select("id,date")
+    .eq("date", tomorrowIso)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (dayError) {
+    throw new Error(`Unable to find tomorrow: ${dayError.message}`);
+  }
+
+  if (!day) {
+    throw new Error("Tomorrow is outside the active dashboard week.");
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      day_id: day.id,
+      date: day.date,
+    })
+    .eq("id", transactionId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(`Unable to move transaction: ${error.message}`);
+  }
+
+  const { error: deactivateGasError } = await supabase
+    .from("gas_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateGasError) {
+    throw new Error(`Unable to clear gas allocation: ${deactivateGasError.message}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/trends");
+  revalidatePath("/history");
+  return { ok: true, dayId: String(day.id), date: String(day.date) };
+}
+
 export async function renameTransactionAction(
   input: RenameTransactionInput,
 ): Promise<{ ok: true; merchantName: string }> {

@@ -18,6 +18,7 @@ import {
   closeWeekAction,
   deleteTransactionAction,
   moveTransactionToYesterdayAction,
+  moveTransactionToTomorrowAction,
   refreshDashboardProjectionMaintenanceAction,
   renameTransactionAction,
   saveEarnSlotAction,
@@ -566,6 +567,51 @@ export function DashboardEditor({
 
     try {
       await moveTransactionToYesterdayAction({ transactionId: transaction.id });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      router.refresh();
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error ? error.message : "Unable to move transaction.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
+  async function moveTransactionToTomorrow(transaction: DashboardTransaction) {
+    if (isHistorical) return; // transactions are read-only in History
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const previousDays = days;
+    const tomorrowIso = addDaysIso(transaction.date, 1);
+    const targetDay = days.find((day) => day.date === tomorrowIso);
+
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+
+    if (targetDay) {
+      setDays((currentDays) =>
+        moveTransactionToDay(currentDays, transaction, targetDay),
+      );
+    }
+
+    try {
+      await moveTransactionToTomorrowAction({ transactionId: transaction.id });
       lastSavedAt.current = Date.now();
       setSaveState("saved");
       router.refresh();
@@ -1231,6 +1277,7 @@ export function DashboardEditor({
               onAllocateGasTransaction={allocateGasTransaction}
               onDeleteTransaction={deleteTransaction}
               onMoveTransactionToYesterday={moveTransactionToYesterday}
+              onMoveTransactionToTomorrow={moveTransactionToTomorrow}
               onRenameTransaction={renameTransaction}
               onRemoveSlot={removeSlot}
               onReorderSlots={reorderSlots}
@@ -1710,6 +1757,7 @@ function FocusedDayEditor({
   onAddManualTransaction,
   onDeleteTransaction,
   onMoveTransactionToYesterday,
+  onMoveTransactionToTomorrow,
   onRenameTransaction,
   onAmortizeTransaction,
   onAllocateGasTransaction,
@@ -1741,6 +1789,7 @@ function FocusedDayEditor({
   ) => void;
   onDeleteTransaction: (transaction: DashboardTransaction) => void;
   onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
+  onMoveTransactionToTomorrow: (transaction: DashboardTransaction) => void;
   onRenameTransaction: (
     transaction: DashboardTransaction,
     merchantName: string,
@@ -1786,6 +1835,7 @@ function FocusedDayEditor({
           onAmortizeTransaction={onAmortizeTransaction}
           onDeleteTransaction={onDeleteTransaction}
           onMoveTransactionToYesterday={onMoveTransactionToYesterday}
+          onMoveTransactionToTomorrow={onMoveTransactionToTomorrow}
           onRenameTransaction={onRenameTransaction}
           onToggleTransactionStatus={onToggleTransactionStatus}
         />
@@ -1802,6 +1852,7 @@ function TransactionDrawer({
   onToggleTransactionStatus,
   onDeleteTransaction,
   onMoveTransactionToYesterday,
+  onMoveTransactionToTomorrow,
   onRenameTransaction,
   onAmortizeTransaction,
   onAllocateGasTransaction,
@@ -1817,6 +1868,7 @@ function TransactionDrawer({
   ) => void;
   onDeleteTransaction: (transaction: DashboardTransaction) => void;
   onMoveTransactionToYesterday: (transaction: DashboardTransaction) => void;
+  onMoveTransactionToTomorrow: (transaction: DashboardTransaction) => void;
   onRenameTransaction: (
     transaction: DashboardTransaction,
     merchantName: string,
@@ -1889,6 +1941,7 @@ function TransactionDrawer({
           variant="spending"
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
+          onMoveToTomorrow={onMoveTransactionToTomorrow}
           onRename={onRenameTransaction}
           onAllocateGas={onAllocateGasTransaction}
           onAmortize={onAmortizeTransaction}
@@ -1906,6 +1959,7 @@ function TransactionDrawer({
             variant="spending"
             onDelete={onDeleteTransaction}
             onMoveToYesterday={onMoveTransactionToYesterday}
+            onMoveToTomorrow={onMoveTransactionToTomorrow}
             onRename={onRenameTransaction}
             onAllocateGas={onAllocateGasTransaction}
             onAmortize={onAmortizeTransaction}
@@ -1921,6 +1975,7 @@ function TransactionDrawer({
           variant="exempt"
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
+          onMoveToTomorrow={onMoveTransactionToTomorrow}
           onRename={onRenameTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "applied")
@@ -1990,6 +2045,7 @@ function TransactionColumn({
   variant,
   onDelete,
   onMoveToYesterday,
+  onMoveToTomorrow,
   onRename,
   onToggle,
   onAllocateGas,
@@ -2004,6 +2060,7 @@ function TransactionColumn({
   variant: "spending" | "exempt";
   onDelete: (transaction: DashboardTransaction) => void;
   onMoveToYesterday: (transaction: DashboardTransaction) => void;
+  onMoveToTomorrow: (transaction: DashboardTransaction) => void;
   onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
   onAllocateGas?: (
@@ -2078,6 +2135,7 @@ function TransactionColumn({
             variant={variant}
             onDelete={onDelete}
             onMoveToYesterday={onMoveToYesterday}
+            onMoveToTomorrow={onMoveToTomorrow}
             onRename={onRename}
             onToggle={onToggle}
             onAllocateGas={onAllocateGas}
@@ -2332,6 +2390,7 @@ function TransactionRowButton({
   variant,
   onDelete,
   onMoveToYesterday,
+  onMoveToTomorrow,
   onRename,
   onToggle,
   onAllocateGas,
@@ -2342,6 +2401,7 @@ function TransactionRowButton({
   variant: "spending" | "exempt";
   onDelete: (transaction: DashboardTransaction) => void;
   onMoveToYesterday: (transaction: DashboardTransaction) => void;
+  onMoveToTomorrow: (transaction: DashboardTransaction) => void;
   onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
   onAllocateGas?: (
@@ -2532,6 +2592,14 @@ function TransactionRowButton({
             type="button"
           >
             Move to yesterday
+          </button>
+          <button
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={disabled}
+            onClick={() => onMoveToTomorrow(transaction)}
+            type="button"
+          >
+            Move to tomorrow
           </button>
           {variant === "spending" && onAllocateGas ? (
             <button
