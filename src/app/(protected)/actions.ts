@@ -388,7 +388,7 @@ export async function refreshDashboardProjectionMaintenanceAction(): Promise<Ref
 
 export async function toggleTransactionStatusAction(
   input: ToggleTransactionStatusInput,
-): Promise<{ ok: true }> {
+): Promise<{ ok: true; dashboardData: DashboardData | null }> {
   const { supabase, user } = await requireUser();
   const transactionId = requireUuid(input.transactionId, "transactionId");
   const newStatus = requireEnum(
@@ -412,6 +412,17 @@ export async function toggleTransactionStatusAction(
 
   if (newStatus === "applied" && !transaction.day_id) {
     throw new Error("Cannot apply a transaction without a day.");
+  }
+
+  const { data: activeGasAllocation, error: activeGasError } = await supabase
+    .from("gas_allocations")
+    .select("id")
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (activeGasError) {
+    throw new Error(`Unable to inspect gas allocation: ${activeGasError.message}`);
   }
 
   const { error } = await supabase
@@ -454,7 +465,24 @@ export async function toggleTransactionStatusAction(
   revalidatePath("/trends");
   revalidatePath("/baseline");
   revalidatePath("/history");
-  return { ok: true };
+
+  let dashboardData: DashboardData | null = null;
+  if (activeGasAllocation && transaction.day_id) {
+    const { data: day, error: dayError } = await supabase
+      .from("days")
+      .select("week_id")
+      .eq("id", transaction.day_id)
+      .eq("user_id", user.id)
+      .single();
+    if (dayError) {
+      throw new Error(`Unable to reload gas allocation week: ${dayError.message}`);
+    }
+    dashboardData = await getWeekDashboardData(
+      String((day as { week_id: string }).week_id),
+    );
+  }
+
+  return { ok: true, dashboardData };
 }
 
 export async function deleteTransactionAction(

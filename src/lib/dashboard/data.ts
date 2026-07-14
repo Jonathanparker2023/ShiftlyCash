@@ -16,6 +16,7 @@ import type {
   DashboardTransactionStatus,
   EarnSlotSource,
   DashboardWeek,
+  DashboardWeekNavigation,
 } from "@/lib/dashboard/types";
 import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
 import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
@@ -50,6 +51,8 @@ type WeekRow = {
   end_date: string;
   status: string;
 };
+
+type AdjacentWeekRow = Pick<WeekRow, "id" | "status">;
 
 type DayRow = {
   id: string;
@@ -324,6 +327,44 @@ export async function getDashboardData(
     );
   }
 
+  const weekRow = weekData as WeekRow;
+  const [previousWeekResult, nextWeekResult] = await Promise.all([
+    supabase
+      .from("weeks")
+      .select("id,status")
+      .eq("user_id", user.id)
+      .lt("start_date", weekRow.start_date)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("weeks")
+      .select("id,status")
+      .eq("user_id", user.id)
+      .gt("start_date", weekRow.start_date)
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (previousWeekResult.error) {
+    console.warn(
+      `[dashboard] previous week unavailable: ${previousWeekResult.error.message}`,
+    );
+  }
+  if (nextWeekResult.error) {
+    console.warn(
+      `[dashboard] next week unavailable: ${nextWeekResult.error.message}`,
+    );
+  }
+  const weekNavigation: DashboardWeekNavigation = {
+    previous: previousWeekResult.data
+      ? (previousWeekResult.data as AdjacentWeekRow)
+      : null,
+    next: nextWeekResult.data
+      ? (nextWeekResult.data as AdjacentWeekRow)
+      : null,
+  };
+
   const days = (dayData ?? []) as DayRow[];
   const dayIds = days.map((day) => day.id);
   const tBatchB = mark();
@@ -464,6 +505,7 @@ export async function getDashboardData(
   const result = mapDashboardData({
     settings: settingsData as SettingsRow,
     week: weekData as WeekRow,
+    weekNavigation,
     days,
     dayTotals: (dayTotalData ?? []) as DayTotalRow[],
     slots: (slotData ?? []) as EarnSlotRow[],
@@ -487,6 +529,7 @@ export async function getDashboardData(
 function mapDashboardData(input: {
   settings: SettingsRow;
   week: WeekRow;
+  weekNavigation: DashboardWeekNavigation;
   days: DayRow[];
   dayTotals: DayTotalRow[];
   slots: EarnSlotRow[];
@@ -583,6 +626,7 @@ function mapDashboardData(input: {
     todayIso: input.todayIso,
     settings,
     week,
+    weekNavigation: input.weekNavigation,
     days,
     hiddenBuiltins: (input.settings.hidden_builtin_jobs ?? []) as string[],
     customJobs: input.customJobs

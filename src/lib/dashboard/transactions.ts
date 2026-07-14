@@ -15,6 +15,36 @@ export function sortDashboardTransactions(
   return sortChronologicalTransactions(transactions);
 }
 
+export function splitDashboardTransactionRows(
+  appliedTransactions: DashboardTransaction[],
+  excludedTransactions: DashboardTransaction[],
+): {
+  spendingTransactions: DashboardTransaction[];
+  exemptTransactions: DashboardTransaction[];
+} {
+  const spendingTransactions = appliedTransactions.filter(
+    (transaction) =>
+      !transaction.isGasAllocated || transaction.gasRemainderCents > 0,
+  );
+  const gasExemptions = appliedTransactions
+    .filter(
+      (transaction) =>
+        transaction.isGasAllocated && transaction.gasAllocatedCents > 0,
+    )
+    .map((transaction) => ({
+      ...transaction,
+      amountCents: transaction.gasAllocatedCents,
+    }));
+
+  return {
+    spendingTransactions: sortDashboardTransactions(spendingTransactions),
+    exemptTransactions: sortDashboardTransactions([
+      ...excludedTransactions,
+      ...gasExemptions,
+    ]),
+  };
+}
+
 export function sortChronologicalTransactions<T extends ChronologicalTransaction>(
   transactions: T[],
 ): T[] {

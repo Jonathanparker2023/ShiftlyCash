@@ -47,7 +47,10 @@ import {
 import { syncTransactionsAction } from "@/app/(protected)/banking/actions";
 import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
 import { addDaysIso } from "@/lib/dashboard/dates";
-import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
+import {
+  sortDashboardTransactions,
+  splitDashboardTransactionRows,
+} from "@/lib/dashboard/transactions";
 import type {
   DashboardCustomJob,
   DashboardData,
@@ -132,6 +135,8 @@ export function DashboardEditor({
   const customJobs = initialData.customJobs;
   const isHistorical = mode === "historical";
   const router = useRouter();
+  const previousWeekHref = weekReferenceHref(initialData.weekNavigation.previous);
+  const nextWeekHref = weekReferenceHref(initialData.weekNavigation.next);
   const [days, setDays] = useState(initialData.days);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -490,19 +495,24 @@ export function DashboardEditor({
     setTransactionError(null);
     setSaveState("saving");
     setPendingTransactionIds((current) => new Set(current).add(transaction.id));
-    setDays((currentDays) =>
-      currentDays.map((day) =>
-        day.id === transaction.dayId
-          ? moveTransactionBetweenBuckets(day, transaction, newStatus)
-          : day,
-      ),
-    );
+    if (!transaction.isGasAllocated) {
+      setDays((currentDays) =>
+        currentDays.map((day) =>
+          day.id === transaction.dayId
+            ? moveTransactionBetweenBuckets(day, transaction, newStatus)
+            : day,
+        ),
+      );
+    }
 
     try {
-      await toggleTransactionStatusAction({
+      const result = await toggleTransactionStatusAction({
         transactionId: transaction.id,
         newStatus,
       });
+      if (result.dashboardData) {
+        setDays(result.dashboardData.days);
+      }
       lastSavedAt.current = Date.now();
       setSaveState("saved");
       window.setTimeout(() => {
@@ -1172,26 +1182,38 @@ export function DashboardEditor({
           />
           <div className="p-3 sm:p-4">
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                Week {initialData.week.displayWeekNumber}
-              </p>
-              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] drop-shadow-sm sm:text-3xl">
-                {formatFullRange(initialData.week.startDate, initialData.week.endDate)}
-                <CalendarIcon />
-              </h1>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
-                  {initialData.week.payPeriodRole === "week_1"
-                    ? "Week 1 of Pay Period"
-                    : "Week 2 of Pay Period"}
-                  {" - "}
-                  Paycheck {initialData.week.paycheckDueDate ?? "after week 2"}
+            <div className="flex items-start gap-2 sm:gap-3">
+              <WeekArrowButton
+                direction="previous"
+                href={previousWeekHref}
+                onNavigate={(href) => router.push(href)}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                  Week {initialData.week.displayWeekNumber}
                 </p>
-                {saveState === "error" ? (
-                  <SaveIndicator state={saveState} error={saveError} />
-                ) : null}
+                <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] drop-shadow-sm sm:text-3xl">
+                  {formatFullRange(initialData.week.startDate, initialData.week.endDate)}
+                  <CalendarIcon />
+                </h1>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
+                    {initialData.week.payPeriodRole === "week_1"
+                      ? "Week 1 of Pay Period"
+                      : "Week 2 of Pay Period"}
+                    {" - "}
+                    Paycheck {initialData.week.paycheckDueDate ?? "after week 2"}
+                  </p>
+                  {saveState === "error" ? (
+                    <SaveIndicator state={saveState} error={saveError} />
+                  ) : null}
+                </div>
               </div>
+              <WeekArrowButton
+                direction="next"
+                href={nextWeekHref}
+                onNavigate={(href) => router.push(href)}
+              />
             </div>
 
             <div>
@@ -1249,6 +1271,7 @@ export function DashboardEditor({
                 cashflowCents={weekTotals.cashflowCents}
                 earningsCents={weekTotals.earningsCents}
                 medians={initialData.metricMedians}
+                runningBalanceCents={initialData.week.runningBalanceCents}
                 spendBreakdown={spendBreakdown}
                 spendCents={weekTotals.spendCents}
               />
@@ -1374,12 +1397,14 @@ function MetricStrip({
   earningsCents,
   spendCents,
   cashflowCents,
+  runningBalanceCents,
   medians,
   spendBreakdown,
 }: {
   earningsCents: number;
   spendCents: number;
   cashflowCents: number;
+  runningBalanceCents: number;
   medians: DashboardData["metricMedians"];
   spendBreakdown: SpendBreakdown;
 }) {
@@ -1391,7 +1416,13 @@ function MetricStrip({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <TopMetric
+          accent={runningBalanceCents < 0 ? "negative" : "blue"}
+          label="Balance"
+          tone={runningBalanceCents < 0 ? "negative" : undefined}
+          value={formatMoney(runningBalanceCents)}
+        />
         <TopMetric
           accent={earningsTone}
           label="Earn"
@@ -1632,6 +1663,62 @@ function TopMetric({
   }
 
   return <div className={wrapperClass}>{inner}</div>;
+}
+
+function weekReferenceHref(
+  reference: DashboardData["weekNavigation"]["previous"],
+): string | null {
+  if (!reference) {
+    return null;
+  }
+  return reference.status === "active" ? "/" : `/history/${reference.id}`;
+}
+
+function WeekArrowButton({
+  direction,
+  href,
+  onNavigate,
+}: {
+  direction: "previous" | "next";
+  href: string | null;
+  onNavigate: (href: string) => void;
+}) {
+  const label = direction === "previous" ? "Previous week" : "Next week";
+  return (
+    <button
+      aria-label={label}
+      className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-base)] text-[var(--text-primary)] transition hover:border-[var(--accent-primary-border)] hover:text-[var(--accent-primary-text)] disabled:cursor-not-allowed disabled:opacity-30"
+      disabled={!href}
+      onClick={() => {
+        if (href) onNavigate(href);
+      }}
+      title={label}
+      type="button"
+    >
+      <svg
+        aria-hidden="true"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+      >
+        {direction === "previous" ? (
+          <>
+            <path d="m15 18-6-6 6-6" />
+            <path d="M9 12h10" />
+          </>
+        ) : (
+          <>
+            <path d="m9 18 6-6-6-6" />
+            <path d="M5 12h10" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
 }
 
 function CalendarIcon() {
@@ -1915,14 +2002,14 @@ function TransactionDrawer({
   const [isAdding, setIsAdding] = useState(false);
   const [merchantName, setMerchantName] = useState("");
   const [amount, setAmount] = useState("");
-  // Gas-allocated transactions stay in SPENDING (never hidden, even at $0
-  // remainder) but get a blue mark on the row, so a duplicate of an
-  // already-gas'd purchase can never be mistaken for a fresh, un-handled one
-  // and get gas'd a second time (which would double-count it into the
-  // whole-history daily average). Status stays "applied" underneath; the
-  // remainder still counts as spend exactly as before.
-  const appliedTransactions = sortDashboardTransactions(day.appliedTransactions);
-  const excludedTransactions = sortDashboardTransactions(day.excludedTransactions);
+  // A gas-station source transaction is one database row, but it has two clear
+  // display roles: the gas portion is a blue exemption and any non-gas
+  // remainder is ordinary spending. The daily gas overlay remains in SPENDING.
+  const { spendingTransactions, exemptTransactions } =
+    splitDashboardTransactionRows(
+      day.appliedTransactions,
+      day.excludedTransactions,
+    );
 
   function submitManualTransaction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1951,7 +2038,7 @@ function TransactionDrawer({
           heading="SPENDING"
           gasSpendCents={day.gasSpendCents}
           pendingTransactionIds={pendingTransactionIds}
-          transactions={appliedTransactions}
+          transactions={spendingTransactions}
           variant="spending"
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
@@ -1966,12 +2053,13 @@ function TransactionDrawer({
         <TransactionColumn
           heading="EXEMPT"
           pendingTransactionIds={pendingTransactionIds}
-          transactions={excludedTransactions}
+          transactions={exemptTransactions}
           variant="exempt"
           onDelete={onDeleteTransaction}
           onMoveToYesterday={onMoveTransactionToYesterday}
           onMoveToTomorrow={onMoveTransactionToTomorrow}
           onRename={onRenameTransaction}
+          onAllocateGas={onAllocateGasTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "applied")
           }
@@ -2390,13 +2478,9 @@ function TransactionRowButton({
     ),
   );
   const isAmortizedExempt = variant === "exempt" && transaction.isAmortized;
-  // Gas-allocated transactions stay in the ordinary spending list, but get
-  // the same blue mark as amortized-exempt rows so a duplicate purchase can
-  // never be mistaken for a fresh, un-gas'd one at a glance.
-  const isGasAllocatedSpending =
-    variant === "spending" && transaction.isGasAllocated;
+  const isGasExempt = variant === "exempt" && transaction.isGasAllocated;
   const rowStyle =
-    isAmortizedExempt || isGasAllocatedSpending
+    isAmortizedExempt || isGasExempt
       ? {
           backgroundColor: "rgba(37, 99, 235, 0.12)",
           borderColor: "rgba(96, 165, 250, 0.48)",
@@ -2437,6 +2521,8 @@ function TransactionRowButton({
               className={
                 isAmortizedExempt
                   ? "truncate font-semibold text-sky-200 line-through"
+                  : isGasExempt
+                    ? "truncate font-semibold text-sky-200"
                   : variant === "exempt"
                   ? "truncate font-semibold text-[var(--text-muted)] line-through"
                   : "truncate font-semibold text-[var(--text-primary)]"
@@ -2444,7 +2530,7 @@ function TransactionRowButton({
             >
               {transaction.merchantName}
             </span>
-            {isGasAllocatedSpending ? (
+            {isGasExempt ? (
               <span className="shrink-0 rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-500">
                 Gas
               </span>
@@ -2464,6 +2550,8 @@ function TransactionRowButton({
           className={
             isAmortizedExempt
               ? "font-semibold text-sky-200 line-through"
+              : isGasExempt
+                ? "font-semibold text-sky-200"
               : variant === "exempt"
               ? "font-semibold text-[var(--text-tertiary)] line-through"
               : "font-semibold text-red-600"
@@ -2475,10 +2563,10 @@ function TransactionRowButton({
 
       {isExpanded ? (
         <div className="border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2">
-          {transaction.isGasAllocated ? (
+          {isGasExempt ? (
             <div className="mb-2 rounded-md border border-sky-400/40 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold text-sky-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]">
               Gas {formatMoneyExact(transaction.gasAllocatedCents)} averaged across
-              your gas history as daily spend; {formatMoneyExact(transaction.gasRemainderCents)} stays here.
+              your gas history as daily spend; {formatMoneyExact(transaction.gasRemainderCents)} remains ordinary spending.
             </div>
           ) : null}
           {isGasEditing ? (
@@ -2562,7 +2650,7 @@ function TransactionRowButton({
             onClick={() => onToggle(transaction)}
             type="button"
           >
-            {variant === "exempt" ? "Include" : "Exempt"}
+            {isGasExempt ? "Remove gas" : variant === "exempt" ? "Include" : "Exempt"}
           </button>
           <button
             className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -2582,7 +2670,9 @@ function TransactionRowButton({
               Move to tomorrow
             </button>
           ) : null}
-          {variant === "spending" && onAllocateGas ? (
+          {onAllocateGas &&
+          ((variant === "spending" && !transaction.isGasAllocated) ||
+            isGasExempt) ? (
             <button
               className="rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-warning-text)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={disabled}
@@ -2603,10 +2693,12 @@ function TransactionRowButton({
               title="Spread the gas part as daily spend; any extra stays on this day."
               type="button"
             >
-              {transaction.isGasAllocated ? "Edit gas" : "Gas"}
+              {isGasExempt ? "Edit gas" : "Gas"}
             </button>
           ) : null}
-          {variant === "spending" && onAmortize ? (
+          {variant === "spending" &&
+          onAmortize &&
+          !transaction.isGasAllocated ? (
             <>
               <button
                 className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
+import {
+  sortDashboardTransactions,
+  splitDashboardTransactionRows,
+} from "@/lib/dashboard/transactions";
 import type { DashboardTransaction } from "@/lib/dashboard/types";
 
 describe("sortDashboardTransactions", () => {
@@ -44,6 +47,63 @@ describe("sortDashboardTransactions", () => {
       "first",
       "second",
     ]);
+  });
+});
+
+describe("splitDashboardTransactionRows", () => {
+  it("shows the gas portion as exempt and the unstyled remainder as spending", () => {
+    const source = transaction({
+      id: "gas-and-chips",
+      merchantName: "Cumberland Farms",
+      amountCents: 1_200,
+      originalAmountCents: 7_200,
+      isGasAllocated: true,
+      gasAllocatedCents: 6_000,
+      gasRemainderCents: 1_200,
+    });
+
+    const result = splitDashboardTransactionRows([source], []);
+
+    expect(result.spendingTransactions).toEqual([source]);
+    expect(result.exemptTransactions).toEqual([
+      expect.objectContaining({
+        id: "gas-and-chips",
+        amountCents: 6_000,
+        isGasAllocated: true,
+      }),
+    ]);
+    expect(
+      result.spendingTransactions[0].amountCents +
+        result.exemptTransactions[0].amountCents,
+    ).toBe(source.originalAmountCents);
+  });
+
+  it("omits a zero remainder from spending while retaining the gas exemption", () => {
+    const source = transaction({
+      id: "gas-only",
+      amountCents: 0,
+      originalAmountCents: 6_000,
+      isGasAllocated: true,
+      gasAllocatedCents: 6_000,
+      gasRemainderCents: 0,
+    });
+
+    const result = splitDashboardTransactionRows([source], []);
+
+    expect(result.spendingTransactions).toEqual([]);
+    expect(result.exemptTransactions[0].amountCents).toBe(6_000);
+  });
+
+  it("keeps ordinary spending and existing exemptions in their original buckets", () => {
+    const spending = transaction({ id: "spending" });
+    const exempt = transaction({ id: "exempt", status: "excluded" });
+
+    const result = splitDashboardTransactionRows([spending], [exempt]);
+
+    expect(result.spendingTransactions.map((row) => row.id)).toEqual([
+      "spending",
+    ]);
+    expect(result.exemptTransactions.map((row) => row.id)).toEqual(["exempt"]);
   });
 });
 

@@ -118,6 +118,16 @@ export type DashboardWeek = {
   totals: WeekTotals;
 };
 
+export type DashboardWeekReference = {
+  id: string;
+  status: string;
+};
+
+export type DashboardWeekNavigation = {
+  previous: DashboardWeekReference | null;
+  next: DashboardWeekReference | null;
+};
+
 export type DashboardBaselineTotals = {
   monthlyTotalCents: number;
   weeklyAverageCents: number;
@@ -142,6 +152,7 @@ export type DashboardData = {
   todayIso: string;
   settings: PaySettings;
   week: DashboardWeek;
+  weekNavigation: DashboardWeekNavigation;
   days: DashboardDay[];
   customJobs: DashboardCustomJob[];
   // Built-in job keys ("ability" | "prestige" | "prestige_ilst") the user hid —
