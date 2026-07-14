@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
@@ -23,6 +23,23 @@ export function AppNav({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   const logo = (
     <Link className="flex shrink-0 items-center gap-2.5" href="/">
@@ -107,11 +124,25 @@ export function AppNav({
         {footer}
       </aside>
 
-      {/* Mobile: sticky top bar with a hamburger that opens the drawer. */}
+      {/* Mobile: compact identity bar. The menu trigger stays thumb-reachable. */}
       <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-3 text-[var(--text-primary)] shadow-[0_10px_30px_rgba(0,0,0,0.18)] lg:hidden">
+        {logo}
+        <form action="/auth/logout" method="post">
+          <button
+            className="h-9 rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] px-3 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+            type="submit"
+          >
+            Sign Out
+          </button>
+        </form>
+      </header>
+
+      {!open ? (
         <button
+          aria-controls="mobile-app-nav"
+          aria-expanded="false"
           aria-label="Open menu"
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] transition hover:border-[var(--border-strong)]"
+          className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-50 flex h-12 w-12 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--text-primary)] transition hover:border-[var(--accent-brand-border)] hover:bg-[var(--surface-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-brand)] lg:hidden"
           onClick={() => setOpen(true)}
           type="button"
         >
@@ -127,26 +158,24 @@ export function AppNav({
             <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        {logo}
-        <form action="/auth/logout" method="post">
-          <button
-            className="h-9 rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] px-3 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-            type="submit"
-          >
-            Sign Out
-          </button>
-        </form>
-      </header>
+      ) : null}
 
       {/* Mobile drawer overlay. */}
       {open ? (
         <div className="fixed inset-0 z-[60] lg:hidden">
-          <div
-            aria-hidden="true"
+          <button
+            aria-label="Close menu"
             className="absolute inset-0 bg-black/60"
             onClick={() => setOpen(false)}
+            type="button"
           />
-          <aside className="absolute inset-y-0 left-0 flex w-64 max-w-[80vw] flex-col gap-4 border-r border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-4 text-[var(--text-primary)] shadow-2xl">
+          <aside
+            aria-label="Navigation menu"
+            aria-modal="true"
+            className="mobile-app-drawer absolute inset-y-0 right-0 flex w-72 max-w-[82vw] flex-col gap-4 border-l border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-4 text-[var(--text-primary)]"
+            id="mobile-app-nav"
+            role="dialog"
+          >
             <div className="flex items-center justify-between px-1">
               {logo}
               <button
@@ -168,9 +197,23 @@ export function AppNav({
                 </svg>
               </button>
             </div>
-            {navList}
-            {footer}
+            <div className="mt-auto flex min-h-0 max-h-[calc(100dvh-5rem)] flex-col gap-4 pb-[env(safe-area-inset-bottom)]">
+              {navList}
+              {footer}
+            </div>
           </aside>
+          <style>{`
+            @keyframes mobile-app-drawer-in {
+              from { transform: translateX(100%); }
+              to { transform: translateX(0); }
+            }
+            .mobile-app-drawer {
+              animation: mobile-app-drawer-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .mobile-app-drawer { animation: none; }
+            }
+          `}</style>
         </div>
       ) : null}
     </>

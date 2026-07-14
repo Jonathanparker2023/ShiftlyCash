@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 import {
   createSavedFoodAction,
@@ -105,8 +98,6 @@ export function AiFoodEstimator({
   const [isListening, setIsListening] = useState(false);
   const [labelPhotoName, setLabelPhotoName] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const panelId = useId();
-  const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
   const labelPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const requestSeqRef = useRef(0);
@@ -365,43 +356,19 @@ export function AiFoodEstimator({
     }
   }
 
-  // The default "Log food" button opens as a right-side drawer below the
-  // desktop breakpoint. Embedded
-  // usages (for example, "AI add food" inside an entry editor) stay inline.
+  // The default "Log food" button is the primary mobile entry point — make
+  // it large, full-width, and high-contrast so it's the obvious next tap
+  // when the user lands on the day view. Embedded usages (e.g. "AI add
+  // food" inside the entry editor) keep the compact style via a smaller
+  // visual variant.
   const isPrimary = buttonLabel === "Log food";
   const buttonClass = isPrimary
-    ? "ml-auto flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] text-[var(--text-primary)] shadow-sm transition hover:border-[var(--accent-primary-border)] hover:text-[var(--accent-primary-text)] disabled:cursor-not-allowed disabled:opacity-60 xl:ml-0 xl:h-auto xl:w-auto xl:gap-2 xl:border-[var(--accent-primary-border)] xl:bg-[var(--accent-primary)] xl:px-6 xl:py-3 xl:text-base xl:font-bold"
+    ? "flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-5 py-4 text-base font-bold text-[var(--text-primary)] shadow-md transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-6 sm:py-3"
     : "rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60";
-
-  useEffect(() => {
-    if (!isOpen || !isPrimary) return;
-
-    const compactLayout = window.matchMedia("(max-width: 1279px)");
-    if (!compactLayout.matches) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const focusFrame = window.requestAnimationFrame(() => {
-      descriptionInputRef.current?.focus();
-    });
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      window.removeEventListener("keydown", closeOnEscape);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen, isPrimary]);
 
   return (
     <div>
       <button
-        aria-controls={panelId}
-        aria-expanded={isOpen}
-        aria-label={isPrimary ? "Open food logger" : undefined}
         className={buttonClass}
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
@@ -409,13 +376,8 @@ export function AiFoodEstimator({
       >
         {isPrimary ? (
           <>
-            <span aria-hidden="true" className="xl:hidden">
-              <FoodLoggerMenuIcon />
-            </span>
-            <span className="hidden items-center gap-2 xl:inline-flex">
-              <span aria-hidden="true" className="text-lg leading-none">+</span>
-              {buttonLabel}
-            </span>
+            <span aria-hidden="true" className="text-lg leading-none">+</span>
+            {buttonLabel}
           </>
         ) : (
           buttonLabel
@@ -423,63 +385,7 @@ export function AiFoodEstimator({
       </button>
 
       {isOpen ? (
-        <div
-          className={
-            isPrimary
-              ? "fixed inset-0 z-[80] text-[var(--text-primary)] xl:static xl:z-auto xl:mt-3"
-              : "mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)]"
-          }
-          id={panelId}
-        >
-          {isPrimary ? (
-            <button
-              aria-label="Close food logger"
-              className="absolute inset-0 bg-black/65 xl:hidden"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            />
-          ) : null}
-          <section
-            aria-labelledby={isPrimary ? `${panelId}-title` : undefined}
-            className={
-              isPrimary
-                ? "food-logger-drawer absolute inset-y-0 right-0 flex w-[min(92vw,28rem)] flex-col border-l border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[-24px_0_60px_rgba(0,0,0,0.45)] xl:static xl:block xl:w-auto xl:rounded-md xl:border xl:border-[var(--border-subtle)] xl:p-3 xl:shadow-none"
-                : undefined
-            }
-            role={isPrimary ? "dialog" : undefined}
-          >
-            {isPrimary ? (
-              <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3 xl:hidden">
-                <p
-                  className="text-sm font-semibold text-[var(--text-primary)]"
-                  id={`${panelId}-title`}
-                >
-                  Log food
-                </p>
-                <button
-                  aria-label="Close food logger"
-                  className="flex h-10 w-10 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-hover)] text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-                  onClick={() => setIsOpen(false)}
-                  type="button"
-                >
-                  <CloseIcon />
-                </button>
-              </div>
-            ) : null}
-            <div
-              className={
-                isPrimary
-                  ? "flex min-h-0 flex-1 flex-col justify-end overflow-hidden xl:block"
-                  : undefined
-              }
-            >
-              <div
-                className={
-                  isPrimary
-                    ? "max-h-full overflow-y-auto overscroll-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 xl:overflow-visible xl:p-0"
-                    : undefined
-                }
-              >
+        <div className="mt-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)]">
           {estimateStatus === "loading" ? (
             <EstimateLoadingPanel
               onCancel={() => {
@@ -525,7 +431,6 @@ export function AiFoodEstimator({
               <label className="block text-sm font-semibold text-[var(--text-secondary)]">
                 What did you eat?
                 <textarea
-                  ref={descriptionInputRef}
                   className="mt-1 min-h-32 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-3 text-base text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-white/40 sm:min-h-24 sm:text-sm"
                   maxLength={4000}
                   onChange={(event) => setDescription(event.target.value)}
@@ -621,60 +526,9 @@ export function AiFoodEstimator({
               </div>
             </div>
           )}
-              </div>
-            </div>
-          </section>
-          {isPrimary ? (
-            <style>{`
-              @keyframes food-logger-drawer-in {
-                from { transform: translateX(100%); }
-                to { transform: translateX(0); }
-              }
-              @media (max-width: 1279px) {
-                .food-logger-drawer {
-                  animation: food-logger-drawer-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-                }
-              }
-              @media (prefers-reduced-motion: reduce) {
-                .food-logger-drawer { animation: none; }
-              }
-            `}</style>
-          ) : null}
         </div>
       ) : null}
     </div>
-  );
-}
-
-function FoodLoggerMenuIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M6 6l12 12M18 6 6 18" />
-    </svg>
   );
 }
 
