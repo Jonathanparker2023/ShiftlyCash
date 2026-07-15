@@ -1990,6 +1990,7 @@ function TransactionDrawer({
           }
         />
         <TransactionColumn
+          collapsible
           heading="EXEMPT"
           pendingTransactionIds={pendingTransactionIds}
           transactions={exemptTransactions}
@@ -2073,6 +2074,7 @@ function TransactionColumn({
   onAllocateGas,
   onAmortize,
   gasSpendCents,
+  collapsible,
 }: {
   heading: string;
   pendingTransactionIds: Set<string>;
@@ -2090,21 +2092,53 @@ function TransactionColumn({
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
   gasSpendCents?: number;
+  // Collapsed by default -- a header you tap to reveal the list, so a column
+  // you rarely need to look at doesn't sit open in your field of view.
+  collapsible?: boolean;
 }) {
+  const [isOpen, setIsOpen] = useState(!collapsible);
   const showGasRow =
     variant === "spending" && !!gasSpendCents && gasSpendCents > 0;
+  const count = transactions.length + (showGasRow ? 1 : 0);
   return (
     <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-          {heading}
-        </h3>
-        <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
-          {transactions.length + (showGasRow ? 1 : 0)}
-        </span>
-      </div>
+      {collapsible ? (
+        <button
+          className="flex w-full items-center justify-between"
+          onClick={() => setIsOpen((current) => !current)}
+          type="button"
+        >
+          <span className="flex items-center gap-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+              {heading}
+            </h3>
+            <svg
+              className={`h-3 w-3 text-[var(--text-tertiary)] transition-transform ${isOpen ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
+            {count}
+          </span>
+        </button>
+      ) : (
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+            {heading}
+          </h3>
+          <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
+            {count}
+          </span>
+        </div>
+      )}
 
-      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+      {isOpen ? (
+      <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
         {showGasRow ? (
           <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2">
             <div className="min-w-0">
@@ -2136,6 +2170,7 @@ function TransactionColumn({
           />
         ))}
       </div>
+      ) : null}
     </div>
   );
 }
