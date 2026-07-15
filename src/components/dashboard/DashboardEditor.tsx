@@ -150,8 +150,6 @@ export function DashboardEditor({
     new Set(),
   );
   const [transactionError, setTransactionError] = useState<string | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [focusedDayIndex, setFocusedDayIndex] = useState(() =>
     Math.max(
       0,
@@ -356,23 +354,6 @@ export function DashboardEditor({
   const spendBreakdown = useMemo(() => buildSpendBreakdown(days), [days]);
   const focusedDay = days[focusedDayIndex] ?? days[0];
   const focusedDayTotals = focusedDay ? dayTotals.get(focusedDay.id) : undefined;
-
-  async function handleManualSync() {
-    setSyncStatus(null);
-    setIsSyncing(true);
-
-    try {
-      const result = await syncTransactionsAction({ forceRefresh: true });
-      window.sessionStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
-      setSyncStatus(`Pulled ${result.added} new, ${result.modified} updated`);
-      router.refresh();
-      window.setTimeout(() => setSyncStatus(null), 4000);
-    } catch (error) {
-      setSyncStatus(error instanceof Error ? error.message : "Sync failed");
-    } finally {
-      setIsSyncing(false);
-    }
-  }
 
   function updateSlot(
     dayId: string,
@@ -1175,107 +1156,93 @@ export function DashboardEditor({
 
       <main className="mx-auto max-w-7xl">
         <section className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
-          {/* Mode cue: emerald top bar = editing (live week or an unlocked closed week); amber = read-only history */}
-          <div
-            className={shiftsEditable ? "h-2 bg-[var(--accent-primary)]" : "h-2 bg-amber-400/80"}
-            aria-hidden="true"
-          />
           <div className="p-3 sm:p-4">
-          <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(420px,0.9fr)] lg:items-start">
-            <div className="flex items-start gap-2 sm:gap-3">
-              <WeekArrowButton
-                direction="previous"
-                href={previousWeekHref}
-                onNavigate={(href) => router.push(href)}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                  Week {initialData.week.displayWeekNumber}
-                </p>
-                <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] drop-shadow-sm sm:text-3xl">
-                  {formatFullRange(initialData.week.startDate, initialData.week.endDate)}
-                  <CalendarIcon />
-                </h1>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <p className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
-                    {initialData.week.payPeriodRole === "week_1"
-                      ? "Week 1 of Pay Period"
-                      : "Week 2 of Pay Period"}
-                    {" - "}
-                    Paycheck {initialData.week.paycheckDueDate ?? "after week 2"}
-                  </p>
-                  {saveState === "error" ? (
-                    <SaveIndicator state={saveState} error={saveError} />
-                  ) : null}
-                </div>
-              </div>
-              <WeekArrowButton
-                direction="next"
-                href={nextWeekHref}
-                onNavigate={(href) => router.push(href)}
-              />
-            </div>
-
-            <div>
-              <div className="mb-3 flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-                {isHistorical ? (
-                  <>
-                    <span className="inline-flex rounded-full border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-xs font-semibold text-amber-100 shadow-sm">
-                      Closed week{editingClosed ? " - editing" : " - read only"}
-                    </span>
-                    {editingClosed ? (
-                      <button
-                        className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70"
-                        disabled={finishingEdit}
-                        onClick={finishClosedEdit}
-                        type="button"
-                      >
-                        {finishingEdit ? "Saving..." : "Save & done"}
-                      </button>
-                    ) : (
-                      <button
-                        className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70"
-                        disabled={enablingEdit}
-                        onClick={enableClosedEdit}
-                        type="button"
-                      >
-                        {enablingEdit ? "Saving snapshot..." : "Edit week"}
-                      </button>
-                    )}
-                    {saveState !== "idle" ? (
+          <div className="mb-5 space-y-3">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <WeekArrowButton
+                  direction="previous"
+                  href={previousWeekHref}
+                  onNavigate={(href) => router.push(href)}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:gap-x-8">
+                    <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">
+                      Week {initialData.week.displayWeekNumber}
+                    </h1>
+                    <p className="text-xl font-semibold tracking-tight text-[var(--accent-brand-text)] sm:text-2xl">
+                      {formatFullRange(initialData.week.startDate, initialData.week.endDate)}
+                    </p>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+                      {initialData.week.payPeriodRole === "week_1"
+                        ? "Week 1 of pay period"
+                        : "Week 2 of pay period"}
+                    </p>
+                    {!isHistorical && saveState === "error" ? (
                       <SaveIndicator state={saveState} error={saveError} />
                     ) : null}
-                  </>
-                ) : (
-                  <>
-                    <span className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-2 py-1 text-xs font-semibold text-[var(--accent-primary-text)] shadow-sm">
-                      Active week
-                    </span>
-                    <button
-                      className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition hover:bg-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-70"
-                      disabled={isSyncing}
-                      onClick={handleManualSync}
-                      type="button"
-                    >
-                      {isSyncing ? "Syncing..." : "Sync now"}
-                    </button>
-                    {syncStatus ? (
-                      <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)] shadow-sm">
-                        {syncStatus}
+                  </div>
+                  {isHistorical ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex rounded-full border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-xs font-semibold text-amber-100 shadow-sm">
+                        Closed week{editingClosed ? " - editing" : " - read only"}
                       </span>
-                    ) : null}
-                  </>
-                )}
+                      {editingClosed ? (
+                        <button
+                          className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70"
+                          disabled={finishingEdit}
+                          onClick={finishClosedEdit}
+                          type="button"
+                        >
+                          {finishingEdit ? "Saving..." : "Save & done"}
+                        </button>
+                      ) : (
+                        <button
+                          className="inline-flex rounded-full border border-[var(--accent-primary-border)] bg-[var(--accent-primary)] px-3 py-1 text-xs font-bold text-[var(--surface-base)] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-70"
+                          disabled={enablingEdit}
+                          onClick={enableClosedEdit}
+                          type="button"
+                        >
+                          {enablingEdit ? "Saving snapshot..." : "Edit week"}
+                        </button>
+                      )}
+                      {saveState !== "idle" ? (
+                        <SaveIndicator state={saveState} error={saveError} />
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                <WeekArrowButton
+                  direction="next"
+                  href={nextWeekHref}
+                  onNavigate={(href) => router.push(href)}
+                />
               </div>
-              <MetricStrip
-                cashflowCents={weekTotals.cashflowCents}
-                earningsCents={weekTotals.earningsCents}
-                medians={initialData.metricMedians}
-                runningBalanceCents={initialData.week.runningBalanceCents}
-                spendBreakdown={spendBreakdown}
-                spendCents={weekTotals.spendCents}
-              />
+
+              <div className="min-w-0 text-right lg:pb-0.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+                  Running balance
+                </p>
+                <p
+                  className={`mt-0.5 text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl ${
+                    initialData.week.runningBalanceCents < 0
+                      ? "text-[var(--accent-negative-text)]"
+                      : "text-[var(--text-primary)]"
+                  }`}
+                >
+                  {formatMoney(initialData.week.runningBalanceCents)}
+                </p>
+              </div>
             </div>
+            <MetricStrip
+              cashflowCents={weekTotals.cashflowCents}
+              earningsCents={weekTotals.earningsCents}
+              medians={initialData.metricMedians}
+              spendBreakdown={spendBreakdown}
+              spendCents={weekTotals.spendCents}
+            />
           </div>
 
           {!isHistorical && nextPaycheck ? (
@@ -1397,14 +1364,12 @@ function MetricStrip({
   earningsCents,
   spendCents,
   cashflowCents,
-  runningBalanceCents,
   medians,
   spendBreakdown,
 }: {
   earningsCents: number;
   spendCents: number;
   cashflowCents: number;
-  runningBalanceCents: number;
   medians: DashboardData["metricMedians"];
   spendBreakdown: SpendBreakdown;
 }) {
@@ -1416,13 +1381,7 @@ function MetricStrip({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <TopMetric
-          accent={runningBalanceCents < 0 ? "negative" : "blue"}
-          label="Balance"
-          tone={runningBalanceCents < 0 ? "negative" : undefined}
-          value={formatMoney(runningBalanceCents)}
-        />
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
         <TopMetric
           accent={earningsTone}
           label="Earn"
@@ -1594,7 +1553,7 @@ function TopMetric({
       : accent === "positive"
         ? "before:bg-green-600"
         : accent === "amber"
-          ? "before:bg-[var(--accent-warning)]"
+          ? "before:bg-amber-500"
           : accent === "negative"
             ? "before:bg-red-600"
       : accent === "blue"
@@ -1605,15 +1564,15 @@ function TopMetric({
     ? `rounded-md bg-[var(--surface-base)] px-2.5 py-3 text-[var(--text-primary)] sm:px-4 ${className}`
     : `relative overflow-hidden rounded-md border-2 border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 py-3 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_24px_rgba(8,15,28,0.12)] before:absolute before:inset-x-0 before:top-0 before:h-1 sm:px-4 ${accentClass} ${className}`;
   const valueClass = dark
-    ? "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
+    ? "mt-1 text-base font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl"
     : tone
-      ? `mt-1 text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl ${cashflowColorFromTone(tone)}`
-      : "mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl";
+      ? `mt-1 text-base font-bold tracking-tight sm:text-2xl lg:text-3xl ${cashflowColorFromTone(tone)}`
+      : "mt-1 text-base font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl lg:text-3xl";
 
   const inner = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+        <div className="flex items-center gap-1 text-[8px] font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)] sm:text-[10px] sm:tracking-[0.18em]">
           {label}
           {expandable ? (
             <svg
@@ -1633,7 +1592,7 @@ function TopMetric({
         {trend ? (
           <div
             className={`shrink-0 whitespace-nowrap pr-px text-right text-[8px] font-bold uppercase leading-none tracking-[0.02em] sm:text-[9px] md:text-[10px] md:tracking-[0.08em] ${cashflowColorFromTone(
-              trend.tone,
+              tone ?? trend.tone,
             )}`}
           >
             {trend.direction === "up"
@@ -1718,26 +1677,6 @@ function WeekArrowButton({
         )}
       </svg>
     </button>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4 text-[var(--text-primary)]"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-    >
-      <path d="M8 2v4" />
-      <path d="M16 2v4" />
-      <rect height="18" rx="3" width="18" x="3" y="4" />
-      <path d="M3 10h18" />
-    </svg>
   );
 }
 
