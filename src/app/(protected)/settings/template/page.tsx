@@ -14,15 +14,10 @@ export default async function TemplateSettingsPage() {
   const jobsData: JobsData | null = CAPABILITIES.showCustomJobs
     ? await getJobsData()
     : null;
-  const editorKey = [
-    data.templateId,
-    ...data.days.flatMap((day) =>
-      day.slots.map(
-        (slot) =>
-          `${slot.dayIndex}:${slot.slotIndex}:${slot.jobType}:${slot.payType}:${slot.hoursOrUnits}`,
-      ),
-    ),
-  ].join("|");
+  // Key on the template identity ONLY -- never on slot values. The editor
+  // auto-saves as you type; keying on values would remount it mid-edit on
+  // every save, blowing away focus, the focused day, and the expanded row.
+  const editorKey = data.templateId;
 
   return (
     <main className="min-h-screen px-4 py-6 text-[var(--text-primary)] sm:px-6 lg:px-8">

@@ -121,6 +121,10 @@ function formatTemplateMoney(cents: number): string {
 }
 const INCENTIVE_MODE_OPTIONS: IncentiveMode[] = ["rate", "lump_sum"];
 
+// Long enough to type a whole multi-digit number without a save firing between
+// digits. Edits still flush on unmount, so a longer wait never risks the data.
+const AUTOSAVE_DELAY_MS = 2500;
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 type TemplateEditorProps = {
@@ -143,40 +147,54 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const daysRef = useRef(days);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasUnsavedEdits = useRef(false);
 
   useEffect(() => {
     daysRef.current = days;
   }, [days]);
 
-  // Auto-saves the whole template ~900ms after the last edit, so typing
-  // never triggers a network round-trip per keystroke. Reads daysRef at fire
-  // time (not the value captured when scheduling) so rapid edits within the
-  // debounce window all land in one save.
+  async function flushSave() {
+    hasUnsavedEdits.current = false;
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      await saveDefaultTemplateAction({
+        slots: daysRef.current.flatMap((day) => day.slots),
+      });
+      setSaveState("saved");
+    } catch (error) {
+      hasUnsavedEdits.current = true;
+      setSaveState("error");
+      setSaveError(error instanceof Error ? error.message : "Save failed.");
+    }
+  }
+
+  // Records edits quietly in the background. The debounce is deliberately long
+  // (AUTOSAVE_DELAY_MS) so typing a multi-digit number never fires a save
+  // mid-number. Reads daysRef at fire time, so every edit made inside the
+  // window collapses into one save. Nothing here re-renders the page or moves
+  // focus -- the save action does not revalidate this route for that reason.
   function scheduleAutoSave() {
+    hasUnsavedEdits.current = true;
     setSaveState("idle");
     setSaveError(null);
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
     }
-    saveTimer.current = setTimeout(async () => {
-      setSaveState("saving");
-      setSaveError(null);
-      try {
-        await saveDefaultTemplateAction({
-          slots: daysRef.current.flatMap((day) => day.slots),
-        });
-        setSaveState("saved");
-      } catch (error) {
-        setSaveState("error");
-        setSaveError(error instanceof Error ? error.message : "Save failed.");
-      }
-    }, 900);
+    saveTimer.current = setTimeout(flushSave, AUTOSAVE_DELAY_MS);
   }
 
+  // On unmount, flush any edit still sitting in the debounce window instead of
+  // dropping it -- navigating away right after typing must not lose the edit.
   useEffect(() => {
     return () => {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
+      }
+      if (hasUnsavedEdits.current) {
+        void saveDefaultTemplateAction({
+          slots: daysRef.current.flatMap((day) => day.slots),
+        });
       }
     };
   }, []);

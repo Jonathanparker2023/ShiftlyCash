@@ -65,7 +65,10 @@ export async function saveDefaultTemplateAction(
     }
   }
 
-  revalidatePath("/settings/template");
+  // Deliberately NOT revalidating /settings/template: this action fires on a
+  // debounce while the user is still editing, and re-rendering the page they
+  // are typing on is what makes the view jump. The client already holds the
+  // authoritative draft; a fresh server render happens on the next navigation.
   revalidatePath("/");
 
   return {
