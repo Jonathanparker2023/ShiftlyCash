@@ -19,7 +19,14 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { CSSProperties } from "react";
-import { createContext, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { saveDefaultTemplateAction } from "@/app/(protected)/settings/template/actions";
 import { centsToDollars } from "@/lib/domain/money";
@@ -134,6 +141,45 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
   );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const daysRef = useRef(days);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    daysRef.current = days;
+  }, [days]);
+
+  // Auto-saves the whole template ~900ms after the last edit, so typing
+  // never triggers a network round-trip per keystroke. Reads daysRef at fire
+  // time (not the value captured when scheduling) so rapid edits within the
+  // debounce window all land in one save.
+  function scheduleAutoSave() {
+    setSaveState("idle");
+    setSaveError(null);
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+    }
+    saveTimer.current = setTimeout(async () => {
+      setSaveState("saving");
+      setSaveError(null);
+      try {
+        await saveDefaultTemplateAction({
+          slots: daysRef.current.flatMap((day) => day.slots),
+        });
+        setSaveState("saved");
+      } catch (error) {
+        setSaveState("error");
+        setSaveError(error instanceof Error ? error.message : "Save failed.");
+      }
+    }, 900);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+      }
+    };
+  }, []);
 
   const filledSlotCount = useMemo(
     () =>
@@ -176,8 +222,7 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
             },
       ),
     );
-    setSaveState("idle");
-    setSaveError(null);
+    scheduleAutoSave();
   }
 
   function addShift(dayIndex: number) {
@@ -244,22 +289,7 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
           : current,
       ),
     );
-    setSaveState("idle");
-    setSaveError(null);
-  }
-
-  async function saveTemplate() {
-    setSaveState("saving");
-    setSaveError(null);
-    try {
-      await saveDefaultTemplateAction({
-        slots: days.flatMap((day) => day.slots),
-      });
-      setSaveState("saved");
-    } catch (error) {
-      setSaveState("error");
-      setSaveError(error instanceof Error ? error.message : "Save failed.");
-    }
+    scheduleAutoSave();
   }
 
   const activeFocusedSlots = focusedDay.slots.filter(
@@ -301,14 +331,6 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
         </div>
         <div className="flex items-center gap-3">
           <SaveStatus state={saveState} message={saveError} />
-          <button
-            className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={saveState === "saving"}
-            onClick={saveTemplate}
-            type="button"
-          >
-            {saveState === "saving" ? "Saving..." : "Save"}
-          </button>
         </div>
       </section>
 
@@ -879,7 +901,7 @@ function SaveStatus({
 }) {
   if (state === "idle") {
     return (
-      <span className="text-sm text-[var(--text-muted)]">Tap Save to apply changes</span>
+      <span className="text-sm text-[var(--text-muted)]">Auto-saves as you edit</span>
     );
   }
   const label =
