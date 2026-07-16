@@ -3247,7 +3247,7 @@ function TotalsPanel({
             ) : null}
           </span>
           <span className="font-semibold text-[var(--text-primary)] tabular-nums">
-            {formatMoneyExact(baseCents)}
+            {formatMoney(baseCents)}
           </span>
         </button>
         {showBaseBreakdown && breakdown.length > 0 ? (
