@@ -1858,7 +1858,7 @@ function FocusedDayEditor({
 }) {
   return (
     <section className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(210px,0.52fr)_minmax(520px,1.55fr)]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(190px,0.45fr)_minmax(430px,1.3fr)]">
         <ShiftList
           day={day}
           expandedSlotIndex={expandedSlotIndex}
@@ -1967,7 +1967,7 @@ function TransactionDrawer({
         </div>
       ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <TransactionColumn
           heading="SPENDING"
           gasSpendCents={day.gasSpendCents}
