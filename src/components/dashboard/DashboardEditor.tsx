@@ -1275,7 +1275,6 @@ export function DashboardEditor({
             <FocusedDayEditor
               day={focusedDay}
               expandedSlotIndex={expandedSlotIndex}
-              gasAverageDailyCents={initialData.gasAverageDailyCents}
               isManualTransactionPending={pendingManualDayIds.has(focusedDay.id)}
               pendingTransactionIds={pendingTransactionIds}
               settings={initialData.settings}
@@ -1793,7 +1792,6 @@ function FocusedDayEditor({
   day,
   totals,
   expandedSlotIndex,
-  gasAverageDailyCents,
   isManualTransactionPending,
   pendingTransactionIds,
   settings,
@@ -1815,7 +1813,6 @@ function FocusedDayEditor({
   day: DashboardDay;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
   expandedSlotIndex: number | null;
-  gasAverageDailyCents: number;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
   settings: PaySettings;
@@ -1876,7 +1873,6 @@ function FocusedDayEditor({
         <TransactionDrawer
           day={day}
           error={transactionError}
-          gasAverageDailyCents={gasAverageDailyCents}
           isManualTransactionPending={isManualTransactionPending}
           pendingTransactionIds={pendingTransactionIds}
           onAddManualTransaction={onAddManualTransaction}
@@ -1896,7 +1892,6 @@ function FocusedDayEditor({
 function TransactionDrawer({
   day,
   error,
-  gasAverageDailyCents,
   isManualTransactionPending,
   pendingTransactionIds,
   onToggleTransactionStatus,
@@ -1910,7 +1905,6 @@ function TransactionDrawer({
 }: {
   day: DashboardDay;
   error: string | null;
-  gasAverageDailyCents: number;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
   onToggleTransactionStatus: (
@@ -1976,7 +1970,6 @@ function TransactionDrawer({
       <div className="grid gap-3 lg:grid-cols-2">
         <TransactionColumn
           heading="SPENDING"
-          gasAverageDailyCents={gasAverageDailyCents}
           gasSpendCents={day.gasSpendCents}
           pendingTransactionIds={pendingTransactionIds}
           transactions={spendingTransactions}
@@ -2075,7 +2068,6 @@ function TransactionColumn({
   onToggle,
   onAllocateGas,
   onAmortize,
-  gasAverageDailyCents,
   gasSpendCents,
   collapsible,
 }: {
@@ -2094,7 +2086,6 @@ function TransactionColumn({
     previousFillDate: string | null,
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
-  gasAverageDailyCents?: number;
   gasSpendCents?: number;
   // Collapsed by default -- a header you tap to reveal the list, so a column
   // you rarely need to look at doesn't sit open in your field of view.
@@ -2146,18 +2137,18 @@ function TransactionColumn({
         {showGasRow ? (
           <div
             className="flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2"
-            title="Uses the same total daily average as Trends. The ledger may distribute a penny differently by day to reconcile exactly."
+            title="Today's exact gas share in the spending ledger."
           >
             <div className="min-w-0">
               <div className="truncate text-sm font-medium text-sky-500">
                 Gas
               </div>
               <div className="text-[11px] text-[var(--text-tertiary)]">
-                total daily average
+                Today&apos;s gas share
               </div>
             </div>
             <div className="shrink-0 text-sm font-semibold tabular-nums text-sky-500">
-              {formatMoney(gasAverageDailyCents ?? gasSpendCents ?? 0)}
+              {formatMoney(gasSpendCents ?? 0)}
             </div>
           </div>
         ) : null}
