@@ -187,33 +187,22 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
 
   return (
     <section className="mt-5 border-t border-[var(--border-subtle)] pt-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-brand-text)]">
-            Average gas / day
-          </p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="text-3xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)] sm:text-4xl">
-              {isActive
-                ? `${formatMoney(tracker.averageDailyGasCents)} / day`
-                : "Waiting for a fill"}
-            </h2>
-          </div>
-          {!isActive ? (
-            <p className="mt-1.5 max-w-xl text-sm text-[var(--text-tertiary)]">
-              Tag your next fill as Gas. It becomes the anchor for the daily set aside.
-            </p>
-          ) : null}
-        </div>
-
-        {isActive ? (
-          <div className="grid grid-cols-3 divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
-            <GasMetric
-              label="7 day pace"
-              value={`${formatMoney(tracker.last7d.avgPerDayCents)}/d`}
+      {isActive ? (
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.65fr)]">
+          <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+            <GasAverageMetric
+              label="Total average"
+              valueCents={tracker.averageDailyGasCents}
             />
+            <GasAverageMetric
+              accent
+              label="Rolling 7 day average"
+              valueCents={tracker.last7d.avgPerDayCents}
+            />
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
             <GasMetric
-              label="30 day pace"
+              label="30 day average"
               value={`${formatMoney(tracker.last30d.avgPerDayCents)}/d`}
             />
             <GasMetric
@@ -221,8 +210,20 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
               value={formatMoney(tracker.last30d.avgPerFillCents)}
             />
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : (
+        <div className="min-w-0">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-brand-text)]">
+            Gas averages
+          </p>
+          <h2 className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+            Waiting for a fill
+          </h2>
+          <p className="mt-1.5 max-w-xl text-sm text-[var(--text-tertiary)]">
+            Tag your next fill as Gas. It becomes the anchor for the daily set aside.
+          </p>
+        </div>
+      )}
 
       {isActive ? (
         <>
@@ -262,6 +263,32 @@ function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
         </>
       ) : null}
     </section>
+  );
+}
+
+function GasAverageMetric({
+  accent = false,
+  label,
+  valueCents,
+}: {
+  accent?: boolean;
+  label: string;
+  valueCents: number;
+}) {
+  return (
+    <div className="min-w-0 px-3 py-3.5 sm:px-4">
+      <div className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] sm:text-[0.65rem]">
+        {label}
+      </div>
+      <div
+        className={`mt-1 flex flex-wrap items-baseline gap-x-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl lg:text-3xl ${
+          accent ? "text-[var(--accent-brand-text)]" : "text-[var(--text-primary)]"
+        }`}
+      >
+        <span>{formatMoney(valueCents)}</span>
+        <span className="text-[0.65em] font-medium text-[var(--text-tertiary)]">/ day</span>
+      </div>
+    </div>
   );
 }
 
