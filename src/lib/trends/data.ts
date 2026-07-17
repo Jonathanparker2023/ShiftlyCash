@@ -1,6 +1,7 @@
 import { requireUserWithBootstrapStatus } from "@/lib/auth";
 import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { dollarsToCents } from "@/lib/domain/money";
+import { calculateGasAverage } from "@/lib/gas/average";
 
 const ROLLING_WINDOW_DAYS = 30; // covers both the 7d and 30d windows below
 
@@ -201,17 +202,17 @@ function mapGasTracker(
   // Rows are ordered fill_date desc — [0] is the most recent fill (used for the
   // merchant + previous-fill context lines).
   const latest = rows[0];
-  const gasAmountCents = rows.reduce(
-    (total, row) => total + Math.round(toNumber(row.gas_amount_cents)),
-    0,
+  const average = calculateGasAverage(
+    rows.map((row) => ({
+      gasAmountCents: toNumber(row.gas_amount_cents),
+      startDate: row.start_date,
+      fillDate: row.fill_date,
+    })),
+    todayIso,
   );
-
-  // first_date = earliest tank START across active fills (start_date, falling
-  // back to fill_date). ISO dates compare chronologically as strings.
-  const firstDate = rows
-    .map((row) => row.start_date ?? row.fill_date)
-    .reduce((min, date) => (date < min ? date : min));
-  const periodDays = inclusiveDateDiff(firstDate, todayIso);
+  if (!average) {
+    return { status: "waiting_for_fill" };
+  }
 
   const last7dStart = addDaysIso(todayIso, -6);
   const last30dStart = addDaysIso(todayIso, -29);
@@ -242,18 +243,18 @@ function mapGasTracker(
   const avgPerFillCents30d =
     fills30d.length > 0
       ? Math.round(fills30d.reduce((sum, row) => sum + fillAmount(row), 0) / fills30d.length)
-      : Math.round(gasAmountCents / rows.length);
+      : Math.round(average.totalCents / rows.length);
 
   return {
     status: "active",
     allocationId: latest.id,
     merchantName: latest.merchant_name,
     previousFillDate: latest.previous_fill_date,
-    periodStartDate: firstDate,
+    periodStartDate: average.firstDate,
     periodEndDate: todayIso,
-    periodDays,
-    gasAmountCents,
-    averageDailyGasCents: Math.round(gasAmountCents / periodDays),
+    periodDays: average.periodDays,
+    gasAmountCents: average.totalCents,
+    averageDailyGasCents: average.dailyAverageCents,
     updatedAt: latest.updated_at ?? latest.created_at,
     fills: rows.map((row) => ({
       id: row.id,
@@ -274,11 +275,4 @@ function mapGasTracker(
       avgPerFillCents: avgPerFillCents30d,
     },
   };
-}
-
-function inclusiveDateDiff(startIso: string, endIso: string): number {
-  const start = Date.parse(`${startIso}T00:00:00.000Z`);
-  const end = Date.parse(`${endIso}T00:00:00.000Z`);
-  const days = Math.round((end - start) / 86_400_000) + 1;
-  return Number.isFinite(days) && days > 0 ? days : 1;
 }

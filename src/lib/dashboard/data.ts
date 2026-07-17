@@ -25,6 +25,7 @@ import {
   dollarsToCents,
   roundCentsToNearestTenDollars,
 } from "@/lib/domain/money";
+import { calculateGasAverage } from "@/lib/gas/average";
 import type {
   IncentiveMode,
   JobType,
@@ -125,6 +126,8 @@ type GasSpreadRow = {
 
 type GasAllocationRow = {
   source_transaction_id: string;
+  fill_date: string;
+  start_date: string | null;
   gas_amount_cents: NumericValue;
   remainder_amount_cents: NumericValue;
   is_active: boolean;
@@ -407,22 +410,17 @@ export async function getDashboardData(
   }
 
   let gasAllocations: GasAllocationRow[] = [];
-  const transactionIds = ((transactionData ?? []) as TransactionRow[]).map(
-    (transaction) => transaction.id,
-  );
-  if (transactionIds.length > 0) {
-    const { data: gasData, error: gasError } = await supabase
-      .from("gas_allocations")
-      .select(
-        "source_transaction_id,gas_amount_cents,remainder_amount_cents,is_active",
-      )
-      .in("source_transaction_id", transactionIds)
-      .eq("is_active", true);
-    if (gasError) {
-      console.warn(`[dashboard] gas allocations unavailable: ${gasError.message}`);
-    } else {
-      gasAllocations = (gasData ?? []) as GasAllocationRow[];
-    }
+  const { data: gasData, error: gasError } = await supabase
+    .from("gas_allocations")
+    .select(
+      "source_transaction_id,fill_date,start_date,gas_amount_cents,remainder_amount_cents,is_active",
+    )
+    .eq("user_id", user.id)
+    .eq("is_active", true);
+  if (gasError) {
+    console.warn(`[dashboard] gas allocations unavailable: ${gasError.message}`);
+  } else {
+    gasAllocations = (gasData ?? []) as GasAllocationRow[];
   }
 
   // Per-day gas SPREAD (the converging daily slice). Surfaced so the dashboard
@@ -621,6 +619,14 @@ function mapDashboardData(input: {
       customJobsById,
     ),
   );
+  const gasAverage = calculateGasAverage(
+    input.gasAllocations.map((allocation) => ({
+      gasAmountCents: toNumber(allocation.gas_amount_cents),
+      startDate: allocation.start_date,
+      fillDate: allocation.fill_date,
+    })),
+    input.todayIso,
+  );
 
   return {
     todayIso: input.todayIso,
@@ -628,6 +634,7 @@ function mapDashboardData(input: {
     week,
     weekNavigation: input.weekNavigation,
     days,
+    gasAverageDailyCents: gasAverage?.dailyAverageCents ?? 0,
     hiddenBuiltins: (input.settings.hidden_builtin_jobs ?? []) as string[],
     customJobs: input.customJobs
       .filter((job) => job.active)
