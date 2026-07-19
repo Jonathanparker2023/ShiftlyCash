@@ -221,6 +221,18 @@ export function DashboardEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData]);
 
+  // Land a closed week already in edit mode so it behaves exactly like the live
+  // dashboard (spending/exempt/gas moves, shift edits) with no extra click. The
+  // recovery snapshot is still taken (inside enableClosedEdit) before the first
+  // change is possible, so closed-week data stays protected.
+  useEffect(() => {
+    if (!isHistorical) {
+      return;
+    }
+    void enableClosedEdit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Projection maintenance is intentionally post-render. It clears projected
   // spend that has reached today and fills future-day projections without
   // blocking dashboard navigation.
@@ -467,7 +479,7 @@ export function DashboardEditor({
     transaction: DashboardTransaction,
     newStatus: "applied" | "excluded",
   ) {
-    if (isHistorical) return; // transactions are read-only in History
+    if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -517,7 +529,7 @@ export function DashboardEditor({
   }
 
   async function deleteTransaction(transaction: DashboardTransaction) {
-    if (isHistorical) return; // transactions are read-only in History
+    if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -555,7 +567,7 @@ export function DashboardEditor({
   }
 
   async function moveTransactionToYesterday(transaction: DashboardTransaction) {
-    if (isHistorical) return; // transactions are read-only in History
+    if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -602,7 +614,7 @@ export function DashboardEditor({
   }
 
   async function moveTransactionToTomorrow(transaction: DashboardTransaction) {
-    if (isHistorical) return; // transactions are read-only in History
+    if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (!transaction.wasMovedToYesterday) return; // only reverses a yesterday move
     if (pendingTransactionIds.has(transaction.id)) {
       return;
@@ -653,7 +665,7 @@ export function DashboardEditor({
     transaction: DashboardTransaction,
     merchantName: string,
   ) {
-    if (isHistorical) return; // transactions are read-only in History
+    if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -702,7 +714,7 @@ export function DashboardEditor({
     transaction: DashboardTransaction,
     months: 1 | 3,
   ) {
-    if (isHistorical) return; // transactions are read-only in History
+    if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -756,7 +768,7 @@ export function DashboardEditor({
     gasAmountCents: number,
     previousFillDate: string | null,
   ) {
-    if (isHistorical) return; // transactions are read-only in History
+    if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
@@ -803,7 +815,7 @@ export function DashboardEditor({
     merchantName: string,
     amountCents: number,
   ) {
-    if (isHistorical) return; // transactions are read-only in History
+    if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (pendingManualDayIds.has(day.id)) {
       return;
     }
