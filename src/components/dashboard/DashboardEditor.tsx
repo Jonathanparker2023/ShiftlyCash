@@ -157,9 +157,11 @@ export function DashboardEditor({
     ),
   );
   const [expandedSlotIndex, setExpandedSlotIndex] = useState<number | null>(null);
-  // Historical mode is read-only until the user explicitly turns on editing
-  // (which first saves a recovery snapshot of the week).
-  const [editingClosed, setEditingClosed] = useState(false);
+  // A closed week opens ALREADY in edit mode so it behaves exactly like the
+  // live dashboard. The recovery snapshot is taken best-effort on mount (see
+  // the effect below) and never gates editing, so a snapshot hiccup can't lock
+  // the week read-only.
+  const [editingClosed, setEditingClosed] = useState(isHistorical);
   const [enablingEdit, setEnablingEdit] = useState(false);
   const shiftsEditable = !isHistorical || editingClosed;
   const timers = useRef<TimerMap>({});
@@ -221,15 +223,18 @@ export function DashboardEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData]);
 
-  // Land a closed week already in edit mode so it behaves exactly like the live
-  // dashboard (spending/exempt/gas moves, shift edits) with no extra click. The
-  // recovery snapshot is still taken (inside enableClosedEdit) before the first
-  // change is possible, so closed-week data stays protected.
+  // Closed weeks open in edit mode (editingClosed initialized true above). Take
+  // the recovery snapshot once, best-effort — its success never gates editing,
+  // so a snapshot error can't strand the week read-only. Errors surface in the
+  // save indicator but the week stays editable.
   useEffect(() => {
     if (!isHistorical) {
       return;
     }
-    void enableClosedEdit();
+    snapshotClosedWeekAction({ weekId: initialData.week.id }).catch(() => {
+      // Non-fatal: the week is still editable; a snapshot retry happens on the
+      // next open. Do not block or revert edit mode.
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
