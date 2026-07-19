@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyDebtLumpSum,
   calcWeeklyProjection,
   ctTax2025,
   type DebtRow,
@@ -11,6 +12,49 @@ import {
   simulateLegacyMillionaire,
   weeklyCashflowToHitDebtFreeBy,
 } from "@/lib/domain/projections";
+
+describe("cash-aware projection inputs", () => {
+  const debts: DebtRow[] = [
+    {
+      id: "zero-apr",
+      name: "Zero APR",
+      balanceCents: 200_000,
+      minimumPaymentCents: 0,
+      aprBps: 0,
+      status: "active",
+      priorityOrder: 0,
+    },
+    {
+      id: "high-apr",
+      name: "High APR",
+      balanceCents: 800_000,
+      minimumPaymentCents: 0,
+      aprBps: 1_850,
+      status: "active",
+      priorityOrder: 1,
+    },
+  ];
+
+  it("applies available cash to the highest-APR debt without mutating input", () => {
+    const result = applyDebtLumpSum(debts, 647_471);
+
+    expect(result.appliedCents).toBe(647_471);
+    expect(result.remainingCashCents).toBe(0);
+    expect(result.debts).toEqual([
+      debts[0],
+      { ...debts[1], balanceCents: 152_529 },
+    ]);
+    expect(debts[1].balanceCents).toBe(800_000);
+  });
+
+  it("leaves excess cash after all active debt is covered", () => {
+    const result = applyDebtLumpSum(debts, 1_200_000);
+
+    expect(result.appliedCents).toBe(1_000_000);
+    expect(result.remainingCashCents).toBe(200_000);
+    expect(result.debts.map((debt) => debt.balanceCents)).toEqual([0, 0]);
+  });
+});
 
 describe("projection math", () => {
   it("grosses up net wages with a safe withholding ceiling", () => {

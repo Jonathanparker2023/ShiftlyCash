@@ -12,5 +12,10 @@ export default async function Page() {
     )
     .join("|");
 
-  return <DebtPage key={debtStateKey} initialData={data} />;
+  return (
+    <DebtPage
+      key={`${debtStateKey}:${data.availableCashCents}:${data.cashBalanceSource}`}
+      initialData={data}
+    />
+  );
 }

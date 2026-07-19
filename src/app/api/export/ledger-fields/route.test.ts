@@ -1,16 +1,29 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET, POST } from "@/app/api/export/ledger-fields/route";
 
 const mockCreateAdminClient = vi.hoisted(() => vi.fn());
+const mockGetProjectionCashBalance = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: mockCreateAdminClient,
+}));
+vi.mock("@/lib/plaid/projectionCash", () => ({
+  getProjectionCashBalance: mockGetProjectionCashBalance,
 }));
 
 describe("/api/export/ledger-fields", () => {
   const originalToken = process.env.SHIFTLYCASH_LEDGER_TOKEN;
   const originalUserId = process.env.SHIFTLYCASH_LEDGER_USER_ID;
+
+  beforeEach(() => {
+    mockGetProjectionCashBalance.mockResolvedValue({
+      availableCashCents: 647_471,
+      asOf: "2026-07-19T06:14:18.651Z",
+      source: "plaid",
+      stale: false,
+    });
+  });
 
   afterEach(() => {
     vi.clearAllMocks();
@@ -238,6 +251,15 @@ describe("/api/export/ledger-fields", () => {
       },
     });
     expect(payload.as_of).toEqual(expect.any(String));
+    expect(payload.debt_totals).toMatchObject({
+      total_active_debt: 14823.45,
+      available_cash: 6474.71,
+      starting_net_worth: -8348.74,
+    });
+    expect(payload.plan_metrics).toMatchObject({
+      cash_balance_source: "plaid",
+      cash_balance_stale: false,
+    });
     expect(payload.income).toMatchObject({
       this_week_net: expect.any(Number),
       this_week_gross: expect.any(Number),

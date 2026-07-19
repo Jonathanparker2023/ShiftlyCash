@@ -292,6 +292,44 @@ export function calcDTI(
 }
 
 /**
+ * Apply available cash to active debts in avalanche order without mutating the
+ * source rows. The returned rows retain their original display order.
+ */
+export function applyDebtLumpSum(
+  debts: DebtRow[],
+  availableCashCents: number,
+): {
+  debts: DebtRow[];
+  appliedCents: number;
+  remainingCashCents: number;
+} {
+  const adjusted = debts.map((debt) => ({ ...debt }));
+  const avalanche = adjusted
+    .filter((debt) => debt.status === "active" && debt.balanceCents > 0)
+    .sort(
+      (a, b) =>
+        b.aprBps - a.aprBps ||
+        a.priorityOrder - b.priorityOrder ||
+        a.id.localeCompare(b.id),
+    );
+  const startingCash = Math.max(0, Math.round(availableCashCents));
+  let remainingCashCents = startingCash;
+
+  for (const debt of avalanche) {
+    if (remainingCashCents <= 0) break;
+    const payment = Math.min(debt.balanceCents, remainingCashCents);
+    debt.balanceCents -= payment;
+    remainingCashCents -= payment;
+  }
+
+  return {
+    debts: adjusted,
+    appliedCents: startingCash - remainingCashCents,
+    remainingCashCents,
+  };
+}
+
+/**
  * Simulate weekly debt balance under avalanche payoff (highest APR first).
  * Returns array of weekly snapshots: total remaining debt at end of each week.
  * weeklyExtraCents = cashflow available beyond minimum payments.
@@ -536,18 +574,17 @@ export function simulateLegacyMillionaire({
 }
 
 /**
- * Legacy linear net-worth projection.
- * Start at -totalDebt, add weeklyCashflow each week. No avalanche, no per-debt
- * interest accounting - just the cashflow's raw effect on net worth.
- * Crosses zero when accumulated cashflow > total debt.
+ * Legacy linear net-worth projection from a caller-supplied starting balance.
+ * No avalanche or per-debt interest accounting: this is the cashflow's raw
+ * effect on net worth.
  */
 export function legacyDebtPaydownTrajectory(
   weeklyCashflowCents: number,
-  totalDebtCents: number,
+  startingBalanceCents: number,
   maxWeeks: number,
 ): number[] {
   const series: number[] = [];
-  let netWorth = -totalDebtCents;
+  let netWorth = startingBalanceCents;
   for (let w = 0; w < maxWeeks; w++) {
     series.push(netWorth);
     netWorth += weeklyCashflowCents;
@@ -556,18 +593,17 @@ export function legacyDebtPaydownTrajectory(
 }
 
 /**
- * Legacy "invested at X%" comparison. Same starting point (-totalDebt), same
- * weekly cashflow contribution, but once the balance goes positive it compounds
- * at the given annual rate.
+ * Legacy "invested at X%" comparison. Uses the same caller-supplied starting
+ * balance and weekly contribution, but compounds once the balance is positive.
  */
 export function legacyInvestedTrajectory(
   weeklyCashflowCents: number,
-  totalDebtCents: number,
+  startingBalanceCents: number,
   maxWeeks: number,
   annualGrowthRate = 0.1,
 ): number[] {
   const series: number[] = [];
-  let bal = -totalDebtCents;
+  let bal = startingBalanceCents;
   const weeklyRate = annualGrowthRate / 52;
   for (let w = 0; w < maxWeeks; w++) {
     series.push(bal);

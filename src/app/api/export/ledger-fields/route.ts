@@ -4,11 +4,14 @@ import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
 import { formatWeekDuration } from "@/lib/domain/projection-format";
 import {
+  applyDebtLumpSum,
   calcWeeklyProjection,
+  simulateDebtFree,
   simulateLegacyMillionaire,
   type DebtRow as ProjectionDebtRow,
   type WeekRow as ProjectionWeekRow,
 } from "@/lib/domain/projections";
+import { getProjectionCashBalance } from "@/lib/plaid/projectionCash";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type NumericValue = number | string | null;
@@ -151,6 +154,7 @@ export async function GET(request: Request) {
       settingsRes,
       baselineTotalsRes,
       transactionsRes,
+      cashBalance,
     ] =
       await Promise.all([
       supabase
@@ -205,6 +209,7 @@ export async function GET(request: Request) {
         .gte("date", yearStartIso)
         .lte("date", todayIso)
         .order("date", { ascending: true }),
+      getProjectionCashBalance({ supabase, userId }),
     ]);
 
     if (debtsRes.error) throw new Error(`Debts: ${debtsRes.error.message}`);
@@ -330,6 +335,7 @@ export async function GET(request: Request) {
       settings,
       activeWeek,
       assets: (assetsRes.data ?? []) as AssetRow[],
+      cashBalance,
     });
 
     return NextResponse.json({
@@ -497,12 +503,14 @@ function buildProjectionContext({
   settings,
   activeWeek,
   assets,
+  cashBalance,
 }: {
   debts: ReturnType<typeof mapDebt>[];
   weeks: WeekTotalRow[];
   settings: SettingsRow;
   activeWeek: WeekTotalRow | null;
   assets: AssetRow[];
+  cashBalance: Awaited<ReturnType<typeof getProjectionCashBalance>>;
 }) {
   const projectionDebts: ProjectionDebtRow[] = debts.map((debt) => ({
     id: debt.id,
@@ -567,16 +575,22 @@ function buildProjectionContext({
     0,
     projection.wpcCents - weeklyTaxDueCents,
   );
-  const debtFreeWeeks =
-    projection.wpcCents > 0
-      ? Math.ceil(totalActiveDebtCents / projection.wpcCents)
-      : null;
+  const cashAdjusted = applyDebtLumpSum(
+    projectionDebts,
+    cashBalance.availableCashCents,
+  );
+  const startingNetWorthCents =
+    cashBalance.availableCashCents - totalActiveDebtCents;
+  const debtFreeWeeks = simulateDebtFree(
+    cashAdjusted.debts,
+    projection.wpcCents,
+  ).weeksToPayoff;
   const linkedDebtIds = new Set(
     assets
       .map((asset) => asset.linked_debt_id)
       .filter((id): id is string => typeof id === "string"),
   );
-  const millionaireDebts = projectionDebts
+  const millionaireDebts = cashAdjusted.debts
     .filter(
       (debt) =>
         debt.status === "active" &&
@@ -590,7 +604,7 @@ function buildProjectionContext({
       minimumPaymentWeeklyCents: Math.round(debt.minimumPaymentCents / 4.33),
     }));
   const millionaireSim = simulateLegacyMillionaire({
-    startingBalanceCents: -totalActiveDebtCents,
+    startingBalanceCents: startingNetWorthCents,
     weeklyCashflowCents: investableWeeklyCashflowCents,
     debtsList: millionaireDebts,
     targetCents: MILLIONAIRE_TARGET_CENTS,
@@ -605,6 +619,8 @@ function buildProjectionContext({
       active_debt_count: activeDebtCount,
       total_min_pay_monthly: money(totalMinPayMonthlyCents),
       total_min_pay_weekly: money(Math.round(totalMinPayMonthlyCents / 4.33)),
+      available_cash: money(cashBalance.availableCashCents),
+      starting_net_worth: money(startingNetWorthCents),
     },
     projection: {
       wpc: money(projection.wpcCents),
@@ -641,6 +657,8 @@ function buildProjectionContext({
         millionaireSim.weeksToTarget === null
           ? null
           : formatWeekDuration(millionaireSim.weeksToTarget),
+      cash_balance_source: cashBalance.source,
+      cash_balance_stale: cashBalance.stale,
     },
   };
 }

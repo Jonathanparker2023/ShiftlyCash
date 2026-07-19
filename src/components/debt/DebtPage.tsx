@@ -264,6 +264,13 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
 
           <Metric
+            label="Available cash"
+            sub={cashBalanceSourceLabel(initialData)}
+            tone="purple"
+            value={formatMoney(initialData.availableCashCents)}
+          />
+
+          <Metric
             label="Yearly projected gross cashflow"
             sub={`YTD ${formatMoney(initialData.projection.ytdCfCents)} + avg ${formatMoney(initialData.projection.wpcCents)} x ${initialData.projection.weeksRemaining} wks`}
             tone="green"
@@ -277,13 +284,13 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           />
           <Metric
             label="Debt-free date"
-            sub={`${weeksUntilLabel(initialData.debtFreeDateIso)} at ${formatMoney(initialData.projection.wpcCents)}/wk gross`}
+            sub={`${weeksUntilLabel(initialData.debtFreeDateIso)} - assumes ${formatMoney(initialData.cashAppliedToDebtCents)} cash applied today + ${formatMoney(initialData.projection.wpcCents)}/wk`}
             tone="amber"
             value={formatShortDate(initialData.debtFreeDateIso)}
           />
           <Metric
             label="Millionaire date"
-            sub={`on ${formatShortDate(initialData.millionaireDateIso)}${initialData.ageAtMillionaire != null ? ` - you'll be ${initialData.ageAtMillionaire} years old` : ""} - ${formatMoney(initialData.investableWeeklyCashflowCents)}/wk - 10% return`}
+            sub={`on ${formatShortDate(initialData.millionaireDateIso)}${initialData.ageAtMillionaire != null ? ` - you'll be ${initialData.ageAtMillionaire} years old` : ""} - starts at ${formatMoney(initialData.startingNetWorthCents)} net worth - ${formatMoney(initialData.investableWeeklyCashflowCents)}/wk - 10% return`}
             tone="purple"
             value={initialData.millionaireDurationLabel}
           />
@@ -299,8 +306,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
                 Path to $1M
               </h2>
               <p className="mt-1 text-sm" style={{ color: "var(--text-tertiary)" }}>
-                Starts at negative debt, invests post-tax weekly cashflow, and
-                compounds at 10%.
+                Starts at available cash minus debt, invests post-tax weekly
+                cashflow, and compounds at 10%.
               </p>
             </div>
             <div
@@ -1099,6 +1106,18 @@ function DebtBreakdown({ debts }: { debts: DebtRow[] }) {
 function isAutoLoanName(name: string): boolean {
   const normalized = name.toLowerCase();
   return normalized.includes("auto") || normalized.includes("loan");
+}
+
+function cashBalanceSourceLabel(data: DebtPageData): string {
+  if (data.cashBalanceSource === "plaid") {
+    return "Live Plaid checking + savings available balance";
+  }
+
+  if (data.cashBalanceSource === "cache") {
+    return "Cached Plaid balance - live refresh unavailable";
+  }
+
+  return "Plaid balance unavailable - projection uses $0 cash";
 }
 
 function formatMoney(cents: number): string {

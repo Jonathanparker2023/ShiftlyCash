@@ -5,6 +5,7 @@ import { dollarsToCents } from "@/lib/domain/money";
 import { mark, since, timed } from "@/lib/perf";
 import { formatWeekDuration } from "@/lib/domain/projection-format";
 import {
+  applyDebtLumpSum,
   calcWeeklyProjection,
   legacyDebtPaydownTrajectory,
   legacyInvestedTrajectory,
@@ -13,12 +14,20 @@ import {
   type DebtRow,
   type WeekRow,
 } from "@/lib/domain/projections";
+import { getProjectionCashBalance } from "@/lib/plaid/projectionCash";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type DebtPageData = {
   debts: DebtRow[];
   totalActiveDebtCents: number;
   activeDebtCount: number;
   totalMinPayCents: number;
+  availableCashCents: number;
+  cashAppliedToDebtCents: number;
+  startingNetWorthCents: number;
+  cashBalanceSource: "plaid" | "cache" | "unavailable";
+  cashBalanceStale: boolean;
+  cashBalanceAsOf: string | null;
   projection: ReturnType<typeof calcWeeklyProjection>;
   debtFreeDateIso: string | null;
   millionaireDateIso: string | null;
@@ -52,7 +61,8 @@ export async function getDebtData(): Promise<DebtPageData> {
   if (!user) redirect("/login");
 
   const tBatch = mark();
-  const [debtsRes, weeksRes, settingsRes, assetsRes] = await Promise.all([
+  const [debtsRes, weeksRes, settingsRes, assetsRes, cashBalance] =
+    await Promise.all([
     supabase
       .from("debts")
       .select("id, name, balance, minimum_payment, apr, status, priority_order")
@@ -77,8 +87,12 @@ export async function getDebtData(): Promise<DebtPageData> {
       .select("linked_debt_id")
       .eq("user_id", user.id)
       .not("linked_debt_id", "is", null),
+    getProjectionCashBalance({
+      supabase: createAdminClient(),
+      userId: user.id,
+    }),
   ]);
-  since("debt:reads(debts+weeks+settings+assets)", tBatch);
+  since("debt:reads(debts+weeks+settings+assets+cash)", tBatch);
 
   if (debtsRes.error) throw new Error(`Debts: ${debtsRes.error.message}`);
   if (weeksRes.error) throw new Error(`Weeks: ${weeksRes.error.message}`);
@@ -145,6 +159,10 @@ export async function getDebtData(): Promise<DebtPageData> {
   const totalMinPayCents = debts
     .filter((d) => d.status === "active")
     .reduce((s, d) => s + d.minimumPaymentCents, 0);
+  const availableCashCents = cashBalance.availableCashCents;
+  const cashAdjusted = applyDebtLumpSum(debts, availableCashCents);
+  const cashAdjustedDebts = cashAdjusted.debts;
+  const startingNetWorthCents = availableCashCents - totalActiveDebtCents;
 
   const weeklyTaxDueCents = Math.round(projection.estTaxCents / 52);
   const investableWeeklyCashflowCents = Math.max(
@@ -152,17 +170,13 @@ export async function getDebtData(): Promise<DebtPageData> {
     projection.wpcCents - weeklyTaxDueCents,
   );
 
-  const debtSim = simulateDebtFree(debts, projection.wpcCents);
-  const legacyDebtFreeWeeks =
-    projection.wpcCents > 0
-      ? Math.ceil(totalActiveDebtCents / projection.wpcCents)
-      : null;
+  const debtSim = simulateDebtFree(cashAdjustedDebts, projection.wpcCents);
   const linkedDebtIds = new Set(
     (assetsRes.data ?? [])
       .map((asset) => asset.linked_debt_id as string | null)
       .filter((id): id is string => typeof id === "string"),
   );
-  const millionaireDebts = debts
+  const millionaireDebts = cashAdjustedDebts
     .filter(
       (debt) =>
         debt.status === "active" &&
@@ -176,14 +190,14 @@ export async function getDebtData(): Promise<DebtPageData> {
       minimumPaymentWeeklyCents: Math.round(debt.minimumPaymentCents / 4.33),
     }));
   const millionaireSim = simulateLegacyMillionaire({
-    startingBalanceCents: -totalActiveDebtCents,
+    startingBalanceCents: startingNetWorthCents,
     weeklyCashflowCents: investableWeeklyCashflowCents,
     debtsList: millionaireDebts,
     targetCents: MILLIONAIRE_TARGET_CENTS,
     annualGrowthRate: MILLIONAIRE_ANNUAL_RETURN,
   });
   const principalMillionaireSim = simulateLegacyMillionaire({
-    startingBalanceCents: -totalActiveDebtCents,
+    startingBalanceCents: startingNetWorthCents,
     weeklyCashflowCents: investableWeeklyCashflowCents,
     debtsList: millionaireDebts,
     targetCents: MILLIONAIRE_TARGET_CENTS,
@@ -192,20 +206,20 @@ export async function getDebtData(): Promise<DebtPageData> {
   });
   const netWorthTrajectory = legacyDebtPaydownTrajectory(
     projection.wpcCents,
-    totalActiveDebtCents,
+    startingNetWorthCents,
     520,
   );
   const investedNetWorthTrajectory = legacyInvestedTrajectory(
     projection.wpcCents,
-    totalActiveDebtCents,
+    startingNetWorthCents,
     520,
     MILLIONAIRE_ANNUAL_RETURN,
   );
 
   const today = new Date();
   const debtFreeDateIso =
-    legacyDebtFreeWeeks !== null
-      ? new Date(today.getTime() + legacyDebtFreeWeeks * 7 * 86_400_000)
+    debtSim.weeksToPayoff !== null
+      ? new Date(today.getTime() + debtSim.weeksToPayoff * 7 * 86_400_000)
           .toISOString()
           .slice(0, 10)
       : null;
@@ -225,6 +239,12 @@ export async function getDebtData(): Promise<DebtPageData> {
     totalActiveDebtCents,
     activeDebtCount,
     totalMinPayCents,
+    availableCashCents,
+    cashAppliedToDebtCents: cashAdjusted.appliedCents,
+    startingNetWorthCents,
+    cashBalanceSource: cashBalance.source,
+    cashBalanceStale: cashBalance.stale,
+    cashBalanceAsOf: cashBalance.asOf,
     projection,
     debtFreeDateIso,
     millionaireDateIso,

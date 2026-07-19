@@ -8,6 +8,8 @@ import {
   calcWeeklyProjection,
   type WeekRow,
 } from "@/lib/domain/projections";
+import { getProjectionCashBalance } from "@/lib/plaid/projectionCash";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type NetWorthAsset = {
   id: string;
@@ -21,6 +23,9 @@ export type NetWorthPageData = {
   totalAssetValueCents: number;
   totalDebtCents: number;
   startingBalanceCents: number;
+  availableCashCents: number;
+  cashBalanceSource: "plaid" | "cache" | "unavailable";
+  cashBalanceStale: boolean;
   weeklyContributionCents: number;
   annualReturnRate: number;
   horizonYears: number;
@@ -41,7 +46,8 @@ const ROLLING_WINDOW_WEEKS = 2;
 export async function getNetWorthData(): Promise<NetWorthPageData> {
   const { supabase, user } = await requireUser();
 
-  const [assetsRes, debtsRes, weeksRes, settingsRes] = await Promise.all([
+  const [assetsRes, debtsRes, weeksRes, settingsRes, cashBalance] =
+    await Promise.all([
     supabase
       .from("assets")
       .select("id,name,value,category")
@@ -65,6 +71,10 @@ export async function getNetWorthData(): Promise<NetWorthPageData> {
       )
       .eq("user_id", user.id)
       .maybeSingle(),
+    getProjectionCashBalance({
+      supabase: createAdminClient(),
+      userId: user.id,
+    }),
   ]);
 
   if (assetsRes.error) throw new Error(`Assets: ${assetsRes.error.message}`);
@@ -72,12 +82,27 @@ export async function getNetWorthData(): Promise<NetWorthPageData> {
   if (weeksRes.error) throw new Error(`Weeks: ${weeksRes.error.message}`);
   if (settingsRes.error) throw new Error(`Settings: ${settingsRes.error.message}`);
 
-  const assets: NetWorthAsset[] = (assetsRes.data ?? []).map((row) => ({
+  const recordedAssets: NetWorthAsset[] = (assetsRes.data ?? []).map((row) => ({
     id: row.id as string,
     name: row.name as string,
     valueCents: dollarsToCents(Number(row.value ?? 0)),
     category: String(row.category ?? "other"),
   }));
+  const assets: NetWorthAsset[] =
+    cashBalance.source === "unavailable"
+      ? recordedAssets
+      : [
+          {
+            id: "plaid-available-cash",
+            name: "Available cash",
+            valueCents: cashBalance.availableCashCents,
+            category:
+              cashBalance.source === "plaid"
+                ? "Plaid checking + savings"
+                : "Cached Plaid checking + savings",
+          },
+          ...recordedAssets,
+        ];
   const totalAssetValueCents = assets.reduce(
     (sum, asset) => sum + asset.valueCents,
     0,
@@ -144,6 +169,9 @@ export async function getNetWorthData(): Promise<NetWorthPageData> {
     totalAssetValueCents,
     totalDebtCents,
     startingBalanceCents,
+    availableCashCents: cashBalance.availableCashCents,
+    cashBalanceSource: cashBalance.source,
+    cashBalanceStale: cashBalance.stale,
     weeklyContributionCents,
     annualReturnRate: DEFAULT_ANNUAL_RETURN,
     horizonYears: DEFAULT_HORIZON_YEARS,
