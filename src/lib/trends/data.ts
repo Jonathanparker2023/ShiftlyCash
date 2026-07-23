@@ -3,8 +3,6 @@ import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { dollarsToCents } from "@/lib/domain/money";
 import { calculateGasAverage } from "@/lib/gas/average";
 
-const ROLLING_WINDOW_DAYS = 30; // covers both the 7d and 30d windows below
-
 type NumericValue = number | string | null;
 
 type WeekTotalRow = {
@@ -88,13 +86,8 @@ export type TrendsData = {
 export async function getTrendsData(): Promise<TrendsData> {
   const { supabase, user } = await requireUserWithBootstrapStatus();
   const todayIso = getTodayIso();
-  const windowStartIso = addDaysIso(todayIso, -(ROLLING_WINDOW_DAYS - 1));
 
-  const [
-    { data, error },
-    { data: gasData, error: gasError },
-    { data: dayRows, error: dayError },
-  ] = await Promise.all([
+  const [{ data, error }, { data: gasData, error: gasError }] = await Promise.all([
     supabase
       .from("v_week_totals")
       .select(
@@ -111,14 +104,6 @@ export async function getTrendsData(): Promise<TrendsData> {
       .eq("is_active", true)
       .order("fill_date", { ascending: false })
       .order("updated_at", { ascending: false }),
-    // Last 30 calendar days of `days` rows, so we can attach a real date to
-    // each v_day_gas_spend_totals slice (that view only exposes day_id).
-    supabase
-      .from("days")
-      .select("id,date")
-      .eq("user_id", user.id)
-      .gte("date", windowStartIso)
-      .lte("date", todayIso),
   ]);
 
   if (error) {
@@ -127,36 +112,10 @@ export async function getTrendsData(): Promise<TrendsData> {
   if (gasError) {
     throw new Error(`Unable to load gas tracker: ${gasError.message}`);
   }
-  if (dayError) {
-    throw new Error(`Unable to load recent days for gas metrics: ${dayError.message}`);
-  }
-
-  const recentDayRows = (dayRows ?? []) as { id: string; date: string }[];
-  const dayIds = recentDayRows.map((row) => row.id);
-  let gasSpreadByDate = new Map<string, number>();
-  if (dayIds.length > 0) {
-    const { data: spreadData, error: spreadError } = await supabase
-      .from("v_day_gas_spend_totals")
-      .select("day_id,gas_spend_cents")
-      .in("day_id", dayIds);
-    if (spreadError) {
-      throw new Error(`Unable to load gas spread: ${spreadError.message}`);
-    }
-    const dateByDayId = new Map(recentDayRows.map((row) => [row.id, row.date]));
-    gasSpreadByDate = new Map(
-      ((spreadData ?? []) as { day_id: string; gas_spend_cents: NumericValue }[])
-        .map((row) => [dateByDayId.get(row.day_id), Math.round(toNumber(row.gas_spend_cents))])
-        .filter((entry): entry is [string, number] => Boolean(entry[0])),
-    );
-  }
 
   return {
     weeks: ((data ?? []) as WeekTotalRow[]).map(mapTrendsWeek),
-    gasTracker: mapGasTracker(
-      (gasData ?? []) as GasAllocationRow[],
-      gasSpreadByDate,
-      todayIso,
-    ),
+    gasTracker: mapGasTracker((gasData ?? []) as GasAllocationRow[], todayIso),
   };
 }
 
@@ -183,16 +142,16 @@ function toNumber(value: NumericValue): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-// Mirrors v_day_gas_spend_totals: the whole-history headline is a CONVERGING
-// daily average — total active gas / inclusive days from the FIRST tank start
-// to today — NOT a single fill's window (which collapses to ~1 day and shows
-// the entire tank as the "daily" rate). Rolling 7d/30d metrics below answer
-// the more practical "is gas creeping up right now" question that headline
-// can't: they're windowed off the real per-day gas-spread slices + individual
-// fill events, so a quiet month doesn't get diluted by a busy year.
+// The whole-history "Total average" headline is a CONVERGING daily average —
+// total active gas / inclusive days from the FIRST tank start to today (see
+// calculateGasAverage). The rolling 7d/30d metrics answer the different,
+// practical "is gas creeping up RIGHT NOW" question, so they are windowed off
+// the RAW fills actually tagged inside each window (sum of those fills ÷ 7 or
+// ÷ 30). This is deliberately NOT the amortized daily spread — reading the
+// spread made all three averages collapse to the same smoothed number and hid
+// recent fill activity. Raw-fill windows spike when you actually fill up.
 function mapGasTracker(
   rows: GasAllocationRow[],
-  gasSpreadByDate: Map<string, number>,
   todayIso: string,
 ): TrendsGasTracker {
   if (rows.length === 0) {
@@ -217,25 +176,22 @@ function mapGasTracker(
   const last7dStart = addDaysIso(todayIso, -6);
   const last30dStart = addDaysIso(todayIso, -29);
 
-  const sumSpread = (fromIso: string) => {
-    let total = 0;
-    for (const [date, cents] of gasSpreadByDate) {
-      if (date >= fromIso && date <= todayIso) {
-        total += cents;
-      }
-    }
-    return total;
-  };
-  const last7dTotalCents = sumSpread(last7dStart);
-  const last30dTotalCents = sumSpread(last30dStart);
-  const last7dAvgPerDayCents = Math.round(last7dTotalCents / 7);
-  const last30dAvgPerDayCents = Math.round(last30dTotalCents / 30);
-
   const fillsIn = (fromIso: string) =>
     rows.filter((row) => row.fill_date >= fromIso && row.fill_date <= todayIso);
   const fills7d = fillsIn(last7dStart);
   const fills30d = fillsIn(last30dStart);
   const fillAmount = (row: GasAllocationRow) => Math.round(toNumber(row.gas_amount_cents));
+  const sumFills = (fills: GasAllocationRow[]) =>
+    fills.reduce((total, row) => total + fillAmount(row), 0);
+
+  // Windows are sums of the RAW fills tagged in each window, divided by the
+  // fixed calendar span (7 / 30) so the label matches the math: "the last 7
+  // days of actual gas spend, per day".
+  const last7dTotalCents = sumFills(fills7d);
+  const last30dTotalCents = sumFills(fills30d);
+  const last7dAvgPerDayCents = Math.round(last7dTotalCents / 7);
+  const last30dAvgPerDayCents = Math.round(last30dTotalCents / 30);
+
   const highestFillCents30d =
     fills30d.length > 0 ? Math.max(...fills30d.map(fillAmount)) : 0;
   // Average per fill-up over the last 30 days; fall back to all-time average
