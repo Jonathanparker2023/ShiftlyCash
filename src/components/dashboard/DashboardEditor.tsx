@@ -1421,16 +1421,12 @@ function MetricStrip({
           value={formatMoney(spendCents)}
           valueNode={
             <span className="inline-flex items-baseline gap-1 tabular-nums">
-              <span className={spendColor}>{formatMoney(spendCents)}</span>
-              <span className="text-[0.6em] font-semibold text-[var(--text-tertiary)]">
-                +
-              </span>
-              <span className="text-[0.72em] font-semibold text-[var(--text-secondary)]">
+              <span className="text-[var(--text-tertiary)]">
                 {formatMoney(roundedFixedCents)}
               </span>
-              <span className="text-[0.6em] font-semibold text-[var(--text-tertiary)]">
-                =
-              </span>
+              <span className="text-[var(--text-tertiary)]">+</span>
+              <span className={spendColor}>{formatMoney(spendCents)}</span>
+              <span className="text-[var(--text-tertiary)]">=</span>
               <span className={spendColor}>{formatMoney(spendPlusFixedCents)}</span>
             </span>
           }
