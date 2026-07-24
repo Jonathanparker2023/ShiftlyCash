@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
-import type { CSSProperties, FormEvent } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import {
   createContext,
   useContext,
@@ -1251,6 +1251,7 @@ export function DashboardEditor({
             <MetricStrip
               cashflowCents={weekTotals.cashflowCents}
               earningsCents={weekTotals.earningsCents}
+              fixedCents={weekTotals.baseCents}
               medians={initialData.metricMedians}
               spendBreakdown={spendBreakdown}
               spendCents={weekTotals.spendCents}
@@ -1290,7 +1291,6 @@ export function DashboardEditor({
 
           {focusedDay ? (
             <FocusedDayEditor
-              avgDailyFixedCents={Math.round(weekTotals.baseCents / 100 / 7) * 100}
               day={focusedDay}
               expandedSlotIndex={expandedSlotIndex}
               isManualTransactionPending={pendingManualDayIds.has(focusedDay.id)}
@@ -1377,12 +1377,14 @@ function MetricStrip({
   earningsCents,
   spendCents,
   cashflowCents,
+  fixedCents,
   medians,
   spendBreakdown,
 }: {
   earningsCents: number;
   spendCents: number;
   cashflowCents: number;
+  fixedCents: number;
   medians: DashboardData["metricMedians"];
   spendBreakdown: SpendBreakdown;
 }) {
@@ -1391,6 +1393,12 @@ function MetricStrip({
   const cashflowTone = cashflowWeeklyTone(displayCashflowCents);
   const spendTone = spendWeeklyTone(spendCents, medians.spendCents);
   const earningsTone = earningsWeeklyTone(earningsCents, medians.earningsCents);
+  // SPEND card shows the week's true burn as a formula: spend + fixed = total.
+  // Fixed is rounded to the nearest dollar; spend and the total carry the spend
+  // color, the fixed operand stays neutral.
+  const roundedFixedCents = Math.round(fixedCents / 100) * 100;
+  const spendPlusFixedCents = spendCents + roundedFixedCents;
+  const spendColor = cashflowColorFromTone(spendTone);
 
   return (
     <div className="space-y-2">
@@ -1411,6 +1419,21 @@ function MetricStrip({
           tone={spendTone}
           trend={buildMedianTrend(spendCents, medians.spendCents, "lower")}
           value={formatMoney(spendCents)}
+          valueNode={
+            <span className="inline-flex items-baseline gap-1 tabular-nums">
+              <span className={spendColor}>{formatMoney(spendCents)}</span>
+              <span className="text-[0.6em] font-semibold text-[var(--text-tertiary)]">
+                +
+              </span>
+              <span className="text-[0.72em] font-semibold text-[var(--text-secondary)]">
+                {formatMoney(roundedFixedCents)}
+              </span>
+              <span className="text-[0.6em] font-semibold text-[var(--text-tertiary)]">
+                =
+              </span>
+              <span className={spendColor}>{formatMoney(spendPlusFixedCents)}</span>
+            </span>
+          }
         />
         <TopMetric
           accent={cashflowTone}
@@ -1540,6 +1563,7 @@ type MedianTrend = {
 function TopMetric({
   label,
   value,
+  valueNode,
   tone,
   accent,
   trend,
@@ -1551,6 +1575,7 @@ function TopMetric({
 }: {
   label: string;
   value: string;
+  valueNode?: ReactNode;
   tone?: "positive" | "amber" | "negative";
   accent?: "green" | "blue" | "positive" | "amber" | "negative";
   trend?: MedianTrend | null;
@@ -1617,7 +1642,7 @@ function TopMetric({
           </div>
         ) : null}
       </div>
-      <div className={valueClass}>{value}</div>
+      <div className={valueClass}>{valueNode ?? value}</div>
     </>
   );
 
@@ -1809,7 +1834,6 @@ function WeekStripCell({
 function FocusedDayEditor({
   day,
   totals,
-  avgDailyFixedCents,
   expandedSlotIndex,
   isManualTransactionPending,
   pendingTransactionIds,
@@ -1831,7 +1855,6 @@ function FocusedDayEditor({
 }: {
   day: DashboardDay;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
-  avgDailyFixedCents: number;
   expandedSlotIndex: number | null;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
@@ -1889,7 +1912,7 @@ function FocusedDayEditor({
           onSlotChange={onSlotChange}
           onToggleSlot={onToggleSlot}
         />
-        <TotalsPanel avgDailyFixedCents={avgDailyFixedCents} day={day} totals={totals} />
+        <TotalsPanel day={day} totals={totals} />
         <TransactionDrawer
           day={day}
           error={transactionError}
@@ -3217,19 +3240,13 @@ function payTypeBadgeClass(payType: PayType | null | undefined): string {
 function TotalsPanel({
   day,
   totals,
-  avgDailyFixedCents,
 }: {
   day: DashboardDay;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
-  avgDailyFixedCents: number;
 }) {
   const earningsCents = totals?.earningsCents ?? 0;
   const spendCents = totals?.spendCents ?? 0;
   const baseCents = totals?.baseCents ?? day.baseCents;
-  // Day's true daily burn: what was spent PLUS the day's share of fixed costs.
-  // Fixed is averaged across the week (weekly fixed / 7, rounded) because the
-  // per-day baseline moves around; this gives one stable daily number to add.
-  const spendPlusFixedCents = spendCents + avgDailyFixedCents;
   const cashflowCents = totals?.cashflowCents ?? 0;
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
   const [showBaseBreakdown, setShowBaseBreakdown] = useState(false);
@@ -3248,22 +3265,11 @@ function TotalsPanel({
     <div className="space-y-3">
       <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-sm">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
-        <div className="flex items-center justify-between gap-3 py-1">
-          <span className="text-[var(--text-secondary)]">Spend</span>
-          <span className="inline-flex items-baseline gap-1.5 font-semibold tabular-nums">
-            <span className="text-[var(--accent-negative-text)]">
-              {formatMoney(spendCents)}
-            </span>
-            <span className="text-[var(--text-tertiary)]">+</span>
-            <span className="text-[var(--text-primary)]">
-              {formatMoney(avgDailyFixedCents)}
-            </span>
-            <span className="text-[var(--text-tertiary)]">=</span>
-            <span className="text-[var(--accent-negative-text)]">
-              {formatMoney(spendPlusFixedCents)}
-            </span>
-          </span>
-        </div>
+        <TotalLine
+          label="Spend"
+          tone="negative"
+          value={formatMoney(spendCents)}
+        />
         <button
           aria-expanded={showBaseBreakdown}
           className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
