@@ -1290,6 +1290,7 @@ export function DashboardEditor({
 
           {focusedDay ? (
             <FocusedDayEditor
+              avgDailyFixedCents={Math.round(weekTotals.baseCents / 100 / 7) * 100}
               day={focusedDay}
               expandedSlotIndex={expandedSlotIndex}
               isManualTransactionPending={pendingManualDayIds.has(focusedDay.id)}
@@ -1808,6 +1809,7 @@ function WeekStripCell({
 function FocusedDayEditor({
   day,
   totals,
+  avgDailyFixedCents,
   expandedSlotIndex,
   isManualTransactionPending,
   pendingTransactionIds,
@@ -1829,6 +1831,7 @@ function FocusedDayEditor({
 }: {
   day: DashboardDay;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
+  avgDailyFixedCents: number;
   expandedSlotIndex: number | null;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
@@ -1886,7 +1889,7 @@ function FocusedDayEditor({
           onSlotChange={onSlotChange}
           onToggleSlot={onToggleSlot}
         />
-        <TotalsPanel day={day} totals={totals} />
+        <TotalsPanel avgDailyFixedCents={avgDailyFixedCents} day={day} totals={totals} />
         <TransactionDrawer
           day={day}
           error={transactionError}
@@ -3214,13 +3217,19 @@ function payTypeBadgeClass(payType: PayType | null | undefined): string {
 function TotalsPanel({
   day,
   totals,
+  avgDailyFixedCents,
 }: {
   day: DashboardDay;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
+  avgDailyFixedCents: number;
 }) {
   const earningsCents = totals?.earningsCents ?? 0;
   const spendCents = totals?.spendCents ?? 0;
   const baseCents = totals?.baseCents ?? day.baseCents;
+  // Day's true daily burn: what was spent PLUS the day's share of fixed costs.
+  // Fixed is averaged across the week (weekly fixed / 7, rounded) because the
+  // per-day baseline moves around; this gives one stable daily number to add.
+  const spendPlusFixedCents = spendCents + avgDailyFixedCents;
   const cashflowCents = totals?.cashflowCents ?? 0;
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
   const [showBaseBreakdown, setShowBaseBreakdown] = useState(false);
@@ -3239,11 +3248,22 @@ function TotalsPanel({
     <div className="space-y-3">
       <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-sm">
         <TotalLine label="Earn" value={formatMoney(earningsCents)} />
-        <TotalLine
-          label="Spend"
-          tone="negative"
-          value={formatMoney(spendCents)}
-        />
+        <div className="flex items-center justify-between gap-3 py-1">
+          <span className="text-[var(--text-secondary)]">Spend</span>
+          <span className="inline-flex items-baseline gap-1.5 font-semibold tabular-nums">
+            <span className="text-[var(--accent-negative-text)]">
+              {formatMoney(spendCents)}
+            </span>
+            <span className="text-[var(--text-tertiary)]">+</span>
+            <span className="text-[var(--text-primary)]">
+              {formatMoney(avgDailyFixedCents)}
+            </span>
+            <span className="text-[var(--text-tertiary)]">=</span>
+            <span className="text-[var(--accent-negative-text)]">
+              {formatMoney(spendPlusFixedCents)}
+            </span>
+          </span>
+        </div>
         <button
           aria-expanded={showBaseBreakdown}
           className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
