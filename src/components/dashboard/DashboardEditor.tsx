@@ -1427,7 +1427,9 @@ function MetricStrip({
               <span className="text-[var(--text-tertiary)]">+</span>
               <span className={spendColor}>{formatMoney(spendCents)}</span>
               <span className="ml-3 text-[var(--text-tertiary)]">=</span>
-              <span className={spendColor}>{formatMoney(spendPlusFixedCents)}</span>
+              <span className="text-[var(--text-tertiary)]">
+                {formatMoney(spendPlusFixedCents)}
+              </span>
             </span>
           }
         />
