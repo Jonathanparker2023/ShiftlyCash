@@ -333,6 +333,14 @@ export function applyDebtLumpSum(
  * Simulate weekly debt balance under avalanche payoff (highest APR first).
  * Returns array of weekly snapshots: total remaining debt at end of each week.
  * weeklyExtraCents = cashflow available beyond minimum payments.
+ *
+ * Minimums are paid out of the SAME weekly cashflow as everything else. They
+ * used to be applied unconditionally, which quietly spent money that was never
+ * there: at $10/wk of cashflow the simulation still serviced $480/mo of
+ * minimums and reported a payoff date, when the real outcome is missed
+ * payments. `minimumShortfallWeeks` counts the weeks where cashflow could not
+ * cover every minimum — a payoff date with a nonzero count is not a plan, it
+ * is a warning.
  */
 export function simulateDebtFree(
   debts: DebtRow[],
@@ -341,6 +349,7 @@ export function simulateDebtFree(
 ): {
   weeklyBalances: number[];
   weeksToPayoff: number | null;
+  minimumShortfallWeeks: number;
 } {
   const active = debts
     .filter((d) => d.status === "active" && d.balanceCents > 0)
@@ -348,10 +357,11 @@ export function simulateDebtFree(
     .sort((a, b) => b.aprBps - a.aprBps);
 
   if (active.length === 0) {
-    return { weeklyBalances: [0], weeksToPayoff: 0 };
+    return { weeklyBalances: [0], weeksToPayoff: 0, minimumShortfallWeeks: 0 };
   }
 
   const balances: number[] = [];
+  let minimumShortfallWeeks = 0;
   for (let week = 0; week < maxWeeks; week++) {
     // Apply weekly interest (APR / 52)
     for (const d of active) {
@@ -367,14 +377,22 @@ export function simulateDebtFree(
         s + (d.balanceCents > 0 ? Math.round(d.minimumPaymentCents / 4.33) : 0),
       0,
     );
+    if (totalMinWeekly > weeklyCashflowCents) minimumShortfallWeeks++;
 
-    // Distribute payments: minimums first to all, then extra to highest APR
-    let extra = Math.max(0, weeklyCashflowCents - totalMinWeekly);
+    // Every payment comes out of the same weekly budget. Minimums go first, in
+    // avalanche order, but only as far as the money actually reaches.
+    let budget = Math.max(0, weeklyCashflowCents);
     for (const d of active) {
-      if (d.balanceCents <= 0) continue;
-      const minWeekly = Math.round(d.minimumPaymentCents / 4.33);
-      d.balanceCents = Math.max(0, d.balanceCents - minWeekly);
+      if (d.balanceCents <= 0 || budget <= 0) continue;
+      const minWeekly = Math.min(
+        Math.round(d.minimumPaymentCents / 4.33),
+        budget,
+      );
+      const pay = Math.min(d.balanceCents, minWeekly);
+      d.balanceCents -= pay;
+      budget -= pay;
     }
+    let extra = budget;
     for (const d of active) {
       if (d.balanceCents <= 0 || extra <= 0) continue;
       const pay = Math.min(d.balanceCents, extra);
@@ -385,11 +403,11 @@ export function simulateDebtFree(
     const total = active.reduce((s, d) => s + d.balanceCents, 0);
     balances.push(total);
     if (total === 0) {
-      return { weeklyBalances: balances, weeksToPayoff: week + 1 };
+      return { weeklyBalances: balances, weeksToPayoff: week + 1, minimumShortfallWeeks };
     }
   }
 
-  return { weeklyBalances: balances, weeksToPayoff: null };
+  return { weeklyBalances: balances, weeksToPayoff: null, minimumShortfallWeeks };
 }
 
 export type CatchUpResult = {

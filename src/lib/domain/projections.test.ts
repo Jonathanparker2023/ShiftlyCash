@@ -232,6 +232,31 @@ describe("debt-free catch-up", () => {
     ).toBeLessThanOrEqual(5);
   });
 
+  it("never pays minimums out of money the week did not have", () => {
+    // $14,000 at 18.5% with a $455/mo minimum needs ~$105/wk just to service
+    // the minimum. At $10/wk the old simulation still paid it in full and
+    // reported a payoff date; that is a missed-payment scenario, not a plan.
+    const heavy: DebtRow[] = [
+      {
+        id: "auto",
+        name: "Auto loan",
+        balanceCents: 1_400_000,
+        minimumPaymentCents: 45_500,
+        aprBps: 1850,
+        status: "active",
+        priorityOrder: 0,
+      },
+    ];
+    const starved = simulateDebtFree(heavy, 1_000);
+    expect(starved.minimumShortfallWeeks).toBeGreaterThan(0);
+    // $10/wk against 18.5% interest on $14k cannot pay anything down.
+    expect(starved.weeksToPayoff).toBeNull();
+
+    const funded = simulateDebtFree(heavy, 90_000);
+    expect(funded.minimumShortfallWeeks).toBe(0);
+    expect(funded.weeksToPayoff).not.toBeNull();
+  });
+
   it("reports onTrack with no extra needed when already ahead of target", () => {
     // $250/wk clears $1,000 in 4 weeks, target is 5 -> already on track.
     const res = weeklyCashflowToHitDebtFreeBy([debt()], 25_000, 5);

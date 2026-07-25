@@ -33,9 +33,14 @@ describe("baseline actions", () => {
 
     await createExpenseAction();
 
-    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    // Two RPCs: apply the baseline forward, then heal recently-passed days.
+    expect(supabase.rpc).toHaveBeenCalledTimes(2);
     expect(supabase.rpc).toHaveBeenCalledWith("apply_baseline_to_future_days", {
       p_user_id: userId,
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith("restamp_recent_baseline", {
+      p_user_id: userId,
+      p_days_back: 14,
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/baseline");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
@@ -55,7 +60,8 @@ describe("baseline actions", () => {
       sortOrder: 10,
     });
 
-    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    // Two RPCs: apply the baseline forward, then heal recently-passed days.
+    expect(supabase.rpc).toHaveBeenCalledTimes(2);
     expect(supabase.rpc).toHaveBeenCalledWith("apply_baseline_to_future_days", {
       p_user_id: userId,
     });
@@ -69,7 +75,8 @@ describe("baseline actions", () => {
 
     await deleteExpenseAction({ id: expenseId });
 
-    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    // Two RPCs: apply the baseline forward, then heal recently-passed days.
+    expect(supabase.rpc).toHaveBeenCalledTimes(2);
     expect(supabase.rpc).toHaveBeenCalledWith("apply_baseline_to_future_days", {
       p_user_id: userId,
     });

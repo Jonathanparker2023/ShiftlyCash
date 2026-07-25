@@ -17,15 +17,23 @@ describe("/api/export/ledger-fields", () => {
   const originalUserId = process.env.SHIFTLYCASH_LEDGER_USER_ID;
 
   beforeEach(() => {
+    // The route computes its rolling-30d window from `new Date()`, but every
+    // fixture below is dated early May. Left on real time this test passes
+    // only while the wall clock happens to sit within 30 days of the
+    // fixtures, then silently starts failing — which is exactly what it did.
+    // Freeze the clock inside the fixture window so it is deterministic.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-17T12:00:00.000Z"));
     mockGetProjectionCashBalance.mockResolvedValue({
       availableCashCents: 647_471,
-      asOf: "2026-07-19T06:14:18.651Z",
+      asOf: "2026-05-17T06:14:18.651Z",
       source: "plaid",
       stale: false,
     });
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
     restoreEnv("SHIFTLYCASH_LEDGER_TOKEN", originalToken);
     restoreEnv("SHIFTLYCASH_LEDGER_USER_ID", originalUserId);
