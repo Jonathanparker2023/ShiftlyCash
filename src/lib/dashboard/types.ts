@@ -24,6 +24,9 @@ export type DashboardTransaction = {
   isGasAllocated: boolean;
   gasAllocatedCents: number;
   gasRemainderCents: number;
+  isEvChargeAllocated: boolean;
+  evChargeAllocatedCents: number;
+  evChargeRemainderCents: number;
   wasMovedToYesterday: boolean;
   date: string;
   time: string | null;
@@ -98,6 +101,7 @@ export type DashboardDay = {
   spendCents: number;
   transactionSpendCents: number;
   gasSpendCents: number;
+  evChargeSpendCents: number;
   spendLocked: boolean;
   baseBreakdown: DashboardBaseAllocation[];
   totals: DayTotals;
@@ -155,7 +159,7 @@ export type DashboardData = {
   weekNavigation: DashboardWeekNavigation;
   days: DashboardDay[];
   gasAverageDailyCents: number;
-  gasArchived: boolean;
+  gasEndedOn: string | null;
   customJobs: DashboardCustomJob[];
   // Built-in job keys ("ability" | "prestige" | "prestige_ilst") the user hid —
   // dropped from the job picker + net bar. Display only; history is unaffected.

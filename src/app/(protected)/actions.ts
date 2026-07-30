@@ -89,10 +89,10 @@ export type AmortizeTransactionInput = {
   months: 1 | 3;
 };
 
-export type AllocateGasTransactionInput = {
+export type AllocateEvChargeTransactionInput = {
   transactionId: string;
-  gasAmountCents: number;
-  previousFillDate?: string | null;
+  chargeAmountCents: number;
+  previousChargeDate?: string | null;
 };
 
 export type CloseWeekResult = {
@@ -115,6 +115,9 @@ export type ManualTransactionResult = {
     isGasAllocated: boolean;
     gasAllocatedCents: number;
     gasRemainderCents: number;
+    isEvChargeAllocated: boolean;
+    evChargeAllocatedCents: number;
+    evChargeRemainderCents: number;
     wasMovedToYesterday: boolean;
     date: string;
     time: string | null;
@@ -424,6 +427,19 @@ export async function toggleTransactionStatusAction(
   if (activeGasError) {
     throw new Error(`Unable to inspect gas allocation: ${activeGasError.message}`);
   }
+  const { data: activeEvChargeAllocation, error: activeEvChargeError } =
+    await supabase
+      .from("ev_charge_allocations")
+      .select("id")
+      .eq("source_transaction_id", transactionId)
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+  if (activeEvChargeError) {
+    throw new Error(
+      `Unable to inspect EV charge allocation: ${activeEvChargeError.message}`,
+    );
+  }
 
   const { error } = await supabase
     .from("transactions")
@@ -460,6 +476,16 @@ export async function toggleTransactionStatusAction(
   if (deactivateGasError) {
     throw new Error(`Unable to clear gas allocation: ${deactivateGasError.message}`);
   }
+  const { error: deactivateEvChargeError } = await supabase
+    .from("ev_charge_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateEvChargeError) {
+    throw new Error(
+      `Unable to clear EV charge allocation: ${deactivateEvChargeError.message}`,
+    );
+  }
 
   revalidatePath("/");
   revalidatePath("/trends");
@@ -467,7 +493,7 @@ export async function toggleTransactionStatusAction(
   revalidatePath("/history");
 
   let dashboardData: DashboardData | null = null;
-  if (activeGasAllocation && transaction.day_id) {
+  if ((activeGasAllocation || activeEvChargeAllocation) && transaction.day_id) {
     const { data: day, error: dayError } = await supabase
       .from("days")
       .select("week_id")
@@ -560,6 +586,16 @@ export async function moveTransactionToYesterdayAction(
   if (deactivateGasError) {
     throw new Error(`Unable to clear gas allocation: ${deactivateGasError.message}`);
   }
+  const { error: deactivateEvChargeError } = await supabase
+    .from("ev_charge_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateEvChargeError) {
+    throw new Error(
+      `Unable to clear EV charge allocation: ${deactivateEvChargeError.message}`,
+    );
+  }
 
   revalidatePath("/");
   revalidatePath("/trends");
@@ -628,6 +664,16 @@ export async function moveTransactionToTomorrowAction(
     .eq("user_id", user.id);
   if (deactivateGasError) {
     throw new Error(`Unable to clear gas allocation: ${deactivateGasError.message}`);
+  }
+  const { error: deactivateEvChargeError } = await supabase
+    .from("ev_charge_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateEvChargeError) {
+    throw new Error(
+      `Unable to clear EV charge allocation: ${deactivateEvChargeError.message}`,
+    );
   }
 
   revalidatePath("/");
@@ -746,6 +792,16 @@ export async function amortizeTransactionAction(
   if (deactivateGasError) {
     throw new Error(`Unable to clear gas allocation: ${deactivateGasError.message}`);
   }
+  const { error: deactivateEvChargeError } = await supabase
+    .from("ev_charge_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateEvChargeError) {
+    throw new Error(
+      `Unable to clear EV charge allocation: ${deactivateEvChargeError.message}`,
+    );
+  }
 
   revalidatePath("/");
   revalidatePath("/trends");
@@ -755,19 +811,19 @@ export async function amortizeTransactionAction(
   return { ok: true, amortizedId: String((amortized as { id: string }).id) };
 }
 
-export async function allocateGasTransactionAction(
-  input: AllocateGasTransactionInput,
+export async function allocateEvChargeTransactionAction(
+  input: AllocateEvChargeTransactionInput,
 ): Promise<{
   ok: true;
   allocationId: string;
-  previousFillDate: string;
+  previousChargeDate: string;
   dashboardData: DashboardData;
 }> {
   const { supabase, user } = await requireUser();
   const transactionId = requireUuid(input.transactionId, "transactionId");
-  const gasAmountCents = requirePositiveInteger(
-    input.gasAmountCents,
-    "gasAmountCents",
+  const chargeAmountCents = requirePositiveInteger(
+    input.chargeAmountCents,
+    "chargeAmountCents",
   );
 
   const { data: transaction, error: transactionError } = await supabase
@@ -793,35 +849,40 @@ export async function allocateGasTransactionAction(
     day_id: string | null;
   };
   if (row.status !== "applied" || !row.day_id) {
-    throw new Error("Gas allocation requires an applied spending transaction.");
+    throw new Error("EV charging requires an applied spending transaction.");
   }
 
   const originalAmountCents = Math.round(Math.abs(Number(row.amount)) * 100);
   if (!Number.isFinite(originalAmountCents) || originalAmountCents <= 0) {
     throw new Error("Transaction has no positive amount to allocate.");
   }
-  if (gasAmountCents > originalAmountCents) {
-    throw new Error("Gas amount cannot exceed the transaction amount.");
+  if (chargeAmountCents > originalAmountCents) {
+    throw new Error("EV charge amount cannot exceed the transaction amount.");
   }
 
-  const fillDate = row.date;
-  const previousFillDate = input.previousFillDate
-    ? requirePastDate(input.previousFillDate, fillDate, "previousFillDate")
-    : await findPreviousGasFillDate(supabase, user.id, fillDate, transactionId);
-  const merchantName = String(row.merchant_name ?? "Gas").trim() || "Gas";
+  const chargeDate = row.date;
+  const previousChargeDate = input.previousChargeDate
+    ? requirePastDate(
+        input.previousChargeDate,
+        chargeDate,
+        "previousChargeDate",
+      )
+    : await findPreviousEvChargeDate(supabase, user.id, chargeDate);
+  const merchantName =
+    String(row.merchant_name ?? "EV Charge").trim() || "EV Charge";
 
   const { data: allocation, error: upsertError } = await supabase
-    .from("gas_allocations")
+    .from("ev_charge_allocations")
     .upsert(
       {
         user_id: user.id,
         source_transaction_id: transactionId,
         merchant_name: merchantName,
-        fill_date: fillDate,
-        previous_fill_date: previousFillDate,
-        gas_amount_cents: gasAmountCents,
+        charge_date: chargeDate,
+        previous_charge_date: previousChargeDate,
+        charge_amount_cents: chargeAmountCents,
         original_amount_cents: originalAmountCents,
-        remainder_amount_cents: originalAmountCents - gasAmountCents,
+        remainder_amount_cents: originalAmountCents - chargeAmountCents,
         is_active: true,
       },
       { onConflict: "source_transaction_id" },
@@ -830,7 +891,18 @@ export async function allocateGasTransactionAction(
     .single();
 
   if (upsertError) {
-    throw new Error(`Unable to allocate gas: ${upsertError.message}`);
+    throw new Error(`Unable to allocate EV charge: ${upsertError.message}`);
+  }
+
+  const { error: deactivateGasError } = await supabase
+    .from("gas_allocations")
+    .update({ is_active: false })
+    .eq("source_transaction_id", transactionId)
+    .eq("user_id", user.id);
+  if (deactivateGasError) {
+    throw new Error(
+      `Unable to clear historical gas allocation: ${deactivateGasError.message}`,
+    );
   }
 
   const { error: deactivateAmortizationError } = await supabase
@@ -852,7 +924,7 @@ export async function allocateGasTransactionAction(
     .single();
 
   if (dayError) {
-    throw new Error(`Unable to reload gas allocation week: ${dayError.message}`);
+    throw new Error(`Unable to reload EV charge week: ${dayError.message}`);
   }
 
   revalidatePath("/");
@@ -861,7 +933,7 @@ export async function allocateGasTransactionAction(
   return {
     ok: true,
     allocationId: String((allocation as { id: string }).id),
-    previousFillDate,
+    previousChargeDate,
     dashboardData: await getWeekDashboardData(String((day as { week_id: string }).week_id)),
   };
 }
@@ -1234,6 +1306,9 @@ export async function addManualTransactionAction(
       isGasAllocated: false,
       gasAllocatedCents: 0,
       gasRemainderCents: dollarsToCents(Number(row.amount)),
+      isEvChargeAllocated: false,
+      evChargeAllocatedCents: 0,
+      evChargeRemainderCents: dollarsToCents(Number(row.amount)),
       wasMovedToYesterday: false,
       date: row.date,
       time: null,
@@ -1429,7 +1504,7 @@ function requirePastDate(value: string, currentDate: string, fieldName: string) 
     throw new Error(`Invalid ${fieldName}. Use YYYY-MM-DD.`);
   }
   if (value >= currentDate) {
-    throw new Error("Previous gas date must be before the current gas date.");
+    throw new Error("Previous charge date must be before the current charge date.");
   }
   return value;
 }
@@ -1474,70 +1549,33 @@ function requireEnum<T extends string>(
   return matched;
 }
 
-const GAS_MERCHANT_PATTERN =
-  /\b(gas|fuel|shell|mobil|exxon|sunoco|citgo|bp|cumberland|valero|speedway|gulf|7-eleven|seven eleven|wawa)\b/i;
-
-async function findPreviousGasFillDate(
+async function findPreviousEvChargeDate(
   supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
   userId: string,
-  fillDate: string,
-  currentTransactionId: string,
+  chargeDate: string,
 ): Promise<string> {
   const { data: allocationData, error: allocationError } = await supabase
-    .from("gas_allocations")
-    .select("fill_date")
+    .from("ev_charge_allocations")
+    .select("charge_date")
     .eq("user_id", userId)
     .eq("is_active", true)
-    .lt("fill_date", fillDate)
-    .order("fill_date", { ascending: false })
+    .lt("charge_date", chargeDate)
+    .order("charge_date", { ascending: false })
     .limit(1);
   if (allocationError) {
-    throw new Error(`Unable to load gas history: ${allocationError.message}`);
+    throw new Error(
+      `Unable to load EV charge history: ${allocationError.message}`,
+    );
   }
 
   const priorAllocation = (allocationData ?? [])[0] as
-    | { fill_date: string }
+    | { charge_date: string }
     | undefined;
-  if (priorAllocation?.fill_date) {
-    return String(priorAllocation.fill_date);
+  if (priorAllocation?.charge_date) {
+    return String(priorAllocation.charge_date);
   }
 
-  const { data: transactionData, error: transactionError } = await supabase
-    .from("transactions")
-    .select("id,date,merchant_name,raw_name,category")
-    .eq("user_id", userId)
-    .eq("status", "applied")
-    .lt("date", fillDate)
-    .order("date", { ascending: false })
-    .order("datetime", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (transactionError) {
-    throw new Error(`Unable to load gas candidates: ${transactionError.message}`);
-  }
-
-  const priorGas = (
-    (transactionData ?? []) as {
-      id: string;
-      date: string;
-      merchant_name: string | null;
-      raw_name: string | null;
-      category: string | null;
-    }[]
-  ).find((transaction) => {
-    if (transaction.id === currentTransactionId) {
-      return false;
-    }
-    return GAS_MERCHANT_PATTERN.test(
-      [
-        transaction.merchant_name ?? "",
-        transaction.raw_name ?? "",
-        transaction.category ?? "",
-      ].join(" "),
-    );
-  });
-
-  return priorGas?.date ?? addDaysIso(fillDate, -1);
+  return addDaysIso(chargeDate, -1);
 }
 
 function centsToDollars(value: number): number {

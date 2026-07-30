@@ -31,7 +31,7 @@ import {
 
 import {
   addManualTransactionAction,
-  allocateGasTransactionAction,
+  allocateEvChargeTransactionAction,
   amortizeTransactionAction,
   closeWeekAction,
   deleteTransactionAction,
@@ -103,7 +103,8 @@ type WeekRecap = {
   cashflowCents: number;
   spendCents: number;
   earningsCents: number;
-  gasPerDayCents: number;
+  transportPerDayCents: number;
+  transportLabel: "Gas" | "EV charging";
   greenLineCents: number | null;
 };
 
@@ -493,7 +494,7 @@ export function DashboardEditor({
     setTransactionError(null);
     setSaveState("saving");
     setPendingTransactionIds((current) => new Set(current).add(transaction.id));
-    if (!transaction.isGasAllocated) {
+    if (!transaction.isGasAllocated && !transaction.isEvChargeAllocated) {
       setDays((currentDays) =>
         currentDays.map((day) =>
           day.id === transaction.dayId
@@ -768,18 +769,23 @@ export function DashboardEditor({
     }
   }
 
-  async function allocateGasTransaction(
+  async function allocateEvChargeTransaction(
     transaction: DashboardTransaction,
-    gasAmountCents: number,
-    previousFillDate: string | null,
+    chargeAmountCents: number,
+    previousChargeDate: string | null,
   ) {
     if (!shiftsEditable) return; // transactions follow the same edit gate as shifts
     if (pendingTransactionIds.has(transaction.id)) {
       return;
     }
 
-    if (gasAmountCents <= 0 || gasAmountCents > transaction.originalAmountCents) {
-      setTransactionError("Gas amount must be above $0 and no more than the transaction.");
+    if (
+      chargeAmountCents <= 0 ||
+      chargeAmountCents > transaction.originalAmountCents
+    ) {
+      setTransactionError(
+        "EV charge amount must be above $0 and no more than the transaction.",
+      );
       return;
     }
 
@@ -787,10 +793,10 @@ export function DashboardEditor({
     setSaveState("saving");
     setPendingTransactionIds((current) => new Set(current).add(transaction.id));
     try {
-      const result = await allocateGasTransactionAction({
+      const result = await allocateEvChargeTransactionAction({
         transactionId: transaction.id,
-        gasAmountCents,
-        previousFillDate,
+        chargeAmountCents,
+        previousChargeDate,
       });
       setDays(result.dashboardData.days);
       lastSavedAt.current = Date.now();
@@ -804,7 +810,7 @@ export function DashboardEditor({
     } catch (error) {
       setSaveState("error");
       setTransactionError(
-        error instanceof Error ? error.message : "Unable to allocate gas.",
+        error instanceof Error ? error.message : "Unable to allocate EV charge.",
       );
     } finally {
       setPendingTransactionIds((current) => {
@@ -839,6 +845,9 @@ export function DashboardEditor({
       isGasAllocated: false,
       gasAllocatedCents: 0,
       gasRemainderCents: amountCents,
+      isEvChargeAllocated: false,
+      evChargeAllocatedCents: 0,
+      evChargeRemainderCents: amountCents,
       wasMovedToYesterday: false,
       date: day.date,
       time: null,
@@ -1113,15 +1122,23 @@ export function DashboardEditor({
         storedLine != null && Number.isFinite(Number(storedLine)) && Number(storedLine) > 0
           ? Number(storedLine)
           : DEFAULT_GREEN_LINE_CENTS;
-      const gasPerDayCents = days.some((day) => day.gasSpendCents > 0)
-        ? initialData.gasAverageDailyCents
-        : 0;
+      const evChargeTotalCents = days.reduce(
+        (total, day) => total + day.evChargeSpendCents,
+        0,
+      );
+      const usesEvCharging = evChargeTotalCents > 0;
+      const transportPerDayCents = usesEvCharging
+        ? Math.round(evChargeTotalCents / Math.max(days.length, 1))
+        : days.some((day) => day.gasSpendCents > 0)
+          ? initialData.gasAverageDailyCents
+          : 0;
       setRecap({
         weekLabel: `Week of ${formatShortDate(initialData.week.startDate)}`,
         cashflowCents: weekTotals.cashflowCents,
         spendCents: weekTotals.spendCents,
         earningsCents: weekTotals.earningsCents,
-        gasPerDayCents,
+        transportPerDayCents,
+        transportLabel: usesEvCharging ? "EV charging" : "Gas",
         greenLineCents,
       });
       router.refresh();
@@ -1293,7 +1310,6 @@ export function DashboardEditor({
             <FocusedDayEditor
               day={focusedDay}
               expandedSlotIndex={expandedSlotIndex}
-              hideGasLine={initialData.gasArchived}
               isManualTransactionPending={pendingManualDayIds.has(focusedDay.id)}
               pendingTransactionIds={pendingTransactionIds}
               settings={initialData.settings}
@@ -1302,7 +1318,7 @@ export function DashboardEditor({
               onAddShift={addShift}
               onAddManualTransaction={addManualTransaction}
               onAmortizeTransaction={amortizeTransaction}
-              onAllocateGasTransaction={allocateGasTransaction}
+              onAllocateEvChargeTransaction={allocateEvChargeTransaction}
               onDeleteTransaction={deleteTransaction}
               onMoveTransactionToYesterday={moveTransactionToYesterday}
               onMoveTransactionToTomorrow={moveTransactionToTomorrow}
@@ -1480,6 +1496,14 @@ function SpendBreakdownPanel({
       key: "__gas",
       label: "Incl. Gas",
       cents: breakdown.gasCents,
+      gas: true,
+    });
+  }
+  if (breakdown.evChargeCents !== 0) {
+    rows.push({
+      key: "__ev_charge",
+      label: "Incl. EV charging",
+      cents: breakdown.evChargeCents,
       gas: true,
     });
   }
@@ -1834,7 +1858,6 @@ function FocusedDayEditor({
   day,
   totals,
   expandedSlotIndex,
-  hideGasLine,
   isManualTransactionPending,
   pendingTransactionIds,
   settings,
@@ -1848,7 +1871,7 @@ function FocusedDayEditor({
   onMoveTransactionToTomorrow,
   onRenameTransaction,
   onAmortizeTransaction,
-  onAllocateGasTransaction,
+  onAllocateEvChargeTransaction,
   onAddShift,
   onRemoveSlot,
   onReorderSlots,
@@ -1856,7 +1879,6 @@ function FocusedDayEditor({
   day: DashboardDay;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
   expandedSlotIndex: number | null;
-  hideGasLine: boolean;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
   settings: PaySettings;
@@ -1887,10 +1909,10 @@ function FocusedDayEditor({
     transaction: DashboardTransaction,
     months: 1 | 3,
   ) => void;
-  onAllocateGasTransaction: (
+  onAllocateEvChargeTransaction: (
     transaction: DashboardTransaction,
-    gasAmountCents: number,
-    previousFillDate: string | null,
+    chargeAmountCents: number,
+    previousChargeDate: string | null,
   ) => void;
   onAddShift: (day: DashboardDay) => void;
   onRemoveSlot: (slot: DashboardSlot) => void;
@@ -1917,11 +1939,10 @@ function FocusedDayEditor({
         <TransactionDrawer
           day={day}
           error={transactionError}
-          hideGasLine={hideGasLine}
           isManualTransactionPending={isManualTransactionPending}
           pendingTransactionIds={pendingTransactionIds}
           onAddManualTransaction={onAddManualTransaction}
-          onAllocateGasTransaction={onAllocateGasTransaction}
+          onAllocateEvChargeTransaction={onAllocateEvChargeTransaction}
           onAmortizeTransaction={onAmortizeTransaction}
           onDeleteTransaction={onDeleteTransaction}
           onMoveTransactionToYesterday={onMoveTransactionToYesterday}
@@ -1937,7 +1958,6 @@ function FocusedDayEditor({
 function TransactionDrawer({
   day,
   error,
-  hideGasLine,
   isManualTransactionPending,
   pendingTransactionIds,
   onToggleTransactionStatus,
@@ -1946,12 +1966,11 @@ function TransactionDrawer({
   onMoveTransactionToTomorrow,
   onRenameTransaction,
   onAmortizeTransaction,
-  onAllocateGasTransaction,
+  onAllocateEvChargeTransaction,
   onAddManualTransaction,
 }: {
   day: DashboardDay;
   error: string | null;
-  hideGasLine: boolean;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
   onToggleTransactionStatus: (
@@ -1969,10 +1988,10 @@ function TransactionDrawer({
     transaction: DashboardTransaction,
     months: 1 | 3,
   ) => void;
-  onAllocateGasTransaction: (
+  onAllocateEvChargeTransaction: (
     transaction: DashboardTransaction,
-    gasAmountCents: number,
-    previousFillDate: string | null,
+    chargeAmountCents: number,
+    previousChargeDate: string | null,
   ) => void;
   onAddManualTransaction: (
     day: DashboardDay,
@@ -2017,7 +2036,8 @@ function TransactionDrawer({
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <TransactionColumn
           heading="SPENDING"
-          gasSpendCents={hideGasLine ? 0 : day.gasSpendCents}
+          evChargeSpendCents={day.evChargeSpendCents}
+          gasSpendCents={day.gasSpendCents}
           pendingTransactionIds={pendingTransactionIds}
           transactions={spendingTransactions}
           variant="spending"
@@ -2025,7 +2045,7 @@ function TransactionDrawer({
           onMoveToYesterday={onMoveTransactionToYesterday}
           onMoveToTomorrow={onMoveTransactionToTomorrow}
           onRename={onRenameTransaction}
-          onAllocateGas={onAllocateGasTransaction}
+          onAllocateEvCharge={onAllocateEvChargeTransaction}
           onAmortize={onAmortizeTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "excluded")
@@ -2041,7 +2061,7 @@ function TransactionDrawer({
           onMoveToYesterday={onMoveTransactionToYesterday}
           onMoveToTomorrow={onMoveTransactionToTomorrow}
           onRename={onRenameTransaction}
-          onAllocateGas={onAllocateGasTransaction}
+          onAllocateEvCharge={onAllocateEvChargeTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "applied")
           }
@@ -2113,9 +2133,10 @@ function TransactionColumn({
   onMoveToTomorrow,
   onRename,
   onToggle,
-  onAllocateGas,
+  onAllocateEvCharge,
   onAmortize,
   gasSpendCents,
+  evChargeSpendCents,
   collapsible,
 }: {
   heading: string;
@@ -2127,13 +2148,14 @@ function TransactionColumn({
   onMoveToTomorrow: (transaction: DashboardTransaction) => void;
   onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
-  onAllocateGas?: (
+  onAllocateEvCharge?: (
     transaction: DashboardTransaction,
-    gasAmountCents: number,
-    previousFillDate: string | null,
+    chargeAmountCents: number,
+    previousChargeDate: string | null,
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
   gasSpendCents?: number;
+  evChargeSpendCents?: number;
   // Collapsed by default -- a header you tap to reveal the list, so a column
   // you rarely need to look at doesn't sit open in your field of view.
   collapsible?: boolean;
@@ -2141,7 +2163,12 @@ function TransactionColumn({
   const [isOpen, setIsOpen] = useState(!collapsible);
   const showGasRow =
     variant === "spending" && !!gasSpendCents && gasSpendCents > 0;
-  const count = transactions.length + (showGasRow ? 1 : 0);
+  const showEvChargeRow =
+    variant === "spending" &&
+    !!evChargeSpendCents &&
+    evChargeSpendCents > 0;
+  const count =
+    transactions.length + (showGasRow ? 1 : 0) + (showEvChargeRow ? 1 : 0);
   return (
     <div className="min-h-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3">
       {collapsible ? (
@@ -2199,6 +2226,24 @@ function TransactionColumn({
             </div>
           </div>
         ) : null}
+        {showEvChargeRow ? (
+          <div
+            className="flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2"
+            title="Today's exact EV charging share in the spending ledger."
+          >
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium text-sky-500">
+                EV Charge
+              </div>
+              <div className="text-[11px] text-[var(--text-tertiary)]">
+                Today&apos;s charging share
+              </div>
+            </div>
+            <div className="shrink-0 text-sm font-semibold tabular-nums text-sky-500">
+              {formatMoney(evChargeSpendCents ?? 0)}
+            </div>
+          </div>
+        ) : null}
         {transactions.map((transaction) => (
           <TransactionRowButton
             key={transaction.id}
@@ -2210,7 +2255,7 @@ function TransactionColumn({
             onMoveToTomorrow={onMoveToTomorrow}
             onRename={onRename}
             onToggle={onToggle}
-            onAllocateGas={onAllocateGas}
+            onAllocateEvCharge={onAllocateEvCharge}
             onAmortize={onAmortize}
           />
         ))}
@@ -2263,9 +2308,10 @@ function WeekRecapModal({
           <RecapStat label="Spent" value={formatMoney(recap.spendCents)} />
           <RecapStat label="Cashflow" value={formatMoney(recap.cashflowCents)} />
         </div>
-        {recap.gasPerDayCents > 0 ? (
+        {recap.transportPerDayCents > 0 ? (
           <p className="mt-3 text-xs text-[var(--text-tertiary)]">
-            Gas ran {formatMoney(recap.gasPerDayCents)}/day this week.
+            {recap.transportLabel} ran{" "}
+            {formatMoney(recap.transportPerDayCents)}/day this week.
           </p>
         ) : null}
         <button
@@ -2466,7 +2512,7 @@ function TransactionRowButton({
   onMoveToTomorrow,
   onRename,
   onToggle,
-  onAllocateGas,
+  onAllocateEvCharge,
   onAmortize,
 }: {
   transaction: DashboardTransaction;
@@ -2477,10 +2523,10 @@ function TransactionRowButton({
   onMoveToTomorrow: (transaction: DashboardTransaction) => void;
   onRename: (transaction: DashboardTransaction, merchantName: string) => void;
   onToggle: (transaction: DashboardTransaction) => void;
-  onAllocateGas?: (
+  onAllocateEvCharge?: (
     transaction: DashboardTransaction,
-    gasAmountCents: number,
-    previousFillDate: string | null,
+    chargeAmountCents: number,
+    previousChargeDate: string | null,
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
 }) {
@@ -2488,18 +2534,20 @@ function TransactionRowButton({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(transaction.merchantName);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [isGasEditing, setIsGasEditing] = useState(false);
-  const [gasAmountValue, setGasAmountValue] = useState(
+  const [isEvChargeEditing, setIsEvChargeEditing] = useState(false);
+  const [evChargeAmountValue, setEvChargeAmountValue] = useState(
     formatCentsForInput(
-      transaction.isGasAllocated
-        ? transaction.gasAllocatedCents
+      transaction.isEvChargeAllocated
+        ? transaction.evChargeAllocatedCents
         : transaction.originalAmountCents,
     ),
   );
   const isAmortizedExempt = variant === "exempt" && transaction.isAmortized;
   const isGasExempt = variant === "exempt" && transaction.isGasAllocated;
+  const isEvChargeExempt =
+    variant === "exempt" && transaction.isEvChargeAllocated;
   const rowStyle =
-    isAmortizedExempt || isGasExempt
+    isAmortizedExempt || isGasExempt || isEvChargeExempt
       ? {
           backgroundColor: "rgba(37, 99, 235, 0.12)",
           borderColor: "rgba(96, 165, 250, 0.48)",
@@ -2514,15 +2562,14 @@ function TransactionRowButton({
     setIsRenaming(false);
   }
 
-  function submitGasAllocation(event: FormEvent<HTMLFormElement>) {
+  function submitEvChargeAllocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const gasAmountCents = dollarsToCents(parsePositiveNumber(gasAmountValue));
-    // Previous fill date is always auto-derived server-side (last gas
-    // allocation -> last gas-pattern transaction -> day before).
-    onAllocateGas?.(transaction, gasAmountCents, null);
-    setIsGasEditing(false);
+    const chargeAmountCents = dollarsToCents(
+      parsePositiveNumber(evChargeAmountValue),
+    );
+    onAllocateEvCharge?.(transaction, chargeAmountCents, null);
+    setIsEvChargeEditing(false);
   }
-
   return (
     <div
       className="overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-sm shadow-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
@@ -2540,7 +2587,7 @@ function TransactionRowButton({
               className={
                 isAmortizedExempt
                   ? "truncate font-semibold text-sky-200 line-through"
-                  : isGasExempt
+                  : isGasExempt || isEvChargeExempt
                     ? "truncate font-semibold text-sky-200"
                   : variant === "exempt"
                   ? "truncate font-semibold text-[var(--text-muted)] line-through"
@@ -2552,6 +2599,11 @@ function TransactionRowButton({
             {isGasExempt ? (
               <span className="shrink-0 rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-500">
                 Gas
+              </span>
+            ) : null}
+            {isEvChargeExempt ? (
+              <span className="shrink-0 rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-500">
+                EV Charge
               </span>
             ) : null}
           </span>
@@ -2569,7 +2621,7 @@ function TransactionRowButton({
           className={
             isAmortizedExempt
               ? "font-semibold text-sky-200 line-through"
-              : isGasExempt
+              : isGasExempt || isEvChargeExempt
                 ? "font-semibold text-sky-200"
               : variant === "exempt"
               ? "font-semibold text-[var(--text-tertiary)] line-through"
@@ -2584,43 +2636,55 @@ function TransactionRowButton({
         <div className="border-t border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2">
           {isGasExempt ? (
             <div className="mb-2 rounded-md border border-sky-400/40 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold text-sky-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]">
-              Gas {formatMoneyExact(transaction.gasAllocatedCents)} averaged across
-              your gas history as daily spend; {formatMoneyExact(transaction.gasRemainderCents)} remains ordinary spending.
+              Archived gas {formatMoneyExact(transaction.gasAllocatedCents)}.
+              Its historical daily average is frozen through July 30, 2026.
             </div>
           ) : null}
-          {isGasEditing ? (
+          {isEvChargeExempt ? (
+            <div className="mb-2 rounded-md border border-sky-400/40 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold text-sky-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]">
+              EV charge {formatMoneyExact(transaction.evChargeAllocatedCents)} is
+              averaged as daily spend;{" "}
+              {formatMoneyExact(transaction.evChargeRemainderCents)} remains
+              ordinary spending.
+            </div>
+          ) : null}
+          {isEvChargeEditing ? (
             <form
               className="mb-2 grid gap-2 rounded-md border border-sky-400/40 bg-sky-500/15 p-2 sm:grid-cols-[1fr_auto]"
-              onSubmit={submitGasAllocation}
+              onSubmit={submitEvChargeAllocation}
             >
               <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-200">
-                Gas $
+                EV charge $
                 <input
                   className="mt-1 block h-8 w-full rounded-md border border-sky-400/40 bg-[var(--surface-base)] px-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-sky-300"
                   disabled={disabled}
                   inputMode="decimal"
-                  onChange={(event) => setGasAmountValue(event.target.value)}
-                  value={gasAmountValue}
+                  onChange={(event) =>
+                    setEvChargeAmountValue(event.target.value)
+                  }
+                  value={evChargeAmountValue}
                 />
               </label>
               <div className="flex items-end gap-2">
                 <button
                   className="h-8 rounded-md border border-sky-400/40 bg-[var(--surface-base)] px-2.5 text-xs font-semibold text-[var(--text-primary)] transition hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={disabled || parsePositiveNumber(gasAmountValue) <= 0}
+                  disabled={
+                    disabled || parsePositiveNumber(evChargeAmountValue) <= 0
+                  }
                   type="submit"
                 >
                   Save
                 </button>
                 <button
                   className="h-8 rounded-md px-2.5 text-xs font-semibold text-sky-200 transition hover:text-[var(--text-primary)]"
-                  onClick={() => setIsGasEditing(false)}
+                  onClick={() => setIsEvChargeEditing(false)}
                   type="button"
                 >
                   Cancel
                 </button>
               </div>
               <p className="text-[10px] text-sky-200 sm:col-span-2">
-                Averages across every day since your first fill — your true daily gas cost.
+                Averages across every day since your first tracked charge.
               </p>
             </form>
           ) : null}
@@ -2651,116 +2715,132 @@ function TransactionRowButton({
               </button>
             </form>
           ) : null}
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={disabled}
-              onClick={() => {
-                setRenameValue(transaction.merchantName);
-                setIsRenaming(true);
-              }}
-              type="button"
-            >
-              Rename
-            </button>
-            <button
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={disabled}
-            onClick={() => onToggle(transaction)}
-            type="button"
-          >
-            {isGasExempt ? "Remove gas" : variant === "exempt" ? "Include" : "Exempt"}
-          </button>
-          <button
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={disabled}
-            onClick={() => onMoveToYesterday(transaction)}
-            type="button"
-          >
-            Move to yesterday
-          </button>
-          {transaction.wasMovedToYesterday ? (
-            <button
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={disabled}
-              onClick={() => onMoveToTomorrow(transaction)}
-              type="button"
-            >
-              Move to tomorrow
-            </button>
-          ) : null}
-          {onAllocateGas &&
-          ((variant === "spending" && !transaction.isGasAllocated) ||
-            isGasExempt) ? (
-            <button
-              className="rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-warning-text)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={disabled}
-              onClick={() => {
-                const next = !isGasEditing;
-                if (next) {
-                  setGasAmountValue(
-                    formatCentsForInput(
-                      transaction.isGasAllocated
-                        ? transaction.gasAllocatedCents
-                        : transaction.originalAmountCents,
-                    ),
-                  );
-                }
-                setIsGasEditing(next);
-                setIsRenaming(false);
-              }}
-              title="Spread the gas part as daily spend; any extra stays on this day."
-              type="button"
-            >
-              {isGasExempt ? "Edit gas" : "Gas"}
-            </button>
-          ) : null}
-          {variant === "spending" &&
-          onAmortize &&
-          !transaction.isGasAllocated ? (
-            <>
+          {isGasExempt ? (
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+              Archived record
+            </span>
+          ) : (
+            <div className="flex flex-wrap gap-2">
               <button
                 className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled}
-                onClick={() => onAmortize(transaction, 1)}
-                title="Spread this cost across fixed costs over 1 month, then expire."
+                onClick={() => {
+                  setRenameValue(transaction.merchantName);
+                  setIsRenaming(true);
+                }}
                 type="button"
               >
-                Amort 1mo
+                Rename
               </button>
               <button
                 className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled}
-                onClick={() => onAmortize(transaction, 3)}
-                title="Spread this cost across fixed costs over 3 months, then expire."
+                onClick={() => onToggle(transaction)}
                 type="button"
               >
-                Amort 3mo
+                {isEvChargeExempt
+                  ? "Remove EV charge"
+                  : variant === "exempt"
+                    ? "Include"
+                    : "Exempt"}
               </button>
-            </>
-          ) : null}
-          <button
-            className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-              confirmingDelete
-                ? "border-red-400 bg-red-500/90 text-white hover:bg-red-500"
-                : "border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] text-[var(--accent-negative-text)] hover:bg-[var(--surface-hover)]"
-            }`}
-            disabled={disabled}
-            onClick={() => {
-              // Two-tap inline confirm (window.confirm is dead on installed apps).
-              if (!confirmingDelete) {
-                setConfirmingDelete(true);
-                window.setTimeout(() => setConfirmingDelete(false), 4000);
-                return;
-              }
-              setConfirmingDelete(false);
-              onDelete(transaction);
-            }}
-            type="button"
-          >
-            {confirmingDelete ? "Tap again" : "Delete"}
-          </button>
-          </div>
+              <button
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                onClick={() => onMoveToYesterday(transaction)}
+                type="button"
+              >
+                Move to yesterday
+              </button>
+              {transaction.wasMovedToYesterday ? (
+                <button
+                  className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={disabled}
+                  onClick={() => onMoveToTomorrow(transaction)}
+                  type="button"
+                >
+                  Move to tomorrow
+                </button>
+              ) : null}
+              {onAllocateEvCharge &&
+              ((variant === "spending" &&
+                !transaction.isGasAllocated &&
+                !transaction.isEvChargeAllocated) ||
+                isEvChargeExempt) ? (
+                <button
+                  className="rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-warning-text)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={disabled}
+                  onClick={() => {
+                    const next = !isEvChargeEditing;
+                    if (next) {
+                      setEvChargeAmountValue(
+                        formatCentsForInput(
+                          transaction.isEvChargeAllocated
+                            ? transaction.evChargeAllocatedCents
+                            : transaction.originalAmountCents,
+                        ),
+                      );
+                    }
+                    setIsEvChargeEditing(next);
+                    setIsRenaming(false);
+                  }}
+                  title="Spread the EV charging part as daily spend; any extra stays on this day."
+                  type="button"
+                >
+                  {isEvChargeExempt ? "Edit EV charge" : "EV Charge"}
+                </button>
+              ) : null}
+              {variant === "spending" &&
+              onAmortize &&
+              !transaction.isGasAllocated &&
+              !transaction.isEvChargeAllocated ? (
+                <>
+                  <button
+                    className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={disabled}
+                    onClick={() => onAmortize(transaction, 1)}
+                    title="Spread this cost across fixed costs over 1 month, then expire."
+                    type="button"
+                  >
+                    Amort 1mo
+                  </button>
+                  <button
+                    className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={disabled}
+                    onClick={() => onAmortize(transaction, 3)}
+                    title="Spread this cost across fixed costs over 3 months, then expire."
+                    type="button"
+                  >
+                    Amort 3mo
+                  </button>
+                </>
+              ) : null}
+              <button
+                className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  confirmingDelete
+                    ? "border-red-400 bg-red-500/90 text-white hover:bg-red-500"
+                    : "border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] text-[var(--accent-negative-text)] hover:bg-[var(--surface-hover)]"
+                }`}
+                disabled={disabled}
+                onClick={() => {
+                  // Two-tap inline confirm (window.confirm is dead on installed apps).
+                  if (!confirmingDelete) {
+                    setConfirmingDelete(true);
+                    window.setTimeout(
+                      () => setConfirmingDelete(false),
+                      4000,
+                    );
+                    return;
+                  }
+                  setConfirmingDelete(false);
+                  onDelete(transaction);
+                }}
+                type="button"
+              >
+                {confirmingDelete ? "Tap again" : "Delete"}
+              </button>
+            </div>
+          )}
         </div>
       ) : null}
     </div>
@@ -3842,6 +3922,7 @@ type SpendBreakdown = {
   manualCents: number;
   otherCents: number;
   gasCents: number;
+  evChargeCents: number;
 };
 
 // Decompose the week's Spend into the parts that produce it. The displayed Spend
@@ -3853,11 +3934,13 @@ function buildSpendBreakdown(days: DashboardDay[]): SpendBreakdown {
   let transactionsCents = 0;
   let manualCents = 0;
   let gasCents = 0;
+  let evChargeCents = 0;
   const byCategory = new Map<string, number>();
   for (const day of days) {
     transactionsCents += day.transactionSpendCents;
     manualCents += day.spendCents;
     gasCents += day.gasSpendCents;
+    evChargeCents += day.evChargeSpendCents;
     for (const transaction of day.appliedTransactions) {
       const key = transaction.category ?? "UNCATEGORIZED";
       byCategory.set(key, (byCategory.get(key) ?? 0) + transaction.amountCents);
@@ -3876,11 +3959,15 @@ function buildSpendBreakdown(days: DashboardDay[]): SpendBreakdown {
     transactionsCents,
     manualCents,
     gasCents,
+    evChargeCents,
     // transaction_spend_total already folds in the daily gas slice (the fill's gas
     // is carved out of its source transaction and redistributed across the tank's
     // days), so gas lives inside the transactions component. Surface it as its own
-    // "Incl. Gas" row and subtract it from Other so the rows still reconcile.
-    otherCents: transactionsCents - categorizedCents - gasCents,
+    // Transport energy is already inside transactionSpendCents. Pull both
+    // overlays into named rows and subtract them from Other so the panel
+    // remains exact.
+    otherCents:
+      transactionsCents - categorizedCents - gasCents - evChargeCents,
   };
 }
 

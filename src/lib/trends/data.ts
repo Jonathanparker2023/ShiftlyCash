@@ -1,12 +1,6 @@
 import { requireUserWithBootstrapStatus } from "@/lib/auth";
 import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { dollarsToCents } from "@/lib/domain/money";
-import {
-  calculateEvCharging,
-  DEFAULT_EV_CHARGING_SETTINGS,
-  type EvChargingResult,
-  type EvChargingSettings,
-} from "@/lib/ev/charging";
 import { calculateGasAverage } from "@/lib/gas/average";
 
 type NumericValue = number | string | null;
@@ -39,85 +33,71 @@ type GasAllocationRow = {
   id: string;
   merchant_name: string;
   fill_date: string;
-  previous_fill_date: string;
   start_date: string | null;
   gas_amount_cents: NumericValue;
-  is_active: boolean;
   created_at: string;
   updated_at: string;
 };
 
-type EvChargingSettingsRow = {
-  efficiency_wh_per_mi: NumericValue;
-  free_hours_per_week: NumericValue;
-  free_mi_per_hour: NumericValue;
-  home_rate_cents_per_kwh: NumericValue;
-  public_rate_cents_per_kwh: NumericValue;
-  charging_loss_pct: NumericValue;
-  typical_miles_per_week: NumericValue;
-  explorer_mpg: NumericValue;
-  gas_price_per_gal_cents: NumericValue;
-  gas_archived: boolean;
+type EvChargeAllocationRow = {
+  id: string;
+  merchant_name: string;
+  charge_date: string;
+  start_date: string | null;
+  charge_amount_cents: NumericValue;
+  created_at: string;
+  updated_at: string;
 };
 
-type EvChargingWeekRow = {
-  miles_driven: NumericValue;
-};
-
-export type TrendsGasTracker =
+export type TrendsEnergyTracker =
   | {
-      status: "waiting_for_fill";
+      status: "waiting";
     }
   | {
       status: "active";
-      allocationId: string;
-      merchantName: string;
-      previousFillDate: string;
-      // Whole-history converging average — the "true daily gas cost" headline.
       periodStartDate: string;
       periodEndDate: string;
       periodDays: number;
-      gasAmountCents: number;
-      averageDailyGasCents: number;
+      totalCents: number;
+      averageDailyCents: number;
       updatedAt: string;
-      fills: Array<{
+      events: Array<{
         id: string;
-        fillDate: string;
+        date: string;
         merchantName: string;
-        gasAmountCents: number;
+        amountCents: number;
       }>;
-      // Rolling-window practical metrics (task: gas metrics upgrade).
       last7d: {
         totalCents: number;
         avgPerDayCents: number;
-        fillUps: number;
+        eventCount: number;
       };
       last30d: {
         totalCents: number;
         avgPerDayCents: number;
-        fillUps: number;
-        highestFillCents: number;
-        avgPerFillCents: number;
+        eventCount: number;
+        highestEventCents: number;
+        avgPerEventCents: number;
       };
     };
 
-export type TrendsEvCharging = EvChargingResult & {
-  weekId: string | null;
-  settings: EvChargingSettings;
-  usesTypicalMiles: boolean;
-};
-
 export type TrendsData = {
   weeks: TrendsWeek[];
-  gasTracker: TrendsGasTracker;
-  evCharging: TrendsEvCharging;
+  gasEndedOn: string | null;
+  gasTracker: TrendsEnergyTracker;
+  evChargeTracker: TrendsEnergyTracker;
 };
 
 export async function getTrendsData(): Promise<TrendsData> {
   const { supabase, user } = await requireUserWithBootstrapStatus();
   const todayIso = getTodayIso();
 
-  const [{ data, error }, { data: gasData, error: gasError }] = await Promise.all([
+  const [
+    { data: weekData, error: weekError },
+    { data: gasData, error: gasError },
+    { data: evData, error: evError },
+    { data: settingsData, error: settingsError },
+  ] = await Promise.all([
     supabase
       .from("v_week_totals")
       .select(
@@ -128,46 +108,155 @@ export async function getTrendsData(): Promise<TrendsData> {
     supabase
       .from("gas_allocations")
       .select(
-        "id,merchant_name,fill_date,previous_fill_date,start_date,gas_amount_cents,is_active,created_at,updated_at",
+        "id,merchant_name,fill_date,start_date,gas_amount_cents,created_at,updated_at",
       )
       .eq("user_id", user.id)
       .eq("is_active", true)
       .order("fill_date", { ascending: false })
       .order("updated_at", { ascending: false }),
+    supabase
+      .from("ev_charge_allocations")
+      .select(
+        "id,merchant_name,charge_date,start_date,charge_amount_cents,created_at,updated_at",
+      )
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .order("charge_date", { ascending: false })
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("transport_energy_settings")
+      .select("gas_ended_on")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
 
-  if (error) {
-    throw new Error(`Unable to load trends: ${error.message}`);
+  if (weekError) {
+    throw new Error(`Unable to load trends: ${weekError.message}`);
   }
   if (gasError) {
-    throw new Error(`Unable to load gas tracker: ${gasError.message}`);
+    throw new Error(`Unable to load gas history: ${gasError.message}`);
+  }
+  if (evError) {
+    throw new Error(`Unable to load EV charge history: ${evError.message}`);
+  }
+  if (settingsError) {
+    throw new Error(
+      `Unable to load transport settings: ${settingsError.message}`,
+    );
   }
 
-  const weeks = ((data ?? []) as WeekTotalRow[]).map(mapTrendsWeek);
-  const currentWeek =
-    weeks.find(
-      (week) => week.startDate <= todayIso && week.endDate >= todayIso,
-    ) ??
-    weeks.find((week) => week.status === "active") ??
-    weeks.at(-1) ??
+  const gasEndedOn =
+    (settingsData as { gas_ended_on?: string | null } | null)?.gas_ended_on ??
     null;
-  const settings = await loadEvChargingSettings(supabase, user.id);
-  const explicitMiles = currentWeek
-    ? await loadEvChargingWeekMiles(supabase, user.id, currentWeek.weekId)
-    : null;
-  const milesDriven = explicitMiles ?? settings.typicalMilesPerWeek;
 
   return {
-    weeks,
-    gasTracker: mapGasTracker((gasData ?? []) as GasAllocationRow[], todayIso),
-    evCharging: {
-      weekId: currentWeek?.weekId ?? null,
-      settings,
-      usesTypicalMiles: explicitMiles === null,
-      ...calculateEvCharging({
-        ...settings,
-        milesDriven,
-      }),
+    weeks: ((weekData ?? []) as WeekTotalRow[]).map(mapTrendsWeek),
+    gasEndedOn,
+    gasTracker: mapEnergyTracker(
+      ((gasData ?? []) as GasAllocationRow[]).map((row) => ({
+        id: row.id,
+        date: row.fill_date,
+        startDate: row.start_date,
+        merchantName: row.merchant_name,
+        amountCents: Math.round(toNumber(row.gas_amount_cents)),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+      gasEndedOn ?? todayIso,
+    ),
+    evChargeTracker: mapEnergyTracker(
+      ((evData ?? []) as EvChargeAllocationRow[]).map((row) => ({
+        id: row.id,
+        date: row.charge_date,
+        startDate: row.start_date,
+        merchantName: row.merchant_name,
+        amountCents: Math.round(toNumber(row.charge_amount_cents)),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+      todayIso,
+    ),
+  };
+}
+
+type EnergyEvent = {
+  id: string;
+  date: string;
+  startDate: string | null;
+  merchantName: string;
+  amountCents: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function mapEnergyTracker(
+  events: EnergyEvent[],
+  periodEndDate: string,
+): TrendsEnergyTracker {
+  if (events.length === 0) {
+    return { status: "waiting" };
+  }
+
+  const average = calculateGasAverage(
+    events.map((event) => ({
+      gasAmountCents: event.amountCents,
+      startDate: event.startDate,
+      fillDate: event.date,
+    })),
+    periodEndDate,
+  );
+  if (!average) {
+    return { status: "waiting" };
+  }
+
+  const eventsIn = (fromIso: string) =>
+    events.filter(
+      (event) => event.date >= fromIso && event.date <= periodEndDate,
+    );
+  const events7d = eventsIn(addDaysIso(periodEndDate, -6));
+  const events30d = eventsIn(addDaysIso(periodEndDate, -29));
+  const sumEvents = (rows: EnergyEvent[]) =>
+    rows.reduce((total, event) => total + event.amountCents, 0);
+  const total7d = sumEvents(events7d);
+  const total30d = sumEvents(events30d);
+  const sortedEvents = [...events].sort(
+    (left, right) =>
+      right.date.localeCompare(left.date) ||
+      right.updatedAt.localeCompare(left.updatedAt),
+  );
+  const latest = sortedEvents[0];
+
+  return {
+    status: "active",
+    periodStartDate: average.firstDate,
+    periodEndDate,
+    periodDays: average.periodDays,
+    totalCents: average.totalCents,
+    averageDailyCents: average.dailyAverageCents,
+    updatedAt: latest.updatedAt ?? latest.createdAt,
+    events: sortedEvents.map((event) => ({
+      id: event.id,
+      date: event.date,
+      merchantName: event.merchantName,
+      amountCents: event.amountCents,
+    })),
+    last7d: {
+      totalCents: total7d,
+      avgPerDayCents: Math.round(total7d / 7),
+      eventCount: events7d.length,
+    },
+    last30d: {
+      totalCents: total30d,
+      avgPerDayCents: Math.round(total30d / 30),
+      eventCount: events30d.length,
+      highestEventCents:
+        events30d.length > 0
+          ? Math.max(...events30d.map((event) => event.amountCents))
+          : 0,
+      avgPerEventCents:
+        events30d.length > 0
+          ? Math.round(total30d / events30d.length)
+          : Math.round(average.totalCents / events.length),
     },
   };
 }
@@ -193,193 +282,4 @@ function toNumber(value: NumericValue): number {
 
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-type TrendsSupabaseClient = Awaited<
-  ReturnType<typeof requireUserWithBootstrapStatus>
->["supabase"];
-
-async function loadEvChargingSettings(
-  supabase: TrendsSupabaseClient,
-  userId: string,
-): Promise<EvChargingSettings> {
-  const select =
-    "efficiency_wh_per_mi,free_hours_per_week,free_mi_per_hour,home_rate_cents_per_kwh,public_rate_cents_per_kwh,charging_loss_pct,typical_miles_per_week,explorer_mpg,gas_price_per_gal_cents,gas_archived";
-  const { data, error } = await supabase
-    .from("ev_charging_settings")
-    .select(select)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) {
-    console.warn(`[trends] EV charging settings unavailable: ${error.message}`);
-    return DEFAULT_EV_CHARGING_SETTINGS;
-  }
-  if (data) {
-    return mapEvChargingSettings(data as EvChargingSettingsRow);
-  }
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("ev_charging_settings")
-    .upsert(
-      {
-        user_id: userId,
-        ...serializeEvChargingSettings(DEFAULT_EV_CHARGING_SETTINGS),
-      },
-      { onConflict: "user_id" },
-    )
-    .select(select)
-    .single();
-
-  if (insertError) {
-    console.warn(
-      `[trends] EV charging defaults could not be created: ${insertError.message}`,
-    );
-    return DEFAULT_EV_CHARGING_SETTINGS;
-  }
-
-  return mapEvChargingSettings(inserted as EvChargingSettingsRow);
-}
-
-async function loadEvChargingWeekMiles(
-  supabase: TrendsSupabaseClient,
-  userId: string,
-  weekId: string,
-): Promise<number | null> {
-  const { data, error } = await supabase
-    .from("ev_charging_weeks")
-    .select("miles_driven")
-    .eq("user_id", userId)
-    .eq("week_id", weekId)
-    .maybeSingle();
-
-  if (error) {
-    console.warn(`[trends] EV charging miles unavailable: ${error.message}`);
-    return null;
-  }
-
-  return data ? toNumber((data as EvChargingWeekRow).miles_driven) : null;
-}
-
-function mapEvChargingSettings(
-  row: EvChargingSettingsRow,
-): EvChargingSettings {
-  return {
-    efficiencyWhPerMile: toNumber(row.efficiency_wh_per_mi),
-    freeHoursPerWeek: toNumber(row.free_hours_per_week),
-    freeMilesPerHour: toNumber(row.free_mi_per_hour),
-    homeRateCentsPerKwh: toNumber(row.home_rate_cents_per_kwh),
-    publicRateCentsPerKwh: toNumber(row.public_rate_cents_per_kwh),
-    chargingLossPercent: toNumber(row.charging_loss_pct),
-    typicalMilesPerWeek: toNumber(row.typical_miles_per_week),
-    explorerMpg: toNumber(row.explorer_mpg),
-    gasPricePerGallonCents: toNumber(row.gas_price_per_gal_cents),
-    gasArchived: row.gas_archived,
-  };
-}
-
-function serializeEvChargingSettings(settings: EvChargingSettings) {
-  return {
-    efficiency_wh_per_mi: settings.efficiencyWhPerMile,
-    free_hours_per_week: settings.freeHoursPerWeek,
-    free_mi_per_hour: settings.freeMilesPerHour,
-    home_rate_cents_per_kwh: settings.homeRateCentsPerKwh,
-    public_rate_cents_per_kwh: settings.publicRateCentsPerKwh,
-    charging_loss_pct: settings.chargingLossPercent,
-    typical_miles_per_week: settings.typicalMilesPerWeek,
-    explorer_mpg: settings.explorerMpg,
-    gas_price_per_gal_cents: settings.gasPricePerGallonCents,
-    gas_archived: settings.gasArchived,
-  };
-}
-
-// The whole-history "Total average" headline is a CONVERGING daily average —
-// total active gas / inclusive days from the FIRST tank start to today (see
-// calculateGasAverage). The rolling 7d/30d metrics answer the different,
-// practical "is gas creeping up RIGHT NOW" question, so they are windowed off
-// the RAW fills actually tagged inside each window (sum of those fills ÷ 7 or
-// ÷ 30). This is deliberately NOT the amortized daily spread — reading the
-// spread made all three averages collapse to the same smoothed number and hid
-// recent fill activity. Raw-fill windows spike when you actually fill up.
-function mapGasTracker(
-  rows: GasAllocationRow[],
-  todayIso: string,
-): TrendsGasTracker {
-  if (rows.length === 0) {
-    return { status: "waiting_for_fill" };
-  }
-
-  // Rows are ordered fill_date desc — [0] is the most recent fill (used for the
-  // merchant + previous-fill context lines).
-  const latest = rows[0];
-  const average = calculateGasAverage(
-    rows.map((row) => ({
-      gasAmountCents: toNumber(row.gas_amount_cents),
-      startDate: row.start_date,
-      fillDate: row.fill_date,
-    })),
-    todayIso,
-  );
-  if (!average) {
-    return { status: "waiting_for_fill" };
-  }
-
-  const last7dStart = addDaysIso(todayIso, -6);
-  const last30dStart = addDaysIso(todayIso, -29);
-
-  const fillsIn = (fromIso: string) =>
-    rows.filter((row) => row.fill_date >= fromIso && row.fill_date <= todayIso);
-  const fills7d = fillsIn(last7dStart);
-  const fills30d = fillsIn(last30dStart);
-  const fillAmount = (row: GasAllocationRow) => Math.round(toNumber(row.gas_amount_cents));
-  const sumFills = (fills: GasAllocationRow[]) =>
-    fills.reduce((total, row) => total + fillAmount(row), 0);
-
-  // Windows are sums of the RAW fills tagged in each window, divided by the
-  // fixed calendar span (7 / 30) so the label matches the math: "the last 7
-  // days of actual gas spend, per day".
-  const last7dTotalCents = sumFills(fills7d);
-  const last30dTotalCents = sumFills(fills30d);
-  const last7dAvgPerDayCents = Math.round(last7dTotalCents / 7);
-  const last30dAvgPerDayCents = Math.round(last30dTotalCents / 30);
-
-  const highestFillCents30d =
-    fills30d.length > 0 ? Math.max(...fills30d.map(fillAmount)) : 0;
-  // Average per fill-up over the last 30 days; fall back to all-time average
-  // if nothing was filled in that window so the stat isn't a misleading $0.
-  const avgPerFillCents30d =
-    fills30d.length > 0
-      ? Math.round(fills30d.reduce((sum, row) => sum + fillAmount(row), 0) / fills30d.length)
-      : Math.round(average.totalCents / rows.length);
-
-  return {
-    status: "active",
-    allocationId: latest.id,
-    merchantName: latest.merchant_name,
-    previousFillDate: latest.previous_fill_date,
-    periodStartDate: average.firstDate,
-    periodEndDate: todayIso,
-    periodDays: average.periodDays,
-    gasAmountCents: average.totalCents,
-    averageDailyGasCents: average.dailyAverageCents,
-    updatedAt: latest.updated_at ?? latest.created_at,
-    fills: rows.map((row) => ({
-      id: row.id,
-      fillDate: row.fill_date,
-      merchantName: row.merchant_name,
-      gasAmountCents: fillAmount(row),
-    })),
-    last7d: {
-      totalCents: last7dTotalCents,
-      avgPerDayCents: last7dAvgPerDayCents,
-      fillUps: fills7d.length,
-    },
-    last30d: {
-      totalCents: last30dTotalCents,
-      avgPerDayCents: last30dAvgPerDayCents,
-      fillUps: fills30d.length,
-      highestFillCents: highestFillCents30d,
-      avgPerFillCents: avgPerFillCents30d,
-    },
-  };
 }

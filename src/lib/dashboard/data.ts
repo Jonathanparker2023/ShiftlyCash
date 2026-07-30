@@ -124,11 +124,25 @@ type GasSpreadRow = {
   gas_spend_cents: NumericValue;
 };
 
+type EvChargeSpreadRow = {
+  day_id: string;
+  ev_charge_spend_cents: NumericValue;
+};
+
 type GasAllocationRow = {
   source_transaction_id: string;
   fill_date: string;
   start_date: string | null;
   gas_amount_cents: NumericValue;
+  remainder_amount_cents: NumericValue;
+  is_active: boolean;
+};
+
+type EvChargeAllocationRow = {
+  source_transaction_id: string;
+  charge_date: string;
+  start_date: string | null;
+  charge_amount_cents: NumericValue;
   remainder_amount_cents: NumericValue;
   is_active: boolean;
 };
@@ -423,22 +437,37 @@ export async function getDashboardData(
     gasAllocations = (gasData ?? []) as GasAllocationRow[];
   }
 
-  // The EV settings own the display-only retirement flag for the dashboard's
-  // synthetic Gas line. Gas allocations and all ledger math remain untouched.
-  let gasArchived = false;
-  const { data: evSettingsData, error: evSettingsError } = await supabase
-    .from("ev_charging_settings")
-    .select("gas_archived")
+  let evChargeAllocations: EvChargeAllocationRow[] = [];
+  const { data: evChargeData, error: evChargeError } = await supabase
+    .from("ev_charge_allocations")
+    .select(
+      "source_transaction_id,charge_date,start_date,charge_amount_cents,remainder_amount_cents,is_active",
+    )
     .eq("user_id", user.id)
-    .maybeSingle();
-  if (evSettingsError) {
+    .eq("is_active", true);
+  if (evChargeError) {
     console.warn(
-      `[dashboard] EV charging settings unavailable: ${evSettingsError.message}`,
+      `[dashboard] EV charge allocations unavailable: ${evChargeError.message}`,
     );
   } else {
-    gasArchived = Boolean(
-      (evSettingsData as { gas_archived?: boolean } | null)?.gas_archived,
+    evChargeAllocations = (evChargeData ?? []) as EvChargeAllocationRow[];
+  }
+
+  let gasEndedOn: string | null = null;
+  const { data: transportSettingsData, error: transportSettingsError } =
+    await supabase
+      .from("transport_energy_settings")
+      .select("gas_ended_on")
+      .eq("user_id", user.id)
+      .maybeSingle();
+  if (transportSettingsError) {
+    console.warn(
+      `[dashboard] transport settings unavailable: ${transportSettingsError.message}`,
     );
+  } else {
+    gasEndedOn =
+      (transportSettingsData as { gas_ended_on?: string | null } | null)
+        ?.gas_ended_on ?? null;
   }
 
   // Per-day gas SPREAD (the converging daily slice). Surfaced so the dashboard
@@ -454,6 +483,21 @@ export async function getDashboardData(
       console.warn(`[dashboard] gas spread unavailable: ${gasSpreadError.message}`);
     } else {
       gasSpread = (gasSpreadData ?? []) as GasSpreadRow[];
+    }
+  }
+
+  let evChargeSpread: EvChargeSpreadRow[] = [];
+  if (dayIds.length > 0) {
+    const { data: evSpreadData, error: evSpreadError } = await supabase
+      .from("v_day_ev_charge_spend_totals")
+      .select("day_id,ev_charge_spend_cents")
+      .in("day_id", dayIds);
+    if (evSpreadError) {
+      console.warn(
+        `[dashboard] EV charge spread unavailable: ${evSpreadError.message}`,
+      );
+    } else {
+      evChargeSpread = (evSpreadData ?? []) as EvChargeSpreadRow[];
     }
   }
 
@@ -527,6 +571,7 @@ export async function getDashboardData(
     slots: (slotData ?? []) as EarnSlotRow[],
     transactions: (transactionData ?? []) as TransactionRow[],
     gasAllocations,
+    evChargeAllocations,
     weekTotal: weekTotalData as WeekTotalRow,
     adjacentAbilityPayPeriod,
     baselineTotal: baselineTotalData as BaselineTotalRow | null,
@@ -535,7 +580,8 @@ export async function getDashboardData(
     baseAllocations,
     bucketCredits,
     gasSpread,
-    gasArchived,
+    evChargeSpread,
+    gasEndedOn,
     customJobs,
     todayIso,
   });
@@ -552,6 +598,7 @@ function mapDashboardData(input: {
   slots: EarnSlotRow[];
   transactions: TransactionRow[];
   gasAllocations: GasAllocationRow[];
+  evChargeAllocations: EvChargeAllocationRow[];
   weekTotal: WeekTotalRow;
   adjacentAbilityPayPeriod: AdjacentAbilityPayPeriod;
   baselineTotal: BaselineTotalRow | null;
@@ -560,7 +607,8 @@ function mapDashboardData(input: {
   baseAllocations: BaseAllocationRow[];
   bucketCredits: AmortizationCreditRow[];
   gasSpread: GasSpreadRow[];
-  gasArchived: boolean;
+  evChargeSpread: EvChargeSpreadRow[];
+  gasEndedOn: string | null;
   customJobs: CustomJobRow[];
   todayIso: string;
 }): DashboardData {
@@ -602,9 +650,16 @@ function mapDashboardData(input: {
       allocation,
     ]),
   );
+  const evChargeByTransactionId = new Map(
+    input.evChargeAllocations.map((allocation) => [
+      allocation.source_transaction_id,
+      allocation,
+    ]),
+  );
   const transactionsByDay = groupTransactionsByDay(
     input.transactions,
     gasByTransactionId,
+    evChargeByTransactionId,
   );
   const totalsByDay = new Map(
     input.dayTotals.map((totals) => [totals.day_id, totals]),
@@ -627,6 +682,12 @@ function mapDashboardData(input: {
       Math.round(toNumber(row.gas_spend_cents)),
     ]),
   );
+  const evChargeSpendByDay = new Map(
+    input.evChargeSpread.map((row) => [
+      row.day_id,
+      Math.round(toNumber(row.ev_charge_spend_cents)),
+    ]),
+  );
   const days = input.days.map((day) =>
     mapDashboardDay(
       day,
@@ -636,6 +697,7 @@ function mapDashboardData(input: {
       allocationsByDay.get(day.id) ?? [],
       creditsByDay.get(day.id) ?? [],
       gasSpendByDay.get(day.id) ?? 0,
+      evChargeSpendByDay.get(day.id) ?? 0,
       customJobsById,
     ),
   );
@@ -645,7 +707,7 @@ function mapDashboardData(input: {
       startDate: allocation.start_date,
       fillDate: allocation.fill_date,
     })),
-    input.todayIso,
+    input.gasEndedOn ?? input.todayIso,
   );
 
   return {
@@ -655,7 +717,7 @@ function mapDashboardData(input: {
     weekNavigation: input.weekNavigation,
     days,
     gasAverageDailyCents: gasAverage?.dailyAverageCents ?? 0,
-    gasArchived: input.gasArchived,
+    gasEndedOn: input.gasEndedOn,
     hiddenBuiltins: (input.settings.hidden_builtin_jobs ?? []) as string[],
     customJobs: input.customJobs
       .filter((job) => job.active)
@@ -845,6 +907,7 @@ function mapDashboardDay(
   allocations: BaseAllocationRow[],
   credits: AmortizationCreditRow[],
   gasSpendCents: number,
+  evChargeSpendCents: number,
   customJobsById: Map<string, CustomJobRow>,
 ): DashboardDay {
   const existingSlots = new Map(slots.map((slot) => [slot.slot_index, slot]));
@@ -871,6 +934,7 @@ function mapDashboardDay(
     spendCents,
     transactionSpendCents,
     gasSpendCents,
+    evChargeSpendCents,
     spendLocked: day.spend_locked,
     baseBreakdown: allocations
       .map((row) => ({
@@ -1024,6 +1088,7 @@ function groupSlotsByDay(slots: EarnSlotRow[]) {
 function groupTransactionsByDay(
   transactions: TransactionRow[],
   gasByTransactionId: Map<string, GasAllocationRow>,
+  evChargeByTransactionId: Map<string, EvChargeAllocationRow>,
 ) {
   const grouped = new Map<string, DashboardTransaction[]>();
 
@@ -1033,7 +1098,13 @@ function groupTransactionsByDay(
     }
 
     const rows = grouped.get(transaction.day_id) ?? [];
-    rows.push(mapDashboardTransaction(transaction, gasByTransactionId));
+    rows.push(
+      mapDashboardTransaction(
+        transaction,
+        gasByTransactionId,
+        evChargeByTransactionId,
+      ),
+    );
     grouped.set(transaction.day_id, rows);
   });
 
@@ -1047,6 +1118,7 @@ function groupTransactionsByDay(
 function mapDashboardTransaction(
   row: TransactionRow,
   gasByTransactionId: Map<string, GasAllocationRow>,
+  evChargeByTransactionId: Map<string, EvChargeAllocationRow>,
 ): DashboardTransaction {
   const originalAmountCents = dollarsToCents(toNumber(row.amount));
   const gasAllocation = gasByTransactionId.get(row.id);
@@ -1059,11 +1131,24 @@ function mapDashboardTransaction(
     hasActiveGasAllocation
       ? Math.round(toNumber(gasAllocation.remainder_amount_cents))
       : originalAmountCents;
+  const evChargeAllocation = evChargeByTransactionId.get(row.id);
+  const hasActiveEvChargeAllocation = evChargeAllocation?.is_active === true;
+  const evChargeAllocatedCents = hasActiveEvChargeAllocation
+    ? Math.round(toNumber(evChargeAllocation.charge_amount_cents))
+    : 0;
+  const evChargeRemainderCents = hasActiveEvChargeAllocation
+    ? Math.round(toNumber(evChargeAllocation.remainder_amount_cents))
+    : originalAmountCents;
+  const amountCents = hasActiveGasAllocation
+    ? gasRemainderCents
+    : hasActiveEvChargeAllocation
+      ? evChargeRemainderCents
+      : originalAmountCents;
   return {
     id: row.id,
     dayId: row.day_id ?? "",
     merchantName: row.merchant_name,
-    amountCents: hasActiveGasAllocation ? gasRemainderCents : originalAmountCents,
+    amountCents,
     originalAmountCents,
     category: row.category,
     source: row.source,
@@ -1072,6 +1157,9 @@ function mapDashboardTransaction(
     isGasAllocated: hasActiveGasAllocation,
     gasAllocatedCents,
     gasRemainderCents,
+    isEvChargeAllocated: hasActiveEvChargeAllocation,
+    evChargeAllocatedCents,
+    evChargeRemainderCents,
     wasMovedToYesterday: row.moved_to_yesterday === true,
     date: row.date,
     time: row.datetime ?? row.legacy_time,

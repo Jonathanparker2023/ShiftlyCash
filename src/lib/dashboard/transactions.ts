@@ -23,8 +23,15 @@ export function splitDashboardTransactionRows(
   exemptTransactions: DashboardTransaction[];
 } {
   const spendingTransactions = appliedTransactions.filter(
-    (transaction) =>
-      !transaction.isGasAllocated || transaction.gasRemainderCents > 0,
+    (transaction) => {
+      if (transaction.isGasAllocated) {
+        return transaction.gasRemainderCents > 0;
+      }
+      if (transaction.isEvChargeAllocated) {
+        return transaction.evChargeRemainderCents > 0;
+      }
+      return true;
+    },
   );
   const gasExemptions = appliedTransactions
     .filter(
@@ -35,12 +42,23 @@ export function splitDashboardTransactionRows(
       ...transaction,
       amountCents: transaction.gasAllocatedCents,
     }));
+  const evChargeExemptions = appliedTransactions
+    .filter(
+      (transaction) =>
+        transaction.isEvChargeAllocated &&
+        transaction.evChargeAllocatedCents > 0,
+    )
+    .map((transaction) => ({
+      ...transaction,
+      amountCents: transaction.evChargeAllocatedCents,
+    }));
 
   return {
     spendingTransactions: sortDashboardTransactions(spendingTransactions),
     exemptTransactions: sortDashboardTransactions([
       ...excludedTransactions,
       ...gasExemptions,
+      ...evChargeExemptions,
     ]),
   };
 }

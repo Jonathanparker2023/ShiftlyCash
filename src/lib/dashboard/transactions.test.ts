@@ -94,6 +94,50 @@ describe("splitDashboardTransactionRows", () => {
     expect(result.exemptTransactions[0].amountCents).toBe(6_000);
   });
 
+  it("shows an EV charge as exempt and leaves a mixed-purchase remainder untagged", () => {
+    const source = transaction({
+      id: "charge-and-snacks",
+      merchantName: "Tesla Supercharger",
+      amountCents: 1_200,
+      originalAmountCents: 7_200,
+      isEvChargeAllocated: true,
+      evChargeAllocatedCents: 6_000,
+      evChargeRemainderCents: 1_200,
+    });
+
+    const result = splitDashboardTransactionRows([source], []);
+
+    expect(result.spendingTransactions).toEqual([source]);
+    expect(result.exemptTransactions).toEqual([
+      expect.objectContaining({
+        id: "charge-and-snacks",
+        amountCents: 6_000,
+        isEvChargeAllocated: true,
+      }),
+    ]);
+    expect(result.spendingTransactions[0].isGasAllocated).toBe(false);
+    expect(
+      result.spendingTransactions[0].amountCents +
+        result.exemptTransactions[0].amountCents,
+    ).toBe(source.originalAmountCents);
+  });
+
+  it("omits a zero EV remainder while retaining the EV exemption", () => {
+    const source = transaction({
+      id: "charge-only",
+      amountCents: 0,
+      originalAmountCents: 4_500,
+      isEvChargeAllocated: true,
+      evChargeAllocatedCents: 4_500,
+      evChargeRemainderCents: 0,
+    });
+
+    const result = splitDashboardTransactionRows([source], []);
+
+    expect(result.spendingTransactions).toEqual([]);
+    expect(result.exemptTransactions[0].amountCents).toBe(4_500);
+  });
+
   it("keeps ordinary spending and existing exemptions in their original buckets", () => {
     const spending = transaction({ id: "spending" });
     const exempt = transaction({ id: "exempt", status: "excluded" });
@@ -123,6 +167,9 @@ function transaction(
     isGasAllocated: false,
     gasAllocatedCents: 0,
     gasRemainderCents: 1_00,
+    isEvChargeAllocated: false,
+    evChargeAllocatedCents: 0,
+    evChargeRemainderCents: 1_00,
     wasMovedToYesterday: false,
     date: "2026-05-02",
     time: "12:00",
