@@ -1,10 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 
+import {
+  saveEvChargingAction,
+  type SaveEvChargingInput,
+} from "@/app/(protected)/trends/ev-actions";
 import { centsToDollars } from "@/lib/domain/money";
-import type { TrendsData, TrendsGasTracker, TrendsWeek } from "@/lib/trends/data";
+import type {
+  TrendsData,
+  TrendsEvCharging,
+  TrendsGasTracker,
+  TrendsWeek,
+} from "@/lib/trends/data";
 
 type RangeKey = "12w" | "ytd" | "all" | "custom";
 
@@ -175,18 +184,35 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
             <WeeklyCashflowChart weeks={weeks} medianCents={stats.median} />
           )}
 
-          <GasTracker tracker={initialData.gasTracker} />
+          <GasTracker
+            archived={initialData.evCharging.settings.gasArchived}
+            tracker={initialData.gasTracker}
+          />
+          <EvChargingTracker tracker={initialData.evCharging} />
         </section>
       </section>
     </main>
   );
 }
 
-function GasTracker({ tracker }: { tracker: TrendsGasTracker }) {
+function GasTracker({
+  archived,
+  tracker,
+}: {
+  archived: boolean;
+  tracker: TrendsGasTracker;
+}) {
   const isActive = tracker.status === "active";
 
   return (
     <section className="mt-5 border-t border-[var(--border-subtle)] pt-5">
+      {archived ? (
+        <div className="mb-3 flex justify-end">
+          <span className="rounded-full border border-[var(--border-default)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+            Archived
+          </span>
+        </div>
+      ) : null}
       {isActive ? (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.65fr)]">
           <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
@@ -302,6 +328,336 @@ function GasMetric({ label, value }: { label: string; value: string }) {
         {value}
       </div>
     </div>
+  );
+}
+
+function EvChargingTracker({ tracker }: { tracker: TrendsEvCharging }) {
+  const router = useRouter();
+  const [draft, setDraft] = useState<SaveEvChargingInput>({
+    weekId: tracker.weekId ?? "",
+    milesDriven: tracker.milesDriven,
+    ...tracker.settings,
+  });
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const canSave = Boolean(draft.weekId);
+  const progressDenominator = Math.max(
+    tracker.milesDriven,
+    tracker.freeRangeMiles,
+    1,
+  );
+  const freeProgress =
+    (Math.min(tracker.milesDriven, tracker.freeRangeMiles) /
+      progressDenominator) *
+    100;
+  const paidProgress =
+    (tracker.paidMiles / progressDenominator) * 100;
+
+  function setNumber(
+    field: Exclude<
+      keyof SaveEvChargingInput,
+      "weekId" | "gasArchived"
+    >,
+    value: string,
+  ) {
+    const parsed = Number(value);
+    setSaveState("idle");
+    setDraft((current) => ({
+      ...current,
+      [field]: Number.isFinite(parsed) ? parsed : 0,
+    }));
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSave || saveState === "saving") {
+      return;
+    }
+
+    setSaveState("saving");
+    try {
+      await saveEvChargingAction(draft);
+      setSaveState("saved");
+      router.refresh();
+    } catch {
+      setSaveState("error");
+    }
+  }
+
+  return (
+    <section className="mt-5 border-t border-[var(--border-subtle)] pt-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <ZapIcon />
+            <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+              Charging — Onyx
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+            This week&apos;s free worksite charging against paid miles.
+          </p>
+        </div>
+        {tracker.usesTypicalMiles ? (
+          <span className="rounded-full border border-[var(--border-default)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+            Typical miles
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            Blended cost
+          </div>
+          <div className="mt-1 flex items-baseline gap-1 font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+            <span className="text-4xl sm:text-5xl">
+              {tracker.blendedCentsPerMile}
+            </span>
+            <span className="text-sm text-[var(--text-tertiary)]">¢/mi</span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2.5">
+              <div className="text-[var(--text-muted)]">Free miles</div>
+              <div className="mt-1 font-semibold tabular-nums text-[var(--text-primary)]">
+                {formatMiles(tracker.freeMilesUsed)}
+              </div>
+            </div>
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2.5">
+              <div className="text-[var(--text-muted)]">Paid miles</div>
+              <div className="mt-1 font-semibold tabular-nums text-[var(--text-primary)]">
+                {formatMiles(tracker.paidMiles)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <EvStat label="Free ceiling" value={`${formatMiles(tracker.freeRangeMiles)} / wk`} />
+          <EvStat label="Miles driven" value={formatMiles(tracker.milesDriven)} />
+          <EvStat label="Free unused" value={formatMiles(tracker.freeMilesUnused)} />
+          <EvStat label="Weekly cost" value={formatMoney(tracker.weeklyCostCents)} />
+          <EvStat label="Monthly cost" value={formatMoney(tracker.monthlyCostCents)} />
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">
+            Breakeven: {formatMiles(tracker.breakevenMilesPerWeek)} mi/wk
+          </p>
+          <p className="text-xs text-[var(--text-tertiary)]">
+            Every mile over costs Supercharger rates.
+          </p>
+        </div>
+        <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-[var(--surface-base)]">
+          <div
+            className="bg-[var(--accent-brand)]"
+            style={{ width: `${freeProgress}%` }}
+          />
+          {paidProgress > 0 ? (
+            <div
+              className="bg-[var(--accent-negative)]"
+              style={{ width: `${paidProgress}%` }}
+            />
+          ) : null}
+        </div>
+        <div className="mt-1.5 flex justify-between text-[10px] font-medium tabular-nums text-[var(--text-muted)]">
+          <span>{formatMiles(tracker.milesDriven)} mi this week</span>
+          <span>{formatMiles(tracker.freeRangeMiles)} mi free ceiling</span>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-px overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--border-subtle)] sm:grid-cols-3">
+        <EvCompare
+          label="Explorer gas"
+          value={`${tracker.explorerCentsPerMile}¢/mi`}
+        />
+        <EvCompare
+          label="Onyx home"
+          value={`${tracker.homeCentsPerMile}¢/mi`}
+        />
+        <EvCompare
+          label="Onyx Supercharger"
+          value={`${tracker.paidCentsPerMile}¢/mi`}
+        />
+      </div>
+
+      <details className="group mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-semibold text-[var(--text-secondary)] marker:hidden">
+          <span>Edit inputs</span>
+          <span className="text-xs font-medium text-[var(--text-muted)]">
+            {saveState === "saving"
+              ? "Saving..."
+              : saveState === "saved"
+                ? "Saved"
+                : saveState === "error"
+                  ? "Save failed"
+                  : "Miles, rates, charging"}
+          </span>
+        </summary>
+        <form
+          className="border-t border-[var(--border-subtle)] p-3"
+          onSubmit={save}
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <EvNumberInput
+              label="Miles this week"
+              value={draft.milesDriven}
+              onChange={(value) => setNumber("milesDriven", value)}
+            />
+            <EvNumberInput
+              label="Typical miles / week"
+              value={draft.typicalMilesPerWeek}
+              onChange={(value) => setNumber("typicalMilesPerWeek", value)}
+            />
+            <EvNumberInput
+              label="Efficiency Wh / mi"
+              value={draft.efficiencyWhPerMile}
+              onChange={(value) => setNumber("efficiencyWhPerMile", value)}
+            />
+            <EvNumberInput
+              label="Free hours / week"
+              value={draft.freeHoursPerWeek}
+              onChange={(value) => setNumber("freeHoursPerWeek", value)}
+            />
+            <EvNumberInput
+              label="Free mi / hour"
+              value={draft.freeMilesPerHour}
+              onChange={(value) => setNumber("freeMilesPerHour", value)}
+            />
+            <EvNumberInput
+              label="Charging loss %"
+              value={draft.chargingLossPercent}
+              onChange={(value) => setNumber("chargingLossPercent", value)}
+            />
+            <EvNumberInput
+              label="Home rate ¢ / kWh"
+              value={draft.homeRateCentsPerKwh}
+              onChange={(value) => setNumber("homeRateCentsPerKwh", value)}
+            />
+            <EvNumberInput
+              label="Public rate ¢ / kWh"
+              value={draft.publicRateCentsPerKwh}
+              onChange={(value) => setNumber("publicRateCentsPerKwh", value)}
+            />
+            <EvNumberInput
+              label="Explorer MPG"
+              value={draft.explorerMpg}
+              onChange={(value) => setNumber("explorerMpg", value)}
+            />
+            <EvNumberInput
+              label="Gas price ¢ / gal"
+              value={draft.gasPricePerGallonCents}
+              onChange={(value) => setNumber("gasPricePerGallonCents", value)}
+            />
+          </div>
+          <label className="mt-3 flex min-h-10 items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+            <span>
+              Archive gas line
+              <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                Hide the dashboard spread; keep gas history.
+              </span>
+            </span>
+            <input
+              checked={draft.gasArchived}
+              className="h-4 w-4 accent-[var(--accent-brand)]"
+              onChange={(event) => {
+                setSaveState("idle");
+                setDraft((current) => ({
+                  ...current,
+                  gasArchived: event.target.checked,
+                }));
+              }}
+              type="checkbox"
+            />
+          </label>
+          <div className="mt-3 flex items-center justify-end gap-3">
+            {saveState === "error" ? (
+              <span className="text-xs font-medium text-[var(--accent-negative-text)]">
+                Could not save. Apply the EV migration, then retry.
+              </span>
+            ) : null}
+            <button
+              className="min-h-9 rounded-md bg-[var(--accent-brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!canSave || saveState === "saving"}
+              type="submit"
+            >
+              {saveState === "saving" ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      </details>
+    </section>
+  );
+}
+
+function ZapIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4 text-[var(--accent-brand-text)]"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+    >
+      <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z" />
+    </svg>
+  );
+}
+
+function EvStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-3">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-base font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function EvCompare({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 bg-[var(--surface-elevated)] px-3 py-2.5 sm:block sm:text-center">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+        {label}
+      </div>
+      <div className="text-sm font-semibold tabular-nums text-[var(--text-primary)] sm:mt-1">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function EvNumberInput({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  value: number;
+}) {
+  return (
+    <label className="block text-xs font-medium text-[var(--text-tertiary)]">
+      {label}
+      <input
+        className="mt-1 h-10 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--accent-brand)] focus:ring-2 focus:ring-[var(--accent-ring)]"
+        inputMode="decimal"
+        min={0}
+        onChange={(event) => onChange(event.target.value)}
+        step="any"
+        type="number"
+        value={value}
+      />
+    </label>
   );
 }
 
@@ -537,6 +893,12 @@ function formatMoney(cents: number): string {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(centsToDollars(cents));
+}
+
+function formatMiles(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function shortDate(iso: string): string {

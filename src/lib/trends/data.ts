@@ -1,6 +1,12 @@
 import { requireUserWithBootstrapStatus } from "@/lib/auth";
 import { addDaysIso, getTodayIso } from "@/lib/dashboard/dates";
 import { dollarsToCents } from "@/lib/domain/money";
+import {
+  calculateEvCharging,
+  DEFAULT_EV_CHARGING_SETTINGS,
+  type EvChargingResult,
+  type EvChargingSettings,
+} from "@/lib/ev/charging";
 import { calculateGasAverage } from "@/lib/gas/average";
 
 type NumericValue = number | string | null;
@@ -41,6 +47,23 @@ type GasAllocationRow = {
   updated_at: string;
 };
 
+type EvChargingSettingsRow = {
+  efficiency_wh_per_mi: NumericValue;
+  free_hours_per_week: NumericValue;
+  free_mi_per_hour: NumericValue;
+  home_rate_cents_per_kwh: NumericValue;
+  public_rate_cents_per_kwh: NumericValue;
+  charging_loss_pct: NumericValue;
+  typical_miles_per_week: NumericValue;
+  explorer_mpg: NumericValue;
+  gas_price_per_gal_cents: NumericValue;
+  gas_archived: boolean;
+};
+
+type EvChargingWeekRow = {
+  miles_driven: NumericValue;
+};
+
 export type TrendsGasTracker =
   | {
       status: "waiting_for_fill";
@@ -78,9 +101,16 @@ export type TrendsGasTracker =
       };
     };
 
+export type TrendsEvCharging = EvChargingResult & {
+  weekId: string | null;
+  settings: EvChargingSettings;
+  usesTypicalMiles: boolean;
+};
+
 export type TrendsData = {
   weeks: TrendsWeek[];
   gasTracker: TrendsGasTracker;
+  evCharging: TrendsEvCharging;
 };
 
 export async function getTrendsData(): Promise<TrendsData> {
@@ -113,9 +143,32 @@ export async function getTrendsData(): Promise<TrendsData> {
     throw new Error(`Unable to load gas tracker: ${gasError.message}`);
   }
 
+  const weeks = ((data ?? []) as WeekTotalRow[]).map(mapTrendsWeek);
+  const currentWeek =
+    weeks.find(
+      (week) => week.startDate <= todayIso && week.endDate >= todayIso,
+    ) ??
+    weeks.find((week) => week.status === "active") ??
+    weeks.at(-1) ??
+    null;
+  const settings = await loadEvChargingSettings(supabase, user.id);
+  const explicitMiles = currentWeek
+    ? await loadEvChargingWeekMiles(supabase, user.id, currentWeek.weekId)
+    : null;
+  const milesDriven = explicitMiles ?? settings.typicalMilesPerWeek;
+
   return {
-    weeks: ((data ?? []) as WeekTotalRow[]).map(mapTrendsWeek),
+    weeks,
     gasTracker: mapGasTracker((gasData ?? []) as GasAllocationRow[], todayIso),
+    evCharging: {
+      weekId: currentWeek?.weekId ?? null,
+      settings,
+      usesTypicalMiles: explicitMiles === null,
+      ...calculateEvCharging({
+        ...settings,
+        milesDriven,
+      }),
+    },
   };
 }
 
@@ -140,6 +193,104 @@ function toNumber(value: NumericValue): number {
 
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+type TrendsSupabaseClient = Awaited<
+  ReturnType<typeof requireUserWithBootstrapStatus>
+>["supabase"];
+
+async function loadEvChargingSettings(
+  supabase: TrendsSupabaseClient,
+  userId: string,
+): Promise<EvChargingSettings> {
+  const select =
+    "efficiency_wh_per_mi,free_hours_per_week,free_mi_per_hour,home_rate_cents_per_kwh,public_rate_cents_per_kwh,charging_loss_pct,typical_miles_per_week,explorer_mpg,gas_price_per_gal_cents,gas_archived";
+  const { data, error } = await supabase
+    .from("ev_charging_settings")
+    .select(select)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(`[trends] EV charging settings unavailable: ${error.message}`);
+    return DEFAULT_EV_CHARGING_SETTINGS;
+  }
+  if (data) {
+    return mapEvChargingSettings(data as EvChargingSettingsRow);
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("ev_charging_settings")
+    .upsert(
+      {
+        user_id: userId,
+        ...serializeEvChargingSettings(DEFAULT_EV_CHARGING_SETTINGS),
+      },
+      { onConflict: "user_id" },
+    )
+    .select(select)
+    .single();
+
+  if (insertError) {
+    console.warn(
+      `[trends] EV charging defaults could not be created: ${insertError.message}`,
+    );
+    return DEFAULT_EV_CHARGING_SETTINGS;
+  }
+
+  return mapEvChargingSettings(inserted as EvChargingSettingsRow);
+}
+
+async function loadEvChargingWeekMiles(
+  supabase: TrendsSupabaseClient,
+  userId: string,
+  weekId: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("ev_charging_weeks")
+    .select("miles_driven")
+    .eq("user_id", userId)
+    .eq("week_id", weekId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(`[trends] EV charging miles unavailable: ${error.message}`);
+    return null;
+  }
+
+  return data ? toNumber((data as EvChargingWeekRow).miles_driven) : null;
+}
+
+function mapEvChargingSettings(
+  row: EvChargingSettingsRow,
+): EvChargingSettings {
+  return {
+    efficiencyWhPerMile: toNumber(row.efficiency_wh_per_mi),
+    freeHoursPerWeek: toNumber(row.free_hours_per_week),
+    freeMilesPerHour: toNumber(row.free_mi_per_hour),
+    homeRateCentsPerKwh: toNumber(row.home_rate_cents_per_kwh),
+    publicRateCentsPerKwh: toNumber(row.public_rate_cents_per_kwh),
+    chargingLossPercent: toNumber(row.charging_loss_pct),
+    typicalMilesPerWeek: toNumber(row.typical_miles_per_week),
+    explorerMpg: toNumber(row.explorer_mpg),
+    gasPricePerGallonCents: toNumber(row.gas_price_per_gal_cents),
+    gasArchived: row.gas_archived,
+  };
+}
+
+function serializeEvChargingSettings(settings: EvChargingSettings) {
+  return {
+    efficiency_wh_per_mi: settings.efficiencyWhPerMile,
+    free_hours_per_week: settings.freeHoursPerWeek,
+    free_mi_per_hour: settings.freeMilesPerHour,
+    home_rate_cents_per_kwh: settings.homeRateCentsPerKwh,
+    public_rate_cents_per_kwh: settings.publicRateCentsPerKwh,
+    charging_loss_pct: settings.chargingLossPercent,
+    typical_miles_per_week: settings.typicalMilesPerWeek,
+    explorer_mpg: settings.explorerMpg,
+    gas_price_per_gal_cents: settings.gasPricePerGallonCents,
+    gas_archived: settings.gasArchived,
+  };
 }
 
 // The whole-history "Total average" headline is a CONVERGING daily average —

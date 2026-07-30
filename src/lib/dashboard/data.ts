@@ -423,6 +423,24 @@ export async function getDashboardData(
     gasAllocations = (gasData ?? []) as GasAllocationRow[];
   }
 
+  // The EV settings own the display-only retirement flag for the dashboard's
+  // synthetic Gas line. Gas allocations and all ledger math remain untouched.
+  let gasArchived = false;
+  const { data: evSettingsData, error: evSettingsError } = await supabase
+    .from("ev_charging_settings")
+    .select("gas_archived")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (evSettingsError) {
+    console.warn(
+      `[dashboard] EV charging settings unavailable: ${evSettingsError.message}`,
+    );
+  } else {
+    gasArchived = Boolean(
+      (evSettingsData as { gas_archived?: boolean } | null)?.gas_archived,
+    );
+  }
+
   // Per-day gas SPREAD (the converging daily slice). Surfaced so the dashboard
   // shows a visible "Gas" line on every day in the spread window, not only the
   // fill-day transaction. Soft-fail like the other overlays.
@@ -517,6 +535,7 @@ export async function getDashboardData(
     baseAllocations,
     bucketCredits,
     gasSpread,
+    gasArchived,
     customJobs,
     todayIso,
   });
@@ -541,6 +560,7 @@ function mapDashboardData(input: {
   baseAllocations: BaseAllocationRow[];
   bucketCredits: AmortizationCreditRow[];
   gasSpread: GasSpreadRow[];
+  gasArchived: boolean;
   customJobs: CustomJobRow[];
   todayIso: string;
 }): DashboardData {
@@ -635,6 +655,7 @@ function mapDashboardData(input: {
     weekNavigation: input.weekNavigation,
     days,
     gasAverageDailyCents: gasAverage?.dailyAverageCents ?? 0,
+    gasArchived: input.gasArchived,
     hiddenBuiltins: (input.settings.hidden_builtin_jobs ?? []) as string[],
     customJobs: input.customJobs
       .filter((job) => job.active)

@@ -155,6 +155,7 @@ export type DashboardData = {
   weekNavigation: DashboardWeekNavigation;
   days: DashboardDay[];
   gasAverageDailyCents: number;
+  gasArchived: boolean;
   customJobs: DashboardCustomJob[];
   // Built-in job keys ("ability" | "prestige" | "prestige_ilst") the user hid —
   // dropped from the job picker + net bar. Display only; history is unaffected.

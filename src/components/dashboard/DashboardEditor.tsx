@@ -1293,6 +1293,7 @@ export function DashboardEditor({
             <FocusedDayEditor
               day={focusedDay}
               expandedSlotIndex={expandedSlotIndex}
+              hideGasLine={initialData.gasArchived}
               isManualTransactionPending={pendingManualDayIds.has(focusedDay.id)}
               pendingTransactionIds={pendingTransactionIds}
               settings={initialData.settings}
@@ -1833,6 +1834,7 @@ function FocusedDayEditor({
   day,
   totals,
   expandedSlotIndex,
+  hideGasLine,
   isManualTransactionPending,
   pendingTransactionIds,
   settings,
@@ -1854,6 +1856,7 @@ function FocusedDayEditor({
   day: DashboardDay;
   totals: ReturnType<typeof calculateDayTotals> | undefined;
   expandedSlotIndex: number | null;
+  hideGasLine: boolean;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
   settings: PaySettings;
@@ -1914,6 +1917,7 @@ function FocusedDayEditor({
         <TransactionDrawer
           day={day}
           error={transactionError}
+          hideGasLine={hideGasLine}
           isManualTransactionPending={isManualTransactionPending}
           pendingTransactionIds={pendingTransactionIds}
           onAddManualTransaction={onAddManualTransaction}
@@ -1933,6 +1937,7 @@ function FocusedDayEditor({
 function TransactionDrawer({
   day,
   error,
+  hideGasLine,
   isManualTransactionPending,
   pendingTransactionIds,
   onToggleTransactionStatus,
@@ -1946,6 +1951,7 @@ function TransactionDrawer({
 }: {
   day: DashboardDay;
   error: string | null;
+  hideGasLine: boolean;
   isManualTransactionPending: boolean;
   pendingTransactionIds: Set<string>;
   onToggleTransactionStatus: (
@@ -2011,7 +2017,7 @@ function TransactionDrawer({
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <TransactionColumn
           heading="SPENDING"
-          gasSpendCents={day.gasSpendCents}
+          gasSpendCents={hideGasLine ? 0 : day.gasSpendCents}
           pendingTransactionIds={pendingTransactionIds}
           transactions={spendingTransactions}
           variant="spending"
