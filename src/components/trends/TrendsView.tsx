@@ -284,24 +284,85 @@ function EnergyTracker({
                 Hide history
               </span>
             </summary>
-            <div className="border-t border-[var(--border-subtle)] px-3 py-1">
-              {tracker.events.map((event) => (
-                <div
-                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-[var(--border-subtle)] py-2.5 last:border-b-0"
-                  key={event.id}
-                >
-                  <span className="text-xs font-semibold text-[var(--text-tertiary)]">
-                    {shortDate(event.date)}
-                  </span>
-                  <span className="truncate text-sm font-medium text-[var(--text-primary)]">
-                    {event.merchantName}
-                  </span>
-                  <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
-                    {formatMoney(event.amountCents)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {/* Vertical timeline, newest first. tracker.events already arrives
+                sorted descending by date, so index 0 is the most recent event
+                and events[index + 1] is always the one before it — which is
+                what the interval maths below leans on. */}
+            <ol className="relative border-t border-[var(--border-subtle)] px-3 py-3">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute bottom-6 left-[1.4rem] top-6 w-px bg-[var(--border-subtle)]"
+              />
+              {tracker.events.map((event, index) => {
+                const previous = tracker.events[index + 1];
+                const gapDays = previous
+                  ? daysBetweenIso(previous.date, event.date)
+                  : null;
+                const perDayCents =
+                  gapDays !== null && gapDays > 0
+                    ? Math.round(event.amountCents / gapDays)
+                    : null;
+                const isLatest = index === 0;
+
+                return (
+                  <li className="group relative pl-8" key={event.id}>
+                    <span
+                      aria-hidden
+                      className={`absolute left-[0.78rem] top-[1.05rem] z-10 h-[11px] w-[11px] rounded-full border-2 transition-all duration-150 ${
+                        isLatest
+                          ? "border-[var(--accent-brand-text)] bg-[var(--accent-brand-text)]"
+                          : "border-[var(--border-strong)] bg-[var(--surface-elevated)]"
+                      } group-hover:scale-125 group-hover:border-[var(--accent-brand-text)] group-hover:bg-[var(--accent-brand-text)]`}
+                    />
+                    <div
+                      className="rounded-lg border border-transparent px-2.5 py-2 outline-none transition-all duration-150 group-hover:border-[var(--accent-brand-border)] group-hover:bg-[var(--surface-hover)] group-hover:shadow-[0_0_20px_-6px_var(--accent-brand)] group-focus-within:border-[var(--accent-brand-border)] group-focus-within:bg-[var(--surface-hover)]"
+                      tabIndex={0}
+                    >
+                      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                        <span className="text-xs font-semibold text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--accent-brand-text)]">
+                          {shortDate(event.date)}
+                        </span>
+                        <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+                          {event.merchantName}
+                        </span>
+                        <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+                          {formatMoney(event.amountCents)}
+                        </span>
+                      </div>
+                      {/* Detail stays collapsed until hover/focus so the list
+                          reads as a scannable timeline at rest. */}
+                      <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-200 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
+                        <div className="overflow-hidden">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-xs text-[var(--text-muted)]">
+                            <span>{longDate(event.date)}</span>
+                            {gapDays !== null ? (
+                              <span className="text-[var(--text-tertiary)]">
+                                {gapDays} {gapDays === 1 ? "day" : "days"} since the
+                                previous {eventLabel}
+                              </span>
+                            ) : (
+                              <span className="text-[var(--text-tertiary)]">
+                                First {eventLabel} on record
+                              </span>
+                            )}
+                            {perDayCents !== null ? (
+                              <span className="font-semibold tabular-nums text-[var(--accent-brand-text)]">
+                                {formatMoney(perDayCents)}/day over that stretch
+                              </span>
+                            ) : null}
+                            {isLatest ? (
+                              <span className="rounded-full bg-[var(--accent-brand-fill)] px-2 py-0.5 font-semibold text-[var(--accent-brand-text)]">
+                                Most recent
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           </details>
         </>
       ) : null}
@@ -588,4 +649,24 @@ function shortDate(iso: string): string {
     day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${iso}T00:00:00.000Z`));
+}
+
+// Spelled-out date for the timeline's hover detail, where the collapsed row
+// already carries the short form.
+function longDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${iso}T00:00:00.000Z`));
+}
+
+// Whole days between two ISO dates. Parsed at UTC midnight so a local timezone
+// offset can never shift the count by a day.
+function daysBetweenIso(fromIso: string, toIso: string): number {
+  const from = Date.parse(`${fromIso}T00:00:00.000Z`);
+  const to = Date.parse(`${toIso}T00:00:00.000Z`);
+  return Math.round((to - from) / 86_400_000);
 }
