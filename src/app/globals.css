@@ -3,6 +3,19 @@
 :root {
   --background: #101827;
   --foreground: #f8fafc;
+
+  /* Week-strip gold. Shared verbatim with the Jon Ops app's week view so the
+     two apps read as one system — its globals.css labels this "Bashflow gold",
+     which is where it came from originally. Theme-independent: the foil and
+     ink work on both the dark and light surfaces below. */
+  --gold-grad: linear-gradient(120deg,#8a6d1d 0%,#c8a32d 16%,#f6e6a8 36%,#d4af37 52%,#c8a32d 70%,#f0dd95 86%,#8a6d1d 100%);
+  --gold-foil: #e9c45a;
+  --gold-edge: #d4af37;
+  --gold-ink: #1a1208;
+  /* Cashflow tones darkened to stay legible on the gold fill. */
+  --gold-ink-positive: #0d4f33;
+  --gold-ink-amber: #6b4a06;
+  --gold-ink-negative: #7f1d1d;
   --shift-bg: #101827;
   --shift-bg-deep: #0b1220;
   --shift-panel: #f8fafc;

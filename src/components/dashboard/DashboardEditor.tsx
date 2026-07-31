@@ -1803,49 +1803,91 @@ function WeekStripCell({
       : dayTone === "amber"
         ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
         : "shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]";
-  // Today's column is marked with a subtle lighter/grayish surface tint instead
-  // of a "Today" badge (lighter than the cell in dark mode, soft gray on white).
-  const surfaceBg = isToday
-    ? "bg-[var(--surface-hover)]"
-    : "bg-[var(--surface-elevated)]";
-  const selectedStyle = isFocused
+  // Week-strip proportions and the "today" treatment follow the Jon Ops app's
+  // week view: a 14px radius card, the day label stacked over the figure, past
+  // days dimmed, and today carried by the shared gold fill rather than a badge.
+  // Bashflow's cells hold money instead of a bare date, so the width stays
+  // fluid — only the radius, stacking and gold are borrowed.
+  const isPast = day.date < todayIso;
+  const surfaceBg = isToday ? "" : "bg-[var(--surface-elevated)]";
+
+  // Gold wins the border on today so the cell reads at a glance; the cashflow
+  // figure keeps its positive/amber/negative meaning via darkened ink that
+  // stays legible against the fill.
+  const goldToneInk =
+    dayTone === "positive"
+      ? "var(--gold-ink-positive)"
+      : dayTone === "amber"
+        ? "var(--gold-ink-amber)"
+        : "var(--gold-ink-negative)";
+
+  const cellStyle: CSSProperties = isToday
     ? {
-        borderColor: "var(--accent-primary)",
-        boxShadow:
-          "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px var(--accent-primary), 0 0 24px -6px rgba(10, 129, 86, 0.45)",
+        backgroundImage: "var(--gold-grad)",
+        borderColor: "var(--gold-edge)",
+        boxShadow: isFocused
+          ? "0 4px 18px rgba(212,175,55,0.35), 0 0 0 2px var(--accent-primary)"
+          : "0 4px 18px rgba(212,175,55,0.35)",
       }
-    : undefined;
+    : isFocused
+      ? {
+          borderColor: "var(--accent-primary)",
+          boxShadow:
+            "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px var(--accent-primary), 0 0 24px -6px rgba(10, 129, 86, 0.45)",
+        }
+      : {};
+
+  const borderClass = isToday
+    ? "border-2"
+    : isFocused
+      ? `border-[3px] ${toneBorderFocused}`
+      : `border-2 ${toneBorder}`;
+  const glowClass = isToday ? "" : isFocused ? toneGlowFocused : toneGlow;
+  const dimClass = day.spendLocked
+    ? "opacity-75"
+    : isPast && !isToday
+      ? "opacity-60"
+      : "";
 
   return (
     <button
-      className={
-        isFocused
-          ? `min-w-0 rounded-md border-[3px] ${toneBorderFocused} ${surfaceBg} px-1.5 py-2 text-left ${toneGlowFocused} transition-colors duration-150 focus:outline-none sm:p-3`
-          : day.spendLocked
-            ? `min-w-0 rounded-md border-2 ${toneBorder} ${surfaceBg} px-1.5 py-2 text-left opacity-75 ${toneGlow} transition focus:outline-none sm:p-3`
-            : `min-w-0 rounded-md border-2 ${toneBorder} ${surfaceBg} px-1.5 py-2 text-left ${toneGlow} transition focus:outline-none sm:p-3`
-      }
+      className={`min-w-0 rounded-[14px] ${borderClass} ${surfaceBg} px-1.5 py-2 text-left ${glowClass} ${dimClass} transition-colors duration-150 focus:outline-none sm:p-3`}
       onClick={() => onFocus(dayIndex)}
-      style={selectedStyle}
+      style={cellStyle}
       type="button"
     >
-      <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] sm:text-[10px] sm:tracking-[0.18em]">
+      <div
+        className={`flex min-w-0 items-center justify-between gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] sm:text-[10px] sm:tracking-[0.18em] ${
+          isToday ? "" : "text-[var(--text-tertiary)]"
+        }`}
+        style={isToday ? { color: "rgba(26, 18, 8, 0.74)" } : undefined}
+      >
         <span className="whitespace-nowrap">
           {shortDayName(day.date)}
           <span className="hidden sm:inline"> {formatDayOnly(day.date)}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {day.spendLocked ? (
-            <span className="hidden rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-primary)] sm:inline-flex">
+            <span
+              className={`hidden rounded-full px-1.5 py-0.5 text-[9px] font-semibold sm:inline-flex ${
+                isToday ? "" : "bg-[var(--surface-hover)] text-[var(--text-primary)]"
+              }`}
+              style={
+                isToday
+                  ? { backgroundColor: "rgba(26, 18, 8, 0.22)", color: "var(--gold-ink)" }
+                  : undefined
+              }
+            >
               Locked
             </span>
           ) : null}
         </span>
       </div>
       <p
-        className={`mt-2 truncate text-xs font-bold tracking-tight sm:mt-3 sm:text-sm md:text-base lg:text-lg xl:text-xl ${cashflowDailyColor(
-          displayCashflowCents,
-        )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
+        className={`mt-2 truncate text-xs font-bold tracking-tight sm:mt-3 sm:text-sm md:text-base lg:text-lg xl:text-xl ${
+          isToday ? "" : cashflowDailyColor(displayCashflowCents)
+        } ${isFutureUnspent ? "italic opacity-70" : ""}`}
+        style={isToday ? { color: goldToneInk } : undefined}
       >
         <span className="sm:hidden">{formatCashflowNoSymbol(displayCashflowCents)}</span>
         <span className="hidden sm:inline">{formatCashflow(displayCashflowCents)}</span>
