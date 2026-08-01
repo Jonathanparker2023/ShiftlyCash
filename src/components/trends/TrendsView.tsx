@@ -470,8 +470,19 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 // Collapsed row height drives the "ten weeks deep, then scroll" viewport.
-const WEEK_ROW_PX = 46;
+const WEEK_ROW_PX = 34;
 const VISIBLE_WEEK_ROWS = 10;
+
+// Date and amount sit in fixed gutters either side of the bar track, so every
+// bar starts and ends on the same pixels. The vertical guides are inset by the
+// identical amounts — that is the only reason zero/target/median line up with
+// the bars they annotate.
+const DATE_COL_PX = 88;
+const AMOUNT_COL_PX = 76;
+const ROW_PAD_X = 8;
+const COL_GAP_PX = 12;
+const TRACK_LEFT_PX = ROW_PAD_X + DATE_COL_PX + COL_GAP_PX;
+const TRACK_RIGHT_PX = ROW_PAD_X + AMOUNT_COL_PX + COL_GAP_PX;
 
 /**
  * Vertical cashflow rail, newest week at the top.
@@ -508,26 +519,30 @@ function WeeklyCashflowChart({
         style={{ maxHeight: WEEK_ROW_PX * VISIBLE_WEEK_ROWS }}
       >
         <div className="relative">
-          {/* Vertical guides span the full scroll height, behind the rows. */}
-          {maxNeg > 0 ? (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 w-px bg-[var(--chart-zero)]"
-              style={{ left: `${zeroPct}%` }}
-            />
-          ) : null}
-          <span
+          {/* Guides span the full scroll height but are inset to the bar track,
+              so their percentages share the bars' coordinate space. */}
+          <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 w-px bg-[rgba(255,255,255,0.35)]"
-            style={{ left: `${targetPct}%` }}
-          />
-          {medianCents > 0 ? (
+            className="pointer-events-none absolute inset-y-0"
+            style={{ left: TRACK_LEFT_PX, right: TRACK_RIGHT_PX }}
+          >
+            {maxNeg > 0 ? (
+              <span
+                className="absolute inset-y-0 w-px bg-[var(--chart-zero)]"
+                style={{ left: `${zeroPct}%` }}
+              />
+            ) : null}
             <span
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 w-px border-l border-dashed border-[var(--chart-grid)]"
-              style={{ left: `${medianPct}%` }}
+              className="absolute inset-y-0 w-px bg-[rgba(255,255,255,0.35)]"
+              style={{ left: `${targetPct}%` }}
             />
-          ) : null}
+            {medianCents > 0 ? (
+              <span
+                className="absolute inset-y-0 border-l border-dashed border-[var(--chart-grid)]"
+                style={{ left: `${medianPct}%` }}
+              />
+            ) : null}
+          </div>
 
           <ol>
             {ordered.map((week, index) => (
@@ -547,7 +562,8 @@ function WeeklyCashflowChart({
         <span>Brighter = closer to the $1,000 line</span>
         <span>Glowing white = at or above it</span>
         <span>Outline only = negative week</span>
-        <span>Dashed = median</span>
+        <span>Dashed bar = week in progress</span>
+        <span>Dashed guide = median</span>
       </div>
     </div>
   );
@@ -586,7 +602,7 @@ function CashflowWeekRow({
   return (
     <li className="group relative">
       <div
-        className="cursor-pointer rounded-lg border border-transparent px-2 py-1.5 outline-none transition-all duration-150 group-hover:z-10 group-hover:scale-[1.015] group-hover:border-[var(--border-default)] group-hover:bg-[var(--surface-hover)] group-hover:shadow-[0_0_24px_-8px_rgba(255,255,255,0.35)] group-focus-within:z-10 group-focus-within:scale-[1.015] group-focus-within:border-[var(--border-default)] group-focus-within:bg-[var(--surface-hover)]"
+        className="cursor-pointer rounded-lg border border-transparent py-1.5 outline-none transition-all duration-150 group-hover:z-10 group-hover:border-[var(--border-default)] group-hover:bg-[var(--surface-hover)] group-hover:shadow-[0_0_24px_-8px_rgba(255,255,255,0.35)] group-focus-within:z-10 group-focus-within:border-[var(--border-default)] group-focus-within:bg-[var(--surface-hover)]"
         onClick={open}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -595,40 +611,43 @@ function CashflowWeekRow({
           }
         }}
         role="link"
+        style={{ paddingLeft: ROW_PAD_X, paddingRight: ROW_PAD_X }}
         tabIndex={0}
       >
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-primary)]">
+        {/* One baseline: date gutter, bar track, amount gutter. */}
+        <div
+          className="grid items-center"
+          style={{
+            gridTemplateColumns: `${DATE_COL_PX}px minmax(0,1fr) ${AMOUNT_COL_PX}px`,
+            columnGap: COL_GAP_PX,
+          }}
+        >
+          <span className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-primary)]">
             {shortDate(week.startDate)}
-            {week.status === "active" ? (
-              <span className="ml-2 normal-case tracking-normal text-[var(--text-muted)]">
-                in progress
-              </span>
-            ) : null}
+          </span>
+          <span className="relative block h-3">
+            <span
+              className={`absolute inset-y-0 rounded-full border transition-all duration-150 group-hover:brightness-125 ${
+                week.status === "active" ? "border-dashed" : ""
+              }`}
+              style={{
+                left: `${leftPct}%`,
+                width: `${widthPct}%`,
+                borderColor: `rgba(255,255,255,${borderAlpha.toFixed(2)})`,
+                backgroundColor:
+                  fillAlpha > 0
+                    ? `rgba(255,255,255,${fillAlpha.toFixed(2)})`
+                    : "transparent",
+                boxShadow: glow,
+              }}
+            />
           </span>
           <span
-            className="text-xs font-semibold tabular-nums text-[var(--text-primary)]"
+            className="text-right text-xs font-semibold tabular-nums text-[var(--text-primary)]"
             style={{ opacity: negative ? 0.75 : 0.55 + 0.45 * ratio }}
           >
             {formatMoney(cents)}
           </span>
-        </div>
-        <div className="relative mt-1 h-3">
-          <span
-            className={`absolute inset-y-0 rounded-full border transition-all duration-150 group-hover:brightness-125 ${
-              week.status === "active" ? "border-dashed" : ""
-            }`}
-            style={{
-              left: `${leftPct}%`,
-              width: `${widthPct}%`,
-              borderColor: `rgba(255,255,255,${borderAlpha.toFixed(2)})`,
-              backgroundColor:
-                fillAlpha > 0
-                  ? `rgba(255,255,255,${fillAlpha.toFixed(2)})`
-                  : "transparent",
-              boxShadow: glow,
-            }}
-          />
         </div>
         {/* Unfolds on hover/focus, same mechanic as the energy timeline. */}
         <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-200 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
@@ -654,7 +673,11 @@ function CashflowWeekRow({
                   ? `+${formatMoney(cents - TARGET_LINE_CENTS)} over the $1,000 line`
                   : `${formatMoney(TARGET_LINE_CENTS - cents)} short of $1,000`}
               </span>
-              {isLatest ? (
+              {week.status === "active" ? (
+                <span className="rounded-full border border-dashed border-[var(--border-default)] px-2 py-0.5 font-semibold text-[var(--text-tertiary)]">
+                  In progress
+                </span>
+              ) : isLatest ? (
                 <span className="rounded-full border border-[var(--border-default)] px-2 py-0.5 font-semibold text-[var(--text-tertiary)]">
                   Latest
                 </span>
