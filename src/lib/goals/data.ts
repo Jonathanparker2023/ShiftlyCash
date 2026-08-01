@@ -5,12 +5,12 @@ import { dollarsToCents } from "@/lib/domain/money";
 
 type NumericValue = number | string | null;
 
-type WeekBalanceRow = {
-  running_balance: NumericValue;
-  display_week_number: NumericValue;
+type WeekRow = {
   start_date: string;
-  end_date: string;
+  display_week_number: NumericValue;
   status: string;
+  running_balance: NumericValue;
+  cashflow_total: NumericValue;
 };
 
 type DebtRow = {
@@ -20,177 +20,79 @@ type DebtRow = {
   status: string;
 };
 
-export type GoalKind = "balance_threshold" | "debt_clear";
-
-export type GoalStatus = "locked" | "in_progress" | "unlocked";
-
-export type Goal = {
-  id: string;
-  title: string;
-  kicker: string;
-  description: string;
-  kind: GoalKind;
-  currentCents: number;
-  targetCents: number;
-  remainingCents: number;
-  progress: number;
-  status: GoalStatus;
-  accent: "brand" | "positive" | "warning" | "negative";
-  unlockCopy: string;
-};
-
+/** Primitives only — the client rebuilds the ladder as assumptions change. */
 export type GoalsData = {
-  runningBalanceCents: number;
-  activeDebtCents: number;
   weekLabel: string;
-  goals: Goal[];
-  timeline: Array<{
-    id: string;
-    title: string;
-    caption: string;
-    status: GoalStatus;
-  }>;
+  todayIso: string;
+  /** Cumulative cashflow banked this year: the pool that fills the ladder. */
+  bankedCents: number;
+  medianWeeklyCashflowCents: number;
+  activeDebtCents: number;
+  explorerCents: number;
+  teslaCents: number;
 };
-
-const BALANCE_GOALS = [
-  {
-    id: "porsche-cayman-gts",
-    title: "Porsche Cayman GTS",
-    kicker: "Dream car",
-    description: "Unlocked when running balance clears the Cayman threshold.",
-    targetCents: 100_000_00,
-    accent: "brand" as const,
-    unlockCopy: "Cayman threshold unlocked",
-  },
-  {
-    id: "four-family-brrr",
-    title: "4-family BRRR",
-    kicker: "Dream house",
-    description: "Down payment, reserves, and rehab runway for the first BRRR move.",
-    targetCents: 150_000_00,
-    accent: "positive" as const,
-    unlockCopy: "BRRR war chest unlocked",
-  },
-] as const;
 
 export async function getGoalsData(): Promise<GoalsData> {
   const { supabase, user } = await requireUser();
   if (!user) redirect("/login");
 
-  const [activeWeekRes, latestWeekRes, debtsRes] = await Promise.all([
+  const [weeksRes, debtsRes] = await Promise.all([
     supabase
       .from("v_week_totals")
-      .select("running_balance,display_week_number,start_date,end_date,status")
+      .select(
+        "start_date,display_week_number,status,running_balance,cashflow_total",
+      )
       .eq("user_id", user.id)
-      .eq("status", "active")
-      .order("start_date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("v_week_totals")
-      .select("running_balance,display_week_number,start_date,end_date,status")
-      .eq("user_id", user.id)
-      .order("start_date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("debts")
-      .select("id,name,balance,status")
-      .eq("user_id", user.id),
+      .order("start_date", { ascending: true }),
+    supabase.from("debts").select("id,name,balance,status").eq("user_id", user.id),
   ]);
 
-  if (activeWeekRes.error) {
-    throw new Error(`Unable to load active running balance: ${activeWeekRes.error.message}`);
-  }
-  if (latestWeekRes.error) {
-    throw new Error(`Unable to load latest running balance: ${latestWeekRes.error.message}`);
+  if (weeksRes.error) {
+    throw new Error(`Unable to load goal weeks: ${weeksRes.error.message}`);
   }
   if (debtsRes.error) {
     throw new Error(`Unable to load goal debts: ${debtsRes.error.message}`);
   }
 
-  const weekRow = (activeWeekRes.data ?? latestWeekRes.data) as WeekBalanceRow | null;
-  const runningBalanceCents = dollarsToCents(toNumber(weekRow?.running_balance ?? 0));
-  const weekNumber = Math.round(toNumber(weekRow?.display_week_number ?? 0));
+  const weeks = (weeksRes.data ?? []) as WeekRow[];
+  const latest = weeks.at(-1);
+  const active = weeks.find((week) => week.status === "active") ?? latest;
+  const weekNumber = Math.round(toNumber(active?.display_week_number ?? 0));
+  const bankedCents = Math.max(
+    0,
+    dollarsToCents(toNumber(latest?.running_balance ?? 0)),
+  );
+
+  // Median of CLOSED weeks this year. Median rather than mean on purpose: one
+  // $2,600 week should not drag the whole forecast optimistic.
+  const year = (latest?.start_date ?? "2026-01-01").slice(0, 4);
+  const medianWeeklyCashflowCents = median(
+    weeks
+      .filter(
+        (week) => week.status !== "active" && week.start_date >= `${year}-01-01`,
+      )
+      .map((week) => dollarsToCents(toNumber(week.cashflow_total))),
+  );
+
   const debts = ((debtsRes.data ?? []) as DebtRow[]).filter(
     (debt) => debt.status !== "paid",
   );
-  const activeDebtCents = debts.reduce(
-    (sum, debt) => sum + dollarsToCents(toNumber(debt.balance)),
-    0,
-  );
-  const explorerDebt = debts.find((debt) =>
-    /ford|explorer/i.test(debt.name),
-  );
-  const explorerDebtCents = explorerDebt
-    ? dollarsToCents(toNumber(explorerDebt.balance))
-    : activeDebtCents;
-
-  const balanceGoals: Goal[] = BALANCE_GOALS.map((goal) =>
-    mapBalanceGoal(goal, runningBalanceCents),
-  );
-  const explorerGoal = mapDebtGoal({
-    currentDebtCents: explorerDebtCents,
-    label: explorerDebt?.name ?? "Ford Explorer debt",
-  });
-  const goals = [...balanceGoals, explorerGoal];
+  const balanceOf = (pattern: RegExp) => {
+    const match = debts.find((debt) => pattern.test(debt.name));
+    return match ? dollarsToCents(toNumber(match.balance)) : 0;
+  };
 
   return {
-    runningBalanceCents,
-    activeDebtCents,
     weekLabel: weekNumber > 0 ? `Week ${weekNumber}` : "Current week",
-    goals,
-    timeline: goals.map((goal) => ({
-      id: goal.id,
-      title: goal.title,
-      caption:
-        goal.kind === "debt_clear"
-          ? `${formatShortMoney(goal.remainingCents)} remaining`
-          : `${formatShortMoney(goal.targetCents)} threshold`,
-      status: goal.status,
-    })),
-  };
-}
-
-function mapBalanceGoal(
-  goal: (typeof BALANCE_GOALS)[number],
-  runningBalanceCents: number,
-): Goal {
-  const remainingCents = Math.max(0, goal.targetCents - runningBalanceCents);
-  const progress = clamp01(runningBalanceCents / goal.targetCents);
-
-  return {
-    ...goal,
-    kind: "balance_threshold",
-    currentCents: runningBalanceCents,
-    remainingCents,
-    progress,
-    status: progress >= 1 ? "unlocked" : progress > 0 ? "in_progress" : "locked",
-  };
-}
-
-function mapDebtGoal({
-  currentDebtCents,
-  label,
-}: {
-  currentDebtCents: number;
-  label: string;
-}): Goal {
-  const isClear = currentDebtCents <= 0;
-
-  return {
-    id: "ford-explorer-payoff",
-    title: "Ford Explorer",
-    kicker: "Debt payoff",
-    description: `${label} clears when the debt balance hits zero.`,
-    kind: "debt_clear",
-    currentCents: Math.max(0, currentDebtCents),
-    targetCents: 0,
-    remainingCents: Math.max(0, currentDebtCents),
-    progress: isClear ? 1 : 0,
-    status: isClear ? "unlocked" : "in_progress",
-    accent: isClear ? "positive" : "negative",
-    unlockCopy: "Explorer debt cleared",
+    todayIso: new Date().toISOString().slice(0, 10),
+    bankedCents,
+    medianWeeklyCashflowCents,
+    activeDebtCents: debts.reduce(
+      (sum, debt) => sum + dollarsToCents(toNumber(debt.balance)),
+      0,
+    ),
+    explorerCents: balanceOf(/explorer|holyoke/i),
+    teslaCents: balanceOf(/tesla|td auto/i),
   };
 }
 
@@ -200,21 +102,11 @@ function toNumber(value: NumericValue): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function clamp01(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
-
-function formatShortMoney(cents: number): string {
-  const absolute = Math.abs(cents);
-
-  if (absolute >= 100_000_000) {
-    return `$${(cents / 100_000_000).toFixed(1)}M`;
-  }
-
-  if (absolute >= 1_000_00) {
-    return `$${Math.round(cents / 100_000)}K`;
-  }
-
-  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[mid]
+    : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }

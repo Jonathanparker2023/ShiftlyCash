@@ -1,484 +1,473 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import * as THREE from "three";
+import { useMemo, useState } from "react";
 
-import { MetricValue, SemanticChip } from "@/components/shell";
-import type { Goal, GoalsData, GoalStatus } from "@/lib/goals/data";
-import styles from "./GoalsExperience.module.css";
+import type { GoalsData } from "@/lib/goals/data";
+import {
+  ASSUMPTION_SOURCES,
+  DEFAULT_ASSUMPTIONS,
+  type GoalStep,
+  type HouseHackAssumptions,
+  buildLadder,
+} from "@/lib/goals/ladder";
 
-type Props = {
-  data: GoalsData;
-};
-
-const currency = new Intl.NumberFormat("en-US", {
+const money = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   maximumFractionDigits: 0,
 });
 
-export function GoalsExperience({ data }: Props) {
-  const primaryGoal = data.goals[0];
-  const unlocked = data.goals.filter((goal) => goal.status === "unlocked").length;
+function formatMoney(cents: number): string {
+  return money.format(cents / 100);
+}
+
+function formatDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${iso}T00:00:00.000Z`));
+}
+
+function formatHorizon(weeks: number): string {
+  if (weeks < 8) return `${weeks} wk`;
+  const months = Math.round(weeks / 4.345);
+  if (months < 24) return `${months} mo`;
+  return `${(weeks / 52).toFixed(1)} yr`;
+}
+
+export function GoalsExperience({ data }: { data: GoalsData }) {
+  const [override, setOverride] = useState<number | null>(null);
+  const [assumptions, setAssumptions] = useState<HouseHackAssumptions>(
+    DEFAULT_ASSUMPTIONS,
+  );
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [showAssumptions, setShowAssumptions] = useState(false);
+
+  const weeklyCents = override ?? data.medianWeeklyCashflowCents;
+
+  const goals = useMemo(
+    () =>
+      buildLadder({
+        explorerCents: data.explorerCents,
+        teslaCents: data.teslaCents,
+        bankedCents: data.bankedCents,
+        weeklyCashflowCents: weeklyCents,
+        assumptions,
+        todayIso: data.todayIso,
+      }),
+    [data, weeklyCents, assumptions],
+  );
+
+  const maxTarget = Math.max(1, ...goals.map((goal) => goal.targetCents));
+  const totalRemaining = goals.reduce((sum, g) => sum + g.remainingCents, 0);
+  // Rung one renders at the BOTTOM, so the ladder is climbed upward.
+  const topDown = [...goals].sort((a, b) => b.order - a.order);
 
   return (
-    <main className={styles.stage} data-theme="linear">
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <section className="relative min-h-[calc(100vh-6rem)] py-4 lg:py-10">
-          <div className={styles.heroGrid}>
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-brand-text)]">
-                  Goals cockpit
-                </div>
-                <h1 className="max-w-[11ch] text-5xl font-semibold leading-[0.95] tracking-[-0.055em] text-[var(--text-primary)] sm:text-6xl xl:text-7xl">
-                  Unlock the next life.
-                </h1>
-                <p className="max-w-md text-base leading-7 text-[var(--text-secondary)] sm:text-lg">
-                  Balance thresholds for the assets that change the room:
-                  Cayman GTS, first 4-family BRRR, and the Explorer debt clear.
-                </p>
-              </div>
+    <main className="min-h-screen px-4 py-6 text-[var(--text-primary)] sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-4xl">
+        <header className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
+            Bashflow
+          </p>
+          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">Goals</h1>
+          <p className="mt-1.5 max-w-xl text-sm text-[var(--text-tertiary)]">
+            One objective at a time, funded by cashflow. Each rung unlocks the
+            one above it.
+          </p>
+        </header>
 
-              <div className={`${styles.glassPanel} rounded-[var(--radius-panel)] p-4`}>
-                <MetricValue
-                  label={`${data.weekLabel} running balance`}
-                  tone={data.runningBalanceCents >= 0 ? "positive" : "negative"}
-                  value={formatMoney(data.runningBalanceCents)}
-                />
-                <div className={`${styles.chromeLine} mt-4 h-px w-full`} />
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <MiniStat label="Unlocked" value={`${unlocked}/${data.goals.length}`} />
-                  <MiniStat label="Debt left" value={formatMoney(data.activeDebtCents)} />
-                </div>
-              </div>
+        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+            <CashflowControl
+              medianCents={data.medianWeeklyCashflowCents}
+              onChange={setOverride}
+              override={override}
+              weeklyCents={weeklyCents}
+            />
+            <div className="flex gap-5">
+              <Stat label="Banked" value={formatMoney(data.bankedCents)} />
+              <Stat label="Still needed" value={formatMoney(totalRemaining)} />
+              <Stat label={data.weekLabel} value={`${goals.length} rungs`} />
             </div>
+          </div>
 
-            <div className={styles.sceneShell} aria-label="Spinning chrome dream car and house scene">
-              <div className={styles.sceneGlow} />
-              <DreamScene />
-            </div>
+          <ol className="relative">
+            {/* The spine, drawn behind the rungs. */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute bottom-8 left-[27px] top-8 w-px bg-[var(--border-subtle)]"
+            />
+            {topDown.map((goal) => (
+              <GoalRung
+                goal={goal}
+                isOpen={openId === goal.id}
+                key={goal.id}
+                maxTarget={maxTarget}
+                onToggle={() =>
+                  setOpenId((current) => (current === goal.id ? null : goal.id))
+                }
+              />
+            ))}
+          </ol>
 
-            <div className="space-y-3">
-              {data.goals.map((goal) => (
-                <HeroGoalCard goal={goal} key={goal.id} />
-              ))}
-            </div>
+          <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
+            <button
+              className="text-xs font-semibold text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
+              onClick={() => setShowAssumptions((v) => !v)}
+              type="button"
+            >
+              {showAssumptions ? "Hide" : "Show"} house-hack assumptions
+            </button>
+            {showAssumptions ? (
+              <AssumptionEditor
+                assumptions={assumptions}
+                onChange={setAssumptions}
+              />
+            ) : null}
           </div>
         </section>
-
-        <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className={`${styles.glassPanel} rounded-[var(--radius-panel)] p-4 sm:p-5`}>
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-                  Progress cards
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-[var(--text-primary)]">
-                  Thresholds
-                </h2>
-              </div>
-              <SemanticChip tone={primaryGoal.status === "unlocked" ? "positive" : "warning"}>
-                {primaryGoal.status === "unlocked" ? "Next unlocked" : "Next target"}
-              </SemanticChip>
-            </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              {data.goals.map((goal) => (
-                <GoalCard goal={goal} key={goal.id} />
-              ))}
-            </div>
-          </div>
-
-          <div className={`${styles.glassPanel} rounded-[var(--radius-panel)] p-4 sm:p-5`}>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-              Milestone timeline
-            </p>
-            <div className="mt-5 space-y-5">
-              {data.timeline.map((item, index) => (
-                <TimelineItem
-                  caption={item.caption}
-                  isLast={index === data.timeline.length - 1}
-                  key={item.id}
-                  status={item.status}
-                  title={item.title}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      </div>
+      </section>
     </main>
   );
 }
 
-function DreamScene() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const canvasElement = canvas;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-    camera.position.set(0, 1.8, 8.2);
-
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      canvas,
-      powerPreference: "high-performance",
-      preserveDrawingBuffer: true,
-    });
-    renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
-
-    const root = new THREE.Group();
-    scene.add(root);
-
-    const chrome = new THREE.MeshStandardMaterial({
-      color: 0xf0f2f7,
-      emissive: 0x181a24,
-      emissiveIntensity: 0.18,
-      metalness: 0.86,
-      roughness: 0.2,
-    });
-    const graphite = new THREE.MeshPhysicalMaterial({
-      color: 0x111217,
-      metalness: 0.72,
-      roughness: 0.24,
-      clearcoat: 0.8,
-    });
-    const glass = new THREE.MeshPhysicalMaterial({
-      color: 0x5e6ad2,
-      metalness: 0.25,
-      roughness: 0.08,
-      transmission: 0.28,
-      transparent: true,
-      opacity: 0.72,
-    });
-    const tire = new THREE.MeshStandardMaterial({
-      color: 0x050506,
-      metalness: 0.3,
-      roughness: 0.46,
-    });
-    const houseMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x3a3d46,
-      emissive: 0x070812,
-      emissiveIntensity: 0.18,
-      metalness: 0.55,
-      roughness: 0.2,
-      clearcoat: 0.7,
-    });
-    const edgeMaterial = new THREE.LineBasicMaterial({
-      color: 0x99a0ff,
-      opacity: 0.46,
-      transparent: true,
-    });
-
-    const car = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(3.25, 0.62, 1.24, 5, 1, 2), chrome);
-    body.position.y = 0.02;
-    car.add(body);
-    car.add(edgeFor(body, edgeMaterial));
-
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.34, 1.18), chrome);
-    nose.position.set(-1.65, -0.08, 0);
-    car.add(nose);
-    car.add(edgeFor(nose, edgeMaterial));
-
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.56, 1.02), glass);
-    cabin.position.set(0.38, 0.54, 0);
-    cabin.rotation.z = -0.03;
-    car.add(cabin);
-    car.add(edgeFor(cabin, edgeMaterial));
-
-    const spoiler = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.08, 1.38), graphite);
-    spoiler.position.set(1.78, 0.42, 0);
-    car.add(spoiler);
-
-    const wheelGeometry = new THREE.CylinderGeometry(0.36, 0.36, 0.24, 32);
-    for (const x of [-1.12, 1.1]) {
-      for (const z of [-0.68, 0.68]) {
-        const wheel = new THREE.Mesh(wheelGeometry, tire);
-        wheel.rotation.x = Math.PI / 2;
-        wheel.position.set(x, -0.38, z);
-        car.add(wheel);
-      }
-    }
-    car.position.set(-0.8, -0.25, 0);
-    root.add(car);
-
-    const house = new THREE.Group();
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.55, 1.2), houseMaterial);
-    tower.position.set(1.82, 0.17, -0.72);
-    house.add(tower);
-    house.add(edgeFor(tower, edgeMaterial));
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(1.02, 0.62, 4), chrome);
-    roof.rotation.y = Math.PI / 4;
-    roof.position.set(1.82, 1.28, -0.72);
-    house.add(roof);
-    house.add(edgeFor(roof, edgeMaterial));
-    const windowMaterial = new THREE.MeshBasicMaterial({ color: 0x99a0ff });
-    for (let row = 0; row < 2; row += 1) {
-      for (let col = 0; col < 2; col += 1) {
-        const windowMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.28), windowMaterial);
-        windowMesh.position.set(1.58 + col * 0.48, 0.1 + row * 0.48, -0.105);
-        windowMesh.rotation.y = 0;
-        house.add(windowMesh);
-      }
-    }
-    root.add(house);
-
-    const platform = new THREE.Mesh(
-      new THREE.CylinderGeometry(3.1, 3.45, 0.08, 96),
-      new THREE.MeshPhysicalMaterial({
-        color: 0x0f1011,
-        metalness: 0.8,
-        roughness: 0.16,
-        clearcoat: 1,
-      }),
-    );
-    platform.position.y = -0.78;
-    root.add(platform);
-
-    const particleCount = 180;
-    const positions = new Float32Array(particleCount * 3);
-    for (let index = 0; index < particleCount; index += 1) {
-      positions[index * 3] = (Math.random() - 0.5) * 9;
-      positions[index * 3 + 1] = Math.random() * 5 - 1.4;
-      positions[index * 3 + 2] = (Math.random() - 0.5) * 6;
-    }
-    const particleGeometry = new THREE.BufferGeometry();
-    particleGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const particles = new THREE.Points(
-      particleGeometry,
-      new THREE.PointsMaterial({
-        color: 0x99a0ff,
-        opacity: 0.42,
-        size: 0.025,
-        transparent: true,
-      }),
-    );
-    scene.add(particles);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const fillLight = new THREE.HemisphereLight(0xdfe7ff, 0x08080a, 1.55);
-    scene.add(fillLight);
-    const keyLight = new THREE.SpotLight(0xffffff, 4.8, 18, Math.PI / 5, 0.5, 0.9);
-    keyLight.position.set(-3.5, 5.4, 5);
-    scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0x5e6ad2, 8, 10);
-    rimLight.position.set(3.2, 1.4, 2.4);
-    scene.add(rimLight);
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let frameId = 0;
-    let disposed = false;
-
-    function resize() {
-      const rect = canvasElement.getBoundingClientRect();
-      const width = Math.max(1, rect.width);
-      const height = Math.max(1, rect.height);
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    }
-
-    const observer = new ResizeObserver(resize);
-    observer.observe(canvasElement);
-    resize();
-
-    const clock = new THREE.Clock();
-
-    function render() {
-      if (disposed) return;
-      const elapsed = clock.getElapsedTime();
-      if (!reduceMotion.matches) {
-        root.rotation.y = elapsed * 0.19;
-        root.rotation.x = Math.sin(elapsed * 0.35) * 0.035;
-        particles.rotation.y = elapsed * 0.035;
-      } else {
-        root.rotation.y = 0.38;
-      }
-      renderer.render(scene, camera);
-      frameId = window.requestAnimationFrame(render);
-    }
-
-    render();
-
-    return () => {
-      disposed = true;
-      window.cancelAnimationFrame(frameId);
-      observer.disconnect();
-      renderer.dispose();
-      scene.traverse((object) => {
-        if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
-          object.geometry.dispose();
-          const materials = Array.isArray(object.material)
-            ? object.material
-            : [object.material];
-          materials.forEach((material) => material.dispose());
-        }
-      });
-    };
-  }, []);
-
-  return <canvas className={styles.sceneCanvas} data-goals-canvas ref={canvasRef} />;
-}
-
-function HeroGoalCard({ goal }: { goal: Goal }) {
-  return (
-    <article className={`${styles.glassPanel} rounded-[var(--radius-panel)] p-4`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-            {goal.kicker}
-          </p>
-          <h2 className="mt-1 text-lg font-semibold tracking-[-0.025em] text-[var(--text-primary)]">
-            {goal.title}
-          </h2>
-        </div>
-        <GoalStatusChip status={goal.status} />
-      </div>
-      <ProgressBar goal={goal} />
-      <div className="mt-3 flex items-end justify-between gap-3 text-sm">
-        <span className="text-[var(--text-tertiary)]">
-          {goal.kind === "debt_clear" ? "Remaining" : "Needed"}
-        </span>
-        <strong className="text-base font-semibold text-[var(--text-primary)]">
-          {formatMoney(goal.remainingCents)}
-        </strong>
-      </div>
-    </article>
-  );
-}
-
-function GoalCard({ goal }: { goal: Goal }) {
-  const value = goal.kind === "debt_clear" ? goal.remainingCents : goal.currentCents;
-
-  return (
-    <article className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[var(--panel-shadow)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-            {goal.kicker}
-          </p>
-          <h3 className="mt-1 text-xl font-semibold tracking-[-0.035em] text-[var(--text-primary)]">
-            {goal.title}
-          </h3>
-        </div>
-        <GoalStatusChip status={goal.status} />
-      </div>
-      <p className="mt-3 min-h-[3rem] text-sm leading-6 text-[var(--text-secondary)]">
-        {goal.description}
-      </p>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <MiniStat
-          label={goal.kind === "debt_clear" ? "Debt" : "Balance"}
-          value={formatMoney(value)}
-        />
-        <MiniStat
-          label={goal.kind === "debt_clear" ? "Clear line" : "Threshold"}
-          value={goal.kind === "debt_clear" ? "$0" : formatMoney(goal.targetCents)}
-        />
-      </div>
-      <ProgressBar goal={goal} />
-      <p className="mt-3 text-sm font-medium text-[var(--text-secondary)]">
-        {goal.status === "unlocked" ? goal.unlockCopy : `${formatMoney(goal.remainingCents)} to go`}
-      </p>
-    </article>
-  );
-}
-
-function ProgressBar({ goal }: { goal: Goal }) {
-  const width = `${Math.max(goal.status === "unlocked" ? 100 : 4, goal.progress * 100)}%`;
-
-  return (
-    <div className="mt-4 h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.07)]">
-      <div
-        className={styles.progressFill}
-        style={{
-          width,
-          background:
-            goal.accent === "negative"
-              ? "linear-gradient(90deg, var(--accent-negative), var(--accent-negative-text))"
-              : goal.accent === "positive"
-                ? "linear-gradient(90deg, var(--accent-primary), var(--accent-primary-text))"
-                : "linear-gradient(90deg, var(--accent-brand), var(--accent-brand-text))",
-        }}
-      />
-    </div>
-  );
-}
-
-function TimelineItem({
-  caption,
-  isLast,
-  status,
-  title,
+function CashflowControl({
+  medianCents,
+  onChange,
+  override,
+  weeklyCents,
 }: {
-  caption: string;
-  isLast: boolean;
-  status: GoalStatus;
-  title: string;
+  medianCents: number;
+  onChange: (value: number | null) => void;
+  override: number | null;
+  weeklyCents: number;
 }) {
-  const dotClass = useMemo(() => {
-    if (status === "unlocked") return "bg-[var(--accent-primary-text)]";
-    if (status === "in_progress") return "bg-[var(--accent-brand-text)]";
-    return "bg-[var(--surface-hover)]";
-  }, [status]);
+  return (
+    <div className="min-w-0">
+      <div className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        Weekly cashflow applied
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <span className="text-[var(--text-tertiary)]">$</span>
+        <input
+          className="h-9 w-28 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 text-lg font-semibold tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--accent-brand-border)]"
+          inputMode="numeric"
+          onChange={(event) => {
+            const parsed = Number(event.target.value);
+            onChange(Number.isFinite(parsed) && parsed > 0 ? parsed * 100 : null);
+          }}
+          type="number"
+          value={Math.round(weeklyCents / 100)}
+        />
+        {override === null ? (
+          <span className="text-xs text-[var(--text-muted)]">
+            median of {formatMoney(medianCents)}/wk this year
+          </span>
+        ) : (
+          <button
+            className="text-xs font-semibold text-[var(--accent-brand-text)] hover:underline"
+            onClick={() => onChange(null)}
+            type="button"
+          >
+            reset to median
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GoalRung({
+  goal,
+  isOpen,
+  maxTarget,
+  onToggle,
+}: {
+  goal: GoalStep;
+  isOpen: boolean;
+  maxTarget: number;
+  onToggle: () => void;
+}) {
+  const active = goal.status === "active";
+  const complete = goal.status === "complete";
+  const locked = goal.status === "locked";
+  // Bar length is the goal's COST relative to the biggest rung, so the ladder
+  // shows at a glance which objective is the heavy one.
+  const widthPct = Math.max(6, (goal.targetCents / maxTarget) * 100);
 
   return (
-    <div className="relative grid grid-cols-[18px_1fr] gap-4">
-      <div className="relative flex justify-center">
-        <span className={`mt-1 h-3 w-3 rounded-full ${dotClass} shadow-[0_0_18px_rgba(94,106,210,0.55)]`} />
-        {!isLast ? (
-          <span className={`${styles.timelineLine} absolute top-6 h-[calc(100%+1.25rem)] w-px opacity-60`} />
-        ) : null}
-      </div>
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">{title}</h3>
-          <GoalStatusChip status={status} />
+    <li className="group relative pl-[70px]">
+      {/* Node + artwork slot */}
+      <span
+        className={`absolute left-0 top-4 z-10 flex h-[54px] w-[54px] items-center justify-center overflow-hidden rounded-xl border transition-all duration-200 ${
+          active
+            ? "border-[var(--accent-brand-border)] shadow-[0_0_24px_-6px_var(--accent-brand)]"
+            : complete
+              ? "border-[var(--accent-primary-border)]"
+              : "border-[var(--border-subtle)]"
+        } bg-[var(--surface-elevated)] ${locked ? "opacity-45" : ""}`}
+      >
+        <GoalArtwork goal={goal} />
+      </span>
+
+      <button
+        aria-expanded={isOpen}
+        className={`w-full rounded-xl border px-3 py-3 text-left outline-none transition-all duration-200 ${
+          active
+            ? "border-[var(--accent-brand-border)] bg-[var(--surface-elevated)]"
+            : "border-transparent hover:border-[var(--border-default)] hover:bg-[var(--surface-elevated)]"
+        } ${locked ? "opacity-60 hover:opacity-100" : ""}`}
+        onClick={onToggle}
+        type="button"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <span className="flex flex-wrap items-baseline gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              {goal.kicker}
+            </span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">
+              {goal.title}
+            </span>
+          </span>
+          <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+            {formatMoney(goal.targetCents)}
+          </span>
         </div>
-        <p className="mt-1 text-sm text-[var(--text-tertiary)]">{caption}</p>
+
+        {/* Cost bar. Width = relative cost, fill = progress toward it. */}
+        <div className="mt-2 h-2.5 w-full">
+          <div
+            className={`relative h-full overflow-hidden rounded-full border transition-all duration-200 ${
+              active
+                ? "border-[rgba(255,255,255,0.45)] group-hover:shadow-[0_0_18px_-4px_rgba(255,255,255,0.6)]"
+                : "border-[rgba(255,255,255,0.18)]"
+            }`}
+            style={{ width: `${widthPct}%` }}
+          >
+            <span
+              className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
+                complete
+                  ? "bg-[var(--accent-primary)]"
+                  : "bg-[rgba(255,255,255,0.9)]"
+              }`}
+              style={{
+                width: `${Math.max(0, Math.min(100, goal.progress * 100))}%`,
+                boxShadow: active ? "0 0 16px rgba(255,255,255,0.55)" : undefined,
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
+          <span className="tabular-nums">
+            {formatMoney(goal.fundedCents)} of {formatMoney(goal.targetCents)}
+          </span>
+          {complete ? (
+            <span className="font-semibold text-[var(--accent-primary-text)]">
+              Cleared
+            </span>
+          ) : goal.weeksAway === null ? (
+            <span className="text-[var(--accent-warning-text)]">
+              No cashflow — set a weekly number
+            </span>
+          ) : (
+            <span className="font-semibold text-[var(--text-tertiary)]">
+              {formatHorizon(goal.weeksAway)} away
+              {goal.etaIso ? ` · ${formatDate(goal.etaIso)}` : ""}
+            </span>
+          )}
+          {goal.deadlineIso ? (
+            <span
+              className={
+                goal.missesDeadline
+                  ? "font-semibold text-[var(--accent-negative-text)]"
+                  : ""
+              }
+            >
+              {goal.deadlineLabel} {formatDate(goal.deadlineIso)}
+              {goal.missesDeadline ? " — projected to miss" : ""}
+            </span>
+          ) : null}
+          <span className="ml-auto text-[var(--text-muted)]">
+            {isOpen ? "Hide detail" : "Detail"}
+          </span>
+        </div>
+
+        <div
+          className={`grid transition-all duration-300 ${
+            isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <p className="pt-3 text-sm leading-6 text-[var(--text-secondary)]">
+              {goal.description}
+            </p>
+            <dl className="mt-3 space-y-1.5">
+              {goal.components.map((component) => (
+                <div
+                  className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-[var(--border-subtle)] pt-1.5 text-xs"
+                  key={component.label}
+                >
+                  <dt className="font-semibold text-[var(--text-secondary)]">
+                    {component.label}
+                    <span className="ml-2 font-normal text-[var(--text-muted)]">
+                      {component.note}
+                    </span>
+                  </dt>
+                  <dd className="tabular-nums text-[var(--text-primary)]">
+                    {formatMoney(component.cents)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * Artwork slot. Jon supplies the images; until a file exists at the goal's
+ * path the tile falls back to its rung number rather than a broken image.
+ */
+function GoalArtwork({ goal }: { goal: GoalStep }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <span className="text-lg font-semibold text-[var(--text-muted)]">
+        {goal.order}
+      </span>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      alt=""
+      className="h-full w-full object-cover"
+      onError={() => setFailed(true)}
+      src={goal.imageSrc}
+    />
+  );
+}
+
+function AssumptionEditor({
+  assumptions,
+  onChange,
+}: {
+  assumptions: HouseHackAssumptions;
+  onChange: (value: HouseHackAssumptions) => void;
+}) {
+  const set = (patch: Partial<HouseHackAssumptions>) =>
+    onChange({ ...assumptions, ...patch });
+
+  return (
+    <div className="mt-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Field
+          label="Property price"
+          onChange={(v) => set({ propertyPriceCents: v * 100 })}
+          prefix="$"
+          value={Math.round(assumptions.propertyPriceCents / 100)}
+        />
+        <Field
+          label="Down payment"
+          onChange={(v) => set({ downPaymentPct: v })}
+          step={0.5}
+          suffix="%"
+          value={assumptions.downPaymentPct}
+        />
+        <Field
+          label="Closing costs"
+          onChange={(v) => set({ closingCostPct: v })}
+          step={0.5}
+          suffix="%"
+          value={assumptions.closingCostPct}
+        />
+        <Field
+          label="Reserve months"
+          onChange={(v) => set({ reserveMonths: v })}
+          value={assumptions.reserveMonths}
+        />
+        <Field
+          label="Monthly PITI"
+          onChange={(v) => set({ monthlyPitiCents: v * 100 })}
+          prefix="$"
+          value={Math.round(assumptions.monthlyPitiCents / 100)}
+        />
+        <button
+          className="self-end rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-tertiary)] transition-colors hover:border-[var(--border-default)] hover:text-[var(--text-primary)]"
+          onClick={() => onChange(DEFAULT_ASSUMPTIONS)}
+          type="button"
+        >
+          Reset to researched defaults
+        </button>
+      </div>
+      <ul className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
+        {ASSUMPTION_SOURCES.map((source) => (
+          <li key={source}>· {source}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  onChange,
+  prefix,
+  step,
+  suffix,
+  value,
+}: {
+  label: string;
+  onChange: (value: number) => void;
+  prefix?: string;
+  step?: number;
+  suffix?: string;
+  value: number;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </span>
+      <span className="mt-1 flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2">
+        {prefix ? (
+          <span className="text-xs text-[var(--text-tertiary)]">{prefix}</span>
+        ) : null}
+        <input
+          className="h-9 w-full bg-transparent text-sm font-semibold tabular-nums text-[var(--text-primary)] outline-none"
+          inputMode="decimal"
+          onChange={(event) => {
+            const parsed = Number(event.target.value);
+            if (Number.isFinite(parsed) && parsed >= 0) onChange(parsed);
+          }}
+          step={step ?? 1}
+          type="number"
+          value={value}
+        />
+        {suffix ? (
+          <span className="text-xs text-[var(--text-tertiary)]">{suffix}</span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-right">
+      <div className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
       </div>
     </div>
   );
-}
-
-function GoalStatusChip({ status }: { status: GoalStatus }) {
-  if (status === "unlocked") return <SemanticChip tone="positive">Unlocked</SemanticChip>;
-  if (status === "in_progress") return <SemanticChip tone="warning">In motion</SemanticChip>;
-  return <SemanticChip tone="negative">Locked</SemanticChip>;
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[var(--radius-data)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function formatMoney(cents: number): string {
-  return currency.format(cents / 100);
-}
-
-function edgeFor(mesh: THREE.Mesh, material: THREE.LineBasicMaterial) {
-  const edges = new THREE.EdgesGeometry(mesh.geometry, 25);
-  const line = new THREE.LineSegments(edges, material);
-  line.position.copy(mesh.position);
-  line.rotation.copy(mesh.rotation);
-  line.scale.copy(mesh.scale);
-  return line;
 }
