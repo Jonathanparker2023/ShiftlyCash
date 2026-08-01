@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/domain/money";
+import type { DebtBalance, GoalRungRecord, TargetKind } from "@/lib/goals/ladder";
 
 type NumericValue = number | string | null;
 
@@ -9,42 +10,56 @@ type WeekRow = {
   start_date: string;
   display_week_number: NumericValue;
   status: string;
-  running_balance: NumericValue;
   cashflow_total: NumericValue;
 };
 
 type DebtRow = {
-  id: string;
   name: string;
   balance: NumericValue;
   status: string;
 };
 
-/** Primitives only — the client rebuilds the ladder as assumptions change. */
+type RungRow = {
+  id: string;
+  order_index: number;
+  title: string;
+  kicker: string;
+  description: string;
+  image_src: string | null;
+  target_kind: string;
+  target_cents: NumericValue;
+  debt_match: string | null;
+  deadline_on: string | null;
+  deadline_label: string | null;
+};
+
 export type GoalsData = {
   weekLabel: string;
   todayIso: string;
-  /** Cumulative cashflow banked this year: the pool that fills the ladder. */
-  bankedCents: number;
   medianWeeklyCashflowCents: number;
-  activeDebtCents: number;
-  explorerCents: number;
-  teslaCents: number;
+  debts: DebtBalance[];
+  rungs: GoalRungRecord[];
 };
 
 export async function getGoalsData(): Promise<GoalsData> {
   const { supabase, user } = await requireUser();
   if (!user) redirect("/login");
 
-  const [weeksRes, debtsRes] = await Promise.all([
+  const [weeksRes, debtsRes, rungsRes] = await Promise.all([
     supabase
       .from("v_week_totals")
-      .select(
-        "start_date,display_week_number,status,running_balance,cashflow_total",
-      )
+      .select("start_date,display_week_number,status,cashflow_total")
       .eq("user_id", user.id)
       .order("start_date", { ascending: true }),
-    supabase.from("debts").select("id,name,balance,status").eq("user_id", user.id),
+    supabase.from("debts").select("name,balance,status").eq("user_id", user.id),
+    supabase
+      .from("goal_rungs")
+      .select(
+        "id,order_index,title,kicker,description,image_src,target_kind,target_cents,debt_match,deadline_on,deadline_label",
+      )
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .order("order_index", { ascending: true }),
   ]);
 
   if (weeksRes.error) {
@@ -53,15 +68,14 @@ export async function getGoalsData(): Promise<GoalsData> {
   if (debtsRes.error) {
     throw new Error(`Unable to load goal debts: ${debtsRes.error.message}`);
   }
+  if (rungsRes.error) {
+    throw new Error(`Unable to load goal rungs: ${rungsRes.error.message}`);
+  }
 
   const weeks = (weeksRes.data ?? []) as WeekRow[];
   const latest = weeks.at(-1);
   const active = weeks.find((week) => week.status === "active") ?? latest;
   const weekNumber = Math.round(toNumber(active?.display_week_number ?? 0));
-  const bankedCents = Math.max(
-    0,
-    dollarsToCents(toNumber(latest?.running_balance ?? 0)),
-  );
 
   // Median of CLOSED weeks this year. Median rather than mean on purpose: one
   // $2,600 week should not drag the whole forecast optimistic.
@@ -74,25 +88,35 @@ export async function getGoalsData(): Promise<GoalsData> {
       .map((week) => dollarsToCents(toNumber(week.cashflow_total))),
   );
 
-  const debts = ((debtsRes.data ?? []) as DebtRow[]).filter(
-    (debt) => debt.status !== "paid",
+  const debts = ((debtsRes.data ?? []) as DebtRow[])
+    .filter((debt) => debt.status !== "paid")
+    .map((debt) => ({
+      name: debt.name,
+      cents: dollarsToCents(toNumber(debt.balance)),
+    }));
+
+  const rungs: GoalRungRecord[] = ((rungsRes.data ?? []) as RungRow[]).map(
+    (row) => ({
+      id: row.id,
+      orderIndex: row.order_index,
+      title: row.title,
+      kicker: row.kicker,
+      description: row.description,
+      imageSrc: row.image_src,
+      targetKind: row.target_kind as TargetKind,
+      targetCents: Math.round(toNumber(row.target_cents)),
+      debtMatch: row.debt_match,
+      deadlineOn: row.deadline_on,
+      deadlineLabel: row.deadline_label,
+    }),
   );
-  const balanceOf = (pattern: RegExp) => {
-    const match = debts.find((debt) => pattern.test(debt.name));
-    return match ? dollarsToCents(toNumber(match.balance)) : 0;
-  };
 
   return {
     weekLabel: weekNumber > 0 ? `Week ${weekNumber}` : "Current week",
     todayIso: new Date().toISOString().slice(0, 10),
-    bankedCents,
     medianWeeklyCashflowCents,
-    activeDebtCents: debts.reduce(
-      (sum, debt) => sum + dollarsToCents(toNumber(debt.balance)),
-      0,
-    ),
-    explorerCents: balanceOf(/explorer|holyoke/i),
-    teslaCents: balanceOf(/tesla|td auto/i),
+    debts,
+    rungs,
   };
 }
 

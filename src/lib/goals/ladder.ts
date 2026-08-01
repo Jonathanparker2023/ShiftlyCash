@@ -2,11 +2,28 @@
  * Pure goal-ladder maths.
  *
  * Lives apart from data.ts because the client recomputes the whole ladder
- * whenever an assumption or the weekly cashflow is changed, and data.ts pulls
- * in server-only auth.
+ * whenever an assumption, the weekly cashflow, or a rung itself is edited,
+ * and data.ts pulls in server-only auth.
  */
 
 export type GoalStatus = "complete" | "active" | "locked";
+
+export type TargetKind = "fixed" | "debt" | "house_hack";
+
+/** A rung exactly as it is stored — the editable record. */
+export type GoalRungRecord = {
+  id: string;
+  orderIndex: number;
+  title: string;
+  kicker: string;
+  description: string;
+  imageSrc: string | null;
+  targetKind: TargetKind;
+  targetCents: number;
+  debtMatch: string | null;
+  deadlineOn: string | null;
+  deadlineLabel: string | null;
+};
 
 export type GoalComponent = {
   label: string;
@@ -14,27 +31,18 @@ export type GoalComponent = {
   note: string;
 };
 
-export type GoalStep = {
-  id: string;
-  /** 1 is the first rung and renders at the BOTTOM of the ladder. */
+/** A rung with everything derived for display. */
+export type GoalStep = GoalRungRecord & {
   order: number;
-  title: string;
-  kicker: string;
-  description: string;
-  /** Jon supplies artwork later; a placeholder renders until then. */
-  imageSrc: string;
-  targetCents: number;
+  resolvedTargetCents: number;
   fundedCents: number;
   remainingCents: number;
   progress: number;
   status: GoalStatus;
   components: GoalComponent[];
-  /** Cumulative: reaching rung 2 means clearing rung 1 first. */
+  /** Cumulative: reaching rung 3 means clearing 1 and 2 first. */
   weeksAway: number | null;
   etaIso: string | null;
-  deadlineIso: string | null;
-  deadlineLabel: string | null;
-  /** True when the projected date lands after the deadline. */
   missesDeadline: boolean;
 };
 
@@ -44,8 +52,6 @@ export type HouseHackAssumptions = {
   closingCostPct: number;
   reserveMonths: number;
   monthlyPitiCents: number;
-  /** Rung four: starting capital for the BRRR operation. */
-  brrrCapitalCents: number;
 };
 
 /**
@@ -67,7 +73,6 @@ export const DEFAULT_ASSUMPTIONS: HouseHackAssumptions = {
   closingCostPct: 3,
   reserveMonths: 3,
   monthlyPitiCents: 3_700_00,
-  brrrCapitalCents: 90_000_00,
 };
 
 export const ASSUMPTION_SOURCES = [
@@ -77,10 +82,6 @@ export const ASSUMPTION_SOURCES = [
   "Hartford assesses 4+ unit buildings as commercial, which raises the tax line versus a two or three family.",
 ];
 
-// Loan maturities: what makes the ladder time-sensitive.
-export const EXPLORER_MATURITY = "2029-12-16"; // opened 2024-12-16, 60 months
-export const TESLA_MATURITY = "2032-07-01"; // originated July 2026, 72 months
-
 export function houseHackEntry(a: HouseHackAssumptions) {
   const down = Math.round(a.propertyPriceCents * (a.downPaymentPct / 100));
   const closing = Math.round(a.propertyPriceCents * (a.closingCostPct / 100));
@@ -88,15 +89,16 @@ export function houseHackEntry(a: HouseHackAssumptions) {
   return { down, closing, reserves, total: down + closing + reserves };
 }
 
+export type DebtBalance = { name: string; cents: number };
+
 export type LadderInput = {
-  explorerCents: number;
-  teslaCents: number;
+  rungs: GoalRungRecord[];
+  debts: DebtBalance[];
   /**
    * Capital actually earmarked against the ladder today. Deliberately NOT the
    * year's running balance: that is cumulative cashflow already spent, a
-   * historical metric, and treating it as a war chest made rung one read
-   * "Cleared" while $13,923 was still owed on the Explorer. The ladder is a
-   * forward projection unless real money is assigned to it.
+   * historical metric, and treating it as a war chest made a rung read
+   * "Cleared" while the debt behind it was still owed.
    */
   appliedCapitalCents: number;
   weeklyCashflowCents: number;
@@ -108,36 +110,34 @@ export function buildLadder(input: LadderInput): GoalStep[] {
   const entry = houseHackEntry(input.assumptions);
   const a = input.assumptions;
 
-  const rungs = [
-    {
-      id: "explorer-payoff",
-      order: 1,
-      title: "Clear the Explorer",
-      kicker: "Rung one",
-      imageSrc: "/goals/explorer-payoff.png",
-      description:
-        "The Explorer is the most expensive money on the board at 18.8%, so it dies first on pure arithmetic — no other dollar bought back earns that much. It is also the smallest rung, which means the ladder starts with a win rather than a slog. Clearing it does double duty: it ends the interest, and it strips a $455 monthly payment out of the debt-to-income ratio a mortgage underwriter will scrutinise on the very next rung.",
-      deadlineIso: EXPLORER_MATURITY,
-      deadlineLabel: "Explorer loan matures",
-      components: [
+  const ordered = [...input.rungs].sort((x, y) => x.orderIndex - y.orderIndex);
+
+  let pool = Math.max(0, input.appliedCapitalCents);
+  let cumulativeRemaining = 0;
+  const weekly = Math.max(0, input.weeklyCashflowCents);
+
+  const steps: GoalStep[] = ordered.map((rung, index) => {
+    let resolvedTargetCents = rung.targetCents;
+    let components: GoalComponent[] = [
+      { label: rung.title, cents: rung.targetCents, note: "Target amount" },
+    ];
+
+    if (rung.targetKind === "debt") {
+      const pattern = rung.debtMatch ? new RegExp(rung.debtMatch, "i") : null;
+      const match = pattern
+        ? input.debts.find((debt) => pattern.test(debt.name))
+        : undefined;
+      resolvedTargetCents = match?.cents ?? 0;
+      components = [
         {
-          label: "Ford Explorer payoff",
-          cents: input.explorerCents,
-          note: "Holyoke Credit Union at 18.8% — the costliest money on the board",
+          label: match?.name ?? "Linked debt",
+          cents: resolvedTargetCents,
+          note: match ? "Live balance" : "No debt matches this rung",
         },
-      ],
-    },
-    {
-      id: "multifamily-house-hack",
-      order: 2,
-      title: "Multifamily house hack",
-      kicker: "Rung two",
-      imageSrc: "/goals/multifamily-house-hack.png",
-      description:
-        "The cash it takes to actually stand at a closing table on a Hartford-area multifamily. Three separate piles, not one: the FHA down payment, the closing costs, and reserves — and the reserves are the part people miss, because the FHA requires three months of the full payment held AFTER the deposit and closing on a three or four unit purchase. Living in one unit and renting the rest is what turns housing from the largest expense on the board into something that pays. It sits above the Explorer because the underwriter looks at debt-to-income, and a cleared auto loan makes this rung cheaper to qualify for.",
-      deadlineIso: null,
-      deadlineLabel: null,
-      components: [
+      ];
+    } else if (rung.targetKind === "house_hack") {
+      resolvedTargetCents = entry.total;
+      components = [
         {
           label: "FHA down payment",
           cents: entry.down,
@@ -153,55 +153,12 @@ export function buildLadder(input: LadderInput): GoalStep[] {
           cents: entry.reserves,
           note: `${a.reserveMonths} months of PITI, required on 3-4 units`,
         },
-      ],
-    },
-    {
-      id: "tesla-payoff",
-      order: 3,
-      title: "Kill the Tesla note",
-      kicker: "Rung three",
-      imageSrc: "/goals/tesla-payoff.png",
-      description:
-        "The Onyx loan is the single largest obligation on the board — 72 months at 10.94%, roughly $11,700 of interest if it runs to term. Every dollar thrown at it after the house hack is interest bought back. It sits third deliberately: at 10.94% it is cheaper money than the Explorer was, and a paid-off car with no property is a worse position than a property with the note still running, because the property pays rent and the car does not.",
-      deadlineIso: TESLA_MATURITY,
-      deadlineLabel: "Tesla loan matures",
-      components: [
-        {
-          label: "TD Auto Finance balance",
-          cents: input.teslaCents,
-          note: "10.94% over 72 months — unconfirmed until TD's first statement",
-        },
-      ],
-    },
-    {
-      id: "brrr-capital",
-      order: 4,
-      title: "BRRR business capital",
-      kicker: "Rung four",
-      imageSrc: "/goals/brrr-capital.png",
-      description:
-        "Buy, rehab, rent, refinance, repeat — the first real operating war chest. This is the rung where the ladder stops being about escaping debt and starts being about buying assets on purpose. It comes last not because it matters least, but because it is the only rung that needs everything below it to be true first: no consumer debt draining cashflow, a property already producing rent, and the experience of having run one deal. Capital without that sequence is just risk.",
-      deadlineIso: null,
-      deadlineLabel: null,
-      components: [
-        {
-          label: "Operating capital",
-          cents: a.brrrCapitalCents,
-          note: "Acquisition, rehab runway, and holding costs for the first deal",
-        },
-      ],
-    },
-  ];
+      ];
+    }
 
-  let pool = Math.max(0, input.appliedCapitalCents);
-  let cumulativeRemaining = 0;
-  const weekly = Math.max(0, input.weeklyCashflowCents);
-
-  const goals: GoalStep[] = rungs.map((rung) => {
-    const targetCents = rung.components.reduce((sum, c) => sum + c.cents, 0);
-    const fundedCents = Math.min(pool, targetCents);
+    const fundedCents = Math.min(pool, resolvedTargetCents);
     pool -= fundedCents;
-    const remainingCents = Math.max(0, targetCents - fundedCents);
+    const remainingCents = Math.max(0, resolvedTargetCents - fundedCents);
     cumulativeRemaining += remainingCents;
 
     const weeksAway =
@@ -215,24 +172,26 @@ export function buildLadder(input: LadderInput): GoalStep[] {
 
     return {
       ...rung,
-      targetCents,
+      order: index + 1,
+      resolvedTargetCents,
       fundedCents,
       remainingCents,
-      progress: targetCents > 0 ? fundedCents / targetCents : 0,
+      progress: resolvedTargetCents > 0 ? fundedCents / resolvedTargetCents : 0,
       status: (remainingCents <= 0 ? "complete" : "locked") as GoalStatus,
+      components,
       weeksAway,
       etaIso,
-      deadlineIso: rung.deadlineIso,
-      deadlineLabel: rung.deadlineLabel,
-      missesDeadline: Boolean(etaIso && rung.deadlineIso && etaIso > rung.deadlineIso),
+      missesDeadline: Boolean(
+        etaIso && rung.deadlineOn && etaIso > rung.deadlineOn,
+      ),
     };
   });
 
   // Exactly one rung reads as active: the lowest incomplete one.
-  const next = goals.find((goal) => goal.status !== "complete");
+  const next = steps.find((step) => step.status !== "complete");
   if (next) next.status = "active";
 
-  return goals;
+  return steps;
 }
 
 function addDaysIso(iso: string, days: number): string {
