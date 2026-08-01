@@ -388,14 +388,20 @@ function EnergyTimelineRow({
           <div className="overflow-hidden">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-xs text-[var(--text-muted)]">
               <span>{longDate(event.date)}</span>
-              {gapDays !== null ? (
+              {gapDays === null ? (
                 <span className="text-[var(--text-tertiary)]">
-                  {gapDays} {gapDays === 1 ? "day" : "days"} since the previous{" "}
-                  {eventLabel}
+                  First {eventLabel} on record
+                </span>
+              ) : gapDays === 0 ? (
+                // Multiple charges a day is normal for a Supercharger, so say
+                // so plainly rather than "0 days since".
+                <span className="text-[var(--text-tertiary)]">
+                  Same day as the previous {eventLabel}
                 </span>
               ) : (
                 <span className="text-[var(--text-tertiary)]">
-                  First {eventLabel} on record
+                  {gapDays} {gapDays === 1 ? "day" : "days"} since the previous{" "}
+                  {eventLabel}
                 </span>
               )}
               {perDayCents !== null ? (
