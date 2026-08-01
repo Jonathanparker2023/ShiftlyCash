@@ -38,6 +38,10 @@ function formatHorizon(weeks: number): string {
 
 export function GoalsExperience({ data }: { data: GoalsData }) {
   const [override, setOverride] = useState<number | null>(null);
+  // Starts at zero on purpose. The year's running balance is cumulative
+  // cashflow already spent, not a war chest — auto-applying it claimed the
+  // Explorer was cleared while it was still owed.
+  const [startingCapitalCents, setStartingCapitalCents] = useState(0);
   const [assumptions, setAssumptions] = useState<HouseHackAssumptions>(
     DEFAULT_ASSUMPTIONS,
   );
@@ -51,12 +55,12 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
       buildLadder({
         explorerCents: data.explorerCents,
         teslaCents: data.teslaCents,
-        bankedCents: data.bankedCents,
+        appliedCapitalCents: startingCapitalCents,
         weeklyCashflowCents: weeklyCents,
         assumptions,
         todayIso: data.todayIso,
       }),
-    [data, weeklyCents, assumptions],
+    [data, weeklyCents, assumptions, startingCapitalCents],
   );
 
   const maxTarget = Math.max(1, ...goals.map((goal) => goal.targetCents));
@@ -80,14 +84,21 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
 
         <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-            <CashflowControl
-              medianCents={data.medianWeeklyCashflowCents}
-              onChange={setOverride}
-              override={override}
-              weeklyCents={weeklyCents}
-            />
+            <div className="flex flex-wrap items-end gap-5">
+              <CashflowControl
+                medianCents={data.medianWeeklyCashflowCents}
+                onChange={setOverride}
+                override={override}
+                weeklyCents={weeklyCents}
+              />
+              <NumberControl
+                hint="cash you're putting in up front"
+                label="Starting capital"
+                onChange={setStartingCapitalCents}
+                valueCents={startingCapitalCents}
+              />
+            </div>
             <div className="flex gap-5">
-              <Stat label="Banked" value={formatMoney(data.bankedCents)} />
               <Stat label="Still needed" value={formatMoney(totalRemaining)} />
               <Stat label={data.weekLabel} value={`${goals.length} rungs`} />
             </div>
@@ -174,6 +185,40 @@ function CashflowControl({
             reset to median
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function NumberControl({
+  hint,
+  label,
+  onChange,
+  valueCents,
+}: {
+  hint: string;
+  label: string;
+  onChange: (cents: number) => void;
+  valueCents: number;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <span className="text-[var(--text-tertiary)]">$</span>
+        <input
+          className="h-9 w-32 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 text-lg font-semibold tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--accent-brand-border)]"
+          inputMode="numeric"
+          onChange={(event) => {
+            const parsed = Number(event.target.value);
+            onChange(Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) : 0);
+          }}
+          type="number"
+          value={Math.round(valueCents / 100)}
+        />
+        <span className="text-xs text-[var(--text-muted)]">{hint}</span>
       </div>
     </div>
   );

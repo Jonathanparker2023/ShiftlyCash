@@ -91,7 +91,14 @@ export function houseHackEntry(a: HouseHackAssumptions) {
 export type LadderInput = {
   explorerCents: number;
   teslaCents: number;
-  bankedCents: number;
+  /**
+   * Capital actually earmarked against the ladder today. Deliberately NOT the
+   * year's running balance: that is cumulative cashflow already spent, a
+   * historical metric, and treating it as a war chest made rung one read
+   * "Cleared" while $13,923 was still owed on the Explorer. The ladder is a
+   * forward projection unless real money is assigned to it.
+   */
+  appliedCapitalCents: number;
   weeklyCashflowCents: number;
   assumptions: HouseHackAssumptions;
   todayIso: string;
@@ -186,7 +193,7 @@ export function buildLadder(input: LadderInput): GoalStep[] {
     },
   ];
 
-  let pool = Math.max(0, input.bankedCents);
+  let pool = Math.max(0, input.appliedCapitalCents);
   let cumulativeRemaining = 0;
   const weekly = Math.max(0, input.weeklyCashflowCents);
 
