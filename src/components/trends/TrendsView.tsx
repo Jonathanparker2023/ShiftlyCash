@@ -21,81 +21,6 @@ const RANGES: { key: RangeKey; label: string }[] = [
 ];
 
 const TARGET_LINE_CENTS = 100_000; // $1,000 reference line
-const CONFETTI_CENTS = 150_000; // $1,500+ weeks get confetti
-
-// Continuous hue: full green at >= $950, yellow at $650, full red at <= $0.
-const GREEN = [22, 163, 74];
-const YELLOW = [245, 158, 11];
-const RED = [220, 38, 38];
-
-function cashflowHue(cents: number): string {
-  const v = cents / 100;
-  if (v >= 950) return rgb(GREEN);
-  if (v >= 650) return rgb(mix(GREEN, YELLOW, (950 - v) / 300));
-  if (v >= 0) return rgb(mix(YELLOW, RED, (650 - v) / 650));
-  return rgb(RED);
-}
-
-const CONFETTI_COLORS = [
-  "#f472b6",
-  "#38bdf8",
-  "#a78bfa",
-  "#fbbf24",
-  "#34d399",
-  "#f87171",
-];
-
-// Deterministic pseudo-random so confetti doesn't shimmer between renders.
-function pseudo(i: number, k: number): number {
-  const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-function ConfettiBurst({
-  cx,
-  topY,
-  seed,
-  spread,
-}: {
-  cx: number;
-  topY: number;
-  seed: number;
-  spread: number;
-}) {
-  const pieces = Array.from({ length: 14 }, (_, k) => {
-    const x = cx + (pseudo(seed, k) - 0.5) * spread * 2.2;
-    const y = topY - 6 - pseudo(seed, k + 20) * 22;
-    const rot = Math.round(pseudo(seed, k + 40) * 360);
-    const color = CONFETTI_COLORS[k % CONFETTI_COLORS.length];
-    return { x, y, rot, color, key: k };
-  });
-
-  return (
-    <g>
-      {pieces.map((p) => (
-        <rect
-          fill={p.color}
-          height={5.5}
-          key={p.key}
-          opacity={0.9}
-          rx={1}
-          transform={`rotate(${p.rot} ${p.x} ${p.y})`}
-          width={2.6}
-          x={p.x}
-          y={p.y}
-        />
-      ))}
-    </g>
-  );
-}
-
-function mix(a: number[], b: number[], t: number): number[] {
-  return a.map((c, i) => Math.round(c + (b[i] - c) * t));
-}
-
-function rgb(c: number[]): string {
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
-}
 
 export function TrendsView({ initialData }: { initialData: TrendsData }) {
   const [range, setRange] = useState<RangeKey>("ytd");
@@ -544,11 +469,19 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-const VBW = 1000;
-const VBH = 280;
-const PAD_TOP = 34;
-const PAD_BOTTOM = 28;
+// Collapsed row height drives the "ten weeks deep, then scroll" viewport.
+const WEEK_ROW_PX = 46;
+const VISIBLE_WEEK_ROWS = 10;
 
+/**
+ * Vertical cashflow rail, newest week at the top.
+ *
+ * Monochrome by design: no hue scale. A week's bar is hollow when the money
+ * was low, fills toward solid as it climbs, and glows white when it reaches
+ * the $1,000 reference — the light itself is the reading. Negative weeks stay
+ * an empty outline. Hover (or keyboard focus) scales the row up, boosts the
+ * glow, and unfolds the week's numbers.
+ */
 function WeeklyCashflowChart({
   weeks,
   medianCents,
@@ -556,151 +489,185 @@ function WeeklyCashflowChart({
   weeks: TrendsWeek[];
   medianCents: number;
 }) {
-  const router = useRouter();
+  const ordered = useMemo(() => [...weeks].reverse(), [weeks]);
   const maxPos = Math.max(
     TARGET_LINE_CENTS,
     ...weeks.map((w) => w.cashflowCents),
   );
   const maxNeg = Math.max(0, ...weeks.map((w) => -w.cashflowCents));
   const total = maxPos + maxNeg || 1;
-  const plotH = VBH - PAD_TOP - PAD_BOTTOM;
-  const zeroY = PAD_TOP + (maxPos / total) * plotH;
-  const slot = VBW / weeks.length;
-  const barW = Math.min(slot * 0.6, 46);
-  const labelEvery = Math.ceil(weeks.length / 12);
-  const targetY = yFor(TARGET_LINE_CENTS, zeroY, maxPos, maxNeg, plotH);
+  // Shared horizontal scale: zero sits right of the space negatives need.
+  const zeroPct = (maxNeg / total) * 100;
+  const targetPct = zeroPct + (TARGET_LINE_CENTS / total) * 100;
+  const medianPct = zeroPct + (medianCents / total) * 100;
 
   return (
     <div className="w-full">
-      <svg
-        className="w-full"
-        preserveAspectRatio="none"
-        style={{ height: 280 }}
-        viewBox={`0 0 ${VBW} ${VBH}`}
+      <div
+        className="overflow-y-auto overscroll-contain pr-1"
+        style={{ maxHeight: WEEK_ROW_PX * VISIBLE_WEEK_ROWS }}
       >
-        {/* zero baseline */}
-        <line
-          className="stroke-[var(--chart-zero)]"
-          strokeWidth={1}
-          x1={0}
-          x2={VBW}
-          y1={zeroY}
-          y2={zeroY}
-        />
-        {/* $1,000 target line */}
-        <line
-          className="stroke-[var(--chart-axis)]"
-          strokeWidth={1.25}
-          x1={0}
-          x2={VBW}
-          y1={targetY}
-          y2={targetY}
-        />
-        <text
-          className="fill-[var(--chart-axis)]"
-          fontSize={11}
-          x={6}
-          y={targetY - 5}
-        >
-          $1,000
-        </text>
-        {/* median guide */}
-        {medianCents !== 0 ? (
-          <line
-            className="stroke-[var(--chart-grid)]"
-            strokeDasharray="4 5"
-            strokeWidth={1}
-            x1={0}
-            x2={VBW}
-            y1={yFor(medianCents, zeroY, maxPos, maxNeg, plotH)}
-            y2={yFor(medianCents, zeroY, maxPos, maxNeg, plotH)}
-          />
-        ) : null}
-
-        {weeks.map((week, i) => {
-          const cx = i * slot + slot / 2;
-          const fill = cashflowHue(week.cashflowCents);
-          const valueY = yFor(week.cashflowCents, zeroY, maxPos, maxNeg, plotH);
-          const barH = Math.max(1, Math.abs(valueY - zeroY));
-          const barY = week.cashflowCents >= 0 ? valueY : zeroY;
-
-          return (
-            <g
-              className="cursor-pointer"
-              key={week.weekId}
-              onClick={() => router.push(`/history/${week.weekId}`)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  router.push(`/history/${week.weekId}`);
-                }
-              }}
-              role="link"
-              tabIndex={0}
-            >
-              {/* full-column transparent hit area so the whole week is clickable */}
-              <rect fill="transparent" height={VBH} width={slot} x={i * slot} y={0} />
-              <rect
-                fill={fill}
-                height={barH}
-                opacity={week.status === "active" ? 0.55 : 1}
-                rx={3}
-                width={barW}
-                x={cx - barW / 2}
-                y={barY}
-              >
-                <title>{`${week.startDate} Â· ${formatMoney(week.cashflowCents)} â€” open week`}</title>
-              </rect>
-              {week.cashflowCents >= CONFETTI_CENTS ? (
-                <ConfettiBurst cx={cx} seed={i + 1} spread={barW} topY={valueY} />
-              ) : null}
-              {i % labelEvery === 0 ? (
-                <text
-                  className="fill-[var(--chart-axis)]"
-                  fontSize={11}
-                  textAnchor="middle"
-                  x={cx}
-                  y={VBH - 9}
-                >
-                  {shortDate(week.startDate)}
-                </text>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
-      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[var(--text-tertiary)]">
-        <span className="inline-flex items-center gap-1.5">
+        <div className="relative">
+          {/* Vertical guides span the full scroll height, behind the rows. */}
+          {maxNeg > 0 ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 w-px bg-[var(--chart-zero)]"
+              style={{ left: `${zeroPct}%` }}
+            />
+          ) : null}
           <span
-            className="h-2.5 w-16 rounded-sm"
-            style={{
-              background:
-                "linear-gradient(90deg, rgb(220,38,38) 0%, rgb(245,158,11) 65%, rgb(22,163,74) 100%)",
-            }}
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 w-px bg-[rgba(255,255,255,0.35)]"
+            style={{ left: `${targetPct}%` }}
           />
-          $0 â†’ $650 â†’ $950+
-        </span>
-        <span className="text-[var(--text-muted)]">
-          Solid line = $1,000 Â· dashed = median Â· faded = current week Â· confetti = $1,500+
-        </span>
+          {medianCents > 0 ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 w-px border-l border-dashed border-[var(--chart-grid)]"
+              style={{ left: `${medianPct}%` }}
+            />
+          ) : null}
+
+          <ol>
+            {ordered.map((week, index) => (
+              <CashflowWeekRow
+                isLatest={index === 0}
+                key={week.weekId}
+                total={total}
+                week={week}
+                zeroPct={zeroPct}
+              />
+            ))}
+          </ol>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
+        <span>Hollow = low</span>
+        <span>Brighter = closer to the $1,000 line</span>
+        <span>Glowing white = at or above it</span>
+        <span>Outline only = negative week</span>
+        <span>Dashed = median</span>
       </div>
     </div>
   );
 }
 
-function yFor(
-  cents: number,
-  zeroY: number,
-  maxPos: number,
-  maxNeg: number,
-  plotH: number,
-): number {
-  if (cents >= 0) {
-    const span = (maxPos / (maxPos + maxNeg || 1)) * plotH || 1;
-    return zeroY - (maxPos ? (cents / maxPos) * span : 0);
-  }
-  const span = (maxNeg / (maxPos + maxNeg || 1)) * plotH || 1;
-  return zeroY + (maxNeg ? (-cents / maxNeg) * span : 0);
+function CashflowWeekRow({
+  isLatest,
+  total,
+  week,
+  zeroPct,
+}: {
+  isLatest: boolean;
+  total: number;
+  week: TrendsWeek;
+  zeroPct: number;
+}) {
+  const router = useRouter();
+  const cents = week.cashflowCents;
+  const negative = cents < 0;
+  // 0 → hollow, 1 → white-hot at the $1,000 reference. Negatives stay 0.
+  const ratio = negative
+    ? 0
+    : Math.min(1, cents / TARGET_LINE_CENTS);
+  const widthPct = Math.max(0.75, (Math.abs(cents) / total) * 100);
+  const leftPct = negative ? zeroPct - widthPct : zeroPct;
+  const fillAlpha = Math.pow(ratio, 1.5) * 0.92;
+  const borderAlpha = negative ? 0.22 : 0.25 + 0.55 * ratio;
+  const glow =
+    ratio >= 1
+      ? "0 0 26px rgba(255,255,255,0.75), 0 0 8px rgba(255,255,255,0.55)"
+      : ratio > 0.35
+        ? `0 0 ${Math.round(4 + 20 * ratio)}px rgba(255,255,255,${(0.12 + 0.5 * ratio).toFixed(2)})`
+        : "none";
+  const open = () => router.push(`/history/${week.weekId}`);
+
+  return (
+    <li className="group relative">
+      <div
+        className="cursor-pointer rounded-lg border border-transparent px-2 py-1.5 outline-none transition-all duration-150 group-hover:z-10 group-hover:scale-[1.015] group-hover:border-[var(--border-default)] group-hover:bg-[var(--surface-hover)] group-hover:shadow-[0_0_24px_-8px_rgba(255,255,255,0.35)] group-focus-within:z-10 group-focus-within:scale-[1.015] group-focus-within:border-[var(--border-default)] group-focus-within:bg-[var(--surface-hover)]"
+        onClick={open}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            open();
+          }
+        }}
+        role="link"
+        tabIndex={0}
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-primary)]">
+            {shortDate(week.startDate)}
+            {week.status === "active" ? (
+              <span className="ml-2 normal-case tracking-normal text-[var(--text-muted)]">
+                in progress
+              </span>
+            ) : null}
+          </span>
+          <span
+            className="text-xs font-semibold tabular-nums text-[var(--text-primary)]"
+            style={{ opacity: negative ? 0.75 : 0.55 + 0.45 * ratio }}
+          >
+            {formatMoney(cents)}
+          </span>
+        </div>
+        <div className="relative mt-1 h-3">
+          <span
+            className={`absolute inset-y-0 rounded-full border transition-all duration-150 group-hover:brightness-125 ${
+              week.status === "active" ? "border-dashed" : ""
+            }`}
+            style={{
+              left: `${leftPct}%`,
+              width: `${widthPct}%`,
+              borderColor: `rgba(255,255,255,${borderAlpha.toFixed(2)})`,
+              backgroundColor:
+                fillAlpha > 0
+                  ? `rgba(255,255,255,${fillAlpha.toFixed(2)})`
+                  : "transparent",
+              boxShadow: glow,
+            }}
+          />
+        </div>
+        {/* Unfolds on hover/focus, same mechanic as the energy timeline. */}
+        <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-200 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
+          <div className="overflow-hidden">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1.5 text-xs text-[var(--text-muted)]">
+              <span>
+                Wk {week.weekNumber} · {shortDate(week.startDate)} –{" "}
+                {shortDate(week.endDate)}
+              </span>
+              <span>Earned {formatMoney(week.earningsCents)}</span>
+              <span>Spent {formatMoney(week.spendCents)}</span>
+              <span>Fixed {formatMoney(week.baseCents)}</span>
+              <span
+                className="font-semibold tabular-nums"
+                style={{
+                  color:
+                    cents >= TARGET_LINE_CENTS
+                      ? "rgba(255,255,255,0.95)"
+                      : "var(--text-tertiary)",
+                }}
+              >
+                {cents >= TARGET_LINE_CENTS
+                  ? `+${formatMoney(cents - TARGET_LINE_CENTS)} over the $1,000 line`
+                  : `${formatMoney(TARGET_LINE_CENTS - cents)} short of $1,000`}
+              </span>
+              {isLatest ? (
+                <span className="rounded-full border border-[var(--border-default)] px-2 py-0.5 font-semibold text-[var(--text-tertiary)]">
+                  Latest
+                </span>
+              ) : null}
+              <span className="ml-auto text-[var(--text-muted)]">
+                Click to open week
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
 }
 
 function filterByRange(
