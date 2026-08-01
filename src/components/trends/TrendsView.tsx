@@ -504,7 +504,7 @@ function WeeklyCashflowChart({
   return (
     <div className="w-full">
       <div
-        className="overflow-y-auto overscroll-contain pr-1"
+        className="overflow-y-auto overflow-x-hidden overscroll-contain pr-1"
         style={{ maxHeight: WEEK_ROW_PX * VISIBLE_WEEK_ROWS }}
       >
         <div className="relative">
