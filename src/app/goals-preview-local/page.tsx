@@ -8,6 +8,9 @@ const previewData: GoalsData = {
   weekLabel: "Preview week",
   todayIso: "2026-08-01",
   medianWeeklyCashflowCents: 614_00,
+  availableCashCents: 7_147_00,
+  cashBalanceSource: "plaid",
+  cashBalanceStale: false,
   debts: [
     { name: "Auto Loan - Holyoke CU - 2017 Ford Explorer", cents: 13_923_00 },
     { name: "Auto Loan - TD Auto Finance - 2024 Tesla Model 3", cents: 31_836_00 },

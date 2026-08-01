@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/domain/money";
 import type { DebtBalance, GoalRungRecord, TargetKind } from "@/lib/goals/ladder";
+import { getProjectionCashBalance } from "@/lib/plaid/projectionCash";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type NumericValue = number | string | null;
 
@@ -37,6 +39,10 @@ export type GoalsData = {
   weekLabel: string;
   todayIso: string;
   medianWeeklyCashflowCents: number;
+  /** Live Plaid checking + savings, the same figure the Debt page shows. */
+  availableCashCents: number;
+  cashBalanceSource: "plaid" | "cache" | "unavailable";
+  cashBalanceStale: boolean;
   debts: DebtBalance[];
   rungs: GoalRungRecord[];
 };
@@ -45,7 +51,7 @@ export async function getGoalsData(): Promise<GoalsData> {
   const { supabase, user } = await requireUser();
   if (!user) redirect("/login");
 
-  const [weeksRes, debtsRes, rungsRes] = await Promise.all([
+  const [weeksRes, debtsRes, rungsRes, cashBalance] = await Promise.all([
     supabase
       .from("v_week_totals")
       .select("start_date,display_week_number,status,cashflow_total")
@@ -60,6 +66,12 @@ export async function getGoalsData(): Promise<GoalsData> {
       .eq("user_id", user.id)
       .eq("is_active", true)
       .order("order_index", { ascending: true }),
+    // Same source the Debt page reads, so the two pages can never disagree
+    // about how much cash is actually on hand.
+    getProjectionCashBalance({
+      supabase: createAdminClient(),
+      userId: user.id,
+    }),
   ]);
 
   if (weeksRes.error) {
@@ -115,6 +127,9 @@ export async function getGoalsData(): Promise<GoalsData> {
     weekLabel: weekNumber > 0 ? `Week ${weekNumber}` : "Current week",
     todayIso: new Date().toISOString().slice(0, 10),
     medianWeeklyCashflowCents,
+    availableCashCents: Math.max(0, cashBalance.availableCashCents),
+    cashBalanceSource: cashBalance.source,
+    cashBalanceStale: cashBalance.stale,
     debts,
     rungs,
   };

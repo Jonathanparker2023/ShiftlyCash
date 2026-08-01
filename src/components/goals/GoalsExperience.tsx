@@ -46,9 +46,12 @@ function formatHorizon(weeks: number): string {
 export function GoalsExperience({ data }: { data: GoalsData }) {
   const router = useRouter();
   const [override, setOverride] = useState<number | null>(null);
-  // Starts at zero on purpose. The year's running balance is cumulative
-  // cashflow already spent, not a war chest.
-  const [startingCapitalCents, setStartingCapitalCents] = useState(0);
+  // Seeds from the live Plaid checking + savings balance — actual money on
+  // hand. Deliberately NOT the year's running balance, which is cumulative
+  // cashflow already spent and once made a rung read "Cleared" while the debt
+  // behind it was still owed. Null means "follow the live balance".
+  const [capitalOverride, setCapitalOverride] = useState<number | null>(null);
+  const startingCapitalCents = capitalOverride ?? data.availableCashCents;
   const [assumptions, setAssumptions] = useState<HouseHackAssumptions>(
     DEFAULT_ASSUMPTIONS,
   );
@@ -124,9 +127,21 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
                 valueCents={weeklyCents}
               />
               <NumberControl
-                hint="cash you're putting in up front"
+                hint={
+                  data.cashBalanceSource === "unavailable"
+                    ? "bank balance unavailable — type what you're putting in"
+                    : data.cashBalanceStale
+                      ? "last known bank balance"
+                      : "live bank balance"
+                }
                 label="Starting capital"
-                onChange={setStartingCapitalCents}
+                onChange={(cents) => setCapitalOverride(cents)}
+                onReset={
+                  capitalOverride === null
+                    ? undefined
+                    : () => setCapitalOverride(null)
+                }
+                resetLabel="use bank balance"
                 valueCents={startingCapitalCents}
               />
             </div>
@@ -214,12 +229,14 @@ function NumberControl({
   label,
   onChange,
   onReset,
+  resetLabel = "reset to median",
   valueCents,
 }: {
   hint: string;
   label: string;
   onChange: (cents: number) => void;
   onReset?: () => void;
+  resetLabel?: string;
   valueCents: number;
 }) {
   return (
@@ -247,7 +264,7 @@ function NumberControl({
             onClick={onReset}
             type="button"
           >
-            reset to median
+            {resetLabel}
           </button>
         ) : (
           <span className="text-xs text-[var(--text-muted)]">{hint}</span>
