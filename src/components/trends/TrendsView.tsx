@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { removeEvChargeAllocationAction } from "@/app/(protected)/trends/actions";
 import { centsToDollars } from "@/lib/domain/money";
 import type {
   TrendsData,
@@ -295,71 +296,16 @@ function EnergyTracker({
               />
               {tracker.events.map((event, index) => {
                 const previous = tracker.events[index + 1];
-                const gapDays = previous
-                  ? daysBetweenIso(previous.date, event.date)
-                  : null;
-                const perDayCents =
-                  gapDays !== null && gapDays > 0
-                    ? Math.round(event.amountCents / gapDays)
-                    : null;
-                const isLatest = index === 0;
-
                 return (
-                  <li className="group relative pl-8" key={event.id}>
-                    <span
-                      aria-hidden
-                      className={`absolute left-[0.78rem] top-[1.05rem] z-10 h-[11px] w-[11px] rounded-full border-2 transition-all duration-150 ${
-                        isLatest
-                          ? "border-[var(--accent-brand-text)] bg-[var(--accent-brand-text)]"
-                          : "border-[var(--border-strong)] bg-[var(--surface-elevated)]"
-                      } group-hover:scale-125 group-hover:border-[var(--accent-brand-text)] group-hover:bg-[var(--accent-brand-text)]`}
-                    />
-                    <div
-                      className="rounded-lg border border-transparent px-2.5 py-2 outline-none transition-all duration-150 group-hover:border-[var(--accent-brand-border)] group-hover:bg-[var(--surface-hover)] group-hover:shadow-[0_0_20px_-6px_var(--accent-brand)] group-focus-within:border-[var(--accent-brand-border)] group-focus-within:bg-[var(--surface-hover)]"
-                      tabIndex={0}
-                    >
-                      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                        <span className="text-xs font-semibold text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--accent-brand-text)]">
-                          {shortDate(event.date)}
-                        </span>
-                        <span className="truncate text-sm font-medium text-[var(--text-primary)]">
-                          {event.merchantName}
-                        </span>
-                        <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
-                          {formatMoney(event.amountCents)}
-                        </span>
-                      </div>
-                      {/* Detail stays collapsed until hover/focus so the list
-                          reads as a scannable timeline at rest. */}
-                      <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-200 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
-                        <div className="overflow-hidden">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-xs text-[var(--text-muted)]">
-                            <span>{longDate(event.date)}</span>
-                            {gapDays !== null ? (
-                              <span className="text-[var(--text-tertiary)]">
-                                {gapDays} {gapDays === 1 ? "day" : "days"} since the
-                                previous {eventLabel}
-                              </span>
-                            ) : (
-                              <span className="text-[var(--text-tertiary)]">
-                                First {eventLabel} on record
-                              </span>
-                            )}
-                            {perDayCents !== null ? (
-                              <span className="font-semibold tabular-nums text-[var(--accent-brand-text)]">
-                                {formatMoney(perDayCents)}/day over that stretch
-                              </span>
-                            ) : null}
-                            {isLatest ? (
-                              <span className="rounded-full bg-[var(--accent-brand-fill)] px-2 py-0.5 font-semibold text-[var(--accent-brand-text)]">
-                                Most recent
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
+                  <EnergyTimelineRow
+                    event={event}
+                    eventLabel={eventLabel}
+                    gapDays={
+                      previous ? daysBetweenIso(previous.date, event.date) : null
+                    }
+                    isLatest={index === 0}
+                    key={event.id}
+                  />
                 );
               })}
             </ol>
@@ -367,6 +313,148 @@ function EnergyTracker({
         </>
       ) : null}
     </section>
+  );
+}
+
+function EnergyTimelineRow({
+  event,
+  eventLabel,
+  gapDays,
+  isLatest,
+}: {
+  event: { id: string; date: string; merchantName: string; amountCents: number };
+  eventLabel: "fill" | "charge";
+  gapDays: number | null;
+  isLatest: boolean;
+}) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Only charges are removable. Gas is frozen history at this point, and
+  // duplicate Plaid rows are a live problem for charging only.
+  const canRemove = eventLabel === "charge";
+  const perDayCents =
+    gapDays !== null && gapDays > 0
+      ? Math.round(event.amountCents / gapDays)
+      : null;
+
+  async function remove() {
+    setPending(true);
+    setError(null);
+    try {
+      await removeEvChargeAllocationAction({ allocationId: event.id });
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not remove.");
+      setPending(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <li className="group relative pl-8">
+      <span
+        aria-hidden
+        className={`absolute left-[0.78rem] top-[1.05rem] z-10 h-[11px] w-[11px] rounded-full border-2 transition-all duration-150 ${
+          isLatest
+            ? "border-[var(--accent-brand-text)] bg-[var(--accent-brand-text)]"
+            : "border-[var(--border-strong)] bg-[var(--surface-elevated)]"
+        } group-hover:scale-125 group-hover:border-[var(--accent-brand-text)] group-hover:bg-[var(--accent-brand-text)]`}
+      />
+      <div
+        className={`rounded-lg border border-transparent px-2.5 py-2 outline-none transition-all duration-150 group-hover:border-[var(--accent-brand-border)] group-hover:bg-[var(--surface-hover)] group-hover:shadow-[0_0_20px_-6px_var(--accent-brand)] group-focus-within:border-[var(--accent-brand-border)] group-focus-within:bg-[var(--surface-hover)] ${
+          pending ? "opacity-50" : ""
+        }`}
+        tabIndex={0}
+      >
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+          <span className="text-xs font-semibold text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--accent-brand-text)]">
+            {shortDate(event.date)}
+          </span>
+          <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+            {event.merchantName}
+          </span>
+          {/* Exact cents. A rounded charge history cannot be reconciled against
+              a bank statement, which is the whole point of keeping it. */}
+          <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+            {formatMoneyExact(event.amountCents)}
+          </span>
+        </div>
+        {/* Detail stays collapsed until hover/focus so the list reads as a
+            scannable timeline at rest. */}
+        <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-200 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
+          <div className="overflow-hidden">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-xs text-[var(--text-muted)]">
+              <span>{longDate(event.date)}</span>
+              {gapDays !== null ? (
+                <span className="text-[var(--text-tertiary)]">
+                  {gapDays} {gapDays === 1 ? "day" : "days"} since the previous{" "}
+                  {eventLabel}
+                </span>
+              ) : (
+                <span className="text-[var(--text-tertiary)]">
+                  First {eventLabel} on record
+                </span>
+              )}
+              {perDayCents !== null ? (
+                <span className="font-semibold tabular-nums text-[var(--accent-brand-text)]">
+                  {formatMoneyExact(perDayCents)}/day over that stretch
+                </span>
+              ) : null}
+              {isLatest ? (
+                <span className="rounded-full bg-[var(--accent-brand-fill)] px-2 py-0.5 font-semibold text-[var(--accent-brand-text)]">
+                  Most recent
+                </span>
+              ) : null}
+              {canRemove && !confirming ? (
+                <button
+                  className="ml-auto rounded-md border border-[var(--border-default)] px-2 py-0.5 font-semibold text-[var(--text-tertiary)] transition-colors hover:border-[var(--accent-negative-border)] hover:text-[var(--accent-negative-text)]"
+                  disabled={pending}
+                  onClick={() => setConfirming(true)}
+                  type="button"
+                >
+                  Delete
+                </button>
+              ) : null}
+            </div>
+            {confirming ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-2.5 py-2 text-xs">
+                <span className="text-[var(--text-secondary)]">
+                  Delete the {formatMoneyExact(event.amountCents)} charge on{" "}
+                  {shortDate(event.date)}? It leaves the charging history and is
+                  excluded from spending.
+                </span>
+                <span className="ml-auto flex items-center gap-2">
+                  <button
+                    className="rounded-md px-2 py-0.5 font-semibold text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                    disabled={pending}
+                    onClick={() => setConfirming(false)}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="rounded-md bg-[var(--accent-negative)] px-2.5 py-1 font-semibold text-white disabled:opacity-60"
+                    disabled={pending}
+                    onClick={remove}
+                    type="button"
+                  >
+                    {pending ? "Deleting…" : "Delete"}
+                  </button>
+                </span>
+              </div>
+            ) : null}
+            {error ? (
+              <p className="mt-1.5 text-xs text-[var(--accent-negative-text)]">
+                {error}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -640,6 +728,17 @@ function formatMoney(cents: number): string {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
+  }).format(centsToDollars(cents));
+}
+
+// Exact cents. The headline averages stay rounded; individual events do not,
+// because a charge history that rounds cannot be checked against a statement.
+function formatMoneyExact(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(centsToDollars(cents));
 }
 
