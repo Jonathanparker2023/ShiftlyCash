@@ -334,24 +334,27 @@ function GoalRung({
  * path the tile falls back to its rung number rather than a broken image.
  */
 function GoalArtwork({ goal }: { goal: GoalStep }) {
-  const [failed, setFailed] = useState(false);
-
-  if (failed) {
-    return (
-      <span className="text-lg font-semibold text-[var(--text-muted)]">
-        {goal.order}
-      </span>
-    );
-  }
+  // The fallback renders by default and the image is layered over it, revealed
+  // only once it actually loads. Reacting to onError instead would leave a
+  // broken-image glyph on screen, because a request that fails during SSR has
+  // already failed before React hydrates and can no longer fire the handler.
+  const [loaded, setLoaded] = useState(false);
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      alt=""
-      className="h-full w-full object-cover"
-      onError={() => setFailed(true)}
-      src={goal.imageSrc}
-    />
+    <>
+      <span className="text-base font-semibold text-[var(--text-muted)]">
+        {goal.order}
+      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        alt=""
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
+        onLoad={() => setLoaded(true)}
+        src={goal.imageSrc}
+      />
+    </>
   );
 }
 
