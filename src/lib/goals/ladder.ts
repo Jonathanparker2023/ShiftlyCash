@@ -44,6 +44,8 @@ export type HouseHackAssumptions = {
   closingCostPct: number;
   reserveMonths: number;
   monthlyPitiCents: number;
+  /** Rung four: starting capital for the BRRR operation. */
+  brrrCapitalCents: number;
 };
 
 /**
@@ -65,6 +67,7 @@ export const DEFAULT_ASSUMPTIONS: HouseHackAssumptions = {
   closingCostPct: 3,
   reserveMonths: 3,
   monthlyPitiCents: 3_700_00,
+  brrrCapitalCents: 90_000_00,
 };
 
 export const ASSUMPTION_SOURCES = [
@@ -100,13 +103,13 @@ export function buildLadder(input: LadderInput): GoalStep[] {
 
   const rungs = [
     {
-      id: "explorer-and-keys",
+      id: "explorer-payoff",
       order: 1,
-      title: "Clear the Explorer, buy the keys",
+      title: "Clear the Explorer",
       kicker: "Rung one",
-      imageSrc: "/goals/explorer-and-keys.png",
+      imageSrc: "/goals/explorer-payoff.png",
       description:
-        "Two things must be true before a multifamily is reachable: the Explorer loan is gone, and there is real cash on the table for an FHA purchase. This rung holds both. The Explorer is the most expensive money on the board at 18.8%, so it dies first — and clearing it also strips a monthly payment out of the debt-to-income ratio the lender will scrutinise. On top of that sits the entry cash: the down payment, closing costs, and the three months of reserves the FHA specifically requires on a three or four unit purchase. Those reserves are held after the deposit, not inside it.",
+        "The Explorer is the most expensive money on the board at 18.8%, so it dies first on pure arithmetic — no other dollar bought back earns that much. It is also the smallest rung, which means the ladder starts with a win rather than a slog. Clearing it does double duty: it ends the interest, and it strips a $455 monthly payment out of the debt-to-income ratio a mortgage underwriter will scrutinise on the very next rung.",
       deadlineIso: EXPLORER_MATURITY,
       deadlineLabel: "Explorer loan matures",
       components: [
@@ -115,6 +118,19 @@ export function buildLadder(input: LadderInput): GoalStep[] {
           cents: input.explorerCents,
           note: "Holyoke Credit Union at 18.8% — the costliest money on the board",
         },
+      ],
+    },
+    {
+      id: "multifamily-house-hack",
+      order: 2,
+      title: "Multifamily house hack",
+      kicker: "Rung two",
+      imageSrc: "/goals/multifamily-house-hack.png",
+      description:
+        "The cash it takes to actually stand at a closing table on a Hartford-area multifamily. Three separate piles, not one: the FHA down payment, the closing costs, and reserves — and the reserves are the part people miss, because the FHA requires three months of the full payment held AFTER the deposit and closing on a three or four unit purchase. Living in one unit and renting the rest is what turns housing from the largest expense on the board into something that pays. It sits above the Explorer because the underwriter looks at debt-to-income, and a cleared auto loan makes this rung cheaper to qualify for.",
+      deadlineIso: null,
+      deadlineLabel: null,
+      components: [
         {
           label: "FHA down payment",
           cents: entry.down,
@@ -134,12 +150,12 @@ export function buildLadder(input: LadderInput): GoalStep[] {
     },
     {
       id: "tesla-payoff",
-      order: 2,
+      order: 3,
       title: "Kill the Tesla note",
-      kicker: "Rung two",
+      kicker: "Rung three",
       imageSrc: "/goals/tesla-payoff.png",
       description:
-        "The Onyx loan is the single largest obligation on the board — 72 months at 10.94%. Run to term it costs roughly $11,700 in interest alone, so every week of cashflow thrown at it after rung one clears is interest bought back. It sits second deliberately: a paid-off Tesla with no property is a worse position than a property with the note still running, because the property pays rent and the car does not.",
+        "The Onyx loan is the single largest obligation on the board — 72 months at 10.94%, roughly $11,700 of interest if it runs to term. Every dollar thrown at it after the house hack is interest bought back. It sits third deliberately: at 10.94% it is cheaper money than the Explorer was, and a paid-off car with no property is a worse position than a property with the note still running, because the property pays rent and the car does not.",
       deadlineIso: TESLA_MATURITY,
       deadlineLabel: "Tesla loan matures",
       components: [
@@ -147,6 +163,24 @@ export function buildLadder(input: LadderInput): GoalStep[] {
           label: "TD Auto Finance balance",
           cents: input.teslaCents,
           note: "10.94% over 72 months — unconfirmed until TD's first statement",
+        },
+      ],
+    },
+    {
+      id: "brrr-capital",
+      order: 4,
+      title: "BRRR business capital",
+      kicker: "Rung four",
+      imageSrc: "/goals/brrr-capital.png",
+      description:
+        "Buy, rehab, rent, refinance, repeat — the first real operating war chest. This is the rung where the ladder stops being about escaping debt and starts being about buying assets on purpose. It comes last not because it matters least, but because it is the only rung that needs everything below it to be true first: no consumer debt draining cashflow, a property already producing rent, and the experience of having run one deal. Capital without that sequence is just risk.",
+      deadlineIso: null,
+      deadlineLabel: null,
+      components: [
+        {
+          label: "Operating capital",
+          cents: a.brrrCapitalCents,
+          note: "Acquisition, rehab runway, and holding costs for the first deal",
         },
       ],
     },
