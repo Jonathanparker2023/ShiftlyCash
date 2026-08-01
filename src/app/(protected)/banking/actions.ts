@@ -396,15 +396,48 @@ async function syncPlaidItem(
   };
 }
 
+const APP_TIME_ZONE = "America/New_York";
+
+/**
+ * The day a transaction actually happened, in Jon's timezone.
+ *
+ * Plaid's `date` is a calendar date the institution assigns, and for an evening
+ * purchase it can already read as the NEXT day because the underlying instant
+ * is stamped in UTC. An 8:40 PM Eastern Supercharger stop is 00:40 UTC, so it
+ * arrives dated tomorrow. That silently moves spend onto the wrong day — and
+ * across a Saturday boundary, into the wrong week.
+ *
+ * The correction is deliberately ONE-DIRECTIONAL. `datetime` is only trusted
+ * when it resolves EARLIER than Plaid's date, because a re-sync can refresh
+ * `datetime` to the later settlement instant, and honouring that would drag
+ * transactions forward off the day they were actually spent. Plaid's date is
+ * never earlier than the real purchase, so pulling backward is always safe and
+ * pushing forward never is.
+ */
+function localTransactionDate(transaction: Transaction): string {
+  if (!transaction.datetime) return transaction.date;
+  const instant = new Date(transaction.datetime);
+  if (Number.isNaN(instant.getTime())) return transaction.date;
+  // en-CA renders ISO-shaped YYYY-MM-DD.
+  const localDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
+  return localDate < transaction.date ? localDate : transaction.date;
+}
+
 async function upsertPlaidTransaction(
   context: PlaidSyncContext,
   plaidItemId: string,
   transaction: Transaction,
 ) {
-  const day = await findDayForTransaction(context, transaction.date);
+  const effectiveDate = localTransactionDate(transaction);
+  const day = await findDayForTransaction(context, effectiveDate);
   const isBeforeActiveWeek =
     Boolean(context.activeWeekStartDate) &&
-    transaction.date < context.activeWeekStartDate!;
+    effectiveDate < context.activeWeekStartDate!;
   const rawName = transaction.original_description ?? transaction.name;
   const existingTransaction = await findExistingPlaidTransaction(
     context,
@@ -452,7 +485,7 @@ async function upsertPlaidTransaction(
     review_reason:
       existingTransaction?.status === "applied" ? null : reviewReason,
     plaid_transaction_id: transaction.transaction_id,
-    date: transaction.date,
+    date: effectiveDate,
     authorized_date: transaction.authorized_date ?? null,
     datetime: transaction.datetime ?? null,
     merchant_name: merchantName,
@@ -494,7 +527,7 @@ async function upsertPlaidTransaction(
   // a duplicate row.
   const chimeMatch = await findChimeMatchForPlaid(
     context,
-    transaction.date,
+    effectiveDate,
     transaction.amount,
   );
 

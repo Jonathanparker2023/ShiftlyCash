@@ -335,8 +335,10 @@ function EnergyTimelineRow({
   // Only charges are removable. Gas is frozen history at this point, and
   // duplicate Plaid rows are a live problem for charging only.
   const canRemove = eventLabel === "charge";
+  // Only meaningful across a real interval. On a 1-day gap it just restates the
+  // amount, and on same-day events there is no interval at all.
   const perDayCents =
-    gapDays !== null && gapDays > 0
+    gapDays !== null && gapDays >= 2
       ? Math.round(event.amountCents / gapDays)
       : null;
 
