@@ -14,12 +14,6 @@ type TemplateRow = {
   id: string;
 };
 
-type StickyLabelRow = {
-  day_index: number;
-  slot_index: number;
-  label: string;
-};
-
 type TemplateSlotRow = {
   day_index: number;
   slot_index: number;
@@ -57,7 +51,7 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
   const { data: slotData, error: slotError } = await supabase
     .from("template_slots")
     .select(
-      "day_index,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,custom_job_id",
+      "day_index,slot_index,job_type,pay_type,hours_or_units,regular_hours,overtime_hours,incentive_mode,incentive_rate,incentive_amount,custom_job_id,label",
     )
     .eq("template_id", template.id)
     .order("day_index", { ascending: true })
@@ -67,19 +61,14 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
     throw new Error(`Unable to load template slots: ${slotError.message}`);
   }
 
-  // Labels live in sticky_labels (keyed by day_index/slot_index), separate from
-  // template_slots. Load them so the editor can view + edit shift labels.
-  const { data: labelData, error: labelError } = await supabase
-    .from("sticky_labels")
-    .select("day_index,slot_index,label");
-  if (labelError) {
-    throw new Error(`Unable to load template labels: ${labelError.message}`);
-  }
+  // Labels travel WITH the slot in template_slots. They used to live in
+  // sticky_labels keyed only by (day_index, slot_index), which pinned a name to
+  // a grid position instead of to the shift in it — so reordering shifts left
+  // the names behind on the wrong rows.
   const labelByPosition = new Map(
-    ((labelData ?? []) as StickyLabelRow[]).map((row) => [
-      `${row.day_index}:${row.slot_index}`,
-      row.label,
-    ]),
+    ((slotData ?? []) as { day_index: number; slot_index: number; label: string | null }[]).map(
+      (row) => [`${row.day_index}:${row.slot_index}`, row.label ?? ""],
+    ),
   );
 
   // Custom jobs for the picker + to resolve color/name on custom slots. Include

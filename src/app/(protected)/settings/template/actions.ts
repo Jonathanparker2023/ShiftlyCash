@@ -44,26 +44,11 @@ export async function saveDefaultTemplateAction(
     throw new Error(`Unable to save template: ${error.message}`);
   }
 
-  // Labels live in sticky_labels. Persist the editor's label for each ACTIVE
-  // slot (empty string clears it); inactive slots are left untouched so their
-  // manual-entry label memory survives. The autofill reads these for non-ability
-  // slots (ability labels are app-managed).
-  const labelRows = input.slots
-    .filter((slot) => requireEnum(slot.jobType, JOB_TYPES, "jobType") !== "none")
-    .map((slot) => ({
-      user_id: user.id,
-      day_index: requireIntegerInRange(slot.dayIndex, 0, 6, "dayIndex"),
-      slot_index: requireIntegerInRange(slot.slotIndex, 0, 3, "slotIndex"),
-      label: typeof slot.label === "string" ? slot.label.trim() : "",
-    }));
-  if (labelRows.length > 0) {
-    const { error: labelError } = await supabase
-      .from("sticky_labels")
-      .upsert(labelRows, { onConflict: "user_id,day_index,slot_index" });
-    if (labelError) {
-      throw new Error(`Unable to save labels: ${labelError.message}`);
-    }
-  }
+  // Labels now travel WITH the slot inside template_slots, written by the RPC
+  // above. They used to be upserted separately into sticky_labels, keyed only
+  // by (day_index, slot_index) with no template reference — so a label was
+  // pinned to a grid position rather than to the shift sitting in it, and
+  // reordering shifts left the names behind on the wrong rows.
 
   // Deliberately NOT revalidating /settings/template: this action fires on a
   // debounce while the user is still editing, and re-rendering the page they
@@ -81,6 +66,9 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
   const dayIndex = requireIntegerInRange(slot.dayIndex, 0, 6, "dayIndex");
   const slotIndex = requireIntegerInRange(slot.slotIndex, 0, 3, "slotIndex");
   const jobType = requireEnum(slot.jobType, JOB_TYPES, "jobType");
+  // Carried through on every branch: the label is part of the slot now, not a
+  // separate row keyed by grid position.
+  const label = typeof slot.label === "string" ? slot.label.trim() : "";
 
   let customJobId: string | null = null;
   if (jobType === "custom") {
@@ -95,6 +83,7 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       dayIndex,
       slotIndex,
       jobType,
+      label,
       payType: "none",
       hoursOrUnits: 0,
       regularHours: 0,
@@ -110,6 +99,7 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       dayIndex,
       slotIndex,
       jobType,
+      label,
       payType: "unit",
       hoursOrUnits: requireNonNegativeNumber(
         slot.hoursOrUnits,
@@ -139,6 +129,7 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
       dayIndex,
       slotIndex,
       jobType,
+      label,
       payType,
       hoursOrUnits: regularHours + overtimeHours,
       regularHours,
@@ -157,6 +148,7 @@ function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
     dayIndex,
     slotIndex,
     jobType,
+    label,
     payType,
     hoursOrUnits,
     regularHours: payType === "regular" ? hoursOrUnits : 0,
