@@ -200,6 +200,55 @@ function EnergyTracker({
             days from {shortDate(tracker.periodStartDate)} through{" "}
             {shortDate(tracker.periodEndDate)}.
           </p>
+          {eventLabel === "charge" && tracker.weeklyAverages.length > 0 ? (
+            <details className="group mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold text-[var(--text-secondary)] marker:hidden">
+                <span>Weekly averages</span>
+                <span className="text-xs font-medium tabular-nums text-[var(--accent-brand-text)] group-open:hidden">
+                  {formatMoney(tracker.weeklyAverages[0].averageDailyCents)}/day
+                </span>
+                <span className="hidden text-xs font-medium text-[var(--text-muted)] group-open:inline">
+                  Hide weeks
+                </span>
+              </summary>
+              <ol className="divide-y divide-[var(--border-subtle)] border-t border-[var(--border-subtle)]">
+                {tracker.weeklyAverages.map((week) => (
+                  <li
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+                    key={week.weekId}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                        Week {week.weekNumber}
+                        {week.status === "active" ? (
+                          <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-[var(--accent-brand-text)]">
+                            In progress
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        {shortDate(week.startDate)} - {shortDate(week.endDate)}
+                        {week.eventCount > 0
+                          ? `, ${week.eventCount} ${week.eventCount === 1 ? "charge" : "charges"}`
+                          : ", no charges"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold tabular-nums text-[var(--accent-brand-text)]">
+                        {formatMoney(week.averageDailyCents)}/day
+                      </p>
+                      <p className="text-[11px] tabular-nums text-[var(--text-muted)]">
+                        {week.periodDays} {week.periodDays === 1 ? "day" : "days"}
+                      </p>
+                    </div>
+                    <p className="col-span-2 text-left text-xs font-medium tabular-nums text-[var(--text-tertiary)] sm:col-span-1 sm:text-right">
+                      {formatMoneyExact(week.totalCents)} total
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ) : null}
           <details className="group mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold text-[var(--text-secondary)] marker:hidden">
               <span>{eventLabel === "fill" ? "Fill-up" : "Charging"} history</span>

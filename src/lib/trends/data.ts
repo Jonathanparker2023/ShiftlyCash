@@ -67,6 +67,18 @@ export type TrendsEnergyTracker =
         merchantName: string;
         amountCents: number;
       }>;
+      weeklyAverages: Array<{
+        weekId: string;
+        weekNumber: number;
+        startDate: string;
+        endDate: string;
+        periodEndDate: string;
+        status: "active" | "closed";
+        periodDays: number;
+        totalCents: number;
+        averageDailyCents: number;
+        eventCount: number;
+      }>;
       last7d: {
         totalCents: number;
         avgPerDayCents: number;
@@ -149,8 +161,10 @@ export async function getTrendsData(): Promise<TrendsData> {
     (settingsData as { gas_ended_on?: string | null } | null)?.gas_ended_on ??
     null;
 
+  const weeks = ((weekData ?? []) as WeekTotalRow[]).map(mapTrendsWeek);
+
   return {
-    weeks: ((weekData ?? []) as WeekTotalRow[]).map(mapTrendsWeek),
+    weeks,
     gasEndedOn,
     gasTracker: mapEnergyTracker(
       ((gasData ?? []) as GasAllocationRow[]).map((row) => ({
@@ -175,6 +189,7 @@ export async function getTrendsData(): Promise<TrendsData> {
         updatedAt: row.updated_at,
       })),
       todayIso,
+      weeks,
     ),
   };
 }
@@ -192,6 +207,7 @@ type EnergyEvent = {
 export function mapEnergyTracker(
   events: EnergyEvent[],
   periodEndDate: string,
+  weeks: TrendsWeek[] = [],
 ): TrendsEnergyTracker {
   if (events.length === 0) {
     return { status: "waiting" };
@@ -225,6 +241,36 @@ export function mapEnergyTracker(
       right.updatedAt.localeCompare(left.updatedAt),
   );
   const latest = sortedEvents[0];
+  const firstEventDate = sortedEvents.at(-1)?.date ?? periodEndDate;
+  const weeklyAverages = weeks
+    .filter(
+      (week) =>
+        week.endDate >= firstEventDate && week.startDate <= periodEndDate,
+    )
+    .map((week) => {
+      const effectiveEndDate =
+        week.endDate < periodEndDate ? week.endDate : periodEndDate;
+      const weekEvents = events.filter(
+        (event) =>
+          event.date >= week.startDate && event.date <= effectiveEndDate,
+      );
+      const totalCents = sumEvents(weekEvents);
+      const periodDays = inclusiveDays(week.startDate, effectiveEndDate);
+
+      return {
+        weekId: week.weekId,
+        weekNumber: week.weekNumber,
+        startDate: week.startDate,
+        endDate: week.endDate,
+        periodEndDate: effectiveEndDate,
+        status: week.status,
+        periodDays,
+        totalCents,
+        averageDailyCents: Math.round(totalCents / periodDays),
+        eventCount: weekEvents.length,
+      };
+    })
+    .sort((left, right) => right.startDate.localeCompare(left.startDate));
 
   return {
     status: "active",
@@ -240,6 +286,7 @@ export function mapEnergyTracker(
       merchantName: event.merchantName,
       amountCents: event.amountCents,
     })),
+    weeklyAverages,
     last7d: {
       totalCents: total7d,
       avgPerDayCents: Math.round(total7d / 7),
@@ -259,6 +306,12 @@ export function mapEnergyTracker(
           : Math.round(average.totalCents / events.length),
     },
   };
+}
+
+function inclusiveDays(fromIso: string, toIso: string): number {
+  const from = Date.parse(`${fromIso}T00:00:00.000Z`);
+  const to = Date.parse(`${toIso}T00:00:00.000Z`);
+  return Math.max(1, Math.round((to - from) / 86_400_000) + 1);
 }
 
 function mapTrendsWeek(row: WeekTotalRow): TrendsWeek {
