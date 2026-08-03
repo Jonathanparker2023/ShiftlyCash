@@ -81,9 +81,25 @@ function slotRateCents(
   return builtin ? { reg: builtin.regularRateCents, ot: builtin.otRateCents } : null;
 }
 
+// A unit-based slot's hoursOrUnits field IS a dollar figure, not a quantity.
+function unitAmountCents(slot: TemplateSlotDraft): number {
+  return Math.round(Math.max(0, slot.hoursOrUnits) * 100);
+}
+
 // Net dollars (cents) a single template shift generates: hours × rate, splitting
 // regular vs overtime the same way the dashboard pay engine does.
 function slotNetCents(slot: TemplateSlotDraft, jobsData: JobsData | null): number {
+  // "Other" is flat cash — the pay engine takes it at face value with no rate
+  // and no withholding, so the template's weekly total has to count it. It was
+  // returning 0 here, which silently dropped every Other shift from the total.
+  //
+  // "Incentive" is deliberately NOT handled: the engine multiplies it by the
+  // Ability withholding rate, and that multiplier is not in JobsData. Showing
+  // its gross as though it were net would be worse than omitting it.
+  if (slot.jobType === "other") {
+    return unitAmountCents(slot);
+  }
+
   const rate = slotRateCents(slot, jobsData);
   if (!rate) return 0;
   let regular: number;
@@ -589,6 +605,7 @@ function TemplateShiftBar({
   const hiddenBuiltins = useContext(HiddenBuiltinsContext);
   const jobsData = useContext(RatesContext);
   const netCents = slotNetCents(slot, jobsData);
+  const isUnitSlot = slot.payType === "unit";
   const isCustom = slot.jobType === "custom";
   const customColor = slot.customColor ?? "#3b82f6";
   const customStyle = isCustom
@@ -642,14 +659,25 @@ function TemplateShiftBar({
               {formatPayBadge(slot.payType)}
             </span>
           ) : null}
-          <span className="text-xs font-semibold opacity-90">
-            {formatNumberInput(slot.hoursOrUnits)}h
-          </span>
-          {jobsData && netCents > 0 ? (
+          {/* Unit-based shifts (Other, Incentive) carry a dollar amount, not
+              hours — the editor already labels the input "Amount ($)", but the
+              bar was suffixing it with "h", so a $50 Other shift read "50h". */}
+          {isUnitSlot ? (
             <span className="text-xs font-semibold tabular-nums opacity-90">
-              {formatTemplateMoney(netCents)}
+              {formatTemplateMoney(unitAmountCents(slot))}
             </span>
-          ) : null}
+          ) : (
+            <>
+              <span className="text-xs font-semibold opacity-90">
+                {formatNumberInput(slot.hoursOrUnits)}h
+              </span>
+              {jobsData && netCents > 0 ? (
+                <span className="text-xs font-semibold tabular-nums opacity-90">
+                  {formatTemplateMoney(netCents)}
+                </span>
+              ) : null}
+            </>
+          )}
         </span>
         <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">
           {slot.label ?? ""}
