@@ -79,8 +79,8 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
           </div>
         </header>
 
-        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <section className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-[var(--panel-shadow)] sm:p-5">
+          <div className="mb-4 flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-base font-semibold tracking-tight">
                 Weekly cashflow
@@ -89,7 +89,7 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
                 Earnings minus spending minus fixed, per week.
               </p>
             </div>
-            <div className="flex gap-5">
+            <div className="grid grid-cols-4 gap-x-4 sm:gap-x-6">
               <Stat label="Total" value={formatMoney(stats.total)} />
               <Stat label="Median" value={formatMoney(stats.median)} />
               <Stat label="Average" value={formatMoney(stats.average)} />
@@ -509,39 +509,19 @@ function RangeSelector({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="text-right">
+    <div className="min-w-0 text-left sm:text-right">
       <div className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
         {label}
       </div>
-      <div className="text-sm font-semibold tabular-nums">{value}</div>
+      <div className="whitespace-nowrap text-[11px] font-semibold tabular-nums sm:text-sm">
+        {value}
+      </div>
     </div>
   );
 }
 
-// Collapsed row height drives the "ten weeks deep, then scroll" viewport.
-const WEEK_ROW_PX = 34;
-const VISIBLE_WEEK_ROWS = 10;
+const DEFAULT_VISIBLE_WEEKS = 12;
 
-// Date and amount sit in fixed gutters either side of the bar track, so every
-// bar starts and ends on the same pixels. The vertical guides are inset by the
-// identical amounts — that is the only reason zero/target/median line up with
-// the bars they annotate.
-const DATE_COL_PX = 88;
-const AMOUNT_COL_PX = 76;
-const ROW_PAD_X = 8;
-const COL_GAP_PX = 12;
-const TRACK_LEFT_PX = ROW_PAD_X + DATE_COL_PX + COL_GAP_PX;
-const TRACK_RIGHT_PX = ROW_PAD_X + AMOUNT_COL_PX + COL_GAP_PX;
-
-/**
- * Vertical cashflow rail, newest week at the top.
- *
- * Monochrome by design: no hue scale. A week's bar is hollow when the money
- * was low, fills toward solid as it climbs, and glows white when it reaches
- * the $1,000 reference — the light itself is the reading. Negative weeks stay
- * an empty outline. Hover (or keyboard focus) scales the row up, boosts the
- * glow, and unfolds the week's numbers.
- */
 function WeeklyCashflowChart({
   weeks,
   medianCents,
@@ -549,70 +529,60 @@ function WeeklyCashflowChart({
   weeks: TrendsWeek[];
   medianCents: number;
 }) {
+  const [showAll, setShowAll] = useState(false);
   const ordered = useMemo(() => [...weeks].reverse(), [weeks]);
-  const maxPos = Math.max(
-    TARGET_LINE_CENTS,
-    ...weeks.map((w) => w.cashflowCents),
-  );
-  const maxNeg = Math.max(0, ...weeks.map((w) => -w.cashflowCents));
-  const total = maxPos + maxNeg || 1;
-  // Shared horizontal scale: zero sits right of the space negatives need.
-  const zeroPct = (maxNeg / total) * 100;
-  const targetPct = zeroPct + (TARGET_LINE_CENTS / total) * 100;
-  const medianPct = zeroPct + (medianCents / total) * 100;
+  const visibleWeeks = showAll
+    ? ordered
+    : ordered.slice(0, DEFAULT_VISIBLE_WEEKS);
+  const hiddenCount = Math.max(0, ordered.length - visibleWeeks.length);
 
   return (
-    <div className="w-full">
-      <div
-        className="overflow-y-auto overflow-x-hidden overscroll-contain pr-1"
-        style={{ maxHeight: WEEK_ROW_PX * VISIBLE_WEEK_ROWS }}
-      >
-        <div className="relative">
-          {/* Guides span the full scroll height but are inset to the bar track,
-              so their percentages share the bars' coordinate space. */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0"
-            style={{ left: TRACK_LEFT_PX, right: TRACK_RIGHT_PX }}
-          >
-            {maxNeg > 0 ? (
-              <span
-                className="absolute inset-y-0 w-px bg-[var(--chart-zero)]"
-                style={{ left: `${zeroPct}%` }}
-              />
-            ) : null}
-            <span
-              className="absolute inset-y-0 w-px bg-[rgba(255,255,255,0.35)]"
-              style={{ left: `${targetPct}%` }}
-            />
-            {medianCents > 0 ? (
-              <span
-                className="absolute inset-y-0 border-l border-dashed border-[var(--chart-grid)]"
-                style={{ left: `${medianPct}%` }}
-              />
-            ) : null}
-          </div>
-
-          <ol>
-            {ordered.map((week, index) => (
-              <CashflowWeekRow
-                isLatest={index === 0}
-                key={week.weekId}
-                total={total}
-                week={week}
-                zeroPct={zeroPct}
-              />
-            ))}
-          </ol>
-        </div>
+    <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-base)]">
+      <div className="hidden grid-cols-[28px_minmax(120px,0.7fr)_minmax(220px,1.3fr)_104px] items-center gap-3 border-b border-[var(--border-subtle)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] sm:grid">
+        <span aria-hidden />
+        <span>Week</span>
+        <span>Cashflow composition</span>
+        <span className="text-right">Net</span>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
-        <span>Hollow = low</span>
-        <span>Brighter = closer to the $1,000 line</span>
-        <span>Glowing white = at or above it</span>
-        <span>Outline only = negative week</span>
-        <span>Dashed bar = week in progress</span>
-        <span>Dashed guide = median</span>
+      <div className="relative">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 left-[24px] top-0 w-px bg-[var(--border-default)] sm:left-[26px]"
+        />
+        <ol className="relative divide-y divide-[var(--border-subtle)]">
+          {visibleWeeks.map((week, index) => (
+            <CashflowWeekRow
+              isLatest={index === 0}
+              key={week.weekId}
+              medianCents={medianCents}
+              week={week}
+            />
+          ))}
+        </ol>
+      </div>
+      {hiddenCount > 0 ? (
+        <button
+          className="w-full border-t border-[var(--border-subtle)] px-4 py-3 text-xs font-semibold text-[var(--accent-brand-text)] transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]"
+          onClick={() => setShowAll(true)}
+          type="button"
+        >
+          Show {hiddenCount} earlier {hiddenCount === 1 ? "week" : "weeks"}
+        </button>
+      ) : ordered.length > DEFAULT_VISIBLE_WEEKS ? (
+        <button
+          className="w-full border-t border-[var(--border-subtle)] px-4 py-3 text-xs font-semibold text-[var(--text-tertiary)] transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]"
+          onClick={() => setShowAll(false)}
+          type="button"
+        >
+          Show recent weeks only
+        </button>
+      ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-[10px] font-medium text-[var(--text-muted)] sm:px-4">
+        <div className="flex items-center gap-3 tabular-nums">
+          <span>Target {formatMoney(TARGET_LINE_CENTS)}</span>
+          <span>Median {formatMoney(medianCents)}</span>
+        </div>
+        <span>Select a week to open its history</span>
       </div>
     </div>
   );
@@ -620,124 +590,117 @@ function WeeklyCashflowChart({
 
 function CashflowWeekRow({
   isLatest,
-  total,
+  medianCents,
   week,
-  zeroPct,
 }: {
   isLatest: boolean;
-  total: number;
+  medianCents: number;
   week: TrendsWeek;
-  zeroPct: number;
 }) {
   const router = useRouter();
   const cents = week.cashflowCents;
   const negative = cents < 0;
-  // 0 → hollow, 1 → white-hot at the $1,000 reference. Negatives stay 0.
-  const ratio = negative
-    ? 0
-    : Math.min(1, cents / TARGET_LINE_CENTS);
-  const widthPct = Math.max(0.75, (Math.abs(cents) / total) * 100);
-  const leftPct = negative ? zeroPct - widthPct : zeroPct;
-  const fillAlpha = Math.pow(ratio, 1.5) * 0.92;
-  const borderAlpha = negative ? 0.22 : 0.25 + 0.55 * ratio;
-  const glow =
-    ratio >= 1
-      ? "0 0 26px rgba(255,255,255,0.75), 0 0 8px rgba(255,255,255,0.55)"
-      : ratio > 0.35
-        ? `0 0 ${Math.round(4 + 20 * ratio)}px rgba(255,255,255,${(0.12 + 0.5 * ratio).toFixed(2)})`
-        : "none";
+  const hitTarget = cents >= TARGET_LINE_CENTS;
+  const belowMedian = !negative && medianCents > 0 && cents < medianCents;
+  const progressPct = Math.max(
+    cents === 0 ? 0 : 2,
+    Math.min(100, (Math.abs(cents) / TARGET_LINE_CENTS) * 100),
+  );
+  const barColor = negative
+    ? "var(--accent-negative)"
+    : hitTarget
+      ? "var(--accent-primary)"
+      : belowMedian
+        ? "var(--text-muted)"
+        : "var(--accent-brand)";
+  const amountColor = negative
+    ? "var(--accent-negative-text)"
+    : hitTarget
+      ? "var(--accent-primary-text)"
+      : belowMedian
+        ? "var(--text-secondary)"
+        : "var(--accent-brand-text)";
+  const medianDelta = cents - medianCents;
   const open = () => router.push(`/history/${week.weekId}`);
 
   return (
-    <li className="group relative">
-      <div
-        className="cursor-pointer rounded-lg border border-transparent py-1.5 outline-none transition-all duration-150 group-hover:z-10 group-hover:border-[var(--border-default)] group-hover:bg-[var(--surface-hover)] group-hover:shadow-[0_0_24px_-8px_rgba(255,255,255,0.35)] group-focus-within:z-10 group-focus-within:border-[var(--border-default)] group-focus-within:bg-[var(--surface-hover)]"
+    <li className="relative">
+      <button
+        aria-label={`Open week ${week.weekNumber}, cashflow ${formatMoney(cents)}`}
+        className="group grid w-full grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-x-3 px-3 py-3 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)] sm:grid-cols-[28px_minmax(120px,0.7fr)_minmax(220px,1.3fr)_104px] sm:items-center sm:py-3.5"
         onClick={open}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            open();
-          }
-        }}
-        role="link"
-        style={{ paddingLeft: ROW_PAD_X, paddingRight: ROW_PAD_X }}
-        tabIndex={0}
+        type="button"
       >
-        {/* One baseline: date gutter, bar track, amount gutter. */}
-        <div
-          className="grid items-center"
+        <span
+          aria-hidden
+          className="relative z-[1] mt-1.5 h-2.5 w-2.5 justify-self-center rounded-full border-2 bg-[var(--surface-base)] transition-transform group-hover:scale-125 sm:mt-0"
           style={{
-            gridTemplateColumns: `${DATE_COL_PX}px minmax(0,1fr) ${AMOUNT_COL_PX}px`,
-            columnGap: COL_GAP_PX,
+            borderColor:
+              week.status === "active"
+                ? "var(--accent-brand)"
+                : hitTarget
+                  ? "var(--accent-primary)"
+                  : negative
+                    ? "var(--accent-negative)"
+                    : "var(--border-strong)",
           }}
-        >
-          <span className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-primary)]">
-            {shortDate(week.startDate)}
+        />
+
+        <span className="min-w-0">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-[var(--text-primary)]">
+              Week {week.weekNumber}
+            </span>
+            {week.status === "active" ? (
+              <span className="hidden shrink-0 rounded-full border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-brand-text)] sm:inline-flex">
+                In progress
+              </span>
+            ) : isLatest ? (
+              <span className="hidden shrink-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] sm:inline">
+                Latest
+              </span>
+            ) : null}
           </span>
-          <span className="relative block h-3">
-            <span
-              className={`absolute inset-y-0 rounded-full border transition-all duration-150 group-hover:brightness-125 ${
-                week.status === "active" ? "border-dashed" : ""
-              }`}
-              style={{
-                left: `${leftPct}%`,
-                width: `${widthPct}%`,
-                borderColor: `rgba(255,255,255,${borderAlpha.toFixed(2)})`,
-                backgroundColor:
-                  fillAlpha > 0
-                    ? `rgba(255,255,255,${fillAlpha.toFixed(2)})`
-                    : "transparent",
-                boxShadow: glow,
-              }}
-            />
+          <span className="mt-0.5 block truncate text-[11px] font-medium text-[var(--text-tertiary)]">
+            {shortDate(week.startDate)} – {shortDate(week.endDate)}
           </span>
+        </span>
+
+        <span className="text-right sm:col-start-4 sm:row-start-1">
           <span
-            className="text-right text-xs font-semibold tabular-nums text-[var(--text-primary)]"
-            style={{ opacity: negative ? 0.75 : 0.55 + 0.45 * ratio }}
+            className="block text-base font-semibold tabular-nums tracking-tight"
+            style={{ color: amountColor }}
           >
+            {cents > 0 ? "+" : ""}
             {formatMoney(cents)}
           </span>
-        </div>
-        {/* Unfolds on hover/focus, same mechanic as the energy timeline. */}
-        <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-200 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
-          <div className="overflow-hidden">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1.5 text-xs text-[var(--text-muted)]">
-              <span>
-                Wk {week.weekNumber} · {shortDate(week.startDate)} –{" "}
-                {shortDate(week.endDate)}
-              </span>
-              <span>Earned {formatMoney(week.earningsCents)}</span>
-              <span>Spent {formatMoney(week.spendCents)}</span>
-              <span>Fixed {formatMoney(week.baseCents)}</span>
-              <span
-                className="font-semibold tabular-nums"
-                style={{
-                  color:
-                    cents >= TARGET_LINE_CENTS
-                      ? "rgba(255,255,255,0.95)"
-                      : "var(--text-tertiary)",
-                }}
-              >
-                {cents >= TARGET_LINE_CENTS
-                  ? `+${formatMoney(cents - TARGET_LINE_CENTS)} over the $1,000 line`
-                  : `${formatMoney(TARGET_LINE_CENTS - cents)} short of $1,000`}
-              </span>
-              {week.status === "active" ? (
-                <span className="rounded-full border border-dashed border-[var(--border-default)] px-2 py-0.5 font-semibold text-[var(--text-tertiary)]">
-                  In progress
-                </span>
-              ) : isLatest ? (
-                <span className="rounded-full border border-[var(--border-default)] px-2 py-0.5 font-semibold text-[var(--text-tertiary)]">
-                  Latest
-                </span>
-              ) : null}
-              <span className="ml-auto text-[var(--text-muted)]">
-                Click to open week
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+          <span className="mt-0.5 block whitespace-nowrap text-[10px] font-medium tabular-nums text-[var(--text-muted)]">
+            {medianDelta >= 0 ? "+" : "−"}
+            {formatMoney(Math.abs(medianDelta))} vs median
+          </span>
+        </span>
+
+        <span className="col-span-2 col-start-2 mt-2 min-w-0 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:mt-0">
+          <span className="relative block h-1.5 overflow-hidden rounded-full bg-[var(--surface-overlay)]">
+            <span
+              className="absolute inset-y-0 left-0 rounded-full transition-[width,filter] duration-200 group-hover:brightness-125"
+              style={{
+                backgroundColor: barColor,
+                width: `${progressPct}%`,
+              }}
+            />
+            <span
+              aria-hidden
+              className="absolute inset-y-[-2px] right-0 w-px bg-[var(--border-strong)]"
+            />
+          </span>
+          <span className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-[10px] font-medium tabular-nums text-[var(--text-muted)]">
+            <span className="truncate">Earn {formatMoney(week.earningsCents)}</span>
+            <span className="truncate">Spend {formatMoney(week.spendCents)}</span>
+            <span className="truncate">Fixed {formatMoney(week.baseCents)}</span>
+          </span>
+        </span>
+      </button>
     </li>
   );
 }
