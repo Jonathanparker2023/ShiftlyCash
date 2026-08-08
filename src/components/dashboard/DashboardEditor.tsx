@@ -38,6 +38,7 @@ import {
   moveTransactionToYesterdayAction,
   moveTransactionToTomorrowAction,
   refreshDashboardProjectionMaintenanceAction,
+  removeAmortizationAction,
   renameTransactionAction,
   saveEarnSlotAction,
   snapshotClosedWeekAction,
@@ -716,6 +717,60 @@ export function DashboardEditor({
     }
   }
 
+  // Stop spreading an amortized cost: it becomes a single charge on the day it
+  // happened, which is the exact inverse of amortizeTransaction below.
+  async function unamortizeTransaction(transaction: DashboardTransaction) {
+    if (!shiftsEditable) return;
+    if (pendingTransactionIds.has(transaction.id)) {
+      return;
+    }
+
+    const previousDays = days;
+    setTransactionError(null);
+    setSaveState("saving");
+    setPendingTransactionIds((current) => new Set(current).add(transaction.id));
+    setDays((currentDays) =>
+      currentDays.map((day) =>
+        day.id === transaction.dayId
+          ? moveTransactionBetweenBuckets(
+              day,
+              { ...transaction, isAmortized: false },
+              "applied",
+            )
+          : day,
+      ),
+    );
+
+    try {
+      await removeAmortizationAction({
+        transactionId: transaction.id,
+        reInclude: true,
+      });
+      lastSavedAt.current = Date.now();
+      setSaveState("saved");
+      router.refresh();
+      window.setTimeout(() => {
+        if (lastSavedAt.current && Date.now() - lastSavedAt.current >= 1150) {
+          setSaveState("idle");
+        }
+      }, 1200);
+    } catch (error) {
+      setDays(previousDays);
+      setSaveState("error");
+      setTransactionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to stop spreading this cost.",
+      );
+    } finally {
+      setPendingTransactionIds((current) => {
+        const next = new Set(current);
+        next.delete(transaction.id);
+        return next;
+      });
+    }
+  }
+
   async function amortizeTransaction(
     transaction: DashboardTransaction,
     months: 1 | 3,
@@ -1318,6 +1373,7 @@ export function DashboardEditor({
               onAddShift={addShift}
               onAddManualTransaction={addManualTransaction}
               onAmortizeTransaction={amortizeTransaction}
+              onUnamortizeTransaction={unamortizeTransaction}
               onAllocateEvChargeTransaction={allocateEvChargeTransaction}
               onDeleteTransaction={deleteTransaction}
               onMoveTransactionToYesterday={moveTransactionToYesterday}
@@ -1899,6 +1955,7 @@ function FocusedDayEditor({
   onMoveTransactionToTomorrow,
   onRenameTransaction,
   onAmortizeTransaction,
+  onUnamortizeTransaction,
   onAllocateEvChargeTransaction,
   onAddShift,
   onRemoveSlot,
@@ -1933,6 +1990,7 @@ function FocusedDayEditor({
     transaction: DashboardTransaction,
     merchantName: string,
   ) => void;
+  onUnamortizeTransaction: (transaction: DashboardTransaction) => void;
   onAmortizeTransaction: (
     transaction: DashboardTransaction,
     months: 1 | 3,
@@ -1972,6 +2030,7 @@ function FocusedDayEditor({
           onAddManualTransaction={onAddManualTransaction}
           onAllocateEvChargeTransaction={onAllocateEvChargeTransaction}
           onAmortizeTransaction={onAmortizeTransaction}
+          onUnamortizeTransaction={onUnamortizeTransaction}
           onDeleteTransaction={onDeleteTransaction}
           onMoveTransactionToYesterday={onMoveTransactionToYesterday}
           onMoveTransactionToTomorrow={onMoveTransactionToTomorrow}
@@ -1994,6 +2053,7 @@ function TransactionDrawer({
   onMoveTransactionToTomorrow,
   onRenameTransaction,
   onAmortizeTransaction,
+  onUnamortizeTransaction,
   onAllocateEvChargeTransaction,
   onAddManualTransaction,
 }: {
@@ -2012,6 +2072,7 @@ function TransactionDrawer({
     transaction: DashboardTransaction,
     merchantName: string,
   ) => void;
+  onUnamortizeTransaction: (transaction: DashboardTransaction) => void;
   onAmortizeTransaction: (
     transaction: DashboardTransaction,
     months: 1 | 3,
@@ -2075,6 +2136,7 @@ function TransactionDrawer({
           onRename={onRenameTransaction}
           onAllocateEvCharge={onAllocateEvChargeTransaction}
           onAmortize={onAmortizeTransaction}
+          onUnamortize={onUnamortizeTransaction}
           onToggle={(transaction) =>
             onToggleTransactionStatus(transaction, "excluded")
           }
@@ -2163,6 +2225,7 @@ function TransactionColumn({
   onToggle,
   onAllocateEvCharge,
   onAmortize,
+  onUnamortize,
   gasSpendCents,
   evChargeSpendCents,
   collapsible,
@@ -2182,6 +2245,7 @@ function TransactionColumn({
     previousChargeDate: string | null,
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
+  onUnamortize?: (transaction: DashboardTransaction) => void;
   gasSpendCents?: number;
   evChargeSpendCents?: number;
   // Collapsed by default -- a header you tap to reveal the list, so a column
@@ -2285,6 +2349,7 @@ function TransactionColumn({
             onToggle={onToggle}
             onAllocateEvCharge={onAllocateEvCharge}
             onAmortize={onAmortize}
+            onUnamortize={onUnamortize}
           />
         ))}
       </div>
@@ -2542,6 +2607,7 @@ function TransactionRowButton({
   onToggle,
   onAllocateEvCharge,
   onAmortize,
+  onUnamortize,
 }: {
   transaction: DashboardTransaction;
   disabled: boolean;
@@ -2557,6 +2623,7 @@ function TransactionRowButton({
     previousChargeDate: string | null,
   ) => void;
   onAmortize?: (transaction: DashboardTransaction, months: 1 | 3) => void;
+  onUnamortize?: (transaction: DashboardTransaction) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -2816,6 +2883,21 @@ function TransactionRowButton({
                   type="button"
                 >
                   {isEvChargeExempt ? "Edit EV charge" : "EV Charge"}
+                </button>
+              ) : null}
+              {/* The inverse of Amort. An amortized cost is EXCLUDED from spend
+                  and lives in the baseline as a daily slice, so it only ever
+                  appears on the exempt side — which is why the Amort buttons
+                  above (spending-only) can never undo it. */}
+              {variant === "exempt" && onUnamortize && transaction.isAmortized ? (
+                <button
+                  className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={disabled}
+                  onClick={() => onUnamortize(transaction)}
+                  title="Stop spreading this cost. It becomes a single charge on the day it happened."
+                  type="button"
+                >
+                  Un-amortize
                 </button>
               ) : null}
               {variant === "spending" &&

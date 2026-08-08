@@ -983,15 +983,25 @@ export async function reAmortizeTransactionAction(
   return { ok: true };
 }
 
-// Undo an amortization (refund / remove / reclassify). Deactivates the
-// amortization so its baseline contribution drops from every overlapping day in
-// the live window. If reInclude is true, the original transaction is restored to
-// spend (reclassify back to a normal expense day-charge).
+/**
+ * Undo an amortization: the spread stops and the cost becomes a single lump sum
+ * on the day it actually happened.
+ *
+ * Amortizing EXCLUDES the source transaction (its money moves into the baseline
+ * as a daily slice), so undoing has to put it back or the money lands nowhere —
+ * gone from the baseline AND still excluded from spend. That silent hole is why
+ * reInclude now defaults to TRUE: a caller that forgets the flag gets the
+ * conservative behaviour instead of quietly deleting an expense.
+ *
+ * Pass reInclude: false only when the transaction genuinely should not count —
+ * a refund, or a row being reclassified by the caller straight afterwards.
+ */
 export async function removeAmortizationAction(
   input: { transactionId: string; reInclude?: boolean },
 ): Promise<{ ok: true }> {
   const { supabase, user } = await requireUser();
   const transactionId = requireUuid(input.transactionId, "transactionId");
+  const reInclude = input.reInclude ?? true;
 
   const { error: deactivateError } = await supabase
     .from("amortized_expenses")
@@ -1003,11 +1013,53 @@ export async function removeAmortizationAction(
     throw new Error(`Unable to remove amortization: ${deactivateError.message}`);
   }
 
-  if (input.reInclude) {
+  if (reInclude) {
+    // A transaction can only be 'applied' if it has a day_id
+    // (transactions_applied_requires_day). Restoring a row whose day was never
+    // set would violate that, so fall back to its date's day.
+    const { data: txn, error: txnError } = await supabase
+      .from("transactions")
+      .select("id,day_id,date")
+      .eq("id", transactionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (txnError) {
+      throw new Error(`Unable to load transaction: ${txnError.message}`);
+    }
+    if (!txn) {
+      throw new Error("Transaction not found.");
+    }
+
+    const row = txn as { id: string; day_id: string | null; date: string };
+    let dayId = row.day_id;
+
+    if (!dayId) {
+      const { data: day } = await supabase
+        .from("days")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("date", row.date)
+        .maybeSingle();
+      dayId = (day as { id: string } | null)?.id ?? null;
+    }
+
+    if (!dayId) {
+      throw new Error(
+        `No day exists for ${row.date}, so this cost cannot be restored as a lump sum. Amortization was removed.`,
+      );
+    }
+
     const { error: reincludeError } = await supabase
       .from("transactions")
-      .update({ status: "applied", review_reason: null, excluded_at: null })
-      .eq("id", transactionId);
+      .update({
+        status: "applied",
+        review_reason: null,
+        excluded_at: null,
+        day_id: dayId,
+      })
+      .eq("id", transactionId)
+      .eq("user_id", user.id);
     if (reincludeError) {
       throw new Error(`Unable to re-include transaction: ${reincludeError.message}`);
     }
@@ -1016,6 +1068,7 @@ export async function removeAmortizationAction(
   revalidatePath("/");
   revalidatePath("/trends");
   revalidatePath("/baseline");
+  revalidatePath("/history");
   return { ok: true };
 }
 

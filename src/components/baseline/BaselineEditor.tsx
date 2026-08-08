@@ -453,11 +453,11 @@ function AmortizedExpensesSection({
                   </p>
                   {expense.sourceTransactionId ? (
                     <button
-                      aria-label={`Remove ${expense.merchantName}`}
+                      aria-label={`Stop spreading ${expense.merchantName} and charge it in full on its original day`}
                       className="h-9 w-9 rounded-md text-lg text-[var(--text-muted)] transition hover:bg-[var(--accent-negative-fill)] hover:text-[var(--accent-negative-text)] disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={removingIds.has(expense.id)}
                       onClick={() => remove(expense)}
-                      title="Remove temporary cost"
+                      title="Stop spreading this cost. It goes back to a single charge on the day it happened."
                       type="button"
                     >
                       {removingIds.has(expense.id) ? "…" : "×"}
