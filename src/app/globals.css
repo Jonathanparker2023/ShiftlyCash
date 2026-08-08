@@ -105,6 +105,8 @@
   --chart-debt: var(--accent-negative-text);
   --chart-debt-soft: var(--accent-negative-fill);
   --chart-target: var(--accent-primary);
+  --chart-warning: #f59e0b;
+  --chart-warning-text: #fbbf24;
   --chart-grid: rgba(255, 255, 255, 0.08);
   --chart-axis: rgba(245, 247, 250, 0.55);
   --chart-zero: rgba(255, 255, 255, 0.28);

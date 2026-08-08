@@ -102,7 +102,7 @@ export function TrendsView({ initialData }: { initialData: TrendsData }) {
               No weeks in this range yet.
             </div>
           ) : (
-            <WeeklyCashflowChart weeks={weeks} medianCents={stats.median} />
+            <WeeklyCashflowChart weeks={weeks} />
           )}
 
           <EnergyTracker
@@ -522,26 +522,28 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const DEFAULT_VISIBLE_WEEKS = 12;
 
-function WeeklyCashflowChart({
-  weeks,
-  medianCents,
-}: {
-  weeks: TrendsWeek[];
-  medianCents: number;
-}) {
+function WeeklyCashflowChart({ weeks }: { weeks: TrendsWeek[] }) {
   const [showAll, setShowAll] = useState(false);
   const ordered = useMemo(() => [...weeks].reverse(), [weeks]);
   const visibleWeeks = showAll
     ? ordered
     : ordered.slice(0, DEFAULT_VISIBLE_WEEKS);
   const hiddenCount = Math.max(0, ordered.length - visibleWeeks.length);
+  const scaleCents = Math.max(
+    TARGET_LINE_CENTS,
+    ...weeks.map((week) => Math.abs(week.cashflowCents)),
+  );
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-base)]">
       <div className="hidden grid-cols-[28px_minmax(120px,0.7fr)_minmax(220px,1.3fr)_104px] items-center gap-3 border-b border-[var(--border-subtle)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] sm:grid">
         <span aria-hidden />
         <span>Week</span>
-        <span>Cashflow composition</span>
+        <span className="grid grid-cols-3 tabular-nums">
+          <span>−{formatMoney(scaleCents)}</span>
+          <span className="text-center">$0</span>
+          <span className="text-right">+{formatMoney(scaleCents)}</span>
+        </span>
         <span className="text-right">Net</span>
       </div>
       <div className="relative">
@@ -550,11 +552,10 @@ function WeeklyCashflowChart({
           className="pointer-events-none absolute bottom-0 left-[24px] top-0 w-px bg-[var(--border-default)] sm:left-[26px]"
         />
         <ol className="relative divide-y divide-[var(--border-subtle)]">
-          {visibleWeeks.map((week, index) => (
+          {visibleWeeks.map((week) => (
             <CashflowWeekRow
-              isLatest={index === 0}
               key={week.weekId}
-              medianCents={medianCents}
+              scaleCents={scaleCents}
               week={week}
             />
           ))}
@@ -577,57 +578,46 @@ function WeeklyCashflowChart({
           Show recent weeks only
         </button>
       ) : null}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-[10px] font-medium text-[var(--text-muted)] sm:px-4">
-        <div className="flex items-center gap-3 tabular-nums">
-          <span>Target {formatMoney(TARGET_LINE_CENTS)}</span>
-          <span>Median {formatMoney(medianCents)}</span>
-        </div>
-        <span>Select a week to open its history</span>
+      <div className="border-t border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-[10px] font-medium tabular-nums text-[var(--text-muted)] sm:px-4">
+        <span>Target {formatMoney(TARGET_LINE_CENTS)}</span>
       </div>
     </div>
   );
 }
 
 function CashflowWeekRow({
-  isLatest,
-  medianCents,
+  scaleCents,
   week,
 }: {
-  isLatest: boolean;
-  medianCents: number;
+  scaleCents: number;
   week: TrendsWeek;
 }) {
   const router = useRouter();
   const cents = week.cashflowCents;
   const negative = cents < 0;
   const hitTarget = cents >= TARGET_LINE_CENTS;
-  const belowMedian = !negative && medianCents > 0 && cents < medianCents;
-  const progressPct = Math.max(
-    cents === 0 ? 0 : 2,
-    Math.min(100, (Math.abs(cents) / TARGET_LINE_CENTS) * 100),
+  const widthPct = Math.max(
+    cents === 0 ? 0 : 1.5,
+    Math.min(50, (Math.abs(cents) / scaleCents) * 50),
   );
+  const leftPct = negative ? 50 - widthPct : 50;
   const barColor = negative
     ? "var(--accent-negative)"
     : hitTarget
       ? "var(--accent-primary)"
-      : belowMedian
-        ? "var(--text-muted)"
-        : "var(--accent-brand)";
+      : "var(--chart-warning)";
   const amountColor = negative
     ? "var(--accent-negative-text)"
     : hitTarget
       ? "var(--accent-primary-text)"
-      : belowMedian
-        ? "var(--text-secondary)"
-        : "var(--accent-brand-text)";
-  const medianDelta = cents - medianCents;
+      : "var(--chart-warning-text)";
   const open = () => router.push(`/history/${week.weekId}`);
 
   return (
     <li className="relative">
       <button
         aria-label={`Open week ${week.weekNumber}, cashflow ${formatMoney(cents)}`}
-        className="group grid w-full grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-x-3 px-3 py-3 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)] sm:grid-cols-[28px_minmax(120px,0.7fr)_minmax(220px,1.3fr)_104px] sm:items-center sm:py-3.5"
+        className="group grid w-full grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-3 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)] sm:grid-cols-[28px_minmax(120px,0.7fr)_minmax(220px,1.3fr)_104px]"
         onClick={open}
         type="button"
       >
@@ -635,14 +625,7 @@ function CashflowWeekRow({
           aria-hidden
           className="relative z-[1] mt-1.5 h-2.5 w-2.5 justify-self-center rounded-full border-2 bg-[var(--surface-base)] transition-transform group-hover:scale-125 sm:mt-0"
           style={{
-            borderColor:
-              week.status === "active"
-                ? "var(--accent-brand)"
-                : hitTarget
-                  ? "var(--accent-primary)"
-                  : negative
-                    ? "var(--accent-negative)"
-                    : "var(--border-strong)",
+            borderColor: barColor,
           }}
         />
 
@@ -652,12 +635,8 @@ function CashflowWeekRow({
               Week {week.weekNumber}
             </span>
             {week.status === "active" ? (
-              <span className="hidden shrink-0 rounded-full border border-[var(--accent-brand-border)] bg-[var(--accent-brand-fill)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-brand-text)] sm:inline-flex">
-                In progress
-              </span>
-            ) : isLatest ? (
-              <span className="hidden shrink-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] sm:inline">
-                Latest
+              <span className="hidden text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] sm:inline">
+                Current
               </span>
             ) : null}
           </span>
@@ -674,30 +653,22 @@ function CashflowWeekRow({
             {cents > 0 ? "+" : ""}
             {formatMoney(cents)}
           </span>
-          <span className="mt-0.5 block whitespace-nowrap text-[10px] font-medium tabular-nums text-[var(--text-muted)]">
-            {medianDelta >= 0 ? "+" : "−"}
-            {formatMoney(Math.abs(medianDelta))} vs median
-          </span>
         </span>
 
         <span className="col-span-2 col-start-2 mt-2 min-w-0 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:mt-0">
-          <span className="relative block h-1.5 overflow-hidden rounded-full bg-[var(--surface-overlay)]">
+          <span className="relative block h-2 overflow-hidden rounded-full bg-[var(--surface-overlay)]">
             <span
-              className="absolute inset-y-0 left-0 rounded-full transition-[width,filter] duration-200 group-hover:brightness-125"
+              className="absolute inset-y-0 rounded-full transition-[width,filter] duration-200 group-hover:brightness-125"
               style={{
                 backgroundColor: barColor,
-                width: `${progressPct}%`,
+                left: `${leftPct}%`,
+                width: `${widthPct}%`,
               }}
             />
             <span
               aria-hidden
-              className="absolute inset-y-[-2px] right-0 w-px bg-[var(--border-strong)]"
+              className="absolute inset-y-0 left-1/2 z-[1] w-px bg-[var(--chart-zero)]"
             />
-          </span>
-          <span className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-[10px] font-medium tabular-nums text-[var(--text-muted)]">
-            <span className="truncate">Earn {formatMoney(week.earningsCents)}</span>
-            <span className="truncate">Spend {formatMoney(week.spendCents)}</span>
-            <span className="truncate">Fixed {formatMoney(week.baseCents)}</span>
           </span>
         </span>
       </button>
