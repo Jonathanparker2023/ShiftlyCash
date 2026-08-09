@@ -20,7 +20,10 @@ import type {
 } from "@/lib/dashboard/types";
 import { sortDashboardTransactions } from "@/lib/dashboard/transactions";
 import { applyDashboardProjectionMaintenance } from "@/lib/dashboard/projectionMaintenance";
-import { deriveSpendProjection } from "@/lib/dashboard/spendProjection";
+import {
+  deriveSpendProjection,
+  type DashboardSpendProjection,
+} from "@/lib/dashboard/spendProjection";
 import {
   dollarsToCents,
   roundCentsToNearestTenDollars,
@@ -170,7 +173,35 @@ type ClosedWeekMetricRow = {
 
 type ProjectionWeekRow = {
   spend_for_projection: NumericValue;
+  start_date: string;
 };
+
+// Below this many closed weeks in the new year, the year median is noisier than
+// the trailing window it replaced — so January falls back. Mirrors the same
+// threshold in apply_future_day_projection.
+const PROJECTION_MIN_YEAR_WEEKS = 4;
+const PROJECTION_FALLBACK_WEEKS = 12;
+
+/**
+ * Pick the weeks the autofill median is taken from: the calendar year, or a
+ * trailing window when the year is too young to be stable.
+ */
+function selectProjectionWindow(
+  rows: ProjectionWeekRow[],
+  todayIso: string,
+): DashboardSpendProjection {
+  const yearStart = `${todayIso.slice(0, 4)}-01-01`;
+  const thisYear = rows.filter((row) => row.start_date >= yearStart);
+  const useYear = thisYear.length >= PROJECTION_MIN_YEAR_WEEKS;
+  const chosen = useYear ? thisYear : rows.slice(-PROJECTION_FALLBACK_WEEKS);
+
+  return deriveSpendProjection(
+    chosen.map((row) => ({
+      spendCents: dollarsToCents(toNumber(row.spend_for_projection)),
+    })),
+    useYear ? "year_median" : "recent_twelve_median",
+  );
+}
 
 type BaselineTotalRow = {
   monthly_total: NumericValue;
@@ -306,7 +337,10 @@ export async function getDashboardData(
       .order("start_date", { ascending: true }),
     supabase
       .from("v_projection_weeks")
-      .select("spend_for_projection")
+      // start_date is needed to scope the median to the current year, matching
+      // apply_future_day_projection — the two must agree or the dashboard
+      // shows a different figure than the one written onto the days.
+      .select("spend_for_projection,start_date")
       .eq("user_id", user.id)
       .not("spend_for_projection", "is", null)
       .order("start_date", { ascending: true }),
@@ -751,10 +785,9 @@ function mapDashboardData(input: {
       ),
     },
     abilityPayPeriod: input.adjacentAbilityPayPeriod,
-    spendProjection: deriveSpendProjection(
-      input.projectionWeeks.map((row) => ({
-        spendCents: dollarsToCents(toNumber(row.spend_for_projection)),
-      })),
+    spendProjection: selectProjectionWindow(
+      input.projectionWeeks,
+      input.todayIso,
     ),
   };
 }
