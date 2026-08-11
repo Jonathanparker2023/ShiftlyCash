@@ -137,6 +137,48 @@ describe("mapEnergyTracker", () => {
     });
   });
 
+  it("averages an active EV week only through today", () => {
+    const tracker = mapEnergyTracker(
+      [
+        energyEvent({
+          id: "charge-1",
+          date: "2026-08-09",
+          startDate: "2026-08-09",
+          amountCents: 1_800,
+        }),
+        energyEvent({
+          id: "charge-2",
+          date: "2026-08-11",
+          startDate: "2026-08-11",
+          amountCents: 1_200,
+        }),
+      ],
+      "2026-08-11",
+      [
+        trendsWeek({
+          weekId: "week-active",
+          startDate: "2026-08-09",
+          endDate: "2026-08-15",
+          weekNumber: 28,
+          status: "active",
+        }),
+      ],
+    );
+
+    expect(tracker.status).toBe("active");
+    if (tracker.status !== "active") {
+      throw new Error("Expected an active tracker.");
+    }
+    expect(tracker.weeklyAverages[0]).toMatchObject({
+      weekId: "week-active",
+      periodEndDate: "2026-08-11",
+      periodDays: 3,
+      totalCents: 3_000,
+      averageDailyCents: 1_000,
+      eventCount: 2,
+    });
+  });
+
   it("keeps zero-charge weeks in the EV trend after tracking begins", () => {
     const tracker = mapEnergyTracker(
       [
