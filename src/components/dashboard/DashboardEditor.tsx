@@ -60,6 +60,7 @@ import type {
   DashboardTransaction,
   SaveState,
 } from "@/lib/dashboard/types";
+import { MAX_SHIFT_SLOTS } from "@/lib/slots";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
 import { contrastText, darken } from "@/lib/domain/jobColor";
 import {
@@ -430,7 +431,7 @@ export function DashboardEditor({
     }
 
     // Reorder only operates on real (editable) slots. Synthetic bucket rows have
-    // slotIndex >= 4 and are never persisted as earn_slots; carry them through
+    // slotIndex >= SYNTHETIC_SLOT_BASE and are never persisted as earn_slots; carry them through
     // untouched so the optimistic UI keeps showing them.
     const bucketSlots = day.slots.filter((slot) => slot.kind === "bucket");
     const activeSlots = day.slots
@@ -452,7 +453,7 @@ export function DashboardEditor({
     reorderedActiveSlots.splice(toPosition, 0, movedSlot);
 
     const nextSlots = [
-      ...Array.from({ length: 4 }, (_, slotIndex) => {
+      ...Array.from({ length: MAX_SHIFT_SLOTS }, (_, slotIndex) => {
         const activeSlot = reorderedActiveSlots[slotIndex];
 
         if (activeSlot) {
@@ -2991,7 +2992,7 @@ function ShiftList({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   // Bucket rows render in the list but must NOT count toward the 4-shift cap,
-  // and are never draggable (synthetic, read-only, slotIndex >= 4 -- see
+  // and are never draggable (synthetic, read-only, slotIndex >= SYNTHETIC_SLOT_BASE -- see
   // reorderSlots above).
   const activeSlots = day.slots.filter((slot) => slot.jobType !== "none");
   const sortableSlots = activeSlots.filter((slot) => slot.kind !== "bucket");

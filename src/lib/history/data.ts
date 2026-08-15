@@ -18,6 +18,7 @@ import type {
   HistoryWeek,
   SnapshotSummary,
 } from "@/lib/history/types";
+import { SYNTHETIC_SLOT_BASE } from "@/lib/slots";
 
 type NumericValue = number | string | null;
 
@@ -432,12 +433,12 @@ function mapHistoryDetailDay(
       ...slots.map((slot) =>
         mapHistoryDetailSlot(slot, settings, customJobsById),
       ),
-      // Synthetic READ-ONLY Amortized Income credit rows (slotIndex >= 4 sentinel).
+      // Synthetic READ-ONLY Amortized Income credit rows (SYNTHETIC_SLOT_BASE sentinel).
       ...credits.map((credit, n): HistoryDetailSlot => {
         const creditCents = Math.round(toNumber(credit.credit_cents));
         return {
           id: `bucket:${credit.bucket_id}`,
-          slotIndex: 4 + n,
+          slotIndex: SYNTHETIC_SLOT_BASE + n,
           jobType: "other",
           payType: "none",
           hoursOrUnits: creditCents / 100,

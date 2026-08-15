@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import type { IncentiveMode, JobType, PayType } from "@/lib/domain/pay";
 import type { TemplateSlotDraft } from "@/lib/template/types";
+import { MAX_SHIFT_SLOTS } from "@/lib/slots";
 
 const JOB_TYPES = [
   "ability",
@@ -64,7 +65,7 @@ export async function saveDefaultTemplateAction(
 
 function normalizeTemplateSlot(slot: TemplateSlotDraft): TemplateSlotDraft {
   const dayIndex = requireIntegerInRange(slot.dayIndex, 0, 6, "dayIndex");
-  const slotIndex = requireIntegerInRange(slot.slotIndex, 0, 3, "slotIndex");
+  const slotIndex = requireIntegerInRange(slot.slotIndex, 0, MAX_SHIFT_SLOTS - 1, "slotIndex");
   const jobType = requireEnum(slot.jobType, JOB_TYPES, "jobType");
   // Carried through on every branch: the label is part of the slot now, not a
   // separate row keyed by grid position.

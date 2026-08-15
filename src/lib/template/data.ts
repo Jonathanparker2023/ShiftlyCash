@@ -5,6 +5,7 @@ import type {
   TemplateEditorData,
   TemplateSlotDraft,
 } from "@/lib/template/types";
+import { MAX_SHIFT_SLOTS } from "@/lib/slots";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -115,7 +116,7 @@ function mapTemplateDays(
   return DAY_LABELS.map((label, dayIndex) => ({
     dayIndex,
     label,
-    slots: Array.from({ length: 4 }, (_, slotIndex) =>
+    slots: Array.from({ length: MAX_SHIFT_SLOTS }, (_, slotIndex) =>
       mapTemplateSlot(
         dayIndex,
         slotIndex,

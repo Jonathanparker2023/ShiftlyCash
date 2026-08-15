@@ -35,6 +35,7 @@ import type {
   PaySettings,
   PayType,
 } from "@/lib/domain/pay";
+import { MAX_SHIFT_SLOTS, SYNTHETIC_SLOT_BASE } from "@/lib/slots";
 
 type NumericValue = number | string | null;
 
@@ -1004,7 +1005,7 @@ function mapDashboardDay(
       legacyRoundedCashflowCents: roundCentsToNearestTenDollars(cashflowCents),
     },
     slots: [
-      ...Array.from({ length: 4 }, (_, slotIndex): DashboardSlot => {
+      ...Array.from({ length: MAX_SHIFT_SLOTS }, (_, slotIndex): DashboardSlot => {
         const slot = existingSlots.get(slotIndex);
         const customJob =
           slot?.job_type === "custom" && slot.custom_job_id
@@ -1041,15 +1042,15 @@ function mapDashboardDay(
           customName: customJob?.name,
         };
       }),
-      // Synthetic READ-ONLY rows for Amortized Income daily credits. slotIndex >= 4
-      // is a sentinel that never collides with real slots (0..3), so these never
+      // Synthetic READ-ONLY rows for Amortized Income daily credits. Their index
+      // starts at SYNTHETIC_SLOT_BASE, far above any real slot, so these never
       // consume a real slot or get treated as editable shifts.
       ...credits.map((credit, n): DashboardSlot => {
         const creditCents = Math.round(toNumber(credit.credit_cents));
         return {
           id: `bucket:${credit.bucket_id}`,
           dayId: day.id,
-          slotIndex: 4 + n,
+          slotIndex: SYNTHETIC_SLOT_BASE + n,
           jobType: "other",
           payType: "none",
           hoursOrUnits: creditCents / 100,

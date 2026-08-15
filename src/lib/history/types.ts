@@ -46,7 +46,7 @@ export type HistoryDetailSlot = {
   customName?: string;
   customRegularRateCents?: number;
   customOvertimeRateCents?: number;
-  // "bucket" = a synthetic READ-ONLY Amortized Income credit row (slotIndex>=4),
+  // "bucket" = a synthetic READ-ONLY Amortized Income credit row (slotIndex >= SYNTHETIC_SLOT_BASE),
   // carrying the SIGNED daily credit. Not a stored earn_slot.
   kind?: "earn" | "bucket";
   bucketId?: string | null;
