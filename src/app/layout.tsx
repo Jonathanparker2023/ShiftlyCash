@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Jost } from "next/font/google";
 import { cookies } from "next/headers";
 
@@ -26,6 +26,18 @@ const jost = Jost({
 export const metadata: Metadata = {
   title: "Bashflow",
   description: "Personal cashflow tracking for shift work.",
+  applicationName: "Bashflow",
+  // Names the icon when the site is saved to an iOS/iPadOS home screen.
+  // Without this, Safari falls back to the page title of whatever page was open.
+  appleWebApp: {
+    capable: true,
+    title: "Bashflow",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0c0e",
 };
 
 export default async function RootLayout({

@@ -1,65 +1,64 @@
-<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
-  <!-- Detailed city skyline: 4 towers w/ varied rooftops + windows. Brand green on app-bg dark. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" fill="#0b0c0e"/><g transform="translate(8.20 9.06) scale(0.85590)">
+  <!-- Gold-bar city skyline: metallic gold towers, dark window cutouts, a few lit windows. -->
+  <defs>
+    <linearGradient id="bashflowGold" x1="0" y1="1" x2="0.22" y2="0">
+      <stop offset="0" stop-color="#7a5f17"/>
+      <stop offset="0.32" stop-color="#c8a32d"/>
+      <stop offset="0.5" stop-color="#f6e6a8"/>
+      <stop offset="0.7" stop-color="#d4af37"/>
+      <stop offset="1" stop-color="#9c7a24"/>
+    </linearGradient>
+  </defs>
 
-  <!-- TOWER 1 (shortest, leftmost): flat top + parapet -->
-  <rect x="8"  y="58" width="14" height="29" fill="#10b860"/>
-  <rect x="10" y="55" width="10" height="3"  fill="#10b860"/>
+  <rect x="8"  y="58" width="14" height="29" fill="url(#bashflowGold)"/>
+  <rect x="10" y="55" width="10" height="3"  fill="url(#bashflowGold)"/>
 
-  <!-- TOWER 2: Art Deco stepped/setback top -->
-  <rect x="29" y="48" width="14" height="39" fill="#10b860"/>
-  <rect x="31" y="44" width="10" height="4"  fill="#10b860"/>
-  <rect x="33" y="40" width="6"  height="4"  fill="#10b860"/>
+  <rect x="29" y="48" width="14" height="39" fill="url(#bashflowGold)"/>
+  <rect x="31" y="44" width="10" height="4"  fill="url(#bashflowGold)"/>
+  <rect x="33" y="40" width="6"  height="4"  fill="url(#bashflowGold)"/>
 
-  <!-- TOWER 3: pyramidal cap (Empire State / Chrysler vibe) -->
-  <rect x="50" y="34" width="14" height="53" fill="#10b860"/>
-  <path d="M 50,34 L 57,22 L 64,34 Z" fill="#10b860"/>
+  <rect x="50" y="34" width="14" height="53" fill="url(#bashflowGold)"/>
+  <path d="M 50,34 L 57,22 L 64,34 Z" fill="url(#bashflowGold)"/>
 
-  <!-- TOWER 4 (tallest): crown + spire/antenna (Burj Khalifa vibe) -->
-  <rect x="71" y="22" width="14" height="65" fill="#10b860"/>
-  <rect x="74" y="18" width="8"  height="4"  fill="#10b860"/>
-  <rect x="77" y="4"  width="2"  height="14" fill="#10b860"/>
+  <rect x="71" y="22" width="14" height="65" fill="url(#bashflowGold)"/>
+  <rect x="74" y="18" width="8"  height="4"  fill="url(#bashflowGold)"/>
+  <rect x="77" y="4"  width="2"  height="14" fill="url(#bashflowGold)"/>
 
-  <!-- WINDOWS — dark cutouts (#0a1d28 = app bg) + a few warm lit ones (#fbbf24) -->
+  <rect x="11" y="62" width="3" height="2" fill="#0b0c0e"/><rect x="16" y="62" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="11" y="67" width="3" height="2" fill="#0b0c0e"/><rect x="16" y="67" width="3" height="2" fill="#fff3c8"/>
+  <rect x="11" y="72" width="3" height="2" fill="#0b0c0e"/><rect x="16" y="72" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="11" y="77" width="3" height="2" fill="#0b0c0e"/><rect x="16" y="77" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="11" y="82" width="3" height="2" fill="#0b0c0e"/><rect x="16" y="82" width="3" height="2" fill="#0b0c0e"/>
 
-  <!-- Tower 1: 2 cols x 5 rows -->
-  <rect x="11" y="62" width="3" height="2" fill="#0a1d28"/><rect x="16" y="62" width="3" height="2" fill="#0a1d28"/>
-  <rect x="11" y="67" width="3" height="2" fill="#0a1d28"/><rect x="16" y="67" width="3" height="2" fill="#fbbf24"/>
-  <rect x="11" y="72" width="3" height="2" fill="#0a1d28"/><rect x="16" y="72" width="3" height="2" fill="#0a1d28"/>
-  <rect x="11" y="77" width="3" height="2" fill="#0a1d28"/><rect x="16" y="77" width="3" height="2" fill="#0a1d28"/>
-  <rect x="11" y="82" width="3" height="2" fill="#0a1d28"/><rect x="16" y="82" width="3" height="2" fill="#0a1d28"/>
+  <rect x="32" y="52" width="3" height="2" fill="#0b0c0e"/><rect x="37" y="52" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="32" y="57" width="3" height="2" fill="#fff3c8"/><rect x="37" y="57" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="32" y="62" width="3" height="2" fill="#0b0c0e"/><rect x="37" y="62" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="32" y="67" width="3" height="2" fill="#0b0c0e"/><rect x="37" y="67" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="32" y="72" width="3" height="2" fill="#0b0c0e"/><rect x="37" y="72" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="32" y="77" width="3" height="2" fill="#0b0c0e"/><rect x="37" y="77" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="32" y="82" width="3" height="2" fill="#0b0c0e"/><rect x="37" y="82" width="3" height="2" fill="#0b0c0e"/>
 
-  <!-- Tower 2: 2 cols x 7 rows -->
-  <rect x="32" y="52" width="3" height="2" fill="#0a1d28"/><rect x="37" y="52" width="3" height="2" fill="#0a1d28"/>
-  <rect x="32" y="57" width="3" height="2" fill="#fbbf24"/><rect x="37" y="57" width="3" height="2" fill="#0a1d28"/>
-  <rect x="32" y="62" width="3" height="2" fill="#0a1d28"/><rect x="37" y="62" width="3" height="2" fill="#0a1d28"/>
-  <rect x="32" y="67" width="3" height="2" fill="#0a1d28"/><rect x="37" y="67" width="3" height="2" fill="#0a1d28"/>
-  <rect x="32" y="72" width="3" height="2" fill="#0a1d28"/><rect x="37" y="72" width="3" height="2" fill="#0a1d28"/>
-  <rect x="32" y="77" width="3" height="2" fill="#0a1d28"/><rect x="37" y="77" width="3" height="2" fill="#0a1d28"/>
-  <rect x="32" y="82" width="3" height="2" fill="#0a1d28"/><rect x="37" y="82" width="3" height="2" fill="#0a1d28"/>
+  <rect x="53" y="38" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="38" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="53" y="43" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="43" width="3" height="2" fill="#fff3c8"/>
+  <rect x="53" y="48" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="48" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="53" y="53" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="53" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="53" y="58" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="58" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="53" y="63" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="63" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="53" y="68" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="68" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="53" y="73" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="73" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="53" y="78" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="78" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="53" y="83" width="3" height="2" fill="#0b0c0e"/><rect x="58" y="83" width="3" height="2" fill="#0b0c0e"/>
 
-  <!-- Tower 3: 2 cols x 10 rows -->
-  <rect x="53" y="38" width="3" height="2" fill="#0a1d28"/><rect x="58" y="38" width="3" height="2" fill="#0a1d28"/>
-  <rect x="53" y="43" width="3" height="2" fill="#0a1d28"/><rect x="58" y="43" width="3" height="2" fill="#fbbf24"/>
-  <rect x="53" y="48" width="3" height="2" fill="#0a1d28"/><rect x="58" y="48" width="3" height="2" fill="#0a1d28"/>
-  <rect x="53" y="53" width="3" height="2" fill="#0a1d28"/><rect x="58" y="53" width="3" height="2" fill="#0a1d28"/>
-  <rect x="53" y="58" width="3" height="2" fill="#0a1d28"/><rect x="58" y="58" width="3" height="2" fill="#0a1d28"/>
-  <rect x="53" y="63" width="3" height="2" fill="#0a1d28"/><rect x="58" y="63" width="3" height="2" fill="#0a1d28"/>
-  <rect x="53" y="68" width="3" height="2" fill="#0a1d28"/><rect x="58" y="68" width="3" height="2" fill="#0a1d28"/>
-  <rect x="53" y="73" width="3" height="2" fill="#0a1d28"/><rect x="58" y="73" width="3" height="2" fill="#0a1d28"/>
-  <rect x="53" y="78" width="3" height="2" fill="#0a1d28"/><rect x="58" y="78" width="3" height="2" fill="#0a1d28"/>
-  <rect x="53" y="83" width="3" height="2" fill="#0a1d28"/><rect x="58" y="83" width="3" height="2" fill="#0a1d28"/>
-
-  <!-- Tower 4: 2 cols x 12 rows -->
-  <rect x="74" y="26" width="3" height="2" fill="#0a1d28"/><rect x="79" y="26" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="31" width="3" height="2" fill="#0a1d28"/><rect x="79" y="31" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="36" width="3" height="2" fill="#fbbf24"/><rect x="79" y="36" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="41" width="3" height="2" fill="#0a1d28"/><rect x="79" y="41" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="46" width="3" height="2" fill="#0a1d28"/><rect x="79" y="46" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="51" width="3" height="2" fill="#0a1d28"/><rect x="79" y="51" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="56" width="3" height="2" fill="#0a1d28"/><rect x="79" y="56" width="3" height="2" fill="#fbbf24"/>
-  <rect x="74" y="61" width="3" height="2" fill="#0a1d28"/><rect x="79" y="61" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="66" width="3" height="2" fill="#0a1d28"/><rect x="79" y="66" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="71" width="3" height="2" fill="#0a1d28"/><rect x="79" y="71" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="76" width="3" height="2" fill="#0a1d28"/><rect x="79" y="76" width="3" height="2" fill="#0a1d28"/>
-  <rect x="74" y="81" width="3" height="2" fill="#0a1d28"/><rect x="79" y="81" width="3" height="2" fill="#0a1d28"/>
-</svg>
+  <rect x="74" y="26" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="26" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="31" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="31" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="36" width="3" height="2" fill="#fff3c8"/><rect x="79" y="36" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="41" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="41" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="46" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="46" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="51" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="51" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="56" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="56" width="3" height="2" fill="#fff3c8"/>
+  <rect x="74" y="61" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="61" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="66" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="66" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="71" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="71" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="76" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="76" width="3" height="2" fill="#0b0c0e"/>
+  <rect x="74" y="81" width="3" height="2" fill="#0b0c0e"/><rect x="79" y="81" width="3" height="2" fill="#0b0c0e"/>
+</g></svg>
