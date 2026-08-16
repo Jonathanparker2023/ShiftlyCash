@@ -1,12 +1,15 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { savePaycheckActualAction } from "@/app/(protected)/paychecks/actions";
 import {
   reconcilePaycheckAction,
+  recalibrateWithholdingAction,
   revertPaycheckReconciliationAction,
+  type WithholdingRecalibration,
 } from "@/app/(protected)/paychecks/reconcile-actions";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
 import type {
@@ -311,13 +314,35 @@ function PaycheckPeriodCard({
   const [actualValue, setActualValue] = useState(
     job?.actualNetCents == null ? "" : centsToDollars(job.actualNetCents).toFixed(2),
   );
-  const [confirmedCorrect, setConfirmedCorrect] = useState(false);
+  const [actualHoursValue, setActualHoursValue] = useState("");
+  const [recalBusy, setRecalBusy] = useState(false);
+  const router = useRouter();
+
+  // Both of these are DERIVED from the inputs they depend on rather than reset
+  // by an effect. Storing "which input this answer was for" and comparing makes
+  // a stale answer unrepresentable, instead of correct only until the next
+  // render ordering surprise.
 
   // Editing the typed actual forces a fresh affirmation (never reuse an old
   // confirmation; reconcile always recomputes from base).
-  useEffect(() => {
-    setConfirmedCorrect(false);
-  }, [actualValue]);
+  const [confirmedFor, setConfirmedFor] = useState<string | null>(null);
+  const confirmedCorrect = confirmedFor !== null && confirmedFor === actualValue;
+
+  // A verdict belongs to the exact pair of inputs it was computed from. Showing
+  // "hours match" beside hours the user has since edited is the one genuinely
+  // dangerous state this panel could get into.
+  const [recalState, setRecalState] = useState<{
+    forAmount: string;
+    forHours: string;
+    result: WithholdingRecalibration | null;
+    error: string | null;
+  } | null>(null);
+  const recalIsCurrent =
+    recalState !== null &&
+    recalState.forAmount === actualValue &&
+    recalState.forHours === actualHoursValue;
+  const recal = recalIsCurrent ? recalState.result : null;
+  const recalError = recalIsCurrent ? recalState.error : null;
 
   if (!job) {
     return null;
@@ -346,9 +371,56 @@ function PaycheckPeriodCard({
           ? "over"
           : "match";
 
+  // Hours from the paystub, parsed the same way the SQL tolerance assumes.
+  const trimmedHours = actualHoursValue.trim();
+  const parsedHours = trimmedHours ? Number(trimmedHours) : null;
+  const hoursIsValid =
+    parsedHours !== null && Number.isFinite(parsedHours) && parsedHours >= 0;
+  // Only custom jobs carry a withholding rate -- prestige stores net rates
+  // directly, so there is nothing to recalibrate there.
+  const canRecalibrate =
+    job.kind === "custom" &&
+    Boolean(period.actualWeekId) &&
+    actualIsValid &&
+    hoursIsValid &&
+    !recalBusy;
+  const hoursPreviewDelta =
+    hoursIsValid && parsedHours !== null ? parsedHours - job.totalHours : null;
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSaveActual(period, jobKey, actualValue);
+  }
+
+  async function runRecalibrate() {
+    if (!period.actualWeekId || parsedCents === null || parsedHours === null) return;
+    const forAmount = actualValue;
+    const forHours = actualHoursValue;
+    setRecalBusy(true);
+    setRecalState(null);
+    try {
+      const { result } = await recalibrateWithholdingAction({
+        weekId: period.actualWeekId,
+        jobType: jobKey,
+        actualCents: parsedCents,
+        actualHours: parsedHours,
+      });
+      setRecalState({ forAmount, forHours, result, error: null });
+      // Applied means every projection on every page just changed.
+      if (result.outcome === "applied") {
+        router.refresh();
+      }
+    } catch (caught) {
+      setRecalState({
+        forAmount,
+        forHours,
+        result: null,
+        error:
+          caught instanceof Error ? caught.message : "Unable to recalibrate.",
+      });
+    } finally {
+      setRecalBusy(false);
+    }
   }
 
   return (
@@ -457,7 +529,9 @@ function PaycheckPeriodCard({
             className="mt-0.5 h-4 w-4 rounded border-[var(--border-default)] bg-[var(--surface-overlay)]"
             checked={confirmedCorrect}
             disabled={!period.actualWeekId || !actualIsValid}
-            onChange={(event) => setConfirmedCorrect(event.target.checked)}
+            onChange={(event) =>
+              setConfirmedFor(event.target.checked ? actualValue : null)
+            }
           />
           <span>This check is correct — no dispute.</span>
         </label>
@@ -499,6 +573,93 @@ function PaycheckPeriodCard({
           so your daily and weekly rollups match the real paycheck. Reversible.
         </p>
       </div>
+
+      {/* Recalibrate withholding — fixes the RATE, gated on hours matching.
+          Reconcile above corrects one period's dollars and leaves the rate
+          alone, so an estimated rate stays an estimate forever. This closes
+          that loop, but only when the paystub's hours agree with the logged
+          hours: actual/gross absorbs a missed shift or a bonus just as readily
+          as it absorbs withholding, and writing that into a rate poisons every
+          future projection instead of one period. */}
+      {job.kind === "custom" ? (
+        <div className="mt-4 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] backdrop-blur-md p-3">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+            Recalibrate withholding
+          </h3>
+          <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+            {job.rateNote}. Enter the hours your paystub paid — if they match
+            your logged hours, the whole gap is withholding and the rate can be
+            corrected from this check.
+          </p>
+
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+            Hours on paystub
+          </label>
+          <div className="mt-2 flex gap-2">
+            <input
+              className="h-10 min-w-0 flex-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] backdrop-blur-md px-3 text-sm outline-none transition focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-ring)]"
+              disabled={!period.actualWeekId}
+              inputMode="decimal"
+              onChange={(event) => setActualHoursValue(event.target.value)}
+              placeholder={formatHours(job.totalHours)}
+              type="number"
+              value={actualHoursValue}
+            />
+            <button
+              type="button"
+              className="h-10 rounded-md bg-[var(--accent-brand)] px-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-brand-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)]"
+              disabled={!canRecalibrate}
+              onClick={() => void runRecalibrate()}
+            >
+              {recalBusy ? "Checking…" : "Check & update rate"}
+            </button>
+          </div>
+
+          <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+            Logged: {formatHours(job.totalHours)}h
+            {hoursPreviewDelta !== null && Math.abs(hoursPreviewDelta) > 0.005
+              ? ` · paystub differs by ${hoursPreviewDelta > 0 ? "+" : ""}${formatHours(hoursPreviewDelta)}h`
+              : ""}
+          </p>
+
+          {recalError ? (
+            <div className="mt-3 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-negative-text)]">
+              {recalError}
+            </div>
+          ) : null}
+
+          {recal?.outcome === "hours_mismatch" ? (
+            <div className="mt-3 rounded-md border border-[var(--accent-warning-border)] bg-[var(--accent-warning-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-warning-text)]">
+              Hours don&apos;t match — rate unchanged. You logged{" "}
+              {formatHours(recal.loggedHours)}h, the paystub paid{" "}
+              {formatHours(recal.actualHours)}h ({recal.hoursDelta > 0 ? "+" : ""}
+              {formatHours(recal.hoursDelta)}h). Fix the shifts first: until the
+              hours agree, the difference isn&apos;t withholding and updating the
+              rate would bake that error into every future {job.label} shift.
+            </div>
+          ) : null}
+
+          {recal?.outcome === "rate_out_of_range" ? (
+            <div className="mt-3 rounded-md border border-[var(--accent-negative-border)] bg-[var(--accent-negative-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-negative-text)]">
+              Rate unchanged. Hours match, but this check implies{" "}
+              {recal.rateAfter === null ? "an impossible" : `a ${(recal.rateAfter * 100).toFixed(1)}%`}{" "}
+              withholding rate, which isn&apos;t withholding — more likely a
+              bonus, a deduction, or retro pay in this check.
+            </div>
+          ) : null}
+
+          {recal?.outcome === "applied" ? (
+            <div className="mt-3 rounded-md border border-[var(--accent-primary-border)] bg-[var(--accent-primary-fill)] px-3 py-2 text-xs font-medium text-[var(--accent-primary-text)]">
+              Hours matched at {formatHours(recal.loggedHours)}h. Withholding
+              updated from{" "}
+              {recal.rateBefore === null ? "—" : `${(recal.rateBefore * 100).toFixed(2)}%`}{" "}
+              to{" "}
+              {recal.rateAfter === null ? "—" : `${(recal.rateAfter * 100).toFixed(2)}%`}
+              . Every future {job.label} shift now uses the observed rate.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

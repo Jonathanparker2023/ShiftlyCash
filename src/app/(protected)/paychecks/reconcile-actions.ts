@@ -163,6 +163,97 @@ export async function loadPaycheckBaseShiftsAction(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Withholding recalibration (hours-gated)
+// ---------------------------------------------------------------------------
+
+// Reconcile above fixes ONE period's dollars. This fixes the rate those dollars
+// are derived from, so the estimate stops being an estimate.
+//
+// It is deliberately a separate call from reconcile: reconciling is safe on any
+// check, whereas rewriting a tax rate is only safe when the hours on the paystub
+// match the hours logged. All of that judgement lives in the Postgres function
+// (recalibrate_job_withholding) -- a mismatch comes back as a normal outcome to
+// render, not an exception, because "your hours disagree" is an answer.
+export type WithholdingRecalibration = {
+  outcome: "applied" | "hours_mismatch" | "rate_out_of_range";
+  loggedHours: number;
+  actualHours: number;
+  hoursDelta: number;
+  grossCents: number;
+  rateBefore: number | null;
+  rateAfter: number | null;
+};
+
+export async function recalibrateWithholdingAction(input: {
+  weekId: string;
+  jobType: PaycheckJobKey;
+  actualCents: number;
+  actualHours: number;
+}): Promise<{ ok: true; result: WithholdingRecalibration }> {
+  const { supabase } = await requireUser();
+  const weekId = requireUuid(input.weekId, "weekId");
+  const jobKey = requirePaycheckJob(input.jobType);
+  const actualCents = requireNonNegativeInteger(input.actualCents, "actualCents");
+  const actualHours = requireNonNegativeNumber(input.actualHours, "actualHours");
+
+  const { data, error } = await supabase.rpc("recalibrate_job_withholding", {
+    p_week_id: weekId,
+    p_job_key: jobKey,
+    p_actual_cents: actualCents,
+    p_actual_hours: actualHours,
+  });
+
+  if (error) {
+    throw new Error(`Unable to recalibrate withholding: ${error.message}`);
+  }
+
+  const row = firstRow<{
+    outcome: WithholdingRecalibration["outcome"];
+    logged_hours: NumericLike;
+    actual_hours: NumericLike;
+    hours_delta: NumericLike;
+    gross_cents: NumericLike;
+    rate_before: NumericLike;
+    rate_after: NumericLike;
+  }>(data);
+
+  if (!row) {
+    throw new Error("Recalibration did not return a result.");
+  }
+
+  // Only an applied change alters what other pages render.
+  if (row.outcome === "applied") {
+    revalidatePath("/paychecks");
+    revalidatePath("/");
+    revalidatePath("/settings/template");
+  }
+
+  return {
+    ok: true,
+    result: {
+      outcome: row.outcome,
+      loggedHours: Number(row.logged_hours ?? 0),
+      actualHours: Number(row.actual_hours ?? 0),
+      hoursDelta: Number(row.hours_delta ?? 0),
+      grossCents: Number(row.gross_cents ?? 0),
+      rateBefore: row.rate_before == null ? null : Number(row.rate_before),
+      rateAfter: row.rate_after == null ? null : Number(row.rate_after),
+    },
+  };
+}
+
+type NumericLike = number | string | null;
+
+function requireNonNegativeNumber(value: number, fieldName: string): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`Invalid ${fieldName}.`);
+  }
+  // Hours are entered to two decimals; keep the wire value the same shape the
+  // SQL tolerance assumes.
+  return Math.round(value * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
 // Validators (match paychecks/actions.ts style)
 // ---------------------------------------------------------------------------
 
