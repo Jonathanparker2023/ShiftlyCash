@@ -49,6 +49,12 @@ import { syncTransactionsAction } from "@/app/(protected)/banking/actions";
 import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
 import { addDaysIso } from "@/lib/dashboard/dates";
 import {
+  buildCashflowBreakdown,
+  buildIncomeBreakdown,
+  type CashflowBreakdown,
+  type IncomeBreakdown,
+} from "@/lib/dashboard/metricBreakdowns";
+import {
   sortDashboardTransactions,
   splitDashboardTransactionRows,
 } from "@/lib/dashboard/transactions";
@@ -372,6 +378,25 @@ export function DashboardEditor({
   // of the transactions component, with an "Other" remainder so they always add
   // back up to the server transaction total.
   const spendBreakdown = useMemo(() => buildSpendBreakdown(days), [days]);
+  const incomeBreakdown = useMemo(
+    () => buildIncomeBreakdown(days, initialData.settings, weekTotals.earningsCents),
+    [days, initialData.settings, weekTotals.earningsCents],
+  );
+  const cashflowBreakdown = useMemo(
+    () =>
+      buildCashflowBreakdown(
+        incomeBreakdown,
+        weekTotals.spendCents,
+        weekTotals.baseCents,
+        weekTotals.cashflowCents,
+      ),
+    [
+      incomeBreakdown,
+      weekTotals.baseCents,
+      weekTotals.cashflowCents,
+      weekTotals.spendCents,
+    ],
+  );
   const focusedDay = days[focusedDayIndex] ?? days[0];
   const focusedDayTotals = focusedDay ? dayTotals.get(focusedDay.id) : undefined;
 
@@ -1325,6 +1350,8 @@ export function DashboardEditor({
               cashflowCents={weekTotals.cashflowCents}
               earningsCents={weekTotals.earningsCents}
               fixedCents={weekTotals.baseCents}
+              cashflowBreakdown={cashflowBreakdown}
+              incomeBreakdown={incomeBreakdown}
               medians={initialData.metricMedians}
               spendBreakdown={spendBreakdown}
               spendCents={weekTotals.spendCents}
@@ -1452,6 +1479,8 @@ function MetricStrip({
   spendCents,
   cashflowCents,
   fixedCents,
+  incomeBreakdown,
+  cashflowBreakdown,
   medians,
   spendBreakdown,
 }: {
@@ -1459,10 +1488,14 @@ function MetricStrip({
   spendCents: number;
   cashflowCents: number;
   fixedCents: number;
+  incomeBreakdown: IncomeBreakdown;
+  cashflowBreakdown: CashflowBreakdown;
   medians: DashboardData["metricMedians"];
   spendBreakdown: SpendBreakdown;
 }) {
-  const [spendOpen, setSpendOpen] = useState(false);
+  const [openBreakdown, setOpenBreakdown] = useState<
+    "earn" | "spend" | "cashflow" | null
+  >(null);
   const displayCashflowCents = roundCashflowToNearestFiveDollars(cashflowCents);
   const cashflowTone = cashflowWeeklyTone(displayCashflowCents);
   const spendTone = spendWeeklyTone(spendCents, medians.spendCents);
@@ -1479,7 +1512,12 @@ function MetricStrip({
       <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
         <TopMetric
           accent={earningsTone}
+          expandable
+          expanded={openBreakdown === "earn"}
           label="Earn"
+          onClick={() =>
+            setOpenBreakdown((open) => (open === "earn" ? null : "earn"))
+          }
           tone={earningsTone}
           trend={buildMedianTrend(earningsCents, medians.earningsCents, "higher")}
           value={formatMoney(earningsCents)}
@@ -1487,9 +1525,11 @@ function MetricStrip({
         <TopMetric
           accent={spendTone}
           expandable
-          expanded={spendOpen}
+          expanded={openBreakdown === "spend"}
           label="Spend"
-          onClick={() => setSpendOpen((open) => !open)}
+          onClick={() =>
+            setOpenBreakdown((open) => (open === "spend" ? null : "spend"))
+          }
           tone={spendTone}
           trend={buildMedianTrend(spendCents, medians.spendCents, "lower")}
           value={formatMoney(spendCents)}
@@ -1509,7 +1549,14 @@ function MetricStrip({
         />
         <TopMetric
           accent={cashflowTone}
+          expandable
+          expanded={openBreakdown === "cashflow"}
           label="Cashflow"
+          onClick={() =>
+            setOpenBreakdown((open) =>
+              open === "cashflow" ? null : "cashflow",
+            )
+          }
           tone={cashflowTone}
           trend={buildMedianTrend(
             displayCashflowCents,
@@ -1519,9 +1566,161 @@ function MetricStrip({
           value={formatCashflow(displayCashflowCents)}
         />
       </div>
-      {spendOpen ? (
+      {openBreakdown === "earn" ? (
+        <IncomeBreakdownPanel breakdown={incomeBreakdown} />
+      ) : null}
+      {openBreakdown === "spend" ? (
         <SpendBreakdownPanel breakdown={spendBreakdown} totalCents={spendCents} />
       ) : null}
+      {openBreakdown === "cashflow" ? (
+        <CashflowBreakdownPanel breakdown={cashflowBreakdown} />
+      ) : null}
+    </div>
+  );
+}
+
+// Earn is split into labor and other income so a week with a refund, transfer,
+// or amortization credit does not disguise what the jobs themselves generated.
+function IncomeBreakdownPanel({ breakdown }: { breakdown: IncomeBreakdown }) {
+  const hasIncome = breakdown.jobs.length > 0 || breakdown.other.length > 0;
+
+  return (
+    <div className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-3 text-sm text-[var(--text-primary)] shadow-sm">
+      <BreakdownHeading formula="labor + other" title="Earn formula · this week" />
+      {!hasIncome ? (
+        <p className="py-1 text-[var(--text-tertiary)]">No income recorded this week yet.</p>
+      ) : (
+        <>
+          {breakdown.jobs.length > 0 ? (
+            <ul className="divide-y divide-[var(--border-default)]">
+              {breakdown.jobs.map((row) => (
+                <MetricBreakdownRow key={row.key} label={row.label} cents={row.cents} />
+              ))}
+            </ul>
+          ) : null}
+          <BreakdownTotal label="Labor income" cents={breakdown.laborIncomeCents} />
+          {breakdown.other.length > 0 ? (
+            <ul className="mt-1 divide-y divide-[var(--border-default)]">
+              {breakdown.other.map((row) => (
+                <MetricBreakdownRow
+                  key={row.key}
+                  label={row.label}
+                  cents={row.cents}
+                  muted
+                />
+              ))}
+            </ul>
+          ) : null}
+          <BreakdownTotal
+            label="Other income"
+            cents={breakdown.otherIncomeCents}
+            subtle
+          />
+        </>
+      )}
+      <BreakdownTotal label="Earn" cents={breakdown.totalCents} strong />
+    </div>
+  );
+}
+
+// Labor cash flow deliberately removes Other income from the final cash-flow
+// number. It answers the practical question: after every cost, how much did
+// the jobs alone make this week?
+function CashflowBreakdownPanel({
+  breakdown,
+}: {
+  breakdown: CashflowBreakdown;
+}) {
+  return (
+    <div className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-3 text-sm text-[var(--text-primary)] shadow-sm">
+      <BreakdownHeading
+        formula="labor − spend − fixed"
+        title="Cashflow formula · this week"
+      />
+      <ul className="divide-y divide-[var(--border-default)]">
+        <MetricBreakdownRow label="Labor income" cents={breakdown.laborIncomeCents} />
+        <MetricBreakdownRow
+          label="Other income impact"
+          cents={breakdown.otherIncomeCents}
+          muted
+          signed
+        />
+        <MetricBreakdownRow label="Spend" cents={-breakdown.spendCents} muted />
+        <MetricBreakdownRow label="Fixed costs" cents={-breakdown.fixedCents} muted />
+      </ul>
+      <BreakdownTotal
+        label="Labor cash flow"
+        cents={breakdown.laborCashflowCents}
+        strong
+      />
+      <div className="mt-1.5 flex items-center justify-between text-[11px] text-[var(--text-tertiary)]">
+        <span>+ other income impact</span>
+        <span className="font-medium tabular-nums">
+          {formatSignedMoneyExact(breakdown.otherIncomeCents)}
+        </span>
+      </div>
+      <BreakdownTotal label="Cashflow" cents={breakdown.cashflowCents} strong />
+    </div>
+  );
+}
+
+function BreakdownHeading({ title, formula }: { title: string; formula: string }) {
+  return (
+    <div className="mb-1.5 flex items-baseline justify-between">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+        {title}
+      </span>
+      <span className="text-[11px] font-medium text-[var(--text-tertiary)]">
+        {formula}
+      </span>
+    </div>
+  );
+}
+
+function MetricBreakdownRow({
+  label,
+  cents,
+  muted = false,
+  signed = false,
+}: {
+  label: string;
+  cents: number;
+  muted?: boolean;
+  signed?: boolean;
+}) {
+  return (
+    <li className="flex items-center justify-between py-1.5">
+      <span className={muted ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}>
+        {label}
+      </span>
+      <span className="font-medium tabular-nums">
+        {signed ? formatSignedMoneyExact(cents) : formatMoneyExact(cents)}
+      </span>
+    </li>
+  );
+}
+
+function BreakdownTotal({
+  label,
+  cents,
+  subtle = false,
+  strong = false,
+}: {
+  label: string;
+  cents: number;
+  subtle?: boolean;
+  strong?: boolean;
+}) {
+  return (
+    <div
+      className={`mt-1.5 flex items-center justify-between border-t pt-2 ${
+        strong
+          ? "border-2 border-x-0 border-b-0 border-[var(--border-strong)] font-bold"
+          : "border-[var(--border-default)] font-semibold"
+      } ${subtle ? "text-[var(--text-secondary)]" : ""}`}
+    >
+      <span>{label}</span>
+      <span className="tabular-nums">{formatMoneyExact(cents)}</span>
     </div>
   );
 }
@@ -4533,6 +4732,11 @@ function formatMoneyExact(value: number): string {
   }).format(centsToDollars(value));
 }
 
+function formatSignedMoneyExact(value: number): string {
+  const amount = formatMoneyExact(value);
+  return value > 0 ? `+${amount}` : amount;
+}
+
 function formatCentsForInput(value: number): string {
   return centsToDollars(Math.max(0, value)).toFixed(2);
 }
@@ -4633,4 +4837,3 @@ function shortDayName(value: string): string {
     timeZone: "UTC",
   }).format(new Date(`${value}T00:00:00.000Z`));
 }
-
