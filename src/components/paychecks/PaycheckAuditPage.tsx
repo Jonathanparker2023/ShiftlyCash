@@ -254,16 +254,34 @@ function PeriodTotals({ periods }: { periods: PaycheckPeriod[] }) {
 }
 
 function PeriodTotalCard({ period }: { period: PaycheckPeriod }) {
-  const estimatedTotalCents = period.jobs.reduce(
+  // Only jobs that actually worked this period can have a paycheck. A job
+  // sitting at zero hours has nothing to reconcile, and waiting on it was the
+  // reason the actual total never appeared -- every() counted idle jobs as
+  // "not yet entered", so adding a new job silently hid the total for every
+  // past period it had no hours in.
+  const workedJobs = period.jobs.filter((job) => job.totalHours > 0);
+  const enteredJobs = workedJobs.filter((job) => job.actualNetCents !== null);
+
+  const estimatedTotalCents = workedJobs.reduce(
     (total, job) => total + job.estimatedNetCents,
     0,
   );
-  const hasActuals =
-    period.jobs.length > 0 &&
-    period.jobs.every((job) => job.actualNetCents !== null);
-  const actualTotalCents = hasActuals
-    ? period.jobs.reduce((total, job) => total + (job.actualNetCents ?? 0), 0)
-    : null;
+  const actualTotalCents =
+    enteredJobs.length > 0
+      ? enteredJobs.reduce((total, job) => total + (job.actualNetCents ?? 0), 0)
+      : null;
+
+  // Compare like with like: variance is only meaningful against the expected
+  // figure for the SAME jobs that have an actual entered.
+  const expectedForEnteredCents = enteredJobs.reduce(
+    (total, job) => total + job.estimatedNetCents,
+    0,
+  );
+  const varianceCents =
+    actualTotalCents === null ? null : actualTotalCents - expectedForEnteredCents;
+  const isComplete =
+    workedJobs.length > 0 && enteredJobs.length === workedJobs.length;
+
   const heading = period.id === "previous" ? "Total prev" : "Total current";
 
   return (
@@ -273,16 +291,53 @@ function PeriodTotalCard({ period }: { period: PaycheckPeriod }) {
         <span className="text-xs font-semibold text-[var(--text-tertiary)]">{period.label}</span>
       </div>
       <div className="mt-3 grid gap-2 text-sm">
-        {period.jobs.map((job) => (
+        {workedJobs.map((job) => (
           <MoneyLine
             key={job.key}
-            label={`${job.label} net`}
-            value={job.estimatedNetCents}
+            label={
+              job.actualNetCents === null
+                ? `${job.label} net (expected)`
+                : `${job.label} net (actual)`
+            }
+            value={job.actualNetCents ?? job.estimatedNetCents}
           />
         ))}
         <MoneyLine strong label="Expected total" tone="positive" value={estimatedTotalCents} />
         {actualTotalCents !== null ? (
-          <MoneyLine strong label="Actual total" value={actualTotalCents} />
+          <>
+            <MoneyLine
+              strong
+              label={
+                isComplete
+                  ? "Actual take-home"
+                  : `Actual so far (${enteredJobs.length} of ${workedJobs.length})`
+              }
+              tone="positive"
+              value={actualTotalCents}
+            />
+            {varianceCents !== null && Math.abs(varianceCents) >= 1 ? (
+              <MoneyLine
+                label={varianceCents < 0 ? "Short by" : "Over by"}
+                tone={varianceCents < 0 ? "negative" : undefined}
+                value={Math.abs(varianceCents)}
+              />
+            ) : null}
+          </>
+        ) : null}
+        {workedJobs.length === 0 ? (
+          <p className="text-xs text-[var(--text-tertiary)]">
+            No hours logged against any job this period.
+          </p>
+        ) : null}
+        {actualTotalCents !== null && !isComplete ? (
+          <p className="text-xs text-[var(--text-tertiary)]">
+            Still waiting on{" "}
+            {workedJobs
+              .filter((job) => job.actualNetCents === null)
+              .map((job) => job.label)
+              .join(", ")}
+            .
+          </p>
         ) : null}
       </div>
     </article>
