@@ -6,6 +6,8 @@
  * and data.ts pulls in server-only auth.
  */
 
+import { amortize, cashflowCostCents } from "@/lib/goals/amortize";
+
 export type GoalStatus = "complete" | "active" | "locked";
 
 export type TargetKind = "fixed" | "debt" | "house_hack";
@@ -44,6 +46,18 @@ export type GoalStep = GoalRungRecord & {
   weeksAway: number | null;
   etaIso: string | null;
   missesDeadline: boolean;
+  /** Present on debt rungs: how the note actually retires the balance. */
+  payoff: DebtPayoff | null;
+};
+
+export type DebtPayoff = {
+  months: number | null;
+  firstInterestCents: number;
+  firstPrincipalCents: number;
+  totalInterestCents: number;
+  monthlyPaymentCents: number;
+  extraMonthlyCents: number;
+  neverPaysOff: boolean;
 };
 
 export type HouseHackAssumptions = {
@@ -89,7 +103,14 @@ export function houseHackEntry(a: HouseHackAssumptions) {
   return { down, closing, reserves, total: down + closing + reserves };
 }
 
-export type DebtBalance = { name: string; cents: number };
+export type DebtBalance = {
+  name: string;
+  cents: number;
+  /** Annual rate as a fraction: 0.188 for 18.8%. */
+  apr: number;
+  /** The contractual monthly payment, already a fixed expense. */
+  minimumPaymentCents: number;
+};
 
 export type LadderInput = {
   rungs: GoalRungRecord[];
@@ -102,6 +123,12 @@ export type LadderInput = {
    */
   appliedCapitalCents: number;
   weeklyCashflowCents: number;
+  /**
+   * Extra principal per month aimed at debt rungs, on top of the contractual
+   * payment. This is the only part of a debt that competes with other rungs for
+   * cashflow -- the note itself is already paid for out of fixed expenses.
+   */
+  extraDebtMonthlyCents?: number;
   assumptions: HouseHackAssumptions;
   todayIso: string;
 };
@@ -113,6 +140,7 @@ export function buildLadder(input: LadderInput): GoalStep[] {
   const ordered = [...input.rungs].sort((x, y) => x.orderIndex - y.orderIndex);
 
   let pool = Math.max(0, input.appliedCapitalCents);
+  const extraDebtMonthly = Math.max(0, input.extraDebtMonthlyCents ?? 0);
   let cumulativeRemaining = 0;
   const weekly = Math.max(0, input.weeklyCashflowCents);
 
@@ -122,19 +150,59 @@ export function buildLadder(input: LadderInput): GoalStep[] {
       { label: rung.title, cents: rung.targetCents, note: "Target amount" },
     ];
 
+    let payoff: DebtPayoff | null = null;
+
     if (rung.targetKind === "debt") {
       const pattern = rung.debtMatch ? new RegExp(rung.debtMatch, "i") : null;
       const match = pattern
         ? input.debts.find((debt) => pattern.test(debt.name))
         : undefined;
       resolvedTargetCents = match?.cents ?? 0;
-      components = [
-        {
-          label: match?.name ?? "Linked debt",
-          cents: resolvedTargetCents,
-          note: match ? "Live balance" : "No debt matches this rung",
-        },
-      ];
+
+      if (match && match.minimumPaymentCents > 0) {
+        const result = amortize({
+          balanceCents: match.cents,
+          apr: match.apr,
+          monthlyPaymentCents: match.minimumPaymentCents,
+          extraMonthlyCents: extraDebtMonthly,
+        });
+        payoff = {
+          months: result.months,
+          firstInterestCents: result.firstInterestCents,
+          firstPrincipalCents: result.firstPrincipalCents,
+          totalInterestCents: result.totalInterestCents,
+          monthlyPaymentCents: match.minimumPaymentCents,
+          extraMonthlyCents: extraDebtMonthly,
+          neverPaysOff: result.neverPaysOff,
+        };
+        components = [
+          {
+            label: match.name,
+            cents: resolvedTargetCents,
+            note: "Live balance",
+          },
+          {
+            label: "Paid by the note",
+            cents: result.firstPrincipalCents,
+            note: `of ${formatRate(match.apr)} on ${centsLabel(match.minimumPaymentCents)}/mo — the rest is interest`,
+          },
+          {
+            label: "Interest, first month",
+            cents: result.firstInterestCents,
+            note: "Rent on the money. Extra principal is what shrinks this.",
+          },
+        ];
+      } else {
+        components = [
+          {
+            label: match?.name ?? "Linked debt",
+            cents: resolvedTargetCents,
+            note: match
+              ? "No monthly payment set on this debt"
+              : "No debt matches this rung",
+          },
+        ];
+      }
     } else if (rung.targetKind === "house_hack") {
       resolvedTargetCents = entry.total;
       components = [
@@ -159,14 +227,38 @@ export function buildLadder(input: LadderInput): GoalStep[] {
     const fundedCents = Math.min(pool, resolvedTargetCents);
     pool -= fundedCents;
     const remainingCents = Math.max(0, resolvedTargetCents - fundedCents);
-    cumulativeRemaining += remainingCents;
 
+    // THE DOUBLE-COUNT FIX. A debt rung is retired by its note, which is already
+    // a fixed expense and has already been deducted from the cashflow feeding
+    // this ladder. Charging the balance to cashflow as well made the payment
+    // slow every goal down while never advancing the one it was actually
+    // paying. Only EXTRA principal draws on cashflow.
+    const drawsOnCashflow = payoff
+      ? cashflowCostCents(
+          {
+            months: payoff.months,
+            totalInterestCents: payoff.totalInterestCents,
+            firstInterestCents: payoff.firstInterestCents,
+            firstPrincipalCents: payoff.firstPrincipalCents,
+            neverPaysOff: payoff.neverPaysOff,
+          },
+          payoff.extraMonthlyCents,
+        )
+      : remainingCents;
+    cumulativeRemaining += drawsOnCashflow;
+
+    // A debt with a note has its own clock: the amortisation schedule, not how
+    // long it takes to save the balance out of pocket.
     const weeksAway =
       remainingCents <= 0
         ? 0
-        : weekly > 0
-          ? Math.ceil(cumulativeRemaining / weekly)
-          : null;
+        : payoff
+          ? payoff.months === null
+            ? null
+            : Math.ceil((payoff.months * 365) / 12 / 7)
+          : weekly > 0
+            ? Math.ceil(cumulativeRemaining / weekly)
+            : null;
     const etaIso =
       weeksAway === null ? null : addDaysIso(input.todayIso, weeksAway * 7);
 
@@ -177,6 +269,7 @@ export function buildLadder(input: LadderInput): GoalStep[] {
       fundedCents,
       remainingCents,
       progress: resolvedTargetCents > 0 ? fundedCents / resolvedTargetCents : 0,
+      payoff,
       status: (remainingCents <= 0 ? "complete" : "locked") as GoalStatus,
       components,
       weeksAway,
@@ -198,4 +291,12 @@ function addDaysIso(iso: string, days: number): string {
   const base = Date.parse(`${iso}T00:00:00.000Z`);
   if (Number.isNaN(base)) return iso;
   return new Date(base + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+function formatRate(apr: number): string {
+  return `${(apr * 100).toFixed(2).replace(/\.00$/, "")}%`;
+}
+
+function centsLabel(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
 }

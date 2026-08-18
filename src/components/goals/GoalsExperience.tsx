@@ -56,6 +56,9 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
   const [assumptions, setAssumptions] = useState<HouseHackAssumptions>(
     DEFAULT_ASSUMPTIONS,
   );
+  // Extra principal per month aimed at debt rungs. The note itself is already a
+  // fixed expense; this is the only part that competes with the other rungs.
+  const [extraDebtCents, setExtraDebtCents] = useState<number>(0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAssumptions, setShowAssumptions] = useState(false);
@@ -70,10 +73,11 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
         debts: data.debts,
         appliedCapitalCents: startingCapitalCents,
         weeklyCashflowCents: weeklyCents,
+        extraDebtMonthlyCents: extraDebtCents,
         assumptions,
         todayIso: data.todayIso,
       }),
-    [data, weeklyCents, assumptions, startingCapitalCents],
+    [data, weeklyCents, assumptions, startingCapitalCents, extraDebtCents],
   );
 
   const maxTarget = Math.max(1, ...goals.map((g) => g.resolvedTargetCents));
@@ -126,6 +130,18 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
                 onChange={(cents) => setOverride(cents)}
                 onReset={override === null ? undefined : () => setOverride(null)}
                 valueCents={weeklyCents}
+              />
+              <NumberControl
+                hint={
+                  extraDebtCents > 0
+                    ? "on top of each note, straight at principal"
+                    : "add extra to attack the notes"
+                }
+                label="Extra to debt / month"
+                onChange={(cents) => setExtraDebtCents(cents ?? 0)}
+                onReset={extraDebtCents === 0 ? undefined : () => setExtraDebtCents(0)}
+                resetLabel="clear"
+                valueCents={extraDebtCents}
               />
               <NumberControl
                 hint={
@@ -448,6 +464,31 @@ function GoalRung({
                     </p>
                   ) : null}
                   <dl className="mt-3 space-y-1.5">
+                    {goal.payoff ? (
+                      <div className="mb-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-tertiary)]">
+                        {goal.payoff.neverPaysOff ? (
+                          <span className="font-semibold text-[var(--accent-negative-text)]">
+                            The payment does not cover the monthly interest — this
+                            balance never retires.
+                          </span>
+                        ) : (
+                          <>
+                            <span className="font-semibold text-[var(--text-secondary)]">
+                              {goal.payoff.months} months
+                            </span>{" "}
+                            at {formatMoney(goal.payoff.monthlyPaymentCents)}/mo
+                            {goal.payoff.extraMonthlyCents > 0
+                              ? ` + ${formatMoney(goal.payoff.extraMonthlyCents)} extra`
+                              : ""}
+                            , costing{" "}
+                            <span className="font-semibold text-[var(--accent-negative-text)]">
+                              {formatMoney(goal.payoff.totalInterestCents)}
+                            </span>{" "}
+                            in interest.
+                          </>
+                        )}
+                      </div>
+                    ) : null}
                     {goal.components.map((component) => (
                       <div
                         className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-[var(--border-subtle)] pt-1.5 text-xs"

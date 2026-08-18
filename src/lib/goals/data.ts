@@ -19,6 +19,8 @@ type DebtRow = {
   name: string;
   balance: NumericValue;
   status: string;
+  apr: NumericValue;
+  minimum_payment: NumericValue;
 };
 
 type RungRow = {
@@ -57,7 +59,10 @@ export async function getGoalsData(): Promise<GoalsData> {
       .select("start_date,display_week_number,status,cashflow_total")
       .eq("user_id", user.id)
       .order("start_date", { ascending: true }),
-    supabase.from("debts").select("name,balance,status").eq("user_id", user.id),
+    supabase
+      .from("debts")
+      .select("name,balance,status,apr,minimum_payment")
+      .eq("user_id", user.id),
     supabase
       .from("goal_rungs")
       .select(
@@ -105,6 +110,9 @@ export async function getGoalsData(): Promise<GoalsData> {
     .map((debt) => ({
       name: debt.name,
       cents: dollarsToCents(toNumber(debt.balance)),
+      // Stored as a percent (18.8), used as a fraction (0.188).
+      apr: toNumber(debt.apr) / 100,
+      minimumPaymentCents: dollarsToCents(toNumber(debt.minimum_payment)),
     }));
 
   const rungs: GoalRungRecord[] = ((rungsRes.data ?? []) as RungRow[]).map(

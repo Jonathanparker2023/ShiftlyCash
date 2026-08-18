@@ -12,8 +12,18 @@ const previewData: GoalsData = {
   cashBalanceSource: "plaid",
   cashBalanceStale: false,
   debts: [
-    { name: "Auto Loan - Holyoke CU - 2017 Ford Explorer", cents: 13_923_00 },
-    { name: "Auto Loan - TD Auto Finance - 2024 Tesla Model 3", cents: 31_836_00 },
+    {
+      name: "Auto Loan - Holyoke CU - 2017 Ford Explorer",
+      cents: 13_923_00,
+      apr: 0.188,
+      minimumPaymentCents: 455_33,
+    },
+    {
+      name: "Auto Loan - TD Auto Finance - 2024 Tesla Model 3",
+      cents: 31_836_00,
+      apr: 0.1094,
+      minimumPaymentCents: 605_94,
+    },
   ],
   rungs: [
     {
