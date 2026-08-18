@@ -10,6 +10,7 @@ import {
   updateGoalRungAction,
 } from "@/app/(protected)/goals/actions";
 import type { GoalsData } from "@/lib/goals/data";
+import { canonicalText, commitFromText } from "@/lib/goals/numberField";
 import {
   ASSUMPTION_SOURCES,
   DEFAULT_ASSUMPTIONS,
@@ -122,7 +123,7 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
                     : "custom"
                 }
                 label="Weekly cashflow applied"
-                onChange={(cents) => setOverride(cents > 0 ? cents : null)}
+                onChange={(cents) => setOverride(cents)}
                 onReset={override === null ? undefined : () => setOverride(null)}
                 valueCents={weeklyCents}
               />
@@ -234,11 +235,21 @@ function NumberControl({
 }: {
   hint: string;
   label: string;
-  onChange: (cents: number) => void;
+  /** null means the field was emptied -- distinct from a typed zero. */
+  onChange: (cents: number | null) => void;
   onReset?: () => void;
   resetLabel?: string;
   valueCents: number;
 }) {
+  // The input holds its own text while being edited so the field can actually
+  // be EMPTY. Bound straight to valueCents it was impossible to clear: deleting
+  // the digits produced 0, the parent read 0 as "no override", and the fallback
+  // figure was written back into the box on the very next render. You could
+  // never get to a blank field to type your own number.
+  //
+  // draft === null means "not being edited, show the canonical value".
+  const [draft, setDraft] = useState<string | null>(null);
+
   return (
     <div className="min-w-0">
       <div className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
@@ -248,15 +259,21 @@ function NumberControl({
         <span className="text-[var(--text-tertiary)]">$</span>
         <input
           className="h-9 w-32 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 text-lg font-semibold tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--accent-brand-border)]"
-          inputMode="numeric"
+          inputMode="decimal"
+          onBlur={() => setDraft(null)}
           onChange={(event) => {
-            const parsed = Number(event.target.value);
-            onChange(
-              Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) : 0,
-            );
+            const next = event.target.value;
+            setDraft(next);
+
+            const commit = commitFromText(next);
+            if (commit.kind === "cleared") onChange(null);
+            else if (commit.kind === "value") onChange(commit.cents);
+            // "ignore" keeps the typed text without committing anything.
           }}
-          type="number"
-          value={Math.round(valueCents / 100)}
+          // text, not number: type="number" reports an empty string for
+          // intermediate input, which is the same signal as a cleared field.
+          type="text"
+          value={draft ?? canonicalText(valueCents)}
         />
         {onReset ? (
           <button
