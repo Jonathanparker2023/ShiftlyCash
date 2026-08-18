@@ -36,10 +36,6 @@ declare
   v_median_week_spend numeric;
   v_per_day numeric;
   v_count integer;
-  v_q1 numeric;
-  v_q3 numeric;
-  v_iqr numeric;
-  v_candidates integer;
 begin
   if v_user_id is null then return 0; end if;
 
@@ -50,54 +46,42 @@ begin
     and spend_for_projection is not null
     and start_date >= date_trunc('year', p_today)::date;
 
-  -- The candidate pool: the year so far, or the trailing twelve weeks when the
-  -- year is too new to stand on its own.
-  create temp table if not exists _spend_pool (spend numeric) on commit drop;
-  delete from _spend_pool;
-
-  if v_year_weeks >= 4 then
-    insert into _spend_pool (spend)
-    select spend_for_projection
-    from public.v_projection_weeks
-    where user_id = v_user_id
-      and spend_for_projection is not null
-      and start_date >= date_trunc('year', p_today)::date;
-  else
-    insert into _spend_pool (spend)
-    select spend_for_projection
-    from public.v_projection_weeks
-    where user_id = v_user_id
-      and spend_for_projection is not null
-    order by start_date desc
-    limit 12;
-  end if;
-
-  select count(*) into v_candidates from _spend_pool;
-  if v_candidates = 0 then return 0; end if;
-
-  if v_candidates >= 8 then
+  -- Trim outliers, then take the median of what survives. Done entirely in
+  -- CTEs. A first cut of this used a temp table, which is fine in a SQL console
+  -- and unreliable inside a function running per-request behind a pooler --
+  -- exactly the kind of thing that passes every test you run by hand and then
+  -- fails in production.
+  with pool as (
+    select spend
+    from (
+      select spend_for_projection as spend, start_date
+      from public.v_projection_weeks
+      where user_id = v_user_id
+        and spend_for_projection is not null
+        and (v_year_weeks < 4 or start_date >= date_trunc('year', p_today)::date)
+      order by start_date desc
+      limit (case when v_year_weeks >= 4 then 1000000 else 12 end)
+    ) s
+  ),
+  bounds as (
     select
-      percentile_cont(0.25) within group (order by spend)::numeric,
-      percentile_cont(0.75) within group (order by spend)::numeric
-      into v_q1, v_q3
-    from _spend_pool;
-
-    v_iqr := v_q3 - v_q1;
-
-    -- Median of the trimmed set.
-    select percentile_cont(0.5) within group (order by spend)
-      into v_median_week_spend
-    from _spend_pool
-    where spend between (v_q1 - 1.5 * v_iqr) and (v_q3 + 1.5 * v_iqr);
-  end if;
-
-  -- Thin sample, or a fence that somehow excluded everything: fall back to the
-  -- untrimmed median rather than returning nothing.
-  if v_median_week_spend is null then
-    select percentile_cont(0.5) within group (order by spend)
-      into v_median_week_spend
-    from _spend_pool;
-  end if;
+      count(*) as n,
+      percentile_cont(0.25) within group (order by spend)::numeric as q1,
+      percentile_cont(0.75) within group (order by spend)::numeric as q3
+    from pool
+  ),
+  kept as (
+    -- Below 8 weeks the quartiles are too unstable to fence with, so keep
+    -- everything rather than gutting a thin sample.
+    select p.spend
+    from pool p, bounds b
+    where b.n < 8
+       or p.spend between (b.q1 - 1.5 * (b.q3 - b.q1))
+                      and (b.q3 + 1.5 * (b.q3 - b.q1))
+  )
+  select percentile_cont(0.5) within group (order by spend)
+    into v_median_week_spend
+  from kept;
 
   v_per_day := coalesce(round(v_median_week_spend / 7.0, 2), 0);
   if v_per_day <= 0 then return 0; end if;
