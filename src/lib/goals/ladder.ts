@@ -6,7 +6,12 @@
  * and data.ts pulls in server-only auth.
  */
 
-import { amortize, cashflowCostCents } from "@/lib/goals/amortize";
+import { monthlyInterestCents } from "@/lib/goals/amortize";
+import {
+  simulateLadder,
+  weeklyToMonthlyCents,
+  type SimRung,
+} from "@/lib/goals/simulate";
 
 export type GoalStatus = "complete" | "active" | "locked";
 
@@ -51,12 +56,16 @@ export type GoalStep = GoalRungRecord & {
 };
 
 export type DebtPayoff = {
+  /** Months until this rung clears, from the whole-ladder simulation. */
   months: number | null;
   firstInterestCents: number;
   firstPrincipalCents: number;
+  /** Interest this rung costs while the ladder works through it. */
   totalInterestCents: number;
+  /** This rung's own contractual payment. Zero on a savings rung. */
   monthlyPaymentCents: number;
-  extraMonthlyCents: number;
+  /** Month cashflow started attacking this rung specifically. */
+  becameActiveMonth: number | null;
   neverPaysOff: boolean;
 };
 
@@ -123,12 +132,6 @@ export type LadderInput = {
    */
   appliedCapitalCents: number;
   weeklyCashflowCents: number;
-  /**
-   * Extra principal per month aimed at debt rungs, on top of the contractual
-   * payment. This is the only part of a debt that competes with other rungs for
-   * cashflow -- the note itself is already paid for out of fixed expenses.
-   */
-  extraDebtMonthlyCents?: number;
   assumptions: HouseHackAssumptions;
   todayIso: string;
 };
@@ -140,9 +143,11 @@ export function buildLadder(input: LadderInput): GoalStep[] {
   const ordered = [...input.rungs].sort((x, y) => x.orderIndex - y.orderIndex);
 
   let pool = Math.max(0, input.appliedCapitalCents);
-  const extraDebtMonthly = Math.max(0, input.extraDebtMonthlyCents ?? 0);
-  let cumulativeRemaining = 0;
   const weekly = Math.max(0, input.weeklyCashflowCents);
+  // Collected on the first pass so the whole ladder can be simulated at once --
+  // a rung's date depends on the rungs below it, so none of them can be worked
+  // out in isolation.
+  const simRungs: SimRung[] = [];
 
   const steps: GoalStep[] = ordered.map((rung, index) => {
     let resolvedTargetCents = rung.targetCents;
@@ -151,6 +156,7 @@ export function buildLadder(input: LadderInput): GoalStep[] {
     ];
 
     let payoff: DebtPayoff | null = null;
+    let matchedDebt: DebtBalance | null = null;
 
     if (rung.targetKind === "debt") {
       const pattern = rung.debtMatch ? new RegExp(rung.debtMatch, "i") : null;
@@ -159,21 +165,18 @@ export function buildLadder(input: LadderInput): GoalStep[] {
         : undefined;
       resolvedTargetCents = match?.cents ?? 0;
 
+      matchedDebt = match ?? null;
+
       if (match && match.minimumPaymentCents > 0) {
-        const result = amortize({
-          balanceCents: match.cents,
-          apr: match.apr,
-          monthlyPaymentCents: match.minimumPaymentCents,
-          extraMonthlyCents: extraDebtMonthly,
-        });
+        const firstInterest = monthlyInterestCents(match.cents, match.apr);
         payoff = {
-          months: result.months,
-          firstInterestCents: result.firstInterestCents,
-          firstPrincipalCents: result.firstPrincipalCents,
-          totalInterestCents: result.totalInterestCents,
+          months: null,
+          firstInterestCents: firstInterest,
+          firstPrincipalCents: Math.max(0, match.minimumPaymentCents - firstInterest),
+          totalInterestCents: 0,
           monthlyPaymentCents: match.minimumPaymentCents,
-          extraMonthlyCents: extraDebtMonthly,
-          neverPaysOff: result.neverPaysOff,
+          becameActiveMonth: null,
+          neverPaysOff: false,
         };
         components = [
           {
@@ -183,12 +186,12 @@ export function buildLadder(input: LadderInput): GoalStep[] {
           },
           {
             label: "Paid by the note",
-            cents: result.firstPrincipalCents,
+            cents: Math.max(0, match.minimumPaymentCents - firstInterest),
             note: `of ${formatRate(match.apr)} on ${centsLabel(match.minimumPaymentCents)}/mo — the rest is interest`,
           },
           {
             label: "Interest, first month",
-            cents: result.firstInterestCents,
+            cents: firstInterest,
             note: "Rent on the money. Extra principal is what shrinks this.",
           },
         ];
@@ -228,39 +231,20 @@ export function buildLadder(input: LadderInput): GoalStep[] {
     pool -= fundedCents;
     const remainingCents = Math.max(0, resolvedTargetCents - fundedCents);
 
-    // THE DOUBLE-COUNT FIX. A debt rung is retired by its note, which is already
-    // a fixed expense and has already been deducted from the cashflow feeding
-    // this ladder. Charging the balance to cashflow as well made the payment
-    // slow every goal down while never advancing the one it was actually
-    // paying. Only EXTRA principal draws on cashflow.
-    const drawsOnCashflow = payoff
-      ? cashflowCostCents(
-          {
-            months: payoff.months,
-            totalInterestCents: payoff.totalInterestCents,
-            firstInterestCents: payoff.firstInterestCents,
-            firstPrincipalCents: payoff.firstPrincipalCents,
-            neverPaysOff: payoff.neverPaysOff,
-          },
-          payoff.extraMonthlyCents,
-        )
-      : remainingCents;
-    cumulativeRemaining += drawsOnCashflow;
+    // Every rung joins the simulation with its OWN minimum payment: $455.33 on
+    // the Explorer, zero on a savings rung. Free cashflow is aimed at one rung
+    // at a time on top of that, which is what actually pulls a date in.
+    simRungs.push({
+      id: rung.id,
+      remainingCents,
+      minimumPaymentCents: matchedDebt?.minimumPaymentCents ?? 0,
+      apr: matchedDebt?.apr ?? 0,
+      isDebt: rung.targetKind === "debt" && matchedDebt !== null,
+    });
 
-    // A debt with a note has its own clock: the amortisation schedule, not how
-    // long it takes to save the balance out of pocket.
-    const weeksAway =
-      remainingCents <= 0
-        ? 0
-        : payoff
-          ? payoff.months === null
-            ? null
-            : Math.ceil((payoff.months * 365) / 12 / 7)
-          : weekly > 0
-            ? Math.ceil(cumulativeRemaining / weekly)
-            : null;
-    const etaIso =
-      weeksAway === null ? null : addDaysIso(input.todayIso, weeksAway * 7);
+    // Both filled in by the simulation below.
+    const weeksAway: number | null = null;
+
 
     return {
       ...rung,
@@ -273,12 +257,47 @@ export function buildLadder(input: LadderInput): GoalStep[] {
       status: (remainingCents <= 0 ? "complete" : "locked") as GoalStatus,
       components,
       weeksAway,
-      etaIso,
-      missesDeadline: Boolean(
-        etaIso && rung.deadlineOn && etaIso > rung.deadlineOn,
-      ),
+      etaIso: null as string | null,
+      missesDeadline: false,
     };
   });
+
+  // SECOND PASS. Now that every rung's minimum and remaining balance are known,
+  // run the ladder forward as one system. A rung's date depends on everything
+  // below it -- and on its own balance still moving while something below it is
+  // the target -- so this cannot be done rung by rung.
+  const sim = simulateLadder({
+    rungs: simRungs,
+    monthlyCashflowCents: weeklyToMonthlyCents(weekly),
+  });
+  const simById = new Map(sim.map((result) => [result.id, result]));
+
+  for (const step of steps) {
+    const result = simById.get(step.id);
+    if (!result) continue;
+
+    step.weeksAway =
+      result.monthsToClear === null
+        ? null
+        : Math.ceil((result.monthsToClear * 365) / 12 / 7);
+    step.etaIso =
+      step.weeksAway === null
+        ? null
+        : addDaysIso(input.todayIso, step.weeksAway * 7);
+    step.missesDeadline = Boolean(
+      step.etaIso && step.deadlineOn && step.etaIso > step.deadlineOn,
+    );
+
+    if (step.payoff) {
+      step.payoff = {
+        ...step.payoff,
+        months: result.monthsToClear,
+        totalInterestCents: result.interestPaidCents,
+        becameActiveMonth: result.becameActiveMonth,
+        neverPaysOff: result.monthsToClear === null,
+      };
+    }
+  }
 
   // Exactly one rung reads as active: the lowest incomplete one.
   const next = steps.find((step) => step.status !== "complete");

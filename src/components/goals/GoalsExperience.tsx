@@ -56,9 +56,6 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
   const [assumptions, setAssumptions] = useState<HouseHackAssumptions>(
     DEFAULT_ASSUMPTIONS,
   );
-  // Extra principal per month aimed at debt rungs. The note itself is already a
-  // fixed expense; this is the only part that competes with the other rungs.
-  const [extraDebtCents, setExtraDebtCents] = useState<number>(0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAssumptions, setShowAssumptions] = useState(false);
@@ -73,11 +70,10 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
         debts: data.debts,
         appliedCapitalCents: startingCapitalCents,
         weeklyCashflowCents: weeklyCents,
-        extraDebtMonthlyCents: extraDebtCents,
         assumptions,
         todayIso: data.todayIso,
       }),
-    [data, weeklyCents, assumptions, startingCapitalCents, extraDebtCents],
+    [data, weeklyCents, assumptions, startingCapitalCents],
   );
 
   const maxTarget = Math.max(1, ...goals.map((g) => g.resolvedTargetCents));
@@ -130,18 +126,6 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
                 onChange={(cents) => setOverride(cents)}
                 onReset={override === null ? undefined : () => setOverride(null)}
                 valueCents={weeklyCents}
-              />
-              <NumberControl
-                hint={
-                  extraDebtCents > 0
-                    ? "on top of each note, straight at principal"
-                    : "add extra to attack the notes"
-                }
-                label="Extra to debt / month"
-                onChange={(cents) => setExtraDebtCents(cents ?? 0)}
-                onReset={extraDebtCents === 0 ? undefined : () => setExtraDebtCents(0)}
-                resetLabel="clear"
-                valueCents={extraDebtCents}
               />
               <NumberControl
                 hint={
@@ -477,9 +461,10 @@ function GoalRung({
                               {goal.payoff.months} months
                             </span>{" "}
                             at {formatMoney(goal.payoff.monthlyPaymentCents)}/mo
-                            {goal.payoff.extraMonthlyCents > 0
-                              ? ` + ${formatMoney(goal.payoff.extraMonthlyCents)} extra`
-                              : ""}
+                            {goal.payoff.becameActiveMonth !== null &&
+                            goal.payoff.becameActiveMonth > 1
+                              ? ` — cashflow reaches it in month ${goal.payoff.becameActiveMonth}`
+                              : " — cashflow is on it now"}
                             , costing{" "}
                             <span className="font-semibold text-[var(--accent-negative-text)]">
                               {formatMoney(goal.payoff.totalInterestCents)}
