@@ -1594,11 +1594,20 @@ function IncomeBreakdownPanel({ breakdown }: { breakdown: IncomeBreakdown }) {
           {breakdown.jobs.length > 0 ? (
             <ul className="divide-y divide-[var(--border-default)]">
               {breakdown.jobs.map((row) => (
-                <MetricBreakdownRow key={row.key} label={row.label} cents={row.cents} />
+                <MetricBreakdownRow
+                  key={row.key}
+                  label={row.label}
+                  cents={row.cents}
+                  color={row.color}
+                />
               ))}
             </ul>
           ) : null}
-          <BreakdownTotal label="Labor income" cents={breakdown.laborIncomeCents} />
+          <BreakdownTotal
+            label="Labor income"
+            cents={breakdown.laborIncomeCents}
+            tone="default"
+          />
           {breakdown.other.length > 0 ? (
             <ul className="mt-1 divide-y divide-[var(--border-default)]">
               {breakdown.other.map((row) => (
@@ -1618,7 +1627,12 @@ function IncomeBreakdownPanel({ breakdown }: { breakdown: IncomeBreakdown }) {
           />
         </>
       )}
-      <BreakdownTotal label="Earn" cents={breakdown.totalCents} strong />
+      <BreakdownTotal
+        label="Earn"
+        cents={breakdown.totalCents}
+        strong
+        tone="cashflow"
+      />
     </div>
   );
 }
@@ -1638,20 +1652,33 @@ function CashflowBreakdownPanel({
         title="Cashflow formula · this week"
       />
       <ul className="divide-y divide-[var(--border-default)]">
-        <MetricBreakdownRow label="Labor income" cents={breakdown.laborIncomeCents} />
+        <MetricBreakdownRow
+          label="Labor income"
+          cents={breakdown.laborIncomeCents}
+          tone="default"
+        />
         <MetricBreakdownRow
           label="Other income impact"
           cents={breakdown.otherIncomeCents}
           muted
           signed
         />
-        <MetricBreakdownRow label="Spend" cents={-breakdown.spendCents} muted />
-        <MetricBreakdownRow label="Fixed costs" cents={-breakdown.fixedCents} muted />
+        <MetricBreakdownRow
+          label="Spend"
+          cents={-breakdown.spendCents}
+          tone="spend"
+        />
+        <MetricBreakdownRow
+          label="Fixed costs"
+          cents={-breakdown.fixedCents}
+          tone="fixed"
+        />
       </ul>
       <BreakdownTotal
         label="Labor cash flow"
         cents={breakdown.laborCashflowCents}
         strong
+        tone="labor"
       />
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-[var(--text-tertiary)]">
         <span>+ other income impact</span>
@@ -1659,7 +1686,12 @@ function CashflowBreakdownPanel({
           {formatSignedMoneyExact(breakdown.otherIncomeCents)}
         </span>
       </div>
-      <BreakdownTotal label="Cashflow" cents={breakdown.cashflowCents} strong />
+      <BreakdownTotal
+        label="Cashflow"
+        cents={breakdown.cashflowCents}
+        strong
+        tone="cashflow"
+      />
     </div>
   );
 }
@@ -1677,23 +1709,57 @@ function BreakdownHeading({ title, formula }: { title: string; formula: string }
   );
 }
 
+// The dropdown is read at a glance, so each line is colour-coded by what it is
+// rather than all rendering as neutral text: money in is white, money out is
+// red, fixed costs are deliberately dimmer because they are not a choice this
+// week, and job rows take their own shift colour so a row matches its tab.
+type BreakdownTone = "default" | "muted" | "spend" | "fixed" | "cashflow" | "labor";
+
+function toneClass(tone: BreakdownTone): string {
+  switch (tone) {
+    case "spend":
+      return "text-red-500";
+    case "fixed":
+      return "text-[var(--text-muted)]";
+    case "cashflow":
+      return "text-emerald-500";
+    case "labor":
+      return "text-[#facc15]";
+    case "muted":
+      return "text-[var(--text-secondary)]";
+    default:
+      return "text-[var(--text-primary)]";
+  }
+}
+
 function MetricBreakdownRow({
   label,
   cents,
   muted = false,
   signed = false,
+  tone,
+  color,
 }: {
   label: string;
   cents: number;
   muted?: boolean;
   signed?: boolean;
+  tone?: BreakdownTone;
+  color?: string;
 }) {
+  const resolved: BreakdownTone = tone ?? (muted ? "muted" : "default");
   return (
     <li className="flex items-center justify-between py-1.5">
-      <span className={muted ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}>
+      <span
+        className={color ? "font-semibold" : toneClass(resolved)}
+        style={color ? { color } : undefined}
+      >
         {label}
       </span>
-      <span className="font-medium tabular-nums">
+      <span
+        className={`font-medium tabular-nums ${color ? "" : toneClass(resolved)}`}
+        style={color ? { color } : undefined}
+      >
         {signed ? formatSignedMoneyExact(cents) : formatMoneyExact(cents)}
       </span>
     </li>
@@ -1705,11 +1771,13 @@ function BreakdownTotal({
   cents,
   subtle = false,
   strong = false,
+  tone,
 }: {
   label: string;
   cents: number;
   subtle?: boolean;
   strong?: boolean;
+  tone?: BreakdownTone;
 }) {
   return (
     <div
@@ -1717,7 +1785,7 @@ function BreakdownTotal({
         strong
           ? "border-2 border-x-0 border-b-0 border-[var(--border-strong)] font-bold"
           : "border-[var(--border-default)] font-semibold"
-      } ${subtle ? "text-[var(--text-secondary)]" : ""}`}
+      } ${tone ? toneClass(tone) : subtle ? "text-[var(--text-secondary)]" : ""}`}
     >
       <span>{label}</span>
       <span className="tabular-nums">{formatMoneyExact(cents)}</span>

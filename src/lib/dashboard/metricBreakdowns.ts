@@ -5,6 +5,8 @@ export type IncomeBreakdownRow = {
   key: string;
   label: string;
   cents: number;
+  /** The job's own colour, so a breakdown row matches its shift tab. */
+  color?: string;
 };
 
 export type IncomeBreakdown = {
@@ -47,6 +49,7 @@ export function buildIncomeBreakdown(
         key: row.key,
         label: row.label,
         cents: (existing?.cents ?? 0) + row.cents,
+        color: existing?.color ?? row.color,
       });
     }
   }
@@ -132,8 +135,22 @@ function incomeRowForSlot(
     key: job.key,
     label: job.label,
     cents,
+    color: laborJobColor(slot),
     kind: "labor",
   };
+}
+
+// Matches the shift tabs. A custom job carries its own colour; the two
+// built-ins are the palette the shift bars already use.
+function laborJobColor(slot: DashboardSlot): string | undefined {
+  if (slot.customColor) return slot.customColor;
+  if (slot.jobType === "prestige" || slot.jobType === "prestige_ilst") {
+    return "#facc15";
+  }
+  if (slot.jobType === "ability" || slot.jobType === "ability_incentive" || slot.jobType === "incentive") {
+    return "#1d4ed8";
+  }
+  return undefined;
 }
 
 function laborJobLabel(slot: DashboardSlot): { key: string; label: string } {
