@@ -429,7 +429,7 @@ function AmortizedExpensesSection({
         <div className="border-t border-[var(--border-subtle)]">
           {expenses.length === 0 ? (
             <p className="px-3 py-5 text-sm text-[var(--text-tertiary)]">
-              No temporary costs. Use Spread this cost on a transaction to add
+              No temporary costs. Use Prorate on a transaction to add
               one.
             </p>
           ) : (

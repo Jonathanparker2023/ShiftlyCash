@@ -839,7 +839,7 @@ export function DashboardEditor({
       setDays(previousDays);
       setSaveState("error");
       setTransactionError(
-        error instanceof Error ? error.message : "Unable to amortize transaction.",
+        error instanceof Error ? error.message : "Unable to prorate transaction.",
       );
     } finally {
       setPendingTransactionIds((current) => {
@@ -3097,7 +3097,7 @@ function TransactionRowButton({
                   title="Stop spreading this cost. It becomes a single charge on the day it happened."
                   type="button"
                 >
-                  Un-amortize
+                  Un-prorate
                 </button>
               ) : null}
               {variant === "spending" &&
@@ -3112,7 +3112,7 @@ function TransactionRowButton({
                     title="Spread this cost across fixed costs over 1 month, then expire."
                     type="button"
                   >
-                    Amort 1mo
+                    Prorate 1mo
                   </button>
                   <button
                     className="rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -3121,7 +3121,7 @@ function TransactionRowButton({
                     title="Spread this cost across fixed costs over 3 months, then expire."
                     type="button"
                   >
-                    Amort 3mo
+                    Prorate 3mo
                   </button>
                 </>
               ) : null}
@@ -3367,7 +3367,7 @@ function ShiftRow({
           <span className={shiftDotClass(slot.jobType)} />
           <span className="text-sm font-semibold">Other</span>
           <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
-            Amortized
+            Prorated
           </span>
         </span>
         <span className="min-w-0 flex-1 truncate text-center text-xs font-semibold">

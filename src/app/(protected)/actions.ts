@@ -737,7 +737,7 @@ export async function amortizeTransactionAction(
 
   const amount = Math.abs(Number(transaction.amount));
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error("Transaction has no positive amount to amortize.");
+    throw new Error("Transaction has no positive amount to prorate.");
   }
 
   const transactionDate = String(transaction.date);
@@ -960,7 +960,7 @@ export async function reAmortizeTransactionAction(
     throw new Error(`Unable to load amortization: ${rowError.message}`);
   }
   if (!row) {
-    throw new Error("No amortization found for this transaction.");
+    throw new Error("No proration found for this transaction.");
   }
 
   const periodDays = amortizationPeriodDays(String(row.start_date), monthCount);
@@ -1118,7 +1118,7 @@ function inclusivePeriodDays(startIso: string, endIso: string): number {
     Date.parse(`${endIso}T00:00:00Z`) - Date.parse(`${startIso}T00:00:00Z`);
   const days = Math.round(ms / 86_400_000) + 1;
   if (!Number.isInteger(days) || days <= 0) {
-    throw new Error("Amortization range must end on or after it starts.");
+    throw new Error("Proration range must end on or after it starts.");
   }
   return days;
 }
