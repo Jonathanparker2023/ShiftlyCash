@@ -8,7 +8,8 @@
  * half-empty cell.
  *
  * So the figure is sized against the CELL rather than the string: cqw units,
- * capped at the same 12px the short days already use. A four-figure day now
+ * which resolve against the cell's content box, capped at the same 12px the
+ * short days already use. A four-figure day now
  * renders exactly as large as a three-figure one wherever there is room, and
  * only shrinks on the screens that genuinely cannot fit it.
  *
@@ -20,10 +21,16 @@
 const MAX_FONT_REM = 0.75;
 
 /**
- * Share of the cell's width left for the figure after padding and border.
- * px-1.5 + border-2 costs 16px of a ~47px cell.
+ * Headroom left below a perfect fit, so the glyph estimate below never runs the
+ * figure flush into the cell edge.
+ *
+ * NOT a padding discount. Container query units resolve against the container's
+ * CONTENT box, so cqw already excludes the cell's padding and border. A first
+ * version set this to 0.74 to "account for padding" and so discounted it twice,
+ * sizing every figure to three-quarters of the room it actually had -- which
+ * made four-figure days smaller than the step table they replaced.
  */
-const USABLE_FRACTION = 0.74;
+const SAFETY_FRACTION = 0.97;
 
 /**
  * Advance width per character in em, for a bold tracking-tight face. Digits are
@@ -48,6 +55,6 @@ function advanceEm(text: string): number {
  */
 export function mobileCashflowFontSize(text: string): string {
   const advance = advanceEm(text);
-  const cqw = (USABLE_FRACTION * 100) / advance;
+  const cqw = (SAFETY_FRACTION * 100) / advance;
   return `min(${MAX_FONT_REM}rem, ${cqw.toFixed(1)}cqw)`;
 }

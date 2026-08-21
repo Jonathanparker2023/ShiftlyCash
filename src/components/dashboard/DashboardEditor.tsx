@@ -2170,11 +2170,18 @@ function WeekStripCell({
       ? "opacity-60"
       : "";
 
-  const mobileCashflowText = formatCashflowNoSymbol(displayCashflowCents);
+  // The "+" is dropped on phones: cashflowDailyColor already states the sign,
+  // and that one glyph costs 0.55em in a cell measured in single digits. The
+  // minus is kept -- colour is a weaker signal than a sign on a negative
+  // balance, and dropping it is how a loss reads as a gain.
+  const mobileCashflowText = formatCashflowNoSymbol(displayCashflowCents).replace(
+    /^\+/,
+    "",
+  );
 
   return (
     <button
-      className={`min-w-0 rounded-[14px] ${borderClass} ${surfaceBg} px-1.5 py-2 text-left ${glowClass} ${dimClass} transition-colors duration-150 focus:outline-none sm:p-3`}
+      className={`min-w-0 rounded-[14px] ${borderClass} ${surfaceBg} px-1 py-2 text-left ${glowClass} ${dimClass} transition-colors duration-150 focus:outline-none sm:p-3`}
       onClick={() => onFocus(dayIndex)}
       // The figure sizes itself against this cell, so the cell has to be a
       // container. Without it the cqw units below have nothing to measure.

@@ -11,18 +11,29 @@ describe("mobileCashflowFontSize", () => {
   });
 
   it("gives a four-figure day the same 12px ceiling as a three-figure one", () => {
-    // The point of the change: on a cell with room, both hit the cap. The
-    // previous step table forced four figures down to 10px on every device.
     expect(mobileCashflowFontSize("118")).toContain("0.75rem");
-    expect(mobileCashflowFontSize("+1,432")).toContain("0.75rem");
+    expect(mobileCashflowFontSize("1,432")).toContain("0.75rem");
+  });
+
+  it("does not discount the cell padding twice", () => {
+    // The regression this replaced: cqw resolves against the container's
+    // CONTENT box, which already excludes padding and border. Multiplying by a
+    // 0.74 "usable fraction" on top sized every figure to three-quarters of the
+    // room it had, making four-figure days SMALLER than the step table before
+    // it. The fraction here is headroom against the glyph estimate, nothing
+    // more, so it has to stay close to 1.
+    const cqw = cqwOf(mobileCashflowFontSize("1,432"));
+    const perfectFit = 100 / 2.6; // measured advance of "1,432" in em
+    expect(cqw).toBeGreaterThan(perfectFit * 0.9);
+    expect(cqw).toBeLessThanOrEqual(perfectFit);
   });
 
   it("allows a longer figure a smaller share of the cell", () => {
-    expect(cqwOf(mobileCashflowFontSize("+1,432"))).toBeLessThan(
+    expect(cqwOf(mobileCashflowFontSize("1,432"))).toBeLessThan(
       cqwOf(mobileCashflowFontSize("118")),
     );
     expect(cqwOf(mobileCashflowFontSize("-12,345"))).toBeLessThan(
-      cqwOf(mobileCashflowFontSize("+1,432")),
+      cqwOf(mobileCashflowFontSize("1,432")),
     );
   });
 
