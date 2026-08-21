@@ -67,6 +67,7 @@ import type {
   SaveState,
 } from "@/lib/dashboard/types";
 import { MAX_SHIFT_SLOTS } from "@/lib/slots";
+import { mobileCashflowSizeClass } from "@/lib/dashboard/cellText";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
 import { contrastText, darken } from "@/lib/domain/jobColor";
 import {
@@ -2169,6 +2170,8 @@ function WeekStripCell({
       ? "opacity-60"
       : "";
 
+  const mobileCashflowText = formatCashflowNoSymbol(displayCashflowCents);
+
   return (
     <button
       className={`min-w-0 rounded-[14px] ${borderClass} ${surfaceBg} px-1.5 py-2 text-left ${glowClass} ${dimClass} transition-colors duration-150 focus:outline-none sm:p-3`}
@@ -2195,12 +2198,20 @@ function WeekStripCell({
         </span>
       </div>
       <p
-        className={`mt-2 truncate text-xs font-bold tracking-tight sm:mt-3 sm:text-sm md:text-base lg:text-lg xl:text-xl ${cashflowDailyColor(
+        className={`mt-2 whitespace-nowrap font-bold tracking-tight sm:mt-3 ${cashflowDailyColor(
           displayCashflowCents,
         )} ${isFutureUnspent ? "italic opacity-70" : ""}`}
       >
-        <span className="sm:hidden">{formatCashflowNoSymbol(displayCashflowCents)}</span>
-        <span className="hidden sm:inline">{formatCashflow(displayCashflowCents)}</span>
+        {/* A phone fits seven of these cells across, so a four-figure day used
+            to be elided to "1,4…" -- the one thing the cell exists to show.
+            The figure is scaled to fit instead of hidden: a number you cannot
+            read is worse than a small one. */}
+        <span className={`sm:hidden ${mobileCashflowSizeClass(mobileCashflowText)}`}>
+          {mobileCashflowText}
+        </span>
+        <span className="hidden text-xs sm:inline sm:text-sm md:text-base lg:text-lg xl:text-xl">
+          {formatCashflow(displayCashflowCents)}
+        </span>
       </p>
     </button>
   );
