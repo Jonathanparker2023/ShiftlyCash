@@ -67,7 +67,7 @@ import type {
   SaveState,
 } from "@/lib/dashboard/types";
 import { MAX_SHIFT_SLOTS } from "@/lib/slots";
-import { mobileCashflowSizeClass } from "@/lib/dashboard/cellText";
+import { mobileCashflowFontSize } from "@/lib/dashboard/cellText";
 import { centsToDollars, dollarsToCents } from "@/lib/domain/money";
 import { contrastText, darken } from "@/lib/domain/jobColor";
 import {
@@ -2176,7 +2176,9 @@ function WeekStripCell({
     <button
       className={`min-w-0 rounded-[14px] ${borderClass} ${surfaceBg} px-1.5 py-2 text-left ${glowClass} ${dimClass} transition-colors duration-150 focus:outline-none sm:p-3`}
       onClick={() => onFocus(dayIndex)}
-      style={cellStyle}
+      // The figure sizes itself against this cell, so the cell has to be a
+      // container. Without it the cqw units below have nothing to measure.
+      style={{ ...cellStyle, containerType: "inline-size" }}
       type="button"
     >
       <div
@@ -2204,9 +2206,13 @@ function WeekStripCell({
       >
         {/* A phone fits seven of these cells across, so a four-figure day used
             to be elided to "1,4…" -- the one thing the cell exists to show.
-            The figure is scaled to fit instead of hidden: a number you cannot
-            read is worse than a small one. */}
-        <span className={`sm:hidden ${mobileCashflowSizeClass(mobileCashflowText)}`}>
+            The figure is sized against the CELL, capped at the same 12px the
+            short days use, so a four-figure day is just as large wherever
+            there is room and only shrinks on screens that cannot fit it. */}
+        <span
+          className="sm:hidden"
+          style={{ fontSize: mobileCashflowFontSize(mobileCashflowText) }}
+        >
           {mobileCashflowText}
         </span>
         <span className="hidden text-xs sm:inline sm:text-sm md:text-base lg:text-lg xl:text-xl">
