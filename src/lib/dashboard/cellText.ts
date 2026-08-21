@@ -36,14 +36,18 @@ const SAFETY_FRACTION = 0.97;
  * Advance width per character in em, for a bold tracking-tight face. Digits are
  * tabular so they share one width; punctuation is materially narrower and
  * treating it as a full digit is what makes naive estimates over-shrink.
+ *
+ * Figures measured in Chrome against the real cell markup, not guessed: an
+ * earlier table was ~2-3% optimistic, which spent the whole safety margin and
+ * left a five-figure day sitting flush against the cell edge.
  */
 function advanceEm(text: string): number {
   let em = 0;
   for (const char of text) {
-    if (char === ",") em += 0.3;
-    else if (char === ".") em += 0.28;
-    else if (char === "+" || char === "-") em += 0.55;
-    else em += 0.6;
+    if (char === ",") em += 0.32;
+    else if (char === ".") em += 0.3;
+    else if (char === "+" || char === "-") em += 0.58;
+    else em += 0.615;
   }
   // tracking-tight pulls -0.025em between characters.
   return Math.max(0.6, em - Math.max(0, text.length - 1) * 0.025);
