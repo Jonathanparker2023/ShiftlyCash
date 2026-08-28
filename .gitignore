@@ -50,3 +50,6 @@ next-env.d.ts
 
 # ECHO /goals local dev logs
 artifacts/goals-dev.*.log
+
+# Local operating brief — contains personal financial detail, never commit (repo is public)
+BASHFLOW-AGENT-HANDOFF.md

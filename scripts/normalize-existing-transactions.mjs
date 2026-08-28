@@ -4,9 +4,13 @@
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = "https://jrjcajeaduofkhaquzuk.supabase.co";
-const SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpyamNhamVhZHVvZmtoYXF1enVrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg1MTk1MCwiZXhwIjoyMDkzNDI3OTUwfQ.rfAPyhBGdZCkQJPWfyEBIAGQjxmnWKx5CBOwM5fXpoo";
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SERVICE_KEY) {
+  throw new Error(
+    "Missing SUPABASE_SERVICE_ROLE_KEY. Set it in the local environment before running this one-shot script.",
+  );
+}
 
 const MERCHANT_MAP = [
   ["amazon","Amazon"],["amzn","Amazon"],["walmart","Walmart"],["walmrt","Walmart"],
