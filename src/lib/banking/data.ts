@@ -3,6 +3,8 @@ import { getOptionalPlaidServerEnv } from "@/lib/env";
 import { formatDayLabel } from "@/lib/dashboard/dates";
 import { sortChronologicalTransactions } from "@/lib/dashboard/transactions";
 import { dollarsToCents } from "@/lib/domain/money";
+import { getDeployableBalance } from "@/lib/plaid/deployableBalance";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   BankingData,
   BankingDayOption,
@@ -58,6 +60,7 @@ export async function getBankingData(): Promise<BankingData> {
     { data: pendingData, error: pendingError },
     { data: dayData, error: dayError },
     { data: chimeData, error: chimeError },
+    liveBalance,
   ] = await Promise.all([
     supabase
       .from("plaid_item_metadata")
@@ -85,6 +88,10 @@ export async function getBankingData(): Promise<BankingData> {
       .select("id,raw_title,raw_text,received_at,parsed_at,parsed_transaction_id,parse_failure_reason")
       .eq("user_id", user.id)
       .order("received_at", { ascending: false }),
+    getDeployableBalance({
+      supabase: createAdminClient(),
+      userId: user.id,
+    }),
   ]);
 
   if (itemError) {
@@ -104,6 +111,11 @@ export async function getBankingData(): Promise<BankingData> {
     config: {
       isConfigured: Boolean(configResult.config),
       missing: configResult.missing,
+    },
+    liveBalance: {
+      availableCashCents: dollarsToCents(liveBalance.deployable_balance),
+      asOf: liveBalance.as_of,
+      hasFetched: liveBalance.has_fetched,
     },
     items: ((itemData ?? []) as PlaidItemMetadataRow[]).map(mapPlaidItem),
     pendingTransactions: sortChronologicalTransactions(

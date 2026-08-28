@@ -29,6 +29,13 @@ function formatMoney(cents: number): string {
   return money.format(cents / 100);
 }
 
+function formatTimestamp(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 function formatDate(iso: string): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -130,10 +137,10 @@ export function GoalsExperience({ data }: { data: GoalsData }) {
               <NumberControl
                 hint={
                   data.cashBalanceSource === "unavailable"
-                    ? "bank balance unavailable — type what you're putting in"
-                    : data.cashBalanceStale
-                      ? "last known bank balance"
-                      : "live bank balance"
+                    ? "No live balance fetched yet."
+                    : data.cashBalanceAsOf
+                      ? `Last refreshed ${formatTimestamp(data.cashBalanceAsOf)}`
+                      : "No live balance fetched yet."
                 }
                 label="Starting capital"
                 onChange={(cents) => setCapitalOverride(cents)}

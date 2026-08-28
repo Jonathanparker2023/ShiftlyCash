@@ -1,6 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
-import { getPlaidServerEnv } from "@/lib/env";
 import { getDeployableBalance } from "@/lib/plaid/deployableBalance";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -10,7 +9,7 @@ const LEDGER_USER_ID_ENV = "SHIFTLYCASH_LEDGER_USER_ID";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const authResult = authorizeLedgerRequest(request);
 
   if (!authResult.ok) {
@@ -20,12 +19,9 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createAdminClient();
     const userId = await resolveLedgerUserId(supabase);
-    const config = getPlaidServerEnv();
     const payload = await getDeployableBalance({
       supabase,
       userId,
-      encryptionKey: config.tokenEncryptionKey,
-      forcePlaidFailure: shouldForceCachePath(request),
     });
 
     return NextResponse.json(payload, {
@@ -103,17 +99,6 @@ async function resolveLedgerUserId(
   }
 
   return data.id as string;
-}
-
-function shouldForceCachePath(request: NextRequest): boolean {
-  if (request.nextUrl.searchParams.get("force_cache") !== "1") {
-    return false;
-  }
-
-  return (
-    process.env.NODE_ENV !== "production" ||
-    process.env.ALLOW_DEPLOYABLE_BALANCE_TEST_FAILURE === "true"
-  );
 }
 
 function methodNotAllowed() {

@@ -26,6 +26,7 @@ export type NetWorthPageData = {
   availableCashCents: number;
   cashBalanceSource: "plaid" | "cache" | "unavailable";
   cashBalanceStale: boolean;
+  cashBalanceAsOf: string | null;
   weeklyContributionCents: number;
   annualReturnRate: number;
   horizonYears: number;
@@ -172,6 +173,7 @@ export async function getNetWorthData(): Promise<NetWorthPageData> {
     availableCashCents: cashBalance.availableCashCents,
     cashBalanceSource: cashBalance.source,
     cashBalanceStale: cashBalance.stale,
+    cashBalanceAsOf: cashBalance.asOf,
     weeklyContributionCents,
     annualReturnRate: DEFAULT_ANNUAL_RETURN,
     horizonYears: DEFAULT_HORIZON_YEARS,

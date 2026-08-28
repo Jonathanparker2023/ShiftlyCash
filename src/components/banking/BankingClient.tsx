@@ -12,6 +12,7 @@ import {
   excludePendingTransactionAction,
   syncTransactionsAction,
 } from "@/app/(protected)/banking/actions";
+import { refreshLiveBalancesAction } from "@/app/(protected)/banking/balanceActions";
 import { centsToDollars } from "@/lib/domain/money";
 import { ChimeCapturesSection } from "@/components/banking/ChimeCapturesSection";
 import type {
@@ -88,6 +89,23 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Unable to sync transactions.");
+    }
+  }
+
+  async function refreshLiveBalances() {
+    setStatus("loading");
+    setMessage("Refreshing live balances...");
+
+    try {
+      await refreshLiveBalancesAction();
+      setStatus("success");
+      setMessage("Live balances refreshed.");
+      router.refresh();
+    } catch (error) {
+      setStatus("error");
+      setMessage(
+        error instanceof Error ? error.message : "Unable to refresh live balances.",
+      );
     }
   }
 
@@ -209,6 +227,43 @@ export function BankingClient({ initialData }: { initialData: BankingData }) {
             {message}
           </section>
         ) : null}
+
+        <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold">Live balances</h2>
+              {initialData.liveBalance.hasFetched && initialData.liveBalance.asOf ? (
+                <>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {formatMoney(initialData.liveBalance.availableCashCents)}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]" suppressHydrationWarning>
+                    Last refreshed {formatTimestamp(initialData.liveBalance.asOf)}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                  No live balance fetched yet.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <p className="text-xs text-[var(--text-muted)]">
+                Refreshes all connected bank logins. About $0.10 each.
+              </p>
+              <button
+                className="h-10 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-medium transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  !isConfigured || status === "loading" || initialData.items.length === 0
+                }
+                onClick={refreshLiveBalances}
+                type="button"
+              >
+                Refresh live balances
+              </button>
+            </div>
+          </div>
+        </section>
 
         <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 shadow-sm">
           <h2 className="text-base font-semibold">Connected items</h2>

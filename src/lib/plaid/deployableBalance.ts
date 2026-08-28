@@ -17,12 +17,25 @@ export type DeployableBalanceAccount = {
 };
 
 export type DeployableBalancePayload = {
-  as_of: string;
+  as_of: string | null;
   deployable_balance: number;
   accounts: DeployableBalanceAccount[];
   source: DeployableBalanceSource;
   stale: boolean;
+  has_fetched: boolean;
 };
+
+export type RefreshedDeployableBalancePayload = DeployableBalancePayload & {
+  as_of: string;
+  source: "plaid";
+  stale: false;
+  has_fetched: true;
+};
+
+type StoredDeployableBalance = Omit<
+  DeployableBalancePayload,
+  "source" | "stale" | "has_fetched"
+> & { as_of: string };
 
 type PlaidItemRow = {
   id: string;
@@ -40,11 +53,18 @@ type CacheRow = {
 type GetDeployableBalanceOptions = {
   supabase: SupabaseClient;
   userId: string;
+  now?: Date;
+};
+
+type RefreshDeployableBalanceOptions = {
+  supabase: SupabaseClient;
+  userId: string;
   encryptionKey: string;
   plaidClient?: Pick<PlaidApi, "accountsBalanceGet">;
   now?: Date;
-  forcePlaidFailure?: boolean;
 };
+
+export const DEPLOYABLE_BALANCE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 const DEPOSITORY_SUBTYPES = new Set<string>([
   DepositoryAccountSubtype.Checking,
@@ -54,55 +74,67 @@ const DEPOSITORY_SUBTYPES = new Set<string>([
 export async function getDeployableBalance({
   supabase,
   userId,
+  now = new Date(),
+}: GetDeployableBalanceOptions): Promise<DeployableBalancePayload> {
+  const cached = await loadCachedBalance(supabase, userId);
+
+  if (cached) {
+    return {
+      ...cached,
+      source: "cache",
+      stale: !isFresh(cached.as_of, now),
+      has_fetched: true,
+    };
+  }
+
+  return {
+    as_of: null,
+    deployable_balance: 0,
+    accounts: [],
+    source: "cache",
+    stale: true,
+    has_fetched: false,
+  };
+}
+
+export async function refreshDeployableBalance({
+  supabase,
+  userId,
   encryptionKey,
   plaidClient = getPlaidClient(),
   now = new Date(),
-  forcePlaidFailure = false,
-}: GetDeployableBalanceOptions): Promise<DeployableBalancePayload> {
-  try {
-    if (forcePlaidFailure) {
-      throw new Error("Forced Plaid failure for cache verification.");
-    }
+}: RefreshDeployableBalanceOptions): Promise<RefreshedDeployableBalancePayload> {
+  const accounts = await fetchPlaidDepositoryBalances({
+    supabase,
+    userId,
+    encryptionKey,
+    plaidClient,
+  });
+  const payload: StoredDeployableBalance = {
+    as_of: now.toISOString(),
+    deployable_balance: round2(
+      accounts.reduce((sum, account) => sum + account.available, 0),
+    ),
+    accounts,
+  };
 
-    const accounts = await fetchPlaidDepositoryBalances({
-      supabase,
-      userId,
-      encryptionKey,
-      plaidClient,
-    });
-    const asOf = now.toISOString();
-    const payload: DeployableBalancePayload = {
-      as_of: asOf,
-      deployable_balance: round2(
-        accounts.reduce((sum, account) => sum + account.available, 0),
-      ),
-      accounts,
-      source: "plaid",
-      stale: false,
-    };
+  await upsertCachedBalance(supabase, userId, payload);
 
-    await upsertCachedBalance(supabase, userId, payload);
+  return {
+    ...payload,
+    source: "plaid",
+    stale: false,
+    has_fetched: true,
+  };
+}
 
-    return payload;
-  } catch {
-    const cached = await loadCachedBalance(supabase, userId);
+function isFresh(asOf: string, now: Date): boolean {
+  const cachedAt = new Date(asOf).getTime();
 
-    if (cached) {
-      return {
-        ...cached,
-        source: "cache",
-        stale: true,
-      };
-    }
-
-    return {
-      as_of: now.toISOString(),
-      deployable_balance: 0,
-      accounts: [],
-      source: "cache",
-      stale: true,
-    };
-  }
+  return (
+    Number.isFinite(cachedAt) &&
+    now.getTime() - cachedAt < DEPLOYABLE_BALANCE_STALE_AFTER_MS
+  );
 }
 
 async function fetchPlaidDepositoryBalances({
@@ -190,7 +222,7 @@ function mapDeployableAccounts(accounts: AccountBase[]): DeployableBalanceAccoun
 async function upsertCachedBalance(
   supabase: SupabaseClient,
   userId: string,
-  payload: DeployableBalancePayload,
+  payload: StoredDeployableBalance,
 ) {
   const { error } = await supabase.from("plaid_deployable_balance_cache").upsert({
     user_id: userId,
@@ -207,7 +239,7 @@ async function upsertCachedBalance(
 async function loadCachedBalance(
   supabase: SupabaseClient,
   userId: string,
-): Promise<Omit<DeployableBalancePayload, "source" | "stale"> | null> {
+): Promise<StoredDeployableBalance | null> {
   const { data, error } = await supabase
     .from("plaid_deployable_balance_cache")
     .select("as_of,deployable_balance,accounts")

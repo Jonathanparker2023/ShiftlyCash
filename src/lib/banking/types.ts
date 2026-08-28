@@ -42,8 +42,15 @@ export type BankingConfigStatus = {
   missing: string[];
 };
 
+export type BankingLiveBalance = {
+  availableCashCents: number;
+  asOf: string | null;
+  hasFetched: boolean;
+};
+
 export type BankingData = {
   config: BankingConfigStatus;
+  liveBalance: BankingLiveBalance;
   items: BankingPlaidItem[];
   pendingTransactions: PendingTransaction[];
   dayOptions: BankingDayOption[];

@@ -1,38 +1,132 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountBase, PlaidApi } from "plaid";
 
-import { getDeployableBalance } from "@/lib/plaid/deployableBalance";
+const mockGetPlaidClient = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/plaid/client", () => ({
+  getPlaidClient: mockGetPlaidClient,
+}));
+
+import {
+  getDeployableBalance,
+  refreshDeployableBalance,
+} from "@/lib/plaid/deployableBalance";
 import { encryptAccessToken } from "@/lib/plaid/crypto";
 
 const encryptionKey = "test-encryption-key";
 
-describe("getDeployableBalance", () => {
+describe("deployable balances", () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it("sums available balances from checking and savings accounts only", async () => {
-    const encryptedToken = encryptAccessToken("access-token-1", encryptionKey);
-    const { supabase, upserts } = createSupabaseMock({
-      plaidItems: [
-        {
-          id: "item-1",
-          access_token_encrypted: encryptedToken,
-          institution_name: "Test Bank",
-          status: "active",
-        },
-      ],
-      cachedBalance: null,
+  it("returns a fresh cached balance with zero Plaid calls", async () => {
+    const { supabase, upserts, tableReads } = createSupabaseMock({
+      plaidItems: [],
+      cachedBalance: cachedBalance("2026-06-13T12:00:00.000Z"),
     });
-    const plaidClient = createPlaidClientMock([
-      account("Checking", "depository", "checking", 100.126, 101),
-      account("Savings", "depository", "savings", 50, 50),
-      account("No Available", "depository", "checking", null, 25),
-      account("Credit Card", "credit", "credit card", 2000, 100),
-      account("Brokerage", "investment", "brokerage", 300, 300),
-    ]);
 
     const result = await getDeployableBalance({
+      supabase,
+      userId: "user-1",
+      now: new Date("2026-06-13T14:30:00.000Z"),
+    });
+
+    expect(mockGetPlaidClient).not.toHaveBeenCalled();
+    expect(tableReads).not.toContain("plaid_items");
+    expect(upserts).toEqual([]);
+    expect(result).toEqual({
+      as_of: "2026-06-13T12:00:00.000Z",
+      deployable_balance: 88.4,
+      source: "cache",
+      stale: false,
+      has_fetched: true,
+      accounts: [
+        {
+          name: "Cached Checking",
+          type: "depository",
+          subtype: "checking",
+          available: 88.4,
+          balance_basis: "available",
+        },
+      ],
+    });
+  });
+
+  it("returns a stale cached balance with zero Plaid calls", async () => {
+    const { supabase, upserts, tableReads } = createSupabaseMock({
+      plaidItems: [],
+      cachedBalance: cachedBalance("2026-06-11T12:00:00.000Z"),
+    });
+
+    const result = await getDeployableBalance({
+      supabase,
+      userId: "user-1",
+      now: new Date("2026-06-13T14:30:00.000Z"),
+    });
+
+    expect(mockGetPlaidClient).not.toHaveBeenCalled();
+    expect(tableReads).not.toContain("plaid_items");
+    expect(upserts).toEqual([]);
+    expect(result.stale).toBe(true);
+    expect(result.has_fetched).toBe(true);
+    expect(result.as_of).toBe("2026-06-11T12:00:00.000Z");
+  });
+
+  it("returns a not-fetched state with zero Plaid calls when no cache exists", async () => {
+    const { supabase, upserts, tableReads } = createSupabaseMock({
+      plaidItems: [],
+      cachedBalance: null,
+    });
+
+    const result = await getDeployableBalance({
+      supabase,
+      userId: "user-1",
+      now: new Date("2026-06-13T14:30:00.000Z"),
+    });
+
+    expect(mockGetPlaidClient).not.toHaveBeenCalled();
+    expect(tableReads).not.toContain("plaid_items");
+    expect(upserts).toEqual([]);
+    expect(result).toEqual({
+      as_of: null,
+      deployable_balance: 0,
+      accounts: [],
+      source: "cache",
+      stale: true,
+      has_fetched: false,
+    });
+  });
+
+  it("explicit refresh calls Plaid once per connected item and updates the cache", async () => {
+    const { supabase, upserts } = createSupabaseMock({
+      plaidItems: [
+        plaidItem("item-1", "access-token-1"),
+        plaidItem("item-2", "access-token-2"),
+      ],
+      cachedBalance: cachedBalance("2026-06-13T12:00:00.000Z"),
+    });
+    const accountsBalanceGet = vi.fn(
+      async ({ access_token }: { access_token: string }) => ({
+        data: {
+          accounts:
+            access_token === "access-token-1"
+              ? [
+                  account("Checking", "depository", "checking", 100.126, 101),
+                  account("Credit Card", "credit", "credit card", 2000, 100),
+                ]
+              : [
+                  account("Savings", "depository", "savings", 50, 50),
+                  account("No Available", "depository", "checking", null, 25),
+                ],
+        },
+      }),
+    );
+    const plaidClient = {
+      accountsBalanceGet,
+    } as unknown as Pick<PlaidApi, "accountsBalanceGet">;
+
+    const result = await refreshDeployableBalance({
       supabase,
       userId: "user-1",
       encryptionKey,
@@ -40,14 +134,19 @@ describe("getDeployableBalance", () => {
       now: new Date("2026-06-13T14:30:00.000Z"),
     });
 
-    expect(plaidClient.accountsBalanceGet).toHaveBeenCalledWith({
+    expect(accountsBalanceGet).toHaveBeenCalledTimes(2);
+    expect(accountsBalanceGet).toHaveBeenNthCalledWith(1, {
       access_token: "access-token-1",
+    });
+    expect(accountsBalanceGet).toHaveBeenNthCalledWith(2, {
+      access_token: "access-token-2",
     });
     expect(result).toEqual({
       as_of: "2026-06-13T14:30:00.000Z",
       deployable_balance: 175.13,
       source: "plaid",
       stale: false,
+      has_fetched: true,
       accounts: [
         {
           name: "Checking",
@@ -82,96 +181,31 @@ describe("getDeployableBalance", () => {
       },
     ]);
   });
-
-  it("returns the last cached balance when the live Plaid call fails", async () => {
-    const encryptedToken = encryptAccessToken("access-token-1", encryptionKey);
-    const { supabase } = createSupabaseMock({
-      plaidItems: [
-        {
-          id: "item-1",
-          access_token_encrypted: encryptedToken,
-          institution_name: "Test Bank",
-          status: "active",
-        },
-      ],
-      cachedBalance: {
-        as_of: "2026-06-12T12:00:00.000Z",
-        deployable_balance: "88.40",
-        accounts: [
-          {
-            name: "Cached Checking",
-            type: "depository",
-            subtype: "checking",
-            available: 88.4,
-            balance_basis: "available",
-          },
-        ],
-      },
-    });
-    const plaidClient = {
-      accountsBalanceGet: vi.fn(async () => {
-        throw new Error("rate limited");
-      }),
-    } as unknown as Pick<PlaidApi, "accountsBalanceGet">;
-
-    const result = await getDeployableBalance({
-      supabase,
-      userId: "user-1",
-      encryptionKey,
-      plaidClient,
-      now: new Date("2026-06-13T14:30:00.000Z"),
-    });
-
-    expect(result).toEqual({
-      as_of: "2026-06-12T12:00:00.000Z",
-      deployable_balance: 88.4,
-      source: "cache",
-      stale: true,
-      accounts: [
-        {
-          name: "Cached Checking",
-          type: "depository",
-          subtype: "checking",
-          available: 88.4,
-          balance_basis: "available",
-        },
-      ],
-    });
-  });
-
-  it("returns a zero stale cache payload when Plaid fails before any cache exists", async () => {
-    const { supabase } = createSupabaseMock({
-      plaidItems: [],
-      cachedBalance: null,
-    });
-
-    const result = await getDeployableBalance({
-      supabase,
-      userId: "user-1",
-      encryptionKey,
-      plaidClient: createPlaidClientMock([]),
-      now: new Date("2026-06-13T14:30:00.000Z"),
-      forcePlaidFailure: true,
-    });
-
-    expect(result).toEqual({
-      as_of: "2026-06-13T14:30:00.000Z",
-      deployable_balance: 0,
-      source: "cache",
-      stale: true,
-      accounts: [],
-    });
-  });
 });
 
-function createPlaidClientMock(accounts: AccountBase[]) {
+function cachedBalance(asOf: string) {
   return {
-    accountsBalanceGet: vi.fn(async () => ({
-      data: {
-        accounts,
+    as_of: asOf,
+    deployable_balance: "88.40",
+    accounts: [
+      {
+        name: "Cached Checking",
+        type: "depository",
+        subtype: "checking",
+        available: 88.4,
+        balance_basis: "available",
       },
-    })),
-  } as unknown as Pick<PlaidApi, "accountsBalanceGet">;
+    ],
+  };
+}
+
+function plaidItem(id: string, accessToken: string) {
+  return {
+    id,
+    access_token_encrypted: encryptAccessToken(accessToken, encryptionKey),
+    institution_name: "Test Bank",
+    status: "active",
+  };
 }
 
 function createSupabaseMock({
@@ -182,11 +216,15 @@ function createSupabaseMock({
   cachedBalance: unknown | null;
 }) {
   const upserts: unknown[] = [];
+  const tableReads: string[] = [];
 
   return {
     upserts,
+    tableReads,
     supabase: {
       from(table: string) {
+        tableReads.push(table);
+
         if (table === "plaid_items") {
           return createQuery({ data: plaidItems, error: null });
         }

@@ -11,6 +11,7 @@ const previewData: GoalsData = {
   availableCashCents: 7_147_00,
   cashBalanceSource: "plaid",
   cashBalanceStale: false,
+  cashBalanceAsOf: "2026-08-28T10:00:00.000Z",
   debts: [
     {
       name: "Auto Loan - Holyoke CU - 2017 Ford Explorer",

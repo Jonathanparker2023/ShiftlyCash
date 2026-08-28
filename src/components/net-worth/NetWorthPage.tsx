@@ -57,6 +57,11 @@ export function NetWorthPage({ initialData }: { initialData: NetWorthPageData })
               weekly tax{" "}
               {formatMoney(initialData.projectionSource.weeklyTaxDueCents)}.
             </p>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]" suppressHydrationWarning>
+              {initialData.cashBalanceAsOf
+                ? `Cash balance last refreshed ${formatTimestamp(initialData.cashBalanceAsOf)}`
+                : "No live balance fetched yet."}
+            </p>
           </div>
           <Metric
             label="Current net worth"
@@ -521,4 +526,11 @@ function formatMoney(value: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(centsToDollars(value));
+}
+
+function formatTimestamp(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }

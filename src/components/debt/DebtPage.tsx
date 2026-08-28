@@ -1109,15 +1109,18 @@ function isAutoLoanName(name: string): boolean {
 }
 
 function cashBalanceSourceLabel(data: DebtPageData): string {
-  if (data.cashBalanceSource === "plaid") {
-    return "Live Plaid checking + savings available balance";
+  if (data.cashBalanceAsOf) {
+    return `Last refreshed ${formatTimestamp(data.cashBalanceAsOf)}`;
   }
 
-  if (data.cashBalanceSource === "cache") {
-    return "Cached Plaid balance - live refresh unavailable";
-  }
+  return "No live balance fetched yet.";
+}
 
-  return "Plaid balance unavailable - projection uses $0 cash";
+function formatTimestamp(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function formatMoney(cents: number): string {

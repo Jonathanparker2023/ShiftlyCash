@@ -27,7 +27,7 @@ describe("/api/export/ledger-fields", () => {
     mockGetProjectionCashBalance.mockResolvedValue({
       availableCashCents: 647_471,
       asOf: "2026-05-17T06:14:18.651Z",
-      source: "plaid",
+      source: "cache",
       stale: false,
     });
   });
@@ -265,8 +265,9 @@ describe("/api/export/ledger-fields", () => {
       starting_net_worth: -8348.74,
     });
     expect(payload.plan_metrics).toMatchObject({
-      cash_balance_source: "plaid",
+      cash_balance_source: "cache",
       cash_balance_stale: false,
+      cash_balance_last_refreshed_at: "2026-05-17T06:14:18.651Z",
     });
     expect(payload.income).toMatchObject({
       this_week_net: expect.any(Number),

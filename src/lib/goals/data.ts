@@ -41,10 +41,11 @@ export type GoalsData = {
   weekLabel: string;
   todayIso: string;
   medianWeeklyCashflowCents: number;
-  /** Live Plaid checking + savings, the same figure the Debt page shows. */
+  /** Last-fetched Plaid checking + savings, the same figure the Debt page shows. */
   availableCashCents: number;
   cashBalanceSource: "plaid" | "cache" | "unavailable";
   cashBalanceStale: boolean;
+  cashBalanceAsOf: string | null;
   debts: DebtBalance[];
   rungs: GoalRungRecord[];
 };
@@ -138,6 +139,7 @@ export async function getGoalsData(): Promise<GoalsData> {
     availableCashCents: Math.max(0, cashBalance.availableCashCents),
     cashBalanceSource: cashBalance.source,
     cashBalanceStale: cashBalance.stale,
+    cashBalanceAsOf: cashBalance.asOf,
     debts,
     rungs,
   };

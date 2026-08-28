@@ -10,17 +10,6 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: mockCreateAdminClient,
 }));
 
-vi.mock("@/lib/env", () => ({
-  getPlaidServerEnv: () => ({
-    clientId: "client",
-    secret: "secret",
-    env: "sandbox",
-    products: ["transactions"],
-    countryCodes: ["US"],
-    tokenEncryptionKey: "token-key",
-  }),
-}));
-
 vi.mock("@/lib/plaid/deployableBalance", () => ({
   getDeployableBalance: mockGetDeployableBalance,
 }));
@@ -52,8 +41,9 @@ describe("/api/ledger/deployable-balance", () => {
           balance_basis: "available",
         },
       ],
-      source: "plaid",
+      source: "cache",
       stale: false,
+      has_fetched: true,
     });
 
     const response = await GET(
@@ -75,41 +65,43 @@ describe("/api/ledger/deployable-balance", () => {
           balance_basis: "available",
         },
       ],
-      source: "plaid",
+      source: "cache",
       stale: false,
+      has_fetched: true,
     });
     expect(mockGetDeployableBalance).toHaveBeenCalledWith({
       supabase,
       userId: "user-1",
-      encryptionKey: "token-key",
-      forcePlaidFailure: false,
     });
   });
 
-  it("passes the dev-only forced cache flag through for verification", async () => {
+  it("does not expose a query parameter that can force a live refresh", async () => {
     process.env.SHIFTLYCASH_LEDGER_TOKEN = "test-token";
     process.env.SHIFTLYCASH_LEDGER_USER_ID = "user-1";
-    mockCreateAdminClient.mockReturnValue({});
+    const supabase = {};
+    mockCreateAdminClient.mockReturnValue(supabase);
     mockGetDeployableBalance.mockResolvedValue({
       as_of: "2026-06-13T14:30:00.000Z",
-      deployable_balance: 0,
+      deployable_balance: 100,
       accounts: [],
       source: "cache",
-      stale: true,
+      stale: false,
+      has_fetched: true,
     });
 
     await GET(
       new NextRequest(
-        "http://localhost/api/ledger/deployable-balance?force_cache=1",
+        "http://localhost/api/ledger/deployable-balance?refresh=1",
         {
           headers: { authorization: "Bearer test-token" },
         },
       ),
     );
 
-    expect(mockGetDeployableBalance).toHaveBeenCalledWith(
-      expect.objectContaining({ forcePlaidFailure: true }),
-    );
+    expect(mockGetDeployableBalance).toHaveBeenCalledWith({
+      supabase,
+      userId: "user-1",
+    });
   });
 
   it("returns 401 when the token is missing or wrong", async () => {

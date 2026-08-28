@@ -659,6 +659,7 @@ function buildProjectionContext({
           : formatWeekDuration(millionaireSim.weeksToTarget),
       cash_balance_source: cashBalance.source,
       cash_balance_stale: cashBalance.stale,
+      cash_balance_last_refreshed_at: cashBalance.asOf,
     },
   };
 }
