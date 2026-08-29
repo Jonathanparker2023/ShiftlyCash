@@ -16,7 +16,10 @@ import {
   formatWeekOffsetDateLabel,
 } from "@/lib/domain/projection-format";
 import type { DebtRow } from "@/lib/domain/projections";
-import type { DebtPageData } from "@/lib/debt/data";
+import type {
+  CreditCardAccountSnapshot,
+  DebtPageData,
+} from "@/lib/debt/data";
 
 type ChartRange = "1y" | "3y" | "5y" | "10y" | "full";
 
@@ -365,6 +368,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           <DebtBreakdown debts={debts} />
         </section>
 
+        <CreditCardAccountsTable accounts={initialData.creditCards} />
+
         {/* Debts list */}
         <section className="min-w-0 overflow-hidden" style={PANEL}>
           <div
@@ -550,6 +555,166 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
       </main>
     </div>
   );
+}
+
+function CreditCardAccountsTable({
+  accounts,
+}: {
+  accounts: CreditCardAccountSnapshot[];
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden" style={PANEL}>
+      <div className="p-4 sm:p-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+        <h2
+          className="text-sm font-semibold uppercase tracking-[0.14em]"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          Credit card accounts ({accounts.length})
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-tertiary)" }}>
+          Planning balance drives forecasts. Disputed charges remain visible but
+          are excluded from debt and spending.
+        </p>
+      </div>
+      <div className="w-full max-w-full overflow-x-auto">
+        <table className="w-full min-w-[1180px] text-sm">
+          <thead
+            className="text-xs uppercase tracking-[0.12em]"
+            style={{
+              background: "var(--surface-hover)",
+              color: "var(--text-tertiary)",
+              borderBottom: "1px solid var(--border-subtle)",
+            }}
+          >
+            <tr>
+              <th className="p-3 text-left font-semibold">Card</th>
+              <th className="p-3 text-right font-semibold">Planning</th>
+              <th className="p-3 text-right font-semibold">Current</th>
+              <th className="p-3 text-right font-semibold">Statement</th>
+              <th className="p-3 text-right font-semibold">Pending</th>
+              <th className="p-3 text-left font-semibold">Due</th>
+              <th className="p-3 text-right font-semibold">Limit / available</th>
+              <th className="p-3 text-left font-semibold">AutoPay</th>
+              <th className="p-3 text-left font-semibold">Verification</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.map((account) => (
+              <tr
+                key={account.id}
+                className="border-b align-top last:border-0"
+                style={{ borderColor: "var(--border-subtle)" }}
+              >
+                <td className="p-3">
+                  <div className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {account.name}
+                    {account.lastFour ? ` •${account.lastFour}` : ""}
+                  </div>
+                  <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {account.accountStatus.replaceAll("_", " ")}
+                    {account.disputedTotalCents > 0
+                      ? ` · ${formatMoney(account.disputedTotalCents)} disputed`
+                      : ""}
+                  </div>
+                  {account.notes ? (
+                    <div className="mt-1 max-w-[280px] text-xs" style={{ color: "var(--text-tertiary)" }}>
+                      {account.notes}
+                    </div>
+                  ) : null}
+                </td>
+                <td className="p-3 text-right font-semibold">
+                  {formatMoney(account.planningBalanceCents)}
+                </td>
+                <td className="p-3 text-right">
+                  {formatMaybeMoney(account.rawCurrentBalanceCents)}
+                </td>
+                <td className="p-3 text-right">
+                  {formatMaybeMoney(account.statementBalanceCents)}
+                  {account.statementDate ? (
+                    <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                      {formatLongDate(account.statementDate)}
+                    </div>
+                  ) : null}
+                </td>
+                <td className="p-3 text-right">
+                  {formatMaybeMoney(account.pendingTotalCents)}
+                </td>
+                <td className="p-3">
+                  <div>{formatMaybeMoney(account.minimumDueCents)}</div>
+                  <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {account.dueDate ? formatLongDate(account.dueDate) : "Date unverified"}
+                  </div>
+                </td>
+                <td className="p-3 text-right">
+                  <div>{formatMaybeMoney(account.creditLimitCents)}</div>
+                  <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {formatMaybeMoney(account.availableCreditCents)} available
+                  </div>
+                </td>
+                <td className="p-3">
+                  <div className="font-medium">{account.autopayStatus.toUpperCase()}</div>
+                  <div className="mt-1 max-w-[180px] text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {[account.autopayMode, account.autopaySourceLabel]
+                      .filter(Boolean)
+                      .join(" · ") || "Details unverified"}
+                  </div>
+                </td>
+                <td className="p-3">
+                  <div className="font-medium">
+                    {account.verificationStatus.replaceAll("_", " ")}
+                  </div>
+                  <div
+                    className="mt-1 text-xs"
+                    style={{
+                      color:
+                        account.riskStatus === "open_dispute"
+                          ? "var(--accent-negative-text)"
+                          : "var(--text-tertiary)",
+                    }}
+                  >
+                    {account.riskStatus.replaceAll("_", " ")}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {accounts.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="p-6 text-center" style={{ color: "var(--text-tertiary)" }}>
+                  No credit-card audit has been recorded yet.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function formatMaybeMoney(cents: number | null): string {
+  return cents == null ? "Unverified" : formatMoney(cents);
+}
+
+function formatLongDate(iso: string): string {
+  const date = new Date(`${iso}T12:00:00.000Z`);
+  const day = date.getUTCDate();
+  const ordinal =
+    day % 100 >= 11 && day % 100 <= 13
+      ? "th"
+      : day % 10 === 1
+        ? "st"
+        : day % 10 === 2
+          ? "nd"
+          : day % 10 === 3
+            ? "rd"
+            : "th";
+  const formatted = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+  return formatted.replace(String(day), `${day}${ordinal}`);
 }
 
 function Metric({

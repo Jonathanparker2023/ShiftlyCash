@@ -19,6 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type DebtPageData = {
   debts: DebtRow[];
+  creditCards: CreditCardAccountSnapshot[];
   totalActiveDebtCents: number;
   activeDebtCount: number;
   totalMinPayCents: number;
@@ -48,6 +49,37 @@ export type DebtPageData = {
   };
 };
 
+export type CreditCardAccountSnapshot = {
+  id: string;
+  name: string;
+  issuer: string;
+  lastFour: string | null;
+  accountKind: "credit_card" | "store_card";
+  accountStatus: "active" | "paid" | "replacement_pending" | "unverified";
+  rawCurrentBalanceCents: number | null;
+  planningBalanceCents: number;
+  statementBalanceCents: number | null;
+  statementDate: string | null;
+  pendingTotalCents: number | null;
+  creditLimitCents: number | null;
+  availableCreditCents: number | null;
+  minimumDueCents: number | null;
+  dueDate: string | null;
+  autopayStatus: "on" | "off" | "unknown" | "paused";
+  autopayMode: string | null;
+  autopayDay: number | null;
+  autopaySourceLabel: string | null;
+  aprBps: number | null;
+  monthlyFeeCents: number | null;
+  annualFeeCents: number | null;
+  creditProtectionAmountCents: number | null;
+  verificationStatus: "verified" | "user_reported" | "unverified" | "disputed";
+  verifiedAt: string | null;
+  disputedTotalCents: number;
+  riskStatus: "clear" | "open_dispute" | "unverified";
+  notes: string | null;
+};
+
 const OWNER_BIRTH_YEAR = 1998;
 const OWNER_BIRTH_MONTH = 0;
 const OWNER_BIRTH_DAY = 12;
@@ -61,13 +93,20 @@ export async function getDebtData(): Promise<DebtPageData> {
   if (!user) redirect("/login");
 
   const tBatch = mark();
-  const [debtsRes, weeksRes, settingsRes, assetsRes, cashBalance] =
+  const [debtsRes, creditCardsRes, weeksRes, settingsRes, assetsRes, cashBalance] =
     await Promise.all([
     supabase
       .from("debts")
       .select("id, name, balance, minimum_payment, apr, status, priority_order")
       .eq("user_id", user.id)
       .order("priority_order"),
+    supabase
+      .from("credit_card_accounts")
+      .select(
+        "id,name,issuer,last_four,account_kind,account_status,raw_current_balance,planning_balance,statement_balance,statement_date,pending_total,credit_limit,available_credit,minimum_due,due_date,autopay_status,autopay_mode,autopay_day,autopay_source_label,apr,monthly_fee,annual_fee,credit_protection_amount,verification_status,verified_at,disputed_total,risk_status,notes",
+      )
+      .eq("user_id", user.id)
+      .order("name"),
     supabase
       .from("v_week_totals")
       .select(
@@ -92,9 +131,12 @@ export async function getDebtData(): Promise<DebtPageData> {
       userId: user.id,
     }),
   ]);
-  since("debt:reads(debts+weeks+settings+assets+cash)", tBatch);
+  since("debt:reads(debts+cards+weeks+settings+assets+cash)", tBatch);
 
   if (debtsRes.error) throw new Error(`Debts: ${debtsRes.error.message}`);
+  if (creditCardsRes.error) {
+    throw new Error(`Credit cards: ${creditCardsRes.error.message}`);
+  }
   if (weeksRes.error) throw new Error(`Weeks: ${weeksRes.error.message}`);
   if (settingsRes.error) throw new Error(`Settings: ${settingsRes.error.message}`);
   if (assetsRes.error) throw new Error(`Assets: ${assetsRes.error.message}`);
@@ -107,6 +149,41 @@ export async function getDebtData(): Promise<DebtPageData> {
     aprBps: Math.round(Number(row.apr) * 10_000),
     status: (row.status as "active" | "paid") ?? "active",
     priorityOrder: Number(row.priority_order),
+  }));
+  const creditCards: CreditCardAccountSnapshot[] = (
+    creditCardsRes.data ?? []
+  ).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    issuer: row.issuer as string,
+    lastFour: (row.last_four as string | null) ?? null,
+    accountKind: row.account_kind as CreditCardAccountSnapshot["accountKind"],
+    accountStatus: row.account_status as CreditCardAccountSnapshot["accountStatus"],
+    rawCurrentBalanceCents: nullableDollarsToCents(row.raw_current_balance),
+    planningBalanceCents: dollarsToCents(Number(row.planning_balance)),
+    statementBalanceCents: nullableDollarsToCents(row.statement_balance),
+    statementDate: (row.statement_date as string | null) ?? null,
+    pendingTotalCents: nullableDollarsToCents(row.pending_total),
+    creditLimitCents: nullableDollarsToCents(row.credit_limit),
+    availableCreditCents: nullableDollarsToCents(row.available_credit),
+    minimumDueCents: nullableDollarsToCents(row.minimum_due),
+    dueDate: (row.due_date as string | null) ?? null,
+    autopayStatus: row.autopay_status as CreditCardAccountSnapshot["autopayStatus"],
+    autopayMode: (row.autopay_mode as string | null) ?? null,
+    autopayDay: row.autopay_day == null ? null : Number(row.autopay_day),
+    autopaySourceLabel: (row.autopay_source_label as string | null) ?? null,
+    aprBps: row.apr == null ? null : Math.round(Number(row.apr) * 10_000),
+    monthlyFeeCents: nullableDollarsToCents(row.monthly_fee),
+    annualFeeCents: nullableDollarsToCents(row.annual_fee),
+    creditProtectionAmountCents: nullableDollarsToCents(
+      row.credit_protection_amount,
+    ),
+    verificationStatus:
+      row.verification_status as CreditCardAccountSnapshot["verificationStatus"],
+    verifiedAt: (row.verified_at as string | null) ?? null,
+    disputedTotalCents: dollarsToCents(Number(row.disputed_total)),
+    riskStatus: row.risk_status as CreditCardAccountSnapshot["riskStatus"],
+    notes: (row.notes as string | null) ?? null,
   }));
 
   const allWeeks = weeksRes.data ?? [];
@@ -236,6 +313,7 @@ export async function getDebtData(): Promise<DebtPageData> {
 
   const result = {
     debts,
+    creditCards,
     totalActiveDebtCents,
     activeDebtCount,
     totalMinPayCents,
@@ -269,6 +347,10 @@ export async function getDebtData(): Promise<DebtPageData> {
   };
   since("debt:total", tTotal);
   return result;
+}
+
+function nullableDollarsToCents(value: unknown): number | null {
+  return value == null ? null : dollarsToCents(Number(value));
 }
 
 function calculateAgeOnDate(iso: string): number {

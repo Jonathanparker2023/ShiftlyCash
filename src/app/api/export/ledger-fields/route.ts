@@ -26,6 +26,34 @@ type DebtRow = {
   priority_order: NumericValue;
 };
 
+type CreditCardAccountRow = {
+  id: string;
+  name: string;
+  issuer: string;
+  last_four: string | null;
+  account_kind: "credit_card" | "store_card";
+  account_status: "active" | "paid" | "replacement_pending" | "unverified";
+  raw_current_balance: NumericValue;
+  planning_balance: NumericValue;
+  statement_balance: NumericValue;
+  statement_date: string | null;
+  pending_total: NumericValue;
+  credit_limit: NumericValue;
+  available_credit: NumericValue;
+  minimum_due: NumericValue;
+  due_date: string | null;
+  autopay_status: "on" | "off" | "unknown" | "paused";
+  autopay_mode: string | null;
+  autopay_day: NumericValue;
+  autopay_source_label: string | null;
+  apr: NumericValue;
+  verification_status: "verified" | "user_reported" | "unverified" | "disputed";
+  verified_at: string | null;
+  disputed_total: NumericValue;
+  risk_status: "clear" | "open_dispute" | "unverified";
+  notes: string | null;
+};
+
 type AssetRow = {
   id: string;
   name: string;
@@ -147,6 +175,7 @@ export async function GET(request: Request) {
     const yearStartIso = `${todayIso.slice(0, 4)}-01-01`;
     const [
       debtsRes,
+      creditCardsRes,
       assetsRes,
       weeksRes,
       dayTotalsRes,
@@ -164,6 +193,13 @@ export async function GET(request: Request) {
         .eq("status", "active")
         .gt("balance", 0)
         .order("priority_order", { ascending: true }),
+      supabase
+        .from("credit_card_accounts")
+        .select(
+          "id,name,issuer,last_four,account_kind,account_status,raw_current_balance,planning_balance,statement_balance,statement_date,pending_total,credit_limit,available_credit,minimum_due,due_date,autopay_status,autopay_mode,autopay_day,autopay_source_label,apr,verification_status,verified_at,disputed_total,risk_status,notes",
+        )
+        .eq("user_id", userId)
+        .order("name", { ascending: true }),
       supabase
         .from("assets")
         .select("id,name,value,category,linked_debt_id")
@@ -213,6 +249,9 @@ export async function GET(request: Request) {
     ]);
 
     if (debtsRes.error) throw new Error(`Debts: ${debtsRes.error.message}`);
+    if (creditCardsRes.error) {
+      throw new Error(`Credit cards: ${creditCardsRes.error.message}`);
+    }
     if (assetsRes.error) throw new Error(`Assets: ${assetsRes.error.message}`);
     if (weeksRes.error) throw new Error(`Weeks: ${weeksRes.error.message}`);
     if (dayTotalsRes.error) throw new Error(`Day totals: ${dayTotalsRes.error.message}`);
@@ -342,6 +381,9 @@ export async function GET(request: Request) {
       as_of: asOfIso,
       week_of: weekOf,
       debts,
+      credit_cards: ((creditCardsRes.data ?? []) as CreditCardAccountRow[]).map(
+        mapCreditCard,
+      ),
       accounts: mapAccounts((assetsRes.data ?? []) as AssetRow[]),
       cashflow: {
         week_start: activeWeek?.start_date ?? weekOf,
@@ -1110,6 +1152,42 @@ function mapDebt(row: DebtRow) {
     starting_balance: money(balanceCents),
     priority_order: Math.round(toNumber(row.priority_order)),
   };
+}
+
+function mapCreditCard(row: CreditCardAccountRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    issuer: row.issuer,
+    last_four: row.last_four,
+    account_kind: row.account_kind,
+    account_status: row.account_status,
+    raw_current_balance: nullableDollarValue(row.raw_current_balance),
+    planning_balance: money(dollarsToCents(toNumber(row.planning_balance))),
+    statement_balance: nullableDollarValue(row.statement_balance),
+    statement_date: row.statement_date,
+    pending_total: nullableDollarValue(row.pending_total),
+    credit_limit: nullableDollarValue(row.credit_limit),
+    available_credit: nullableDollarValue(row.available_credit),
+    minimum_due: nullableDollarValue(row.minimum_due),
+    due_date: row.due_date,
+    autopay: {
+      status: row.autopay_status,
+      mode: row.autopay_mode,
+      day: row.autopay_day == null ? null : Math.round(toNumber(row.autopay_day)),
+      source: row.autopay_source_label,
+    },
+    apr: row.apr == null ? null : round2(toNumber(row.apr) * 100),
+    verification_status: row.verification_status,
+    verified_at: row.verified_at,
+    disputed_total: money(dollarsToCents(toNumber(row.disputed_total))),
+    risk_status: row.risk_status,
+    notes: row.notes,
+  };
+}
+
+function nullableDollarValue(value: NumericValue): number | null {
+  return value == null ? null : money(dollarsToCents(toNumber(value)));
 }
 
 function mapAccounts(assets: AssetRow[]) {
