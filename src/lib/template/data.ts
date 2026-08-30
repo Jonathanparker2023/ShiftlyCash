@@ -13,6 +13,7 @@ type NumericValue = number | string | null;
 
 type TemplateRow = {
   id: string;
+  updated_at: string;
 };
 
 type TemplateSlotRow = {
@@ -40,7 +41,7 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
 
   const { data: templateData, error: templateError } = await supabase
     .from("weekly_templates")
-    .select("id")
+    .select("id,updated_at")
     .eq("is_default", true)
     .single();
 
@@ -92,6 +93,7 @@ export async function getTemplateEditorData(): Promise<TemplateEditorData> {
 
   return {
     templateId: template.id,
+    templateUpdatedAt: template.updated_at,
     days: mapTemplateDays(
       (slotData ?? []) as TemplateSlotRow[],
       labelByPosition,

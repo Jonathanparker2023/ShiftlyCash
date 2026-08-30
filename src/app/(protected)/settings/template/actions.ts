@@ -24,21 +24,26 @@ const INCENTIVE_MODES = ["none", "rate", "lump_sum"] as const;
 
 export type SaveTemplateInput = {
   slots: TemplateSlotDraft[];
+  expectedUpdatedAt: string;
 };
 
 export type SaveTemplateResult = {
   ok: true;
   savedCount: number;
+  updatedAt: string;
 };
 
 export async function saveDefaultTemplateAction(
   input: SaveTemplateInput,
 ): Promise<SaveTemplateResult> {
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
   const slots = input.slots.map(normalizeTemplateSlot);
 
   const { data, error } = await supabase.rpc("replace_default_template_slots", {
-    p_slots: slots,
+    p_slots: {
+      slots,
+      expectedUpdatedAt: input.expectedUpdatedAt,
+    },
   });
 
   if (error) {
@@ -57,9 +62,18 @@ export async function saveDefaultTemplateAction(
   // authoritative draft; a fresh server render happens on the next navigation.
   revalidatePath("/");
 
+  const result = data as {
+    savedCount?: number | string;
+    updatedAt?: string;
+  } | null;
+  if (!result?.updatedAt) {
+    throw new Error("Unable to save template: database returned no revision.");
+  }
+
   return {
     ok: true,
-    savedCount: typeof data === "number" ? data : Number(data ?? 0),
+    savedCount: Number(result.savedCount ?? 0),
+    updatedAt: result.updatedAt,
   };
 }
 

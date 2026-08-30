@@ -39,6 +39,7 @@ import type {
   TemplateEditorData,
   TemplateSlotDraft,
 } from "@/lib/template/types";
+import { createLatestSaveQueue } from "@/lib/template/saveQueue";
 
 const JOB_OPTIONS: JobType[] = [
   "prestige",
@@ -164,20 +165,36 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
   const daysRef = useRef(days);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasUnsavedEdits = useRef(false);
+  const editVersion = useRef(0);
+  const saveQueue = useRef(
+    createLatestSaveQueue(
+      initialData.templateUpdatedAt,
+      async (slots: TemplateSlotDraft[], expectedUpdatedAt) => {
+        const result = await saveDefaultTemplateAction({
+          slots,
+          expectedUpdatedAt,
+        });
+        return result.updatedAt;
+      },
+    ),
+  );
 
   useEffect(() => {
     daysRef.current = days;
   }, [days]);
 
   async function flushSave() {
+    const requestedVersion = editVersion.current;
     hasUnsavedEdits.current = false;
     setSaveState("saving");
     setSaveError(null);
     try {
-      await saveDefaultTemplateAction({
-        slots: daysRef.current.flatMap((day) => day.slots),
-      });
-      setSaveState("saved");
+      await saveQueue.current.enqueue(
+        daysRef.current.flatMap((day) => day.slots),
+      );
+      if (editVersion.current === requestedVersion) {
+        setSaveState("saved");
+      }
     } catch (error) {
       hasUnsavedEdits.current = true;
       setSaveState("error");
@@ -191,6 +208,7 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
   // window collapses into one save. Nothing here re-renders the page or moves
   // focus -- the save action does not revalidate this route for that reason.
   function scheduleAutoSave() {
+    editVersion.current += 1;
     hasUnsavedEdits.current = true;
     setSaveState("idle");
     setSaveError(null);
@@ -203,14 +221,15 @@ export function TemplateEditor({ initialData, jobsData }: TemplateEditorProps) {
   // On unmount, flush any edit still sitting in the debounce window instead of
   // dropping it -- navigating away right after typing must not lose the edit.
   useEffect(() => {
+    const queue = saveQueue.current;
     return () => {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
       }
       if (hasUnsavedEdits.current) {
-        void saveDefaultTemplateAction({
-          slots: daysRef.current.flatMap((day) => day.slots),
-        });
+        void queue
+          .enqueue(daysRef.current.flatMap((day) => day.slots))
+          .catch(() => undefined);
       }
     };
   }, []);

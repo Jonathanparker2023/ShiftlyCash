@@ -37,6 +37,7 @@ export type TemplateCustomJob = {
 
 export type TemplateEditorData = {
   templateId: string;
+  templateUpdatedAt: string;
   days: TemplateDayDraft[];
   customJobs: TemplateCustomJob[];
   // Built-in job keys the user hid — dropped from the template job picker.
