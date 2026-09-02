@@ -152,6 +152,7 @@ type TransactionRow = {
   amount: NumericValue;
   category: string | null;
   status: string;
+  cashflow_only: boolean;
 };
 
 type ProjectionExclusionRow = {
@@ -260,7 +261,7 @@ export async function GET(request: Request) {
         .maybeSingle(),
       supabase
         .from("transactions")
-        .select("date,amount,category,status")
+        .select("date,amount,category,status,cashflow_only")
         .eq("user_id", userId)
         .gte("date", yearStartIso)
         .lte("date", todayIso)
@@ -952,6 +953,7 @@ function buildTopCategories(
   transactions.forEach((transaction) => {
     if (
       transaction.status !== "applied" ||
+      transaction.cashflow_only ||
       transaction.date < startIso ||
       transaction.date > endIso
     ) {

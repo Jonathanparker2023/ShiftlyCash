@@ -11,7 +11,10 @@ import { getPlaidClient, toPlaidCountryCodes, toPlaidProducts } from "@/lib/plai
 import { decryptAccessToken, encryptAccessToken } from "@/lib/plaid/crypto";
 import { isPlaidLoginRequiredError } from "@/lib/plaid/errors";
 import { isLikelyUglyMerchantName, resolveMerchantName } from "@/lib/domain/merchant-ai";
-import { isLegacyExempt } from "@/lib/domain/legacyRules";
+import {
+  isAutoLoanCashflowOnly,
+  isLegacyExempt,
+} from "@/lib/domain/legacyRules";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type CreateLinkTokenResult = {
@@ -439,12 +442,18 @@ async function upsertPlaidTransaction(
     Boolean(context.activeWeekStartDate) &&
     effectiveDate < context.activeWeekStartDate!;
   const rawName = transaction.original_description ?? transaction.name;
+  const category = formatCategory(transaction);
+  const cashflowOnly = isAutoLoanCashflowOnly({
+    merchantName: transaction.merchant_name ?? transaction.name,
+    rawName,
+    category,
+  });
   const existingTransaction = await findExistingPlaidTransaction(
     context,
     transaction.transaction_id,
   );
 
-  if (existingTransaction?.status === "excluded") {
+  if (existingTransaction?.status === "excluded" && !cashflowOnly) {
     return;
   }
 
@@ -452,14 +461,13 @@ async function upsertPlaidTransaction(
     rawName ?? transaction.merchant_name ?? transaction.name,
     context.merchantCacheClient,
   );
-  const category = formatCategory(transaction);
   const isIncome = transaction.amount <= 0;
   const matchesLegacyRule = isLegacyExempt({
     merchantName,
     rawName,
     category,
   });
-  const autoExclude = isIncome || matchesLegacyRule;
+  const autoExclude = isIncome || (matchesLegacyRule && !cashflowOnly);
   const baseStatus =
     day && !day.spend_locked
       ? "applied"
@@ -492,10 +500,13 @@ async function upsertPlaidTransaction(
     raw_name: rawName,
     amount: transaction.amount,
     category,
+    cashflow_only: cashflowOnly,
     pending: transaction.pending,
     excluded_at: status === "excluded" ? new Date().toISOString() : null,
     notes:
-      autoExcludeNote ??
+      (cashflowOnly
+        ? "Auto-loan payment: cashflow only; excluded from consumption spending."
+        : autoExcludeNote) ??
       (status === "excluded"
         ? "Auto-excluded because the transaction date is before the active week."
         : null),
@@ -539,6 +550,15 @@ async function upsertPlaidTransaction(
         plaid_transaction_id: transaction.transaction_id,
         authorized_date: transaction.authorized_date ?? null,
         category: row.category,
+        ...(cashflowOnly
+          ? {
+              status: row.status,
+              day_id: day?.id ?? null,
+              review_reason: row.review_reason,
+              excluded_at: null,
+              cashflow_only: true,
+            }
+          : {}),
         pending: row.pending,
         notes: chimeMatch.merchant_name
           ? `${chimeMatch.merchant_name} (cross-verified by Plaid)`

@@ -231,6 +231,13 @@ describe("/api/export/ledger-fields", () => {
               category: "Ignored",
               status: "excluded",
             },
+            {
+              date: "2026-05-05",
+              amount: 304.12,
+              category: "LOAN_PAYMENTS",
+              status: "applied",
+              cashflow_only: true,
+            },
           ],
           error: null,
         },

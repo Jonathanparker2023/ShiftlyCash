@@ -19,6 +19,7 @@ This folder contains the Supabase/Postgres schema for the Bashflow rebuild. It i
 | `202605040011_baseline_expenses.sql` | Seeds baseline expenses, adds unique expense names, and backfills existing users |
 | `20260902184000_finance_audit_delta.sql` | Separates issuer minimums from scheduled payments, adds Prosper, and applies the verified September finance-audit delta |
 | `20260902185500_auto_loan_cashflow_separation.sql` | Removes loan accruals from fixed cashflow, records TD payoff-pending state, and schedules the replacement Tesla on contractual due dates |
+| `20260902191000_auto_loan_cashflow_transactions.sql` | Counts posted auto-loan debits in cashflow while excluding principal transfers from consumption spending |
 
 ## Local Setup
 

@@ -7,6 +7,7 @@ import {
   cashflowWeeklyColor,
   cashflowWeeklyTone,
   earningsWeeklyTone,
+  isAutoLoanCashflowOnly,
   normalizeTxName,
   spendWeeklyTone,
 } from "./legacyRules";
@@ -140,5 +141,38 @@ describe("legacy merchant normalization", () => {
     expect(normalizeTxName("spo*primeburger")).toBe("Primeburger");
     expect(normalizeTxName("BLIZZARD*US")).toBe("Blizzard");
     expect(normalizeTxName("BLIZZARD*CALL OF DUTY")).toBe("Call of Duty");
+  });
+});
+
+describe("auto-loan cashflow classification", () => {
+  it("keeps named auto-loan debits out of consumption spending", () => {
+    expect(
+      isAutoLoanCashflowOnly({
+        merchantName: "Tesla Finance",
+        rawName: "TESLA FINANCE LLC ACH",
+        category: "LOAN_PAYMENTS",
+      }),
+    ).toBe(true);
+    expect(
+      isAutoLoanCashflowOnly({
+        merchantName: "TD Auto Finance",
+        category: "loan payment",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not misclassify card payments sharing Plaid's loan category", () => {
+    expect(
+      isAutoLoanCashflowOnly({
+        merchantName: "Capital One",
+        category: "LOAN_PAYMENTS",
+      }),
+    ).toBe(false);
+    expect(
+      isAutoLoanCashflowOnly({
+        merchantName: "Tesla Finance",
+        category: "TRANSFER_OUT",
+      }),
+    ).toBe(false);
   });
 });

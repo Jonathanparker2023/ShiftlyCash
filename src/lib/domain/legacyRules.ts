@@ -49,6 +49,12 @@ export const LEGACY_EXEMPT_CATS: readonly string[] = [
   "utilities",
 ];
 
+const AUTO_LOAN_PAYMENT_NAMES: readonly string[] = [
+  "tesla finance",
+  "td auto finance",
+  "holyoke",
+];
+
 // Compact-key → display-name pairs. Order matters: first match wins.
 export const MERCHANT_MAP: ReadonlyArray<readonly [string, string]> = [
   ["amazon", "Amazon"],
@@ -243,6 +249,29 @@ export function isLegacyExempt(input: {
     return true;
   }
   return false;
+}
+
+/**
+ * Auto-loan payments move cash and reduce a liability, but they are not
+ * consumption spending. Keep this deliberately narrower than LOAN_PAYMENTS:
+ * that Plaid category also contains credit-card payments and transfers.
+ */
+export function isAutoLoanCashflowOnly(input: {
+  merchantName?: string | null;
+  rawName?: string | null;
+  category?: string | null;
+}): boolean {
+  const category = (input.category ?? "").toLowerCase().trim();
+  if (category !== "loan payment" && category !== "loan_payments") {
+    return false;
+  }
+
+  const haystack = [input.merchantName, input.rawName]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLowerCase();
+
+  return AUTO_LOAN_PAYMENT_NAMES.some((needle) => haystack.includes(needle));
 }
 
 export type CashflowTone = "positive" | "amber" | "negative";
