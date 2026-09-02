@@ -76,6 +76,8 @@ describe("/api/export/ledger-fields", () => {
               available_credit: 874.5,
               minimum_due: 25,
               due_date: "2026-06-09",
+              scheduled_payment_amount: 80.25,
+              scheduled_payment_date: "2026-06-09",
               autopay_status: "on",
               autopay_mode: "statement balance",
               autopay_day: 9,
@@ -289,6 +291,10 @@ describe("/api/export/ledger-fields", () => {
           statement_balance: 80.25,
           pending_total: 45.25,
           minimum_due: 25,
+          scheduled_payment: {
+            amount: 80.25,
+            date: "2026-06-09",
+          },
           autopay: {
             status: "on",
             mode: "statement balance",

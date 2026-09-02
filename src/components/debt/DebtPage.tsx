@@ -577,7 +577,7 @@ function CreditCardAccountsTable({
         </p>
       </div>
       <div className="w-full max-w-full overflow-x-auto">
-        <table className="w-full min-w-[1180px] text-sm">
+        <table className="w-full min-w-[1320px] text-sm">
           <thead
             className="text-xs uppercase tracking-[0.12em]"
             style={{
@@ -593,6 +593,7 @@ function CreditCardAccountsTable({
               <th className="p-3 text-right font-semibold">Statement</th>
               <th className="p-3 text-right font-semibold">Pending</th>
               <th className="p-3 text-left font-semibold">Due</th>
+              <th className="p-3 text-left font-semibold">Scheduled payment</th>
               <th className="p-3 text-right font-semibold">Limit / available</th>
               <th className="p-3 text-left font-semibold">AutoPay</th>
               <th className="p-3 text-left font-semibold">Verification</th>
@@ -645,6 +646,18 @@ function CreditCardAccountsTable({
                     {account.dueDate ? formatLongDate(account.dueDate) : "Date unverified"}
                   </div>
                 </td>
+                <td className="p-3">
+                  <div>
+                    {account.scheduledPaymentAmountCents == null
+                      ? "None verified"
+                      : formatMoney(account.scheduledPaymentAmountCents)}
+                  </div>
+                  <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {account.scheduledPaymentDate
+                      ? formatLongDate(account.scheduledPaymentDate)
+                      : "None verified"}
+                  </div>
+                </td>
                 <td className="p-3 text-right">
                   <div>{formatMaybeMoney(account.creditLimitCents)}</div>
                   <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
@@ -674,12 +687,17 @@ function CreditCardAccountsTable({
                   >
                     {account.riskStatus.replaceAll("_", " ")}
                   </div>
+                  {account.verifiedAt ? (
+                    <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                      As of {formatLongDate(account.verifiedAt.slice(0, 10))}
+                    </div>
+                  ) : null}
                 </td>
               </tr>
             ))}
             {accounts.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-6 text-center" style={{ color: "var(--text-tertiary)" }}>
+                <td colSpan={10} className="p-6 text-center" style={{ color: "var(--text-tertiary)" }}>
                   No credit-card audit has been recorded yet.
                 </td>
               </tr>

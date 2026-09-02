@@ -65,6 +65,8 @@ export type CreditCardAccountSnapshot = {
   availableCreditCents: number | null;
   minimumDueCents: number | null;
   dueDate: string | null;
+  scheduledPaymentAmountCents: number | null;
+  scheduledPaymentDate: string | null;
   autopayStatus: "on" | "off" | "unknown" | "paused";
   autopayMode: string | null;
   autopayDay: number | null;
@@ -103,7 +105,7 @@ export async function getDebtData(): Promise<DebtPageData> {
     supabase
       .from("credit_card_accounts")
       .select(
-        "id,name,issuer,last_four,account_kind,account_status,raw_current_balance,planning_balance,statement_balance,statement_date,pending_total,credit_limit,available_credit,minimum_due,due_date,autopay_status,autopay_mode,autopay_day,autopay_source_label,apr,monthly_fee,annual_fee,credit_protection_amount,verification_status,verified_at,disputed_total,risk_status,notes",
+        "id,name,issuer,last_four,account_kind,account_status,raw_current_balance,planning_balance,statement_balance,statement_date,pending_total,credit_limit,available_credit,minimum_due,due_date,scheduled_payment_amount,scheduled_payment_date,autopay_status,autopay_mode,autopay_day,autopay_source_label,apr,monthly_fee,annual_fee,credit_protection_amount,verification_status,verified_at,disputed_total,risk_status,notes",
       )
       .eq("user_id", user.id)
       .order("name"),
@@ -168,6 +170,11 @@ export async function getDebtData(): Promise<DebtPageData> {
     availableCreditCents: nullableDollarsToCents(row.available_credit),
     minimumDueCents: nullableDollarsToCents(row.minimum_due),
     dueDate: (row.due_date as string | null) ?? null,
+    scheduledPaymentAmountCents: nullableDollarsToCents(
+      row.scheduled_payment_amount,
+    ),
+    scheduledPaymentDate:
+      (row.scheduled_payment_date as string | null) ?? null,
     autopayStatus: row.autopay_status as CreditCardAccountSnapshot["autopayStatus"],
     autopayMode: (row.autopay_mode as string | null) ?? null,
     autopayDay: row.autopay_day == null ? null : Number(row.autopay_day),

@@ -42,6 +42,8 @@ type CreditCardAccountRow = {
   available_credit: NumericValue;
   minimum_due: NumericValue;
   due_date: string | null;
+  scheduled_payment_amount: NumericValue;
+  scheduled_payment_date: string | null;
   autopay_status: "on" | "off" | "unknown" | "paused";
   autopay_mode: string | null;
   autopay_day: NumericValue;
@@ -196,7 +198,7 @@ export async function GET(request: Request) {
       supabase
         .from("credit_card_accounts")
         .select(
-          "id,name,issuer,last_four,account_kind,account_status,raw_current_balance,planning_balance,statement_balance,statement_date,pending_total,credit_limit,available_credit,minimum_due,due_date,autopay_status,autopay_mode,autopay_day,autopay_source_label,apr,verification_status,verified_at,disputed_total,risk_status,notes",
+          "id,name,issuer,last_four,account_kind,account_status,raw_current_balance,planning_balance,statement_balance,statement_date,pending_total,credit_limit,available_credit,minimum_due,due_date,scheduled_payment_amount,scheduled_payment_date,autopay_status,autopay_mode,autopay_day,autopay_source_label,apr,verification_status,verified_at,disputed_total,risk_status,notes",
         )
         .eq("user_id", userId)
         .order("name", { ascending: true }),
@@ -1171,6 +1173,10 @@ function mapCreditCard(row: CreditCardAccountRow) {
     available_credit: nullableDollarValue(row.available_credit),
     minimum_due: nullableDollarValue(row.minimum_due),
     due_date: row.due_date,
+    scheduled_payment: {
+      amount: nullableDollarValue(row.scheduled_payment_amount),
+      date: row.scheduled_payment_date,
+    },
     autopay: {
       status: row.autopay_status,
       mode: row.autopay_mode,

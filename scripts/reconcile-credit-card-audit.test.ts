@@ -12,6 +12,8 @@ describe("credit-card audit reconciliation payload", () => {
             name: "Example Card",
             debtName: "Example Card",
             planningBalance: 25,
+            scheduledPaymentAmount: 25,
+            scheduledPaymentDate: "2026-09-09",
           },
         ],
         transactions: [
@@ -63,5 +65,29 @@ describe("credit-card audit reconciliation payload", () => {
     expect(errors).toContain("transactions[0] references an unknown account.");
     expect(errors).toContain("Duplicate transaction importKey: duplicate.");
     expect(errors).toContain("transactions[1].date must be YYYY-MM-DD.");
+  });
+
+  it("rejects incomplete or malformed scheduled payments", () => {
+    const errors = validateAuditPayload({
+      profileEmail: "owner@example.com",
+      accounts: [
+        {
+          name: "Example Card",
+          debtName: "Example Card",
+          planningBalance: 25,
+          scheduledPaymentAmount: 0,
+          scheduledPaymentDate: "September 9",
+        },
+      ],
+      transactions: [],
+      expenses: [],
+    });
+
+    expect(errors).toContain(
+      "accounts[0].scheduledPaymentAmount must be positive or null.",
+    );
+    expect(errors).toContain(
+      "accounts[0].scheduledPaymentDate must be YYYY-MM-DD or null.",
+    );
   });
 });

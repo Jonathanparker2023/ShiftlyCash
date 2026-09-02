@@ -31,6 +31,32 @@ export function validateAuditPayload(payload) {
     if (!Number.isFinite(account?.planningBalance) || account.planningBalance < 0) {
       errors.push(`accounts[${index}].planningBalance must be non-negative.`);
     }
+    if (
+      account?.scheduledPaymentAmount !== undefined &&
+      account.scheduledPaymentAmount !== null &&
+      (!Number.isFinite(account.scheduledPaymentAmount) ||
+        account.scheduledPaymentAmount <= 0)
+    ) {
+      errors.push(
+        `accounts[${index}].scheduledPaymentAmount must be positive or null.`,
+      );
+    }
+    if (
+      account?.scheduledPaymentDate !== undefined &&
+      account.scheduledPaymentDate !== null &&
+      !/^\d{4}-\d{2}-\d{2}$/.test(account.scheduledPaymentDate)
+    ) {
+      errors.push(
+        `accounts[${index}].scheduledPaymentDate must be YYYY-MM-DD or null.`,
+      );
+    }
+    const hasScheduledAmount = account?.scheduledPaymentAmount != null;
+    const hasScheduledDate = account?.scheduledPaymentDate != null;
+    if (hasScheduledAmount !== hasScheduledDate) {
+      errors.push(
+        `accounts[${index}] scheduled payment amount and date must be provided together.`,
+      );
+    }
   }
 
   const importKeys = new Set();
@@ -180,6 +206,12 @@ async function saveAccount(supabase, userId, account, debtId, currentAccounts) {
     available_credit: account.availableCredit ?? null,
     minimum_due: account.minimumDue ?? null,
     due_date: account.dueDate ?? null,
+    ...(Object.hasOwn(account, "scheduledPaymentAmount")
+      ? { scheduled_payment_amount: account.scheduledPaymentAmount }
+      : {}),
+    ...(Object.hasOwn(account, "scheduledPaymentDate")
+      ? { scheduled_payment_date: account.scheduledPaymentDate }
+      : {}),
     autopay_status: account.autopayStatus ?? "unknown",
     autopay_mode: account.autopayMode ?? null,
     autopay_day: account.autopayDay ?? null,
