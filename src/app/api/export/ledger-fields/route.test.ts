@@ -54,6 +54,19 @@ describe("/api/export/ledger-fields", () => {
               apr: 0.0799,
               status: "active",
               priority_order: 1,
+              debt_kind: "auto_loan",
+              contract_date: "2026-05-01",
+              activated_on: "2026-05-01",
+              original_principal: 14823.45,
+              contractual_payment: 304.12,
+              first_payment_date: "2026-06-01",
+              payment_day: 1,
+              term_months: 72,
+              lifecycle_status: "active",
+              payoff_submitted_amount: null,
+              payoff_submitted_on: null,
+              verified_at: "2026-05-17T10:00:00.000Z",
+              notes: "Test loan schedule",
             },
           ],
           error: null,
@@ -278,6 +291,23 @@ describe("/api/export/ledger-fields", () => {
           status: "active",
           starting_balance: 14823.45,
           priority_order: 1,
+          loan_schedule: {
+            lifecycle_status: "active",
+            activated_on: "2026-05-01",
+            contractual_payment: 304.12,
+            first_payment_date: "2026-06-01",
+            cashflow_forecast: expect.any(Array),
+            analytic_accrual: {
+              amount: 166.78,
+              elapsed_days: 17,
+              cycle_days: 31,
+              booked: false,
+            },
+            economic_cost: {
+              principal_is_expense: false,
+              posted_interest_and_fees: null,
+            },
+          },
         },
       ],
       credit_cards: [
@@ -318,6 +348,11 @@ describe("/api/export/ledger-fields", () => {
       },
     });
     expect(payload.as_of).toEqual(expect.any(String));
+    expect(payload.debts[0].loan_schedule.cashflow_forecast).toHaveLength(12);
+    expect(payload.debts[0].loan_schedule.cashflow_forecast.slice(0, 2)).toEqual([
+      { date: "2026-06-01", amount: 304.12 },
+      { date: "2026-07-01", amount: 304.12 },
+    ]);
     expect(payload.debt_totals).toMatchObject({
       total_active_debt: 14823.45,
       available_cash: 6474.71,

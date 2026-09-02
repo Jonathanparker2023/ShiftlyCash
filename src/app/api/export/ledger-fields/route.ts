@@ -11,6 +11,11 @@ import {
   type DebtRow as ProjectionDebtRow,
   type WeekRow as ProjectionWeekRow,
 } from "@/lib/domain/projections";
+import {
+  accruedTowardNextPayment,
+  buildLoanPaymentForecast,
+  type LoanLifecycleStatus,
+} from "@/lib/debt/loanSchedule";
 import { getProjectionCashBalance } from "@/lib/plaid/projectionCash";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -24,6 +29,19 @@ type DebtRow = {
   apr: NumericValue;
   status: "active" | "paid";
   priority_order: NumericValue;
+  debt_kind: string | null;
+  contract_date: string | null;
+  activated_on: string | null;
+  original_principal: NumericValue;
+  contractual_payment: NumericValue;
+  first_payment_date: string | null;
+  payment_day: NumericValue;
+  term_months: NumericValue;
+  lifecycle_status: LoanLifecycleStatus | null;
+  payoff_submitted_amount: NumericValue;
+  payoff_submitted_on: string | null;
+  verified_at: string | null;
+  notes: string | null;
 };
 
 type CreditCardAccountRow = {
@@ -190,7 +208,7 @@ export async function GET(request: Request) {
       await Promise.all([
       supabase
         .from("debts")
-        .select("id,name,balance,minimum_payment,apr,status,priority_order")
+        .select("id,name,balance,minimum_payment,apr,status,priority_order,debt_kind,contract_date,activated_on,original_principal,contractual_payment,first_payment_date,payment_day,term_months,lifecycle_status,payoff_submitted_amount,payoff_submitted_on,verified_at,notes")
         .eq("user_id", userId)
         .eq("status", "active")
         .gt("balance", 0)
@@ -1142,6 +1160,27 @@ function methodNotAllowed() {
 
 function mapDebt(row: DebtRow) {
   const balanceCents = dollarsToCents(toNumber(row.balance));
+  const hasLoanSchedule =
+    row.debt_kind === "auto_loan" &&
+    row.activated_on != null &&
+    row.first_payment_date != null &&
+    row.contractual_payment != null &&
+    row.payment_day != null &&
+    row.lifecycle_status != null;
+  const schedule = hasLoanSchedule
+    ? {
+        loanStartDate: row.activated_on!,
+        firstPaymentDate: row.first_payment_date!,
+        paymentDay: Math.round(toNumber(row.payment_day)),
+        contractualPaymentCents: dollarsToCents(
+          toNumber(row.contractual_payment),
+        ),
+        lifecycleStatus: row.lifecycle_status!,
+      }
+    : null;
+  const analyticAccrual = schedule
+    ? accruedTowardNextPayment(schedule, getTodayIso())
+    : null;
 
   return {
     id: row.id,
@@ -1153,6 +1192,47 @@ function mapDebt(row: DebtRow) {
     status: row.status,
     starting_balance: money(balanceCents),
     priority_order: Math.round(toNumber(row.priority_order)),
+    loan_schedule: schedule
+      ? {
+          lifecycle_status: schedule.lifecycleStatus,
+          contract_date: row.contract_date,
+          activated_on: schedule.loanStartDate,
+          original_principal: nullableDollarValue(row.original_principal),
+          contractual_payment: money(schedule.contractualPaymentCents),
+          first_payment_date: schedule.firstPaymentDate,
+          payment_day: schedule.paymentDay,
+          term_months: Math.round(toNumber(row.term_months)),
+          payoff_submitted: {
+            amount: nullableDollarValue(row.payoff_submitted_amount),
+            date: row.payoff_submitted_on,
+            posted: false,
+          },
+          cashflow_forecast: buildLoanPaymentForecast(
+            schedule,
+            getTodayIso(),
+            12,
+          ).map((payment) => ({
+            date: payment.date,
+            amount: money(payment.amountCents),
+          })),
+          analytic_accrual: analyticAccrual
+            ? {
+                amount: money(analyticAccrual.accruedCents),
+                cycle_start: analyticAccrual.cycleStartDate,
+                cycle_end_exclusive: analyticAccrual.cycleEndDate,
+                elapsed_days: analyticAccrual.elapsedDays,
+                cycle_days: analyticAccrual.cycleDays,
+                booked: false,
+              }
+            : null,
+          economic_cost: {
+            principal_is_expense: false,
+            posted_interest_and_fees: null,
+          },
+          verified_at: row.verified_at,
+          notes: row.notes,
+        }
+      : null,
   };
 }
 

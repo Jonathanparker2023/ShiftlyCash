@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
+import { getTodayIso } from "@/lib/dashboard/dates";
 import { dollarsToCents } from "@/lib/domain/money";
 import { mark, since, timed } from "@/lib/perf";
 import { formatWeekDuration } from "@/lib/domain/projection-format";
@@ -16,9 +17,17 @@ import {
 } from "@/lib/domain/projections";
 import { getProjectionCashBalance } from "@/lib/plaid/projectionCash";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  accruedTowardNextPayment,
+  buildLoanPaymentForecast,
+  type LoanAccrualSnapshot,
+  type LoanLifecycleStatus,
+  type LoanPaymentForecast,
+} from "@/lib/debt/loanSchedule";
 
 export type DebtPageData = {
   debts: DebtRow[];
+  loanAccounts: LoanAccountSnapshot[];
   creditCards: CreditCardAccountSnapshot[];
   totalActiveDebtCents: number;
   activeDebtCount: number;
@@ -47,6 +56,26 @@ export type DebtPageData = {
     rollingWindowWeeks: number;
     recentWeekNumbers: number[];
   };
+};
+
+export type LoanAccountSnapshot = {
+  id: string;
+  name: string;
+  balanceCents: number;
+  originalPrincipalCents: number;
+  aprBps: number;
+  activatedOn: string;
+  contractualPaymentCents: number;
+  firstPaymentDate: string;
+  paymentDay: number;
+  termMonths: number;
+  lifecycleStatus: LoanLifecycleStatus;
+  payoffSubmittedAmountCents: number | null;
+  payoffSubmittedOn: string | null;
+  verifiedAt: string | null;
+  notes: string | null;
+  cashflowForecast: LoanPaymentForecast[];
+  analyticAccrual: LoanAccrualSnapshot | null;
 };
 
 export type CreditCardAccountSnapshot = {
@@ -99,7 +128,7 @@ export async function getDebtData(): Promise<DebtPageData> {
     await Promise.all([
     supabase
       .from("debts")
-      .select("id, name, balance, minimum_payment, apr, status, priority_order")
+      .select("id,name,balance,minimum_payment,apr,status,priority_order,debt_kind,contract_date,activated_on,original_principal,contractual_payment,first_payment_date,payment_day,term_months,lifecycle_status,payoff_submitted_amount,payoff_submitted_on,verified_at,notes")
       .eq("user_id", user.id)
       .order("priority_order"),
     supabase
@@ -152,6 +181,55 @@ export async function getDebtData(): Promise<DebtPageData> {
     status: (row.status as "active" | "paid") ?? "active",
     priorityOrder: Number(row.priority_order),
   }));
+  const todayIso = getTodayIso();
+  const loanAccounts: LoanAccountSnapshot[] = (debtsRes.data ?? [])
+    .filter(
+      (row) =>
+        row.debt_kind === "auto_loan" &&
+        typeof row.activated_on === "string" &&
+        typeof row.first_payment_date === "string" &&
+        row.original_principal != null &&
+        row.contractual_payment != null &&
+        row.payment_day != null &&
+        row.term_months != null &&
+        row.lifecycle_status != null,
+    )
+    .map((row) => {
+      const schedule = {
+        loanStartDate: row.activated_on as string,
+        firstPaymentDate: row.first_payment_date as string,
+        paymentDay: Number(row.payment_day),
+        contractualPaymentCents: dollarsToCents(
+          Number(row.contractual_payment),
+        ),
+        lifecycleStatus: row.lifecycle_status as LoanLifecycleStatus,
+      };
+
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        balanceCents: dollarsToCents(Number(row.balance)),
+        originalPrincipalCents: dollarsToCents(
+          Number(row.original_principal),
+        ),
+        aprBps: Math.round(Number(row.apr) * 10_000),
+        activatedOn: row.activated_on as string,
+        contractualPaymentCents: schedule.contractualPaymentCents,
+        firstPaymentDate: row.first_payment_date as string,
+        paymentDay: schedule.paymentDay,
+        termMonths: Number(row.term_months),
+        lifecycleStatus: schedule.lifecycleStatus,
+        payoffSubmittedAmountCents: nullableDollarsToCents(
+          row.payoff_submitted_amount,
+        ),
+        payoffSubmittedOn:
+          (row.payoff_submitted_on as string | null) ?? null,
+        verifiedAt: (row.verified_at as string | null) ?? null,
+        notes: (row.notes as string | null) ?? null,
+        cashflowForecast: buildLoanPaymentForecast(schedule, todayIso, 12),
+        analyticAccrual: accruedTowardNextPayment(schedule, todayIso),
+      };
+    });
   const creditCards: CreditCardAccountSnapshot[] = (
     creditCardsRes.data ?? []
   ).map((row) => ({
@@ -320,6 +398,7 @@ export async function getDebtData(): Promise<DebtPageData> {
 
   const result = {
     debts,
+    loanAccounts,
     creditCards,
     totalActiveDebtCents,
     activeDebtCount,

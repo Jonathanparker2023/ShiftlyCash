@@ -19,6 +19,7 @@ import type { DebtRow } from "@/lib/domain/projections";
 import type {
   CreditCardAccountSnapshot,
   DebtPageData,
+  LoanAccountSnapshot,
 } from "@/lib/debt/data";
 
 type ChartRange = "1y" | "3y" | "5y" | "10y" | "full";
@@ -368,6 +369,8 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
           <DebtBreakdown debts={debts} />
         </section>
 
+        <LoanTimingTable loans={initialData.loanAccounts} />
+
         <CreditCardAccountsTable accounts={initialData.creditCards} />
 
         {/* Debts list */}
@@ -554,6 +557,139 @@ export function DebtPage({ initialData }: { initialData: DebtPageData }) {
         </section>
       </main>
     </div>
+  );
+}
+
+function LoanTimingTable({ loans }: { loans: LoanAccountSnapshot[] }) {
+  return (
+    <section className="min-w-0 overflow-hidden" style={PANEL}>
+      <div className="p-4 sm:p-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+        <h2
+          className="text-sm font-semibold uppercase tracking-[0.14em]"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          Auto-loan timing
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-tertiary)" }}>
+          Cash leaves only on a posted payment date. Daily accrual is analysis
+          only; principal reduces the liability, while interest and fees are
+          economic cost.
+        </p>
+      </div>
+      <div className="w-full max-w-full overflow-x-auto">
+        <table className="w-full min-w-[1120px] text-sm">
+          <thead
+            className="text-xs uppercase tracking-[0.12em]"
+            style={{
+              background: "var(--surface-hover)",
+              color: "var(--text-tertiary)",
+              borderBottom: "1px solid var(--border-subtle)",
+            }}
+          >
+            <tr>
+              <th className="p-3 text-left font-semibold">Loan</th>
+              <th className="p-3 text-right font-semibold">Liability</th>
+              <th className="p-3 text-left font-semibold">Lifecycle</th>
+              <th className="p-3 text-left font-semibold">Next cash date</th>
+              <th className="p-3 text-left font-semibold">12-month forecast</th>
+              <th className="p-3 text-left font-semibold">Analytic accrual</th>
+              <th className="p-3 text-left font-semibold">Verified</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loans.map((loan) => {
+              const nextPayment = loan.cashflowForecast[0] ?? null;
+              const forecastTotal = loan.cashflowForecast.reduce(
+                (sum, payment) => sum + payment.amountCents,
+                0,
+              );
+              return (
+                <tr
+                  key={loan.id}
+                  className="border-b last:border-0"
+                  style={{ borderColor: "var(--border-subtle)" }}
+                >
+                  <td className="p-3">
+                    <div className="font-semibold">{loan.name}</div>
+                    <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                      {(loan.aprBps / 100).toFixed(2)}% APR · {loan.termMonths} months · started{" "}
+                      {formatLongDate(loan.activatedOn)}
+                    </div>
+                  </td>
+                  <td className="p-3 text-right font-semibold">
+                    {formatMoney(loan.balanceCents)}
+                  </td>
+                  <td className="p-3">
+                    {loan.lifecycleStatus === "payoff_pending"
+                      ? "Payoff submitted—posting pending"
+                      : loan.lifecycleStatus === "paid"
+                        ? "Paid in full"
+                        : "Active contractual loan"}
+                    {loan.payoffSubmittedAmountCents != null ? (
+                      <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                        {formatMoney(loan.payoffSubmittedAmountCents)} submitted{" "}
+                        {loan.payoffSubmittedOn
+                          ? formatLongDate(loan.payoffSubmittedOn)
+                          : "date pending"}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="p-3">
+                    {nextPayment ? (
+                      <>
+                        <div className="font-semibold">{formatMoney(nextPayment.amountCents)}</div>
+                        <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                          {formatLongDate(nextPayment.date)}
+                        </div>
+                      </>
+                    ) : (
+                      "No normal payment forecast"
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {loan.cashflowForecast.length > 0 ? (
+                      <>
+                        <div>{formatMoney(forecastTotal)}</div>
+                        <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                          {loan.cashflowForecast.length} full payments; no proration
+                        </div>
+                      </>
+                    ) : (
+                      "$0 while payoff is pending"
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {loan.analyticAccrual ? (
+                      <>
+                        <div>{formatMoney(loan.analyticAccrual.accruedCents)}</div>
+                        <div className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                          {loan.analyticAccrual.elapsedDays} of {loan.analyticAccrual.cycleDays} days;
+                          not added to spending or cashflow
+                        </div>
+                      </>
+                    ) : (
+                      "Not accruing"
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {loan.verifiedAt
+                      ? formatLongDate(loan.verifiedAt.slice(0, 10))
+                      : "Unverified"}
+                  </td>
+                </tr>
+              );
+            })}
+            {loans.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="p-6 text-center" style={{ color: "var(--text-tertiary)" }}>
+                  No verified auto-loan timing has been recorded yet.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
