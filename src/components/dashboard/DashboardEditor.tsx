@@ -48,6 +48,7 @@ import {
 import { syncTransactionsAction } from "@/app/(protected)/banking/actions";
 import { WeekNetSummary } from "@/components/earnings/WeekNetSummary";
 import { addDaysIso } from "@/lib/dashboard/dates";
+import { formatFixedBreakdownDetail } from "@/lib/dashboard/fixedBreakdown";
 import {
   buildCashflowBreakdown,
   buildIncomeBreakdown,
@@ -3821,9 +3822,7 @@ function BaseBreakdown({
                 {item.itemName}
               </span>
               <span className="block text-[10px] text-[var(--text-tertiary)]">
-                {item.itemKind === "amortized"
-                  ? `${formatMoneyExact(item.originalAmountCents)} over ${item.periodDays}d → ${formatMoneyExact(item.dailyAllocCents)}/day`
-                  : `${formatMoneyExact(item.originalAmountCents)}/mo → ${formatMoneyExact(item.dailyAllocCents)}/day`}
+                {formatFixedBreakdownDetail(item)}
               </span>
             </span>
             <span className="shrink-0 font-semibold tabular-nums text-[var(--text-primary)]">
