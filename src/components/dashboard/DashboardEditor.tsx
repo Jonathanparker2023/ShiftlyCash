@@ -2934,8 +2934,13 @@ function TransactionRowButton({
   const isGasExempt = variant === "exempt" && transaction.isGasAllocated;
   const isEvChargeExempt =
     variant === "exempt" && transaction.isEvChargeAllocated;
+  const isOrdinaryExempt =
+    variant === "exempt" &&
+    !isAmortizedExempt &&
+    !isGasExempt &&
+    !isEvChargeExempt;
   const rowStyle =
-    isAmortizedExempt || isGasExempt || isEvChargeExempt
+    variant === "exempt"
       ? {
           backgroundColor: "rgba(37, 99, 235, 0.12)",
           borderColor: "rgba(96, 165, 250, 0.48)",
@@ -2978,7 +2983,7 @@ function TransactionRowButton({
                   : isGasExempt || isEvChargeExempt
                     ? "truncate font-semibold text-sky-200"
                   : variant === "exempt"
-                  ? "truncate font-semibold text-[var(--text-muted)] line-through"
+                  ? "truncate font-semibold text-sky-200"
                   : "truncate font-semibold text-[var(--text-primary)]"
               }
             >
@@ -2992,6 +2997,11 @@ function TransactionRowButton({
             {isEvChargeExempt ? (
               <span className="shrink-0 rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-500">
                 EV Charge
+              </span>
+            ) : null}
+            {isOrdinaryExempt ? (
+              <span className="shrink-0 rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-500">
+                Exempt
               </span>
             ) : null}
           </span>
@@ -3012,7 +3022,7 @@ function TransactionRowButton({
               : isGasExempt || isEvChargeExempt
                 ? "font-semibold text-sky-200"
               : variant === "exempt"
-              ? "font-semibold text-[var(--text-tertiary)] line-through"
+              ? "font-semibold text-sky-200"
               : "font-semibold text-red-600"
           }
         >

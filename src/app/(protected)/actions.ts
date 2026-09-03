@@ -445,7 +445,7 @@ export async function toggleTransactionStatusAction(
     .from("transactions")
     .update({
       status: newStatus,
-      review_reason: null,
+      review_reason: newStatus === "excluded" ? "manual_exempt" : null,
       excluded_at: newStatus === "excluded" ? new Date().toISOString() : null,
     })
     .eq("id", transactionId);

@@ -29,6 +29,7 @@ import {
   dollarsToCents,
   roundCentsToNearestTenDollars,
 } from "@/lib/domain/money";
+import { isPlaidSyncRemoval } from "@/lib/domain/transactions";
 import { calculateGasAverage } from "@/lib/gas/average";
 import type {
   IncentiveMode,
@@ -121,6 +122,7 @@ type TransactionRow = {
   source: DashboardTransactionSource;
   status: DashboardTransactionStatus | "pending_review";
   review_reason: string | null;
+  notes: string | null;
   moved_to_yesterday: boolean;
 };
 
@@ -437,7 +439,7 @@ export async function getDashboardData(
           supabase
             .from("transactions")
             .select(
-              "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,category,source,status,review_reason,moved_to_yesterday",
+              "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,category,source,status,review_reason,notes,moved_to_yesterday",
             )
             .in("day_id", dayIds)
             .in("status", ["applied", "excluded"])
@@ -1123,7 +1125,7 @@ function groupTransactionsByDay(
   const grouped = new Map<string, DashboardTransaction[]>();
 
   transactions.forEach((transaction) => {
-    if (!transaction.day_id) {
+    if (!transaction.day_id || isPlaidSyncRemoval(transaction.notes)) {
       return;
     }
 

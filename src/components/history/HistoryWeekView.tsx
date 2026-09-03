@@ -394,10 +394,6 @@ function TransactionPanel({
 }: {
   transactions: HistoryDetailTransaction[];
 }) {
-  const visible = transactions.filter(
-    (transaction) => transaction.status !== "excluded",
-  );
-
   return (
     <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 shadow-sm backdrop-blur-md">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -405,29 +401,44 @@ function TransactionPanel({
           Transactions
         </h3>
         <span className="rounded-full bg-[var(--surface-overlay)] backdrop-blur-md px-2 py-0.5 text-xs font-semibold text-[var(--text-primary)]">
-          {visible.length}
+          {transactions.length}
         </span>
       </div>
 
-      {visible.length === 0 ? (
+      {transactions.length === 0 ? (
         <p className="rounded-md border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3 text-sm text-[var(--text-tertiary)]">
           No transactions for this day.
         </p>
       ) : (
         <div className="space-y-1.5">
-          {visible.map((transaction) => (
-            <div
-              className="flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
-              key={transaction.id}
-            >
-              <p className="min-w-0 truncate text-sm font-semibold">
-                {transaction.merchantName}
-              </p>
-              <p className="shrink-0 text-sm font-semibold tabular-nums">
-                {formatMoney(transaction.amountCents)}
-              </p>
-            </div>
-          ))}
+          {transactions.map((transaction) => {
+            const isExempt = transaction.status === "excluded";
+
+            return (
+              <div
+                className={
+                  isExempt
+                    ? "flex items-center justify-between gap-3 rounded-md border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs text-sky-200"
+                    : "flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                }
+                key={transaction.id}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {transaction.merchantName}
+                  </p>
+                  {isExempt ? (
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-500">
+                      Exempt · not counted
+                    </p>
+                  ) : null}
+                </div>
+                <p className="shrink-0 text-sm font-semibold tabular-nums">
+                  {formatMoney(transaction.amountCents)}
+                </p>
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

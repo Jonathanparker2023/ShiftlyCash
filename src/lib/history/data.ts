@@ -2,6 +2,7 @@ import { requireUserWithBootstrapStatus } from "@/lib/auth";
 import { formatDayLabel } from "@/lib/dashboard/dates";
 import { sortChronologicalTransactions } from "@/lib/dashboard/transactions";
 import { dollarsToCents } from "@/lib/domain/money";
+import { isPlaidSyncRemoval } from "@/lib/domain/transactions";
 import {
   calculateEarnSlot,
   type IncentiveMode,
@@ -115,6 +116,7 @@ type TransactionRow = {
   source: string;
   status: string;
   category: string | null;
+  notes: string | null;
 };
 
 type SnapshotRow = {
@@ -356,7 +358,7 @@ export async function getHistoryDetailData(
     const { data, error } = await supabase
       .from("transactions")
       .select(
-        "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,source,status,category",
+        "id,day_id,date,datetime,legacy_time,created_at,merchant_name,amount,source,status,category,notes",
       )
       .eq("user_id", user.id)
       .in("day_id", dayIdsToLoad)
@@ -457,7 +459,9 @@ function mapHistoryDetailDay(
       }),
     ],
     transactions: sortChronologicalTransactions(
-      transactions.map(mapHistoryDetailTransaction),
+      transactions
+        .filter((transaction) => !isPlaidSyncRemoval(transaction.notes))
+        .map(mapHistoryDetailTransaction),
     ),
   };
 }
