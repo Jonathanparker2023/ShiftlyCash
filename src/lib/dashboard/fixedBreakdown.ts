@@ -24,8 +24,5 @@ export function formatFixedBreakdownDetail(
     return `${originalAmount} spread over ${item.periodDays ?? 1}d`;
   }
 
-  const annualAmount = EXACT_USD.format(
-    centsToDollars(item.originalAmountCents * 12),
-  );
-  return `${originalAmount}/mo · ${annualAmount}/yr`;
+  return `${originalAmount}/mo`;
 }
