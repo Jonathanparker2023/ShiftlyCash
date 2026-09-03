@@ -22,6 +22,7 @@ This folder contains the Supabase/Postgres schema for the Bashflow rebuild. It i
 | `20260902191000_auto_loan_cashflow_transactions.sql` | Counts posted auto-loan debits in cashflow while excluding principal transfers from consumption spending |
 | `20260902234500_sephora_spending_correction.sql` | Restores the August 24 Sephora purchase to Spending and disables its duplicate fixed-payoff model |
 | `20260903001000_restore_tesla_fixed_model.sql` | Restores the replacement Tesla payment to daily Fixed and keeps TD and Sephora out of that baseline |
+| `20260903020000_amortize_td_onyx_residual.sql` | Spreads the verified $311.01 TD Onyx residual across July 29–September 2 while excluding its source debit from cashflow |
 
 ## Local Setup
 

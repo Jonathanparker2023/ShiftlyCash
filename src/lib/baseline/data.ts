@@ -129,6 +129,7 @@ export async function getBaselineData(): Promise<BaselineData> {
     )
     .eq("user_id", user.id)
     .eq("is_active", true)
+    .gte("end_date", todayIso)
     .order("start_date", { ascending: true });
   if (amortError) {
     console.warn(`[baseline] amortized expenses unavailable: ${amortError.message}`);

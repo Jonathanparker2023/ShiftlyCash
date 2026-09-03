@@ -169,11 +169,17 @@ describe("auto-loan cashflow classification", () => {
     ).toBe(false);
   });
 
-  it("keeps the unallocated TD payoff residual cashflow-only", () => {
+  it("keeps the Fixed-allocated TD payoff residual excluded", () => {
     expect(
       isAutoLoanCashflowOnly({
         merchantName: "TD Auto Finance",
         category: "loan payment",
+      }),
+    ).toBe(false);
+    expect(
+      isLegacyExempt({
+        merchantName: "Fsi*Td Auto Finance",
+        category: "TRANSFER_OUT",
       }),
     ).toBe(true);
   });

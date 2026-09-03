@@ -9,6 +9,7 @@ export const LEGACY_EXEMPT_NAMES: readonly string[] = [
   "rent",
   "holyoke",
   "tesla finance",
+  "td auto finance",
   "direct debit",
   "ach debit",
   "subscription",
@@ -52,9 +53,9 @@ export const LEGACY_EXEMPT_CATS: readonly string[] = [
 
 // Fixed-covered loan payments are already spread across BashFlow's daily
 // baseline, so their posted bank debits stay excluded like other recurring
-// bills. TD is the narrow exception: its one-time total-loss residual was not
-// part of Fixed and must reduce cashflow once when it posts.
-const CASHFLOW_ONLY_AUTO_LOAN_NAMES: readonly string[] = ["td auto finance"];
+// bills. Keep this list for a future verified one-time loan cashflow that is
+// intentionally not represented in Fixed.
+const CASHFLOW_ONLY_AUTO_LOAN_NAMES: readonly string[] = [];
 
 // Compact-key → display-name pairs. Order matters: first match wins.
 export const MERCHANT_MAP: ReadonlyArray<readonly [string, string]> = [
