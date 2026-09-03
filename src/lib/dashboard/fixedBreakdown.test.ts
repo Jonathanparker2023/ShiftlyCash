@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { formatFixedBreakdownDetail } from "@/lib/dashboard/fixedBreakdown";
+import {
+  formatFixedBreakdownDetail,
+  sortFixedBreakdownGreatestFirst,
+} from "@/lib/dashboard/fixedBreakdown";
 
 describe("Fixed breakdown detail", () => {
   it("shows only the recurring monthly amount", () => {
@@ -21,5 +24,24 @@ describe("Fixed breakdown detail", () => {
         periodDays: 30,
       }),
     ).toBe("$250.55 spread over 30d");
+  });
+
+  it("sorts daily contributions from greatest to least", () => {
+    const items = [
+      { appliedCents: 49, itemName: "Fortiva" },
+      { appliedCents: 1_501, itemName: "Ford Explorer" },
+      { appliedCents: 49, itemName: "Aspire" },
+    ];
+
+    expect(sortFixedBreakdownGreatestFirst(items)).toEqual([
+      { appliedCents: 1_501, itemName: "Ford Explorer" },
+      { appliedCents: 49, itemName: "Aspire" },
+      { appliedCents: 49, itemName: "Fortiva" },
+    ]);
+    expect(items.map((item) => item.itemName)).toEqual([
+      "Fortiva",
+      "Ford Explorer",
+      "Aspire",
+    ]);
   });
 });

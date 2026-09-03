@@ -6,6 +6,7 @@ import {
   getSundayOnOrBeforeTodayIso,
   getTodayIso,
 } from "@/lib/dashboard/dates";
+import { sortFixedBreakdownGreatestFirst } from "@/lib/dashboard/fixedBreakdown";
 import type {
   AmortizationCreditRow,
   DashboardData,
@@ -970,8 +971,8 @@ function mapDashboardDay(
     gasSpendCents,
     evChargeSpendCents,
     spendLocked: day.spend_locked,
-    baseBreakdown: allocations
-      .map((row) => ({
+    baseBreakdown: sortFixedBreakdownGreatestFirst(
+      allocations.map((row) => ({
         itemKind: row.item_kind,
         itemId: row.item_id,
         itemName: row.item_name,
@@ -981,13 +982,8 @@ function mapDashboardDay(
         dailyAllocCents: Math.round(toNumber(row.daily_alloc_cents)),
         appliedCents: Math.round(toNumber(row.applied_cents)),
         scheduleVersion: Math.round(toNumber(row.schedule_version)),
-      }))
-      .sort((a, b) => {
-        if (a.itemKind !== b.itemKind) {
-          return a.itemKind === "recurring" ? -1 : 1;
-        }
-        return a.itemName.localeCompare(b.itemName);
-      }),
+      })),
+    ),
     totals: {
       earningsCents: dollarsToCents(toNumber(totals?.earnings_total ?? 0)),
       abilityPaycheckCents: dollarsToCents(
