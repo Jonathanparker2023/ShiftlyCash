@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateBaselineTotals,
   isExpenseExpired,
+  isExpenseVisible,
 } from "@/lib/domain/baseline";
 import { dollarsToCents } from "@/lib/domain/money";
 
@@ -76,5 +77,48 @@ describe("baseline expense calculations", () => {
     );
 
     expect(totals.monthlyTotalCents).toBe(0);
+  });
+
+  it("shows only active, unexpired expenses in the current Fixed list", () => {
+    expect(
+      isExpenseVisible(
+        { expirationDate: null, isActive: false },
+        "2026-09-02",
+      ),
+    ).toBe(false);
+    expect(
+      isExpenseVisible(
+        {
+          expirationDate: "2026-09-01",
+          isActive: true,
+        },
+        "2026-09-02",
+      ),
+    ).toBe(false);
+    expect(
+      isExpenseVisible(
+        { expirationDate: null, isActive: true },
+        "2026-09-02",
+      ),
+    ).toBe(true);
+  });
+
+  it("prorates the Tesla payment with BashFlow's standard Fixed formula", () => {
+    expect(
+      calculateBaselineTotals(
+        [
+          {
+            amountCents: 71_452,
+            expirationDate: null,
+            isActive: true,
+          },
+        ],
+        "2026-09-02",
+      ),
+    ).toEqual({
+      monthlyTotalCents: 71_452,
+      weeklyAverageCents: 16_502,
+      projectedDailyBaseCents: 2_357,
+    });
   });
 });

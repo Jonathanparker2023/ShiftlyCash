@@ -8,6 +8,7 @@ import {
   cashflowWeeklyTone,
   earningsWeeklyTone,
   isAutoLoanCashflowOnly,
+  isLegacyExempt,
   normalizeTxName,
   spendWeeklyTone,
 } from "./legacyRules";
@@ -145,14 +146,30 @@ describe("legacy merchant normalization", () => {
 });
 
 describe("auto-loan cashflow classification", () => {
-  it("keeps named auto-loan debits out of consumption spending", () => {
+  it("leaves fixed-covered Tesla and Holyoke payments excluded", () => {
     expect(
       isAutoLoanCashflowOnly({
         merchantName: "Tesla Finance",
         rawName: "TESLA FINANCE LLC ACH",
         category: "LOAN_PAYMENTS",
       }),
+    ).toBe(false);
+    expect(
+      isLegacyExempt({
+        merchantName: "Tesla Finance",
+        rawName: "TESLA FINANCE LLC ACH",
+        category: "LOAN_PAYMENTS",
+      }),
     ).toBe(true);
+    expect(
+      isAutoLoanCashflowOnly({
+        merchantName: "Holyoke Credit Union",
+        category: "LOAN_PAYMENTS",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps the unallocated TD payoff residual cashflow-only", () => {
     expect(
       isAutoLoanCashflowOnly({
         merchantName: "TD Auto Finance",
@@ -174,5 +191,11 @@ describe("auto-loan cashflow classification", () => {
         category: "TRANSFER_OUT",
       }),
     ).toBe(false);
+    expect(
+      isLegacyExempt({
+        merchantName: "Tesla Finance",
+        category: "TRANSFER_OUT",
+      }),
+    ).toBe(true);
   });
 });

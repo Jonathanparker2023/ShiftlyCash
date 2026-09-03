@@ -8,6 +8,7 @@ export const LEGACY_EXEMPT_NAMES: readonly string[] = [
   "scl residential",
   "rent",
   "holyoke",
+  "tesla finance",
   "direct debit",
   "ach debit",
   "subscription",
@@ -49,11 +50,11 @@ export const LEGACY_EXEMPT_CATS: readonly string[] = [
   "utilities",
 ];
 
-const AUTO_LOAN_PAYMENT_NAMES: readonly string[] = [
-  "tesla finance",
-  "td auto finance",
-  "holyoke",
-];
+// Fixed-covered loan payments are already spread across BashFlow's daily
+// baseline, so their posted bank debits stay excluded like other recurring
+// bills. TD is the narrow exception: its one-time total-loss residual was not
+// part of Fixed and must reduce cashflow once when it posts.
+const CASHFLOW_ONLY_AUTO_LOAN_NAMES: readonly string[] = ["td auto finance"];
 
 // Compact-key → display-name pairs. Order matters: first match wins.
 export const MERCHANT_MAP: ReadonlyArray<readonly [string, string]> = [
@@ -252,9 +253,10 @@ export function isLegacyExempt(input: {
 }
 
 /**
- * Auto-loan payments move cash and reduce a liability, but they are not
- * consumption spending. Keep this deliberately narrower than LOAN_PAYMENTS:
- * that Plaid category also contains credit-card payments and transfers.
+ * One-time auto-loan settlements that were not allocated through Fixed move
+ * cash without becoming consumption spending. Ordinary loan payments covered
+ * by Fixed return false so the legacy recurring-payment rule excludes the bank
+ * debit instead of charging cashflow twice.
  */
 export function isAutoLoanCashflowOnly(input: {
   merchantName?: string | null;
@@ -271,7 +273,9 @@ export function isAutoLoanCashflowOnly(input: {
     .join(" ")
     .toLowerCase();
 
-  return AUTO_LOAN_PAYMENT_NAMES.some((needle) => haystack.includes(needle));
+  return CASHFLOW_ONLY_AUTO_LOAN_NAMES.some((needle) =>
+    haystack.includes(needle),
+  );
 }
 
 export type CashflowTone = "positive" | "amber" | "negative";

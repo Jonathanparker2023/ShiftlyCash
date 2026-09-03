@@ -21,15 +21,19 @@ export function isExpenseExpired(
   return Boolean(expirationDate && expirationDate < todayIso);
 }
 
+export function isExpenseVisible(
+  expense: Pick<BaselineExpenseInput, "expirationDate" | "isActive">,
+  todayIso: string,
+): boolean {
+  return expense.isActive && !isExpenseExpired(expense.expirationDate, todayIso);
+}
+
 export function calculateBaselineTotals(
   expenses: BaselineExpenseInput[],
   todayIso: string,
 ): BaselineTotals {
   const monthlyTotalCents = expenses
-    .filter(
-      (expense) =>
-        expense.isActive && !isExpenseExpired(expense.expirationDate, todayIso),
-    )
+    .filter((expense) => isExpenseVisible(expense, todayIso))
     .reduce((sum, expense) => sum + expense.amountCents, 0);
   const weeklyAverageCents = Math.round(monthlyTotalCents / WEEKS_PER_MONTH);
   const projectedDailyBaseCents = Math.round(weeklyAverageCents / 7);
